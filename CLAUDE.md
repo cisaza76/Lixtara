@@ -1,0 +1,107 @@
+# Lixtara — Claude Code conventions
+
+Lixtara is an FSBO + licensed-broker real-estate platform for Florida. Three pricing tiers
+(Essentials $199, Pro $495, Concierge $995), 24-month contract, zero traditional 6% commission.
+The product was prototyped in Lovable as "AnaMaria Real Estate" / "Nexxos" / "neoxx-next-flow"
+and is being ported to a clean Next.js stack inside this repo.
+
+This file is the durable, in-repo guidance for any Claude session working in `/Code/lixtara`.
+Project planning (phases, MVP scope, API inventory) lives in the user's auto-memory:
+`~/.claude/projects/-Users-camiloisaza-Code-lixtara/memory/`. Read `MEMORY.md` there first.
+
+## Stack
+
+- **Next.js 16** App Router, Turbopack, React 19
+- **TypeScript** strict, ESLint flat config (`eslint-config-next`)
+- **Tailwind CSS v4** + **shadcn/ui** (style: `base-nova`, base color: `neutral`)
+- **Supabase** Auth + Postgres + Storage + RLS — reused project from Lovable
+  (`fizhoufepowilbhbtfkg.supabase.co`). `@supabase/ssr` clients in `src/lib/supabase/`.
+- **i18n**: `[lang]` segment with `en` and `es`. Default `en`. Proxy in `src/proxy.ts`
+  redirects unmatched paths to `/en`.
+- **pnpm** (workspace: `allowBuilds` for `sharp` + `unrs-resolver`)
+- Deploy: **Vercel** (Fluid Compute)
+
+## Repo layout
+
+```
+src/
+  app/
+    [lang]/
+      layout.tsx       # root layout, sets <html lang>
+      page.tsx         # landing
+    globals.css        # Tailwind + shadcn tokens
+  components/
+    ui/                # shadcn components only — do not edit by hand, regen via shadcn CLI
+  lib/
+    i18n.ts            # locale list + dictionaries (tiny inline for F0; F1 splits to namespaces)
+    utils.ts           # cn() helper
+    supabase/
+      client.ts        # browser client
+      server.ts        # RSC / route handler client
+      middleware.ts    # session refresh helper (used by src/proxy.ts)
+  proxy.ts             # Next 16 proxy (formerly middleware): locale redirect + session refresh
+```
+
+The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-only clone of
+`cisaza76/neoxx-next-flow`). Port features by domain — do not bulk-copy.
+
+## Non-negotiable conventions
+
+### Naming
+- The product is **Lixtara**. The Lovable prototype used "Nexxos" / "AnaMaria Real Estate".
+  All new strings and identifiers use Lixtara. When porting from Lovable, rename `NEXXOS_*`
+  → `LIXTARA_*` constants.
+
+### Pricing
+- Pricing tiers live in **one** module (will be `src/lib/pricing-tiers.ts`, ported in F2).
+  Never hardcode `199`, `495`, `995` in components.
+- Virtual staging: `FREE_QUOTA = 3`, `PRICE_PER_ROOM = 500` cents, hard cap 30 rooms.
+- Buyer rebate: `LIXTARA_BUYER_FEE_PCT = 0.5`, `REBATE_CAP = 50_000`.
+
+### Auth & RLS
+- Roles live in the `user_roles` table, never on `users`. Check via the `has_role()`
+  SECURITY DEFINER function.
+- All 28 tables have RLS active. Personal data follows `owner_id = auth.uid()`. Admin access
+  goes through `has_role('admin')`.
+- Email verification is **required**. Never enable auto-confirm.
+
+### Supabase clients
+- Browser: `import { createClient } from "@/lib/supabase/client"`
+- Server (RSC / route handler / server action): `import { createClient } from "@/lib/supabase/server"`
+- Proxy session refresh: handled automatically in `src/proxy.ts`
+
+### Environment variables
+- `NEXT_PUBLIC_SUPABASE_URL` — public, in `.env.local` and Vercel
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public, RLS-protected
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only, never expose to the client. Added in F2.
+- Service keys for Stripe / DocuSign / Resend / Anthropic / Mapbox / Google Maps / Rentcast /
+  Twilio are added phase by phase (see memory `phase_plan` and `api_inventory`).
+- Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
+  `vercel env add`.
+
+### Anti-patterns (drawn from the Lovable SOW)
+- Do **not** propose Vite + React Router. The migration decision is Next.js App Router.
+- Do **not** mount Supabase via Vercel Marketplace. The project is reused as-is — connect
+  manually with the env vars above.
+- Do **not** route through Lovable AI Gateway. AI calls go through Vercel AI Gateway or
+  direct provider SDKs (Anthropic for text, separate provider for image gen).
+- Do **not** add AI features, the Investor Club, the Loui chatbot, or referrals in Fase 1.
+  All deferred to F5+.
+- Do **not** rename the existing Supabase project or migrate schemas without an explicit
+  cutover plan (Lovable and Lixtara coexist on the same DB during the transition).
+
+## Quality gates
+
+Local before commit:
+- `pnpm tsc --noEmit` must pass
+- `pnpm lint` must pass
+- `pnpm build` must pass
+
+CI runs the same three on every push and pull request.
+
+## Phase status
+
+Current phase: **F0 — Setup**. Exit criterion: `git push` lands a Vercel preview URL with
+the bilingual placeholder + a Supabase auth smoke (signUp → email verify → signIn).
+
+Phase plan and MVP scope are in user memory (`mvp_scope_phase1.md`, `phase_plan.md`).
