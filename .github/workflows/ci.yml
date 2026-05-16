@@ -33,4 +33,4 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-ci-anon-key
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder_for_ci_build_only

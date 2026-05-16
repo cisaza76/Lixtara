@@ -72,8 +72,12 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 
 ### Environment variables
 - `NEXT_PUBLIC_SUPABASE_URL` — public, in `.env.local` and Vercel
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public, RLS-protected
-- `SUPABASE_SERVICE_ROLE_KEY` — server-only, never expose to the client. Added in F2.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — public, opaque key (replaces legacy `anon`).
+  Format: `sb_publishable_...`. RLS still gates row access.
+- `SUPABASE_SECRET_KEY` — server-only opaque key (replaces legacy `service_role`).
+  Format: `sb_secret_...`. Never expose to the client.
+- Legacy `anon` / `service_role` JWT keys are NOT used by this codebase. The Supabase
+  project still has them active because Lovable depends on them — drop after cutover (F3+).
 - Service keys for Stripe / DocuSign / Resend / Anthropic / Mapbox / Google Maps / Rentcast /
   Twilio are added phase by phase (see memory `phase_plan` and `api_inventory`).
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
