@@ -8,6 +8,12 @@ import {
   BROKERAGE_LICENSED_ENTITY,
 } from "@/lib/broker";
 import { BROKER_STATS } from "@/lib/broker-stats";
+import {
+  PRICING_TIERS,
+  TIER_ORDER,
+  DEFAULT_TIER,
+  formatPrice,
+} from "@/lib/pricing-tiers";
 
 export default async function Home({
   params,
@@ -21,6 +27,7 @@ export default async function Home({
   const vpCopy = t(lang).valueProps;
   const hiwCopy = t(lang).howItWorks;
   const spCopy = t(lang).socialProof;
+  const prCopy = t(lang).pricing;
   const altLang: Locale = lang === "en" ? "es" : "en";
 
   const visibleMetrics: Array<{ value: string; label: string }> = [];
@@ -248,6 +255,108 @@ export default async function Home({
                 </figcaption>
               </figure>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-gold-soft">
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
+            {prCopy.eyebrow}
+          </p>
+          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-16 lg:mb-20">
+            {prCopy.titleBefore}
+            <em className="italic text-gold">{prCopy.titleAccent}</em>
+            {prCopy.titleAfter}
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+            {TIER_ORDER.map((id) => {
+              const tier = PRICING_TIERS[id];
+              const tCopy = prCopy.tiers[id];
+              const isPopular = id === DEFAULT_TIER;
+              return (
+                <div
+                  key={id}
+                  className={`relative flex flex-col gap-8 p-8 lg:p-10 ${
+                    isPopular
+                      ? "bg-ink text-ivory"
+                      : "bg-ivory text-ink border border-gold-soft"
+                  }`}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-3 left-8 lg:left-10 bg-gold text-ink text-[10px] font-semibold uppercase tracking-[0.22em] px-3 py-1">
+                      {prCopy.popularBadge}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    <h3 className="font-display text-3xl leading-none font-normal">
+                      {tCopy.name}
+                    </h3>
+                    <p
+                      className={`text-sm leading-snug ${isPopular ? "text-ivory/70" : "text-ink/70"}`}
+                    >
+                      {tCopy.tagline}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="font-display italic font-normal leading-none">
+                      <span className="text-gold text-3xl align-top">$</span>
+                      <span className="text-6xl">
+                        {tier.flatFee}
+                      </span>
+                    </div>
+                    <p
+                      className={`text-sm ${isPopular ? "text-ivory/70" : "text-ink/70"}`}
+                    >
+                      + {tier.commissionPct}% {prCopy.commissionLabel}
+                    </p>
+                    <p
+                      className={`text-[10px] uppercase tracking-[0.18em] ${
+                        isPopular ? "text-ivory/55" : "text-ink/55"
+                      }`}
+                    >
+                      {prCopy.termLabel}
+                    </p>
+                  </div>
+
+                  <div
+                    className={`h-px ${isPopular ? "bg-ivory/15" : "bg-gold-soft"}`}
+                  />
+
+                  <ul className="flex flex-col gap-3 text-sm leading-snug flex-1">
+                    {tCopy.features.map((feat) => (
+                      <li key={feat} className="flex items-start gap-3">
+                        <span
+                          aria-hidden
+                          className="text-gold mt-1 leading-none"
+                        >
+                          •
+                        </span>
+                        <span
+                          className={isPopular ? "text-ivory" : "text-ink"}
+                        >
+                          {feat}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link
+                    href={`/${lang}/listing/new?tier=${id}`}
+                    className={`inline-flex items-center justify-center px-6 py-4 text-xs font-medium tracking-[0.2em] uppercase transition-colors ${
+                      isPopular
+                        ? "bg-ivory text-ink hover:bg-ivory-strong"
+                        : "bg-ink text-ivory hover:bg-ink/85"
+                    }`}
+                  >
+                    {prCopy.ctaLabel}
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
