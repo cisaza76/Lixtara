@@ -8,6 +8,7 @@ import {
   BROKERAGE_LOCATION,
   BROKER_LICENSE,
 } from "@/lib/broker";
+import { createClient } from "@/lib/supabase/server";
 import "../globals.css";
 
 const inter = Inter({
@@ -44,9 +45,15 @@ export default async function RootLayout({
   if (!isLocale(lang)) notFound();
 
   const navCopy = t(lang).nav;
+  const authNavCopy = t(lang).auth.nav;
   const footerCopy = t(lang).footer;
   const altLang: Locale = lang === "en" ? "es" : "en";
   const year = new Date().getFullYear();
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return (
     <html
@@ -105,6 +112,23 @@ export default async function RootLayout({
               >
                 {navCopy.langToggle}
               </Link>
+              {user ? (
+                <form action={`/${lang}/auth/sign-out`} method="POST">
+                  <button
+                    type="submit"
+                    className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+                  >
+                    {authNavCopy.signOut}
+                  </button>
+                </form>
+              ) : (
+                <Link
+                  href={`/${lang}/sign-in`}
+                  className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+                >
+                  {authNavCopy.signIn}
+                </Link>
+              )}
               <Link
                 href={`/${lang}/listing/new`}
                 className="hidden md:inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
