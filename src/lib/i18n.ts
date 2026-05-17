@@ -153,6 +153,38 @@ const dictionaries = {
       cta: "Get started",
       langToggle: "Español",
     },
+    comingSoon: {
+      titleBefore: "Coming ",
+      titleAccent: "soon",
+      titleAfter: ".",
+      backLink: "Back to home",
+      pages: {
+        about: {
+          eyebrow: "About",
+          body: "Our story and the team behind Lixtara are in the works.",
+        },
+        services: {
+          eyebrow: "Services",
+          body: "Add-on services (professional photography, virtual staging, broker consultation) are being prepared.",
+        },
+        contact: {
+          eyebrow: "Contact",
+          body: "The contact form is in the works. In the meantime, reach our brokerage at Nexxos Realty, Miami, Florida.",
+        },
+        terms: {
+          eyebrow: "Terms of service",
+          body: "Our terms of service are being finalized with a Florida real estate attorney.",
+        },
+        privacy: {
+          eyebrow: "Privacy policy",
+          body: "Our privacy policy is being finalized.",
+        },
+        listingNew: {
+          eyebrow: "List your property",
+          body: "The seller flow — pricing report, listing setup, MLS publication — is being built. Reach out for early access.",
+        },
+      },
+    },
     footer: {
       tagline: "Florida flat-fee brokerage. Full MLS exposure. You keep more equity.",
       poweredBy: "Powered by",
@@ -357,6 +389,38 @@ const dictionaries = {
       faq: "Preguntas",
       cta: "Empezar",
       langToggle: "English",
+    },
+    comingSoon: {
+      titleBefore: "Muy ",
+      titleAccent: "pronto",
+      titleAfter: ".",
+      backLink: "Volver al inicio",
+      pages: {
+        about: {
+          eyebrow: "Sobre nosotros",
+          body: "Nuestra historia y el equipo detrás de Lixtara están en construcción.",
+        },
+        services: {
+          eyebrow: "Servicios",
+          body: "Servicios adicionales (fotografía profesional, virtual staging, consultas con broker) se están preparando.",
+        },
+        contact: {
+          eyebrow: "Contacto",
+          body: "El formulario de contacto está en construcción. Mientras tanto, contáctanos en Nexxos Realty, Miami, Florida.",
+        },
+        terms: {
+          eyebrow: "Términos de servicio",
+          body: "Nuestros términos de servicio se están finalizando con un abogado inmobiliario de Florida.",
+        },
+        privacy: {
+          eyebrow: "Política de privacidad",
+          body: "Nuestra política de privacidad se está finalizando.",
+        },
+        listingNew: {
+          eyebrow: "Lista tu propiedad",
+          body: "El flujo de venta — reporte de precio, configuración de listado, publicación en MLS — se está construyendo. Contáctanos para early access.",
+        },
+      },
     },
     footer: {
       tagline: "Brokerage de tarifa fija en Florida. Visibilidad MLS completa. Te quedas con más equity.",
