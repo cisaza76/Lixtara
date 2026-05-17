@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isLocale, t, type Locale } from "@/lib/i18n";
+import { isLocale, t } from "@/lib/i18n";
 import {
   BROKER_LICENSE,
   BROKERAGE_NAME,
@@ -29,7 +29,6 @@ export default async function Home({
   const spCopy = t(lang).socialProof;
   const prCopy = t(lang).pricing;
   const faqCopy = t(lang).faq;
-  const altLang: Locale = lang === "en" ? "es" : "en";
 
   const visibleMetrics: Array<{ value: string; label: string }> = [];
   if (BROKER_STATS.salesVolume) {
@@ -175,7 +174,7 @@ export default async function Home({
         </div>
       </section>
 
-      <section className="border-t border-gold-soft">
+      <section id="how-it-works" className="border-t border-gold-soft scroll-mt-20">
         <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
             {hiwCopy.eyebrow}
@@ -260,7 +259,7 @@ export default async function Home({
         </div>
       </section>
 
-      <section className="border-t border-gold-soft">
+      <section id="pricing" className="border-t border-gold-soft scroll-mt-20">
         <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
             {prCopy.eyebrow}
@@ -362,7 +361,7 @@ export default async function Home({
         </div>
       </section>
 
-      <section className="border-t border-gold-soft">
+      <section id="faq" className="border-t border-gold-soft scroll-mt-20">
         <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
             {faqCopy.eyebrow}
@@ -393,14 +392,6 @@ export default async function Home({
         </div>
       </section>
 
-      <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-10 border-t border-gold-soft mt-0">
-        <Link
-          href={`/${altLang}`}
-          className="text-[10px] uppercase tracking-[0.22em] text-ink/50 hover:text-gold transition-colors"
-        >
-          {copy.langToggle}
-        </Link>
-      </div>
     </main>
   );
 }
