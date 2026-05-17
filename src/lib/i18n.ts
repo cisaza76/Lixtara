@@ -208,6 +208,22 @@ const dictionaries = {
           multi_family: "Multi-family",
         },
       },
+      step4: {
+        title: "Tell buyers about it.",
+        body: "Describe the property and how showings are coordinated. We can polish the description with AI — it keeps your facts and tightens the writing.",
+        descriptionLabel: "Description",
+        descriptionHelp:
+          "What makes this property special? Recent renovations, neighborhood vibe, schools, walkability, light, views.",
+        showingLabel: "Showing instructions",
+        showingHelp:
+          "E.g. 'Call 24 hours ahead' or 'Lockbox code shared with buyer's agent at confirmation'.",
+        improveButton: "Improve with AI",
+        improvingNote: "Improving — usually takes 4-8 seconds.",
+        improvedNotice:
+          "Description improved by AI. Edit anything you want, then continue.",
+        improveFailed: "AI improve failed. Try again, or just continue.",
+        emptyToImprove: "Write a few sentences first, then improve.",
+      },
       placeholderStep: "This step is coming next — finish Step 1 first.",
       placeholderStepLater: "We'll wire this step up in F2.1.",
     },
@@ -606,6 +622,22 @@ const dictionaries = {
           townhouse: "Townhouse",
           multi_family: "Multi-familiar",
         },
+      },
+      step4: {
+        title: "Cuéntale a los compradores.",
+        body: "Describe la propiedad y cómo se coordinan las visitas. Podemos pulir la descripción con IA — mantiene tus hechos y afina la escritura.",
+        descriptionLabel: "Descripción",
+        descriptionHelp:
+          "¿Qué hace especial esta propiedad? Renovaciones recientes, ambiente del barrio, colegios, walkability, luz, vistas.",
+        showingLabel: "Instrucciones de visita",
+        showingHelp:
+          "Ej. 'Llamar con 24 horas de anticipación' o 'Código de lockbox al confirmar con el agente del comprador'.",
+        improveButton: "Mejorar con IA",
+        improvingNote: "Mejorando — usualmente toma 4-8 segundos.",
+        improvedNotice:
+          "Descripción mejorada por IA. Edita lo que quieras, luego continúa.",
+        improveFailed: "Fallo el improve. Intenta de nuevo, o solo continúa.",
+        emptyToImprove: "Escribe unas frases primero, luego mejora.",
       },
       placeholderStep: "Este paso viene a continuación — completa el Paso 1 primero.",
       placeholderStepLater: "Conectamos este paso en F2.1.",

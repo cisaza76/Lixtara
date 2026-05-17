@@ -73,14 +73,79 @@ export function Field({
   );
 }
 
-export function SubmitButton({ children }: { children: ReactNode }) {
+export function SubmitButton({
+  children,
+  name,
+  value,
+}: {
+  children: ReactNode;
+  name?: string;
+  value?: string;
+}) {
   return (
     <button
       type="submit"
+      name={name}
+      value={value}
       className="inline-flex items-center justify-center px-10 py-4 bg-ink text-ivory text-xs font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors mt-2"
     >
       {children}
     </button>
+  );
+}
+
+export function SecondaryButton({
+  children,
+  name,
+  value,
+}: {
+  children: ReactNode;
+  name?: string;
+  value?: string;
+}) {
+  return (
+    <button
+      type="submit"
+      name={name}
+      value={value}
+      className="inline-flex items-center justify-center px-10 py-4 bg-transparent text-ink text-xs font-medium tracking-[0.2em] uppercase border border-gold-soft hover:border-gold hover:text-gold transition-colors mt-2"
+    >
+      {children}
+    </button>
+  );
+}
+
+interface TextareaFieldProps {
+  label: string;
+  name: string;
+  defaultValue?: string;
+  rows?: number;
+  required?: boolean;
+  help?: string;
+}
+
+export function TextareaField({
+  label,
+  name,
+  defaultValue,
+  rows = 5,
+  required = true,
+  help,
+}: TextareaFieldProps) {
+  return (
+    <label className="flex flex-col gap-2">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+        {label}
+      </span>
+      <textarea
+        name={name}
+        defaultValue={defaultValue}
+        rows={rows}
+        required={required}
+        className="bg-transparent border border-gold-soft focus:border-gold outline-none px-3 py-2 text-base text-ink leading-relaxed resize-y"
+      />
+      {help && <span className="text-xs text-ink/50">{help}</span>}
+    </label>
   );
 }
 

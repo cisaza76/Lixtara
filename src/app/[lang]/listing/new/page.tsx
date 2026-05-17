@@ -4,12 +4,20 @@ import { isLocale, t } from "@/lib/i18n";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { StepShell } from "@/components/step-shell";
-import { Field, SubmitButton, ErrorBanner } from "@/components/auth-shell";
+import {
+  Field,
+  SubmitButton,
+  SecondaryButton,
+  TextareaField,
+  ErrorBanner,
+  SuccessBanner,
+} from "@/components/auth-shell";
 import {
   PRICING_TIERS,
   TIER_ORDER,
   type PricingTierId,
 } from "@/lib/pricing-tiers";
+import { improveListingDescription } from "@/lib/ai";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -37,6 +45,8 @@ interface Draft {
   lot_size: number | null;
   year_built: number;
   list_price: number;
+  description: string | null;
+  showing_instructions: string | null;
 }
 
 export default async function ListingNewPage({
@@ -62,7 +72,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price",
+        "id,address_street,address_city,address_state,address_zip,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions",
       )
       .eq("id", draftId)
       .eq("mls_status", "draft")
@@ -217,6 +227,89 @@ export default async function ListingNewPage({
     redirect(`/${lang}/listing/new?id=${id}&step=4`);
   }
 
+  async function saveStep4(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+
+    const description = String(formData.get("description") ?? "").trim();
+    const showing = String(formData.get("showing_instructions") ?? "").trim();
+    const action = String(formData.get("action") ?? "next");
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    if (action === "improve") {
+      if (description.length < 10) {
+        redirect(`/${lang}/listing/new?step=4&id=${id}&error=empty_improve`);
+      }
+      // Load current facts from DB (the draft passed via form may be stale).
+      const { data: facts } = await supabase
+        .from("properties")
+        .select(
+          "bedrooms,bathrooms,sqft,year_built,address_city,address_state,list_price,property_type,lot_size",
+        )
+        .eq("id", id)
+        .eq("owner_id", user.id)
+        .single();
+      if (!facts) {
+        redirect(`/${lang}/listing/new?step=4&id=${id}&error=save_failed`);
+      }
+      let improved: string;
+      try {
+        improved = await improveListingDescription({
+          description,
+          facts: {
+            bedrooms: facts.bedrooms,
+            bathrooms: facts.bathrooms,
+            sqft: facts.sqft,
+            yearBuilt: facts.year_built,
+            city: facts.address_city,
+            state: facts.address_state,
+            listPrice: facts.list_price,
+            propertyType: facts.property_type,
+            lotSize: facts.lot_size,
+          },
+        });
+      } catch (e) {
+        console.error("improve failed", e);
+        redirect(`/${lang}/listing/new?step=4&id=${id}&error=improve_failed`);
+      }
+      const { error } = await supabase
+        .from("properties")
+        .update({
+          description: improved,
+          showing_instructions: showing || null,
+        })
+        .eq("id", id)
+        .eq("owner_id", user.id);
+      if (error) {
+        redirect(`/${lang}/listing/new?step=4&id=${id}&error=save_failed`);
+      }
+      redirect(`/${lang}/listing/new?step=4&id=${id}&improved=1`);
+    }
+
+    // "next" — save and advance
+    if (description.length < 10) {
+      redirect(`/${lang}/listing/new?step=4&id=${id}&error=invalid`);
+    }
+    const { error } = await supabase
+      .from("properties")
+      .update({
+        description,
+        showing_instructions: showing || null,
+      })
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    if (error) {
+      redirect(`/${lang}/listing/new?step=4&id=${id}&error=save_failed`);
+    }
+    redirect(`/${lang}/listing/new?id=${id}&step=5`);
+  }
+
   const errorMessage =
     sp.error === "required"
       ? "All fields are required."
@@ -224,9 +317,15 @@ export default async function ListingNewPage({
         ? copy.step1.flOnly
         : sp.error === "invalid"
           ? "Please check the values."
-          : sp.error === "save_failed"
-            ? "Could not save. Please try again."
-            : null;
+          : sp.error === "empty_improve"
+            ? copy.step4.emptyToImprove
+            : sp.error === "improve_failed"
+              ? copy.step4.improveFailed
+              : sp.error === "save_failed"
+                ? "Could not save. Please try again."
+                : null;
+  const improvedFlag =
+    typeof sp === "object" && "improved" in sp && sp.improved === "1";
 
   return (
     <StepShell
@@ -460,8 +559,56 @@ export default async function ListingNewPage({
         </div>
       )}
 
-      {/* ─── Steps 4-8: placeholders ─── */}
-      {step > 3 && (
+      {/* ─── Step 4: Description + AI improve ─── */}
+      {step === 4 && (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-2xl text-ink font-normal">
+              {copy.step4.title}
+            </h2>
+            <p className="text-base leading-relaxed text-ink/70">
+              {copy.step4.body}
+            </p>
+          </div>
+          {errorMessage && <ErrorBanner message={errorMessage} />}
+          {improvedFlag && <SuccessBanner message={copy.step4.improvedNotice} />}
+          <form action={saveStep4} className="flex flex-col gap-6">
+            <input type="hidden" name="id" value={draftId ?? ""} />
+            <TextareaField
+              label={copy.step4.descriptionLabel}
+              name="description"
+              defaultValue={draft?.description ?? ""}
+              rows={8}
+              help={copy.step4.descriptionHelp}
+            />
+            <TextareaField
+              label={copy.step4.showingLabel}
+              name="showing_instructions"
+              defaultValue={draft?.showing_instructions ?? ""}
+              rows={3}
+              required={false}
+              help={copy.step4.showingHelp}
+            />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6">
+              <Link
+                href={`/${lang}/listing/new?step=3&id=${draftId}`}
+                className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors self-center sm:self-start mt-2"
+              >
+                ← {copy.backLabel}
+              </Link>
+              <SecondaryButton name="action" value="improve">
+                ✨ {copy.step4.improveButton}
+              </SecondaryButton>
+              <SubmitButton name="action" value="next">
+                {copy.nextLabel} →
+              </SubmitButton>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ─── Steps 5-8: placeholders ─── */}
+      {step > 4 && (
         <div className="flex flex-col gap-6">
           <h2 className="font-display text-2xl text-ink font-normal">
             {copy.stepNames[step - 1]}
