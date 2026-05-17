@@ -28,6 +28,7 @@ export default async function Home({
   const hiwCopy = t(lang).howItWorks;
   const spCopy = t(lang).socialProof;
   const prCopy = t(lang).pricing;
+  const faqCopy = t(lang).faq;
   const altLang: Locale = lang === "en" ? "es" : "en";
 
   const visibleMetrics: Array<{ value: string; label: string }> = [];
@@ -358,6 +359,37 @@ export default async function Home({
               );
             })}
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-gold-soft">
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
+            {faqCopy.eyebrow}
+          </p>
+          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-12 lg:mb-16">
+            {faqCopy.titleBefore}
+            <em className="italic text-gold">{faqCopy.titleAccent}</em>
+            {faqCopy.titleAfter}
+          </h2>
+
+          <dl className="flex flex-col">
+            {faqCopy.items.map((item, i) => (
+              <div
+                key={item.q}
+                className={`grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-10 py-8 lg:py-10 ${
+                  i === 0 ? "border-t" : ""
+                } border-b border-gold-soft`}
+              >
+                <dt className="md:col-span-5 font-display text-xl lg:text-2xl leading-snug font-normal text-ink">
+                  {item.q}
+                </dt>
+                <dd className="md:col-span-7 text-sm lg:text-base leading-relaxed text-ink/70">
+                  {item.a}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 

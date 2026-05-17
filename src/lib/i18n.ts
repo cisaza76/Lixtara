@@ -145,6 +145,42 @@ const dictionaries = {
         },
       },
     },
+    faq: {
+      eyebrow: "Frequently asked",
+      titleBefore: "Plainly ",
+      titleAccent: "answered",
+      titleAfter: ".",
+      items: [
+        {
+          q: "What is Lixtara?",
+          a: "Lixtara is a Florida flat-fee real estate brokerage powered by Nexxos Realty (License #BK3166173, 20 years on the ground). We help you sell your home for a flat fee plus low commission — full MLS exposure, licensed broker support, none of the traditional 6% drag.",
+        },
+        {
+          q: "How is Lixtara different from a traditional 6% agent?",
+          a: "A traditional agent charges 5–6% commission ($30,000 on a $500K home). Lixtara's Pro tier charges $495 flat plus 0.5% ($2,995 total on a $500K home). Same MLS exposure, same licensed broker support — you keep the difference.",
+        },
+        {
+          q: "Which tier should I pick?",
+          a: "Essentials fits experienced sellers comfortable handling photos themselves. Pro is the most popular — adds professional photography, AI virtual staging, and a strategy call. Concierge is white-glove for premium properties: dedicated account manager, drone, video walkthrough, and 24/7 phone support.",
+        },
+        {
+          q: "Is Lixtara a licensed brokerage?",
+          a: "Yes. Lixtara operates through Nexxos Realty, LLC — a fully licensed Florida real estate brokerage (License #BK3166173). All transactions are supervised by our licensed broker in compliance with Florida Statute 475 and FAR/BAR contracts.",
+        },
+        {
+          q: "What about the buyer's agent commission?",
+          a: "You decide how much to offer the buyer's agent (typically 2–2.5%). It is separate from Lixtara's fee and is only paid at closing if a buyer's agent brings the offer. Higher compensation tends to attract more agents to show your property.",
+        },
+        {
+          q: "How long until my listing goes live on MLS?",
+          a: "Usually within hours of broker approval. Our broker reviews your listing for completeness, then sends you the listing agreement via DocuSign. Once both signatures are in, your property syndicates to MLS, Zillow, Realtor.com, Redfin, and Trulia.",
+        },
+        {
+          q: "What if my home doesn't sell?",
+          a: "Your listing stays active for a 24-month term — the longest in the industry. The flat fee is non-refundable (it covers MLS listing creation and management), but commission only applies when the property sells. You can withdraw your listing at any time with no penalty.",
+        },
+      ],
+    },
   },
   es: {
     hero: {
@@ -283,6 +319,42 @@ const dictionaries = {
           ],
         },
       },
+    },
+    faq: {
+      eyebrow: "Preguntas frecuentes",
+      titleBefore: "Respuestas ",
+      titleAccent: "directas",
+      titleAfter: ".",
+      items: [
+        {
+          q: "¿Qué es Lixtara?",
+          a: "Lixtara es una correduría inmobiliaria de tarifa fija en Florida, powered by Nexxos Realty (Licencia #BK3166173, 20 años en el mercado). Te ayudamos a vender tu casa con una tarifa fija más una comisión baja — exposición completa en MLS, respaldo de broker licenciado, sin el 6% tradicional.",
+        },
+        {
+          q: "¿En qué se diferencia Lixtara de un agente tradicional del 6%?",
+          a: "Un agente tradicional cobra 5–6% de comisión ($30,000 en una casa de $500K). El tier Pro de Lixtara cobra $495 fijo más 0.5% ($2,995 total en una casa de $500K). Misma exposición en MLS, mismo respaldo de broker licenciado — la diferencia te la quedas tú.",
+        },
+        {
+          q: "¿Qué tier debería elegir?",
+          a: "Essentials va para vendedores experimentados que manejan sus propias fotos. Pro es el más popular — agrega fotografía profesional, virtual staging con IA, y strategy call. Concierge es white-glove para propiedades premium: account manager dedicado, drone, video walkthrough, y soporte telefónico 24/7.",
+        },
+        {
+          q: "¿Lixtara es una correduría licenciada?",
+          a: "Sí. Lixtara opera a través de Nexxos Realty, LLC — una correduría inmobiliaria totalmente licenciada en Florida (Licencia #BK3166173). Todas las transacciones son supervisadas por nuestro broker licenciado en cumplimiento con el Estatuto 475 de Florida y los contratos FAR/BAR.",
+        },
+        {
+          q: "¿Y la comisión del agente del comprador?",
+          a: "Tú decides cuánto ofrecer al agente del comprador (típicamente 2–2.5%). Es separado de la tarifa de Lixtara y se paga al cierre solo si un agente del comprador trae la oferta. Una compensación más alta tiende a atraer más agentes a mostrar tu propiedad.",
+        },
+        {
+          q: "¿Cuánto tarda mi listing en salir al MLS?",
+          a: "Usualmente dentro de horas de la aprobación del broker. Nuestro broker revisa tu listado por completitud, luego te envía el acuerdo de listado vía DocuSign. Una vez firmadas ambas partes, tu propiedad se sindica a MLS, Zillow, Realtor.com, Redfin y Trulia.",
+        },
+        {
+          q: "¿Qué pasa si mi casa no se vende?",
+          a: "Tu listing permanece activo por un plazo de 24 meses — el más largo de la industria. La tarifa fija no es reembolsable (cubre la creación y administración del listado en MLS), pero la comisión solo aplica si la propiedad se vende. Puedes retirar tu listing en cualquier momento sin penalidad.",
+        },
+      ],
     },
   },
 } as const;
