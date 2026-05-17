@@ -51,3 +51,20 @@ export async function improveListingDescription(
 
   return text.trim();
 }
+
+/**
+ * Polish showing instructions — short, concise, professional. Keeps any
+ * specific contact info, lockbox codes, time windows, etc.
+ */
+export async function improveShowingInstructions(
+  current: string,
+): Promise<string> {
+  const { text } = await generateText({
+    model: anthropic(COPY_MODEL),
+    system:
+      "You polish showing instructions for Florida property listings sent to buyer's agents. Keep it under 240 characters, professional, concise, action-oriented. Preserve every specific detail the seller included (phone numbers, lockbox codes, time windows, contact persons). No clichés. Reply with ONLY the improved text — no preamble, no quotes around it.",
+    prompt: `Current showing instructions draft:\n"""${current}"""\n\nReturn the improved text only.`,
+    maxOutputTokens: 200,
+  });
+  return text.trim();
+}

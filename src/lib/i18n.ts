@@ -105,6 +105,7 @@ const dictionaries = {
       commissionLabel: "commission",
       termLabel: "24-month term",
       ctaLabel: "Get started",
+      includesLabel: "Includes",
       tiers: {
         essentials: {
           name: "Essentials",
@@ -194,6 +195,11 @@ const dictionaries = {
       step3: {
         title: "Property details.",
         body: "These match what we'll publish on MLS. You can edit them anytime before the agreement.",
+        autofillButton: "🏛 Autofill from Miami-Dade public records",
+        autofillCaption: "Free — pulls beds/baths/sqft/year/type from county records.",
+        autofillSuccess: "Filled {count} fields from Miami-Dade records. Review and edit if needed.",
+        autofillNotFound: "Miami-Dade didn't recognize this address — fill the fields manually.",
+        autofillError: "Could not reach Miami-Dade. Fill manually.",
         propertyTypeLabel: "Property type",
         bedroomsLabel: "Bedrooms",
         bathroomsLabel: "Bathrooms",
@@ -210,17 +216,19 @@ const dictionaries = {
       },
       step4: {
         title: "Tell buyers about it.",
-        body: "Describe the property and how showings are coordinated. We can polish the description with AI — it keeps your facts and tightens the writing.",
+        body: "Describe the property and how showings are coordinated. Each field has its own AI polish button — keeps your facts, tightens the writing.",
         descriptionLabel: "Description",
         descriptionHelp:
           "What makes this property special? Recent renovations, neighborhood vibe, schools, walkability, light, views.",
         showingLabel: "Showing instructions",
         showingHelp:
           "E.g. 'Call 24 hours ahead' or 'Lockbox code shared with buyer's agent at confirmation'.",
-        improveButton: "Improve with AI",
-        improvingNote: "Improving — usually takes 4-8 seconds.",
-        improvedNotice:
+        improveDescriptionButton: "✨ Improve description",
+        improveShowingButton: "✨ Improve instructions",
+        improvedDescriptionNotice:
           "Description improved by AI. Edit anything you want, then continue.",
+        improvedShowingNotice:
+          "Showing instructions improved by AI. Edit anything you want, then continue.",
         improveFailed: "AI improve failed. Try again, or just continue.",
         emptyToImprove: "Write a few sentences first, then improve.",
       },
@@ -520,6 +528,7 @@ const dictionaries = {
       commissionLabel: "comisión",
       termLabel: "Plazo de 24 meses",
       ctaLabel: "Empezar",
+      includesLabel: "Incluye",
       tiers: {
         essentials: {
           name: "Essentials",
@@ -609,6 +618,11 @@ const dictionaries = {
       step3: {
         title: "Detalles de la propiedad.",
         body: "Estos datos van publicados en MLS. Puedes editarlos hasta antes del acuerdo.",
+        autofillButton: "🏛 Autofill desde registros públicos Miami-Dade",
+        autofillCaption: "Gratis — extrae beds/baths/sqft/año/tipo desde records del condado.",
+        autofillSuccess: "Llené {count} campos desde Miami-Dade. Revisa y edita si hace falta.",
+        autofillNotFound: "Miami-Dade no reconoció la dirección — llena los campos manualmente.",
+        autofillError: "No pude conectar con Miami-Dade. Llena manualmente.",
         propertyTypeLabel: "Tipo de propiedad",
         bedroomsLabel: "Habitaciones",
         bathroomsLabel: "Baños",
@@ -625,17 +639,19 @@ const dictionaries = {
       },
       step4: {
         title: "Cuéntale a los compradores.",
-        body: "Describe la propiedad y cómo se coordinan las visitas. Podemos pulir la descripción con IA — mantiene tus hechos y afina la escritura.",
+        body: "Describe la propiedad y cómo se coordinan las visitas. Cada campo tiene su botón de pulir con IA — mantiene tus hechos y afina la escritura.",
         descriptionLabel: "Descripción",
         descriptionHelp:
           "¿Qué hace especial esta propiedad? Renovaciones recientes, ambiente del barrio, colegios, walkability, luz, vistas.",
         showingLabel: "Instrucciones de visita",
         showingHelp:
           "Ej. 'Llamar con 24 horas de anticipación' o 'Código de lockbox al confirmar con el agente del comprador'.",
-        improveButton: "Mejorar con IA",
-        improvingNote: "Mejorando — usualmente toma 4-8 segundos.",
-        improvedNotice:
+        improveDescriptionButton: "✨ Mejorar descripción",
+        improveShowingButton: "✨ Mejorar instrucciones",
+        improvedDescriptionNotice:
           "Descripción mejorada por IA. Edita lo que quieras, luego continúa.",
+        improvedShowingNotice:
+          "Instrucciones mejoradas por IA. Edita lo que quieras, luego continúa.",
         improveFailed: "Fallo el improve. Intenta de nuevo, o solo continúa.",
         emptyToImprove: "Escribe unas frases primero, luego mejora.",
       },

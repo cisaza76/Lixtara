@@ -17,7 +17,11 @@ import {
   TIER_ORDER,
   type PricingTierId,
 } from "@/lib/pricing-tiers";
-import { improveListingDescription } from "@/lib/ai";
+import {
+  improveListingDescription,
+  improveShowingInstructions,
+} from "@/lib/ai";
+import { lookupMiamiDadeProperty } from "@/lib/miami-dade";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -227,6 +231,56 @@ export default async function ListingNewPage({
     redirect(`/${lang}/listing/new?id=${id}&step=4`);
   }
 
+  async function autofillStep3(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    const { data: row } = await supabase
+      .from("properties")
+      .select("address_street,address_zip")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .single();
+    if (!row) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
+    }
+
+    const result = await lookupMiamiDadeProperty(row.address_street, row.address_zip);
+    if (!result.found || !result.details) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=notfound`);
+    }
+    const d = result.details;
+    const update: Record<string, number | string | null> = {};
+    if (d.bedrooms != null) update.bedrooms = d.bedrooms;
+    if (d.bathrooms != null) update.bathrooms = d.bathrooms;
+    if (d.sqft != null) update.sqft = d.sqft;
+    if (d.lot_size != null) update.lot_size = d.lot_size;
+    if (d.year_built != null) update.year_built = d.year_built;
+    if (d.property_type != null) update.property_type = d.property_type;
+
+    const filledCount = Object.keys(update).length;
+    if (filledCount === 0) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=notfound`);
+    }
+
+    const { error } = await supabase
+      .from("properties")
+      .update(update)
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    if (error) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
+    }
+    redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=${filledCount}`);
+  }
+
   async function saveStep4(formData: FormData) {
     "use server";
     const id = String(formData.get("id") ?? "");
@@ -242,11 +296,10 @@ export default async function ListingNewPage({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
 
-    if (action === "improve") {
+    if (action === "improve_description") {
       if (description.length < 10) {
         redirect(`/${lang}/listing/new?step=4&id=${id}&error=empty_improve`);
       }
-      // Load current facts from DB (the draft passed via form may be stale).
       const { data: facts } = await supabase
         .from("properties")
         .select(
@@ -275,7 +328,7 @@ export default async function ListingNewPage({
           },
         });
       } catch (e) {
-        console.error("improve failed", e);
+        console.error("improve description failed", e);
         redirect(`/${lang}/listing/new?step=4&id=${id}&error=improve_failed`);
       }
       const { error } = await supabase
@@ -289,7 +342,32 @@ export default async function ListingNewPage({
       if (error) {
         redirect(`/${lang}/listing/new?step=4&id=${id}&error=save_failed`);
       }
-      redirect(`/${lang}/listing/new?step=4&id=${id}&improved=1`);
+      redirect(`/${lang}/listing/new?step=4&id=${id}&improved=description`);
+    }
+
+    if (action === "improve_showing") {
+      if (showing.length < 5) {
+        redirect(`/${lang}/listing/new?step=4&id=${id}&error=empty_improve`);
+      }
+      let improved: string;
+      try {
+        improved = await improveShowingInstructions(showing);
+      } catch (e) {
+        console.error("improve showing failed", e);
+        redirect(`/${lang}/listing/new?step=4&id=${id}&error=improve_failed`);
+      }
+      const { error } = await supabase
+        .from("properties")
+        .update({
+          description: description || null,
+          showing_instructions: improved,
+        })
+        .eq("id", id)
+        .eq("owner_id", user.id);
+      if (error) {
+        redirect(`/${lang}/listing/new?step=4&id=${id}&error=save_failed`);
+      }
+      redirect(`/${lang}/listing/new?step=4&id=${id}&improved=showing`);
     }
 
     // "next" — save and advance
@@ -325,7 +403,15 @@ export default async function ListingNewPage({
                 ? "Could not save. Please try again."
                 : null;
   const improvedFlag =
-    typeof sp === "object" && "improved" in sp && sp.improved === "1";
+    typeof sp === "object" && "improved" in sp ? (sp.improved as string) : null;
+  const autofillResult =
+    typeof sp === "object" && "autofill" in sp ? (sp.autofill as string) : null;
+  const autofillMessage =
+    autofillResult === "notfound"
+      ? copy.step3.autofillNotFound
+      : autofillResult && /^\d+$/.test(autofillResult)
+        ? copy.step3.autofillSuccess.replace("{count}", autofillResult)
+        : null;
 
   return (
     <StepShell
@@ -403,8 +489,8 @@ export default async function ListingNewPage({
             <div className="flex flex-col gap-4">
               {TIER_ORDER.map((tierId) => {
                 const tier = PRICING_TIERS[tierId];
-                const tierCopy =
-                  t(lang).pricing.tiers[tierId];
+                const tierCopy = t(lang).pricing.tiers[tierId];
+                const pricingCopy = t(lang).pricing;
                 const checked = draft?.pricing_tier === tierId;
                 return (
                   <label
@@ -423,7 +509,7 @@ export default async function ListingNewPage({
                       required
                       className="mt-1.5 accent-gold"
                     />
-                    <div className="flex-1 flex flex-col gap-2">
+                    <div className="flex-1 flex flex-col gap-4">
                       <div className="flex items-baseline justify-between gap-4 flex-wrap">
                         <span className="font-display text-xl text-ink">
                           {tierCopy.name}
@@ -442,6 +528,21 @@ export default async function ListingNewPage({
                       <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
                         + {tier.commissionPct}% {copy.step2.commissionLabel}
                       </span>
+                      <div className="border-t border-gold-soft pt-4 flex flex-col gap-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                          {pricingCopy.includesLabel}
+                        </div>
+                        <ul className="flex flex-col gap-1.5 text-sm leading-snug">
+                          {tierCopy.features.map((f) => (
+                            <li key={f} className="flex items-start gap-2.5">
+                              <span aria-hidden className="text-gold mt-0.5 leading-none">
+                                •
+                              </span>
+                              <span className="text-ink/80">{f}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </label>
                 );
@@ -471,6 +572,25 @@ export default async function ListingNewPage({
               {copy.step3.body}
             </p>
           </div>
+
+          {/* Miami-Dade autofill */}
+          <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-3">
+            <form action={autofillStep3}>
+              <input type="hidden" name="id" value={draftId ?? ""} />
+              <SecondaryButton>{copy.step3.autofillButton}</SecondaryButton>
+            </form>
+            <p className="text-xs text-ink/55 leading-relaxed">
+              {copy.step3.autofillCaption}
+            </p>
+          </div>
+          {autofillMessage && (
+            autofillResult === "notfound" ? (
+              <ErrorBanner message={autofillMessage} />
+            ) : (
+              <SuccessBanner message={autofillMessage} />
+            )
+          )}
+
           {errorMessage && <ErrorBanner message={errorMessage} />}
           <form action={saveStep3} className="flex flex-col gap-6">
             <input type="hidden" name="id" value={draftId ?? ""} />
@@ -559,7 +679,7 @@ export default async function ListingNewPage({
         </div>
       )}
 
-      {/* ─── Step 4: Description + AI improve ─── */}
+      {/* ─── Step 4: Description + AI improve (per-field button) ─── */}
       {step === 4 && (
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-3">
@@ -571,34 +691,55 @@ export default async function ListingNewPage({
             </p>
           </div>
           {errorMessage && <ErrorBanner message={errorMessage} />}
-          {improvedFlag && <SuccessBanner message={copy.step4.improvedNotice} />}
-          <form action={saveStep4} className="flex flex-col gap-6">
+          {improvedFlag === "description" && (
+            <SuccessBanner message={copy.step4.improvedDescriptionNotice} />
+          )}
+          {improvedFlag === "showing" && (
+            <SuccessBanner message={copy.step4.improvedShowingNotice} />
+          )}
+          <form action={saveStep4} className="flex flex-col gap-8">
             <input type="hidden" name="id" value={draftId ?? ""} />
-            <TextareaField
-              label={copy.step4.descriptionLabel}
-              name="description"
-              defaultValue={draft?.description ?? ""}
-              rows={8}
-              help={copy.step4.descriptionHelp}
-            />
-            <TextareaField
-              label={copy.step4.showingLabel}
-              name="showing_instructions"
-              defaultValue={draft?.showing_instructions ?? ""}
-              rows={3}
-              required={false}
-              help={copy.step4.showingHelp}
-            />
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6">
+
+            {/* Description block + per-field improve button */}
+            <div className="flex flex-col gap-3">
+              <TextareaField
+                label={copy.step4.descriptionLabel}
+                name="description"
+                defaultValue={draft?.description ?? ""}
+                rows={8}
+                help={copy.step4.descriptionHelp}
+              />
+              <div className="self-start">
+                <SecondaryButton name="action" value="improve_description">
+                  {copy.step4.improveDescriptionButton}
+                </SecondaryButton>
+              </div>
+            </div>
+
+            {/* Showing instructions block + per-field improve button */}
+            <div className="flex flex-col gap-3">
+              <TextareaField
+                label={copy.step4.showingLabel}
+                name="showing_instructions"
+                defaultValue={draft?.showing_instructions ?? ""}
+                rows={3}
+                required={false}
+                help={copy.step4.showingHelp}
+              />
+              <div className="self-start">
+                <SecondaryButton name="action" value="improve_showing">
+                  {copy.step4.improveShowingButton}
+                </SecondaryButton>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 border-t border-gold-soft pt-6">
               <Link
                 href={`/${lang}/listing/new?step=3&id=${draftId}`}
                 className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors self-center sm:self-start mt-2"
               >
                 ← {copy.backLabel}
               </Link>
-              <SecondaryButton name="action" value="improve">
-                ✨ {copy.step4.improveButton}
-              </SecondaryButton>
               <SubmitButton name="action" value="next">
                 {copy.nextLabel} →
               </SubmitButton>
