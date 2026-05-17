@@ -63,7 +63,15 @@ export default async function RootLayout({
               Lixtara
             </Link>
 
-            <ul className="hidden md:flex items-center gap-8 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+            <ul className="hidden md:flex items-center gap-7 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+              <li>
+                <Link
+                  href={`/${lang}/properties`}
+                  className="hover:text-gold transition-colors"
+                >
+                  {navCopy.properties}
+                </Link>
+              </li>
               <li>
                 <Link
                   href={`/${lang}#how-it-works`}

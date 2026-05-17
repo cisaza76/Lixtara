@@ -16,7 +16,7 @@ const dictionaries = {
       subheadline:
         "Licensed brokerage. Full MLS exposure. You keep more equity.",
       ctaPrimary: "Get my selling plan",
-      ctaSecondary: "See your savings",
+      ctaSecondary: "Browse Florida listings",
       licensedBy: "Licensed by",
       metricMlsLabel: "MLS Visibility",
       metricVolumeLabel: "Sales Volume",
@@ -147,6 +147,7 @@ const dictionaries = {
     },
     nav: {
       sell: "Sell",
+      properties: "Listings",
       pricing: "Pricing",
       howItWorks: "How it works",
       faq: "FAQ",
@@ -284,7 +285,7 @@ const dictionaries = {
       subheadline:
         "Brokerage licenciada. Visibilidad MLS completa. Te quedas con más equity.",
       ctaPrimary: "Obtener mi plan de venta",
-      ctaSecondary: "Ver tu ahorro",
+      ctaSecondary: "Ver listings en Florida",
       licensedBy: "Licenciado por",
       metricMlsLabel: "Visibilidad MLS",
       metricVolumeLabel: "Volumen de Ventas",
@@ -415,6 +416,7 @@ const dictionaries = {
     },
     nav: {
       sell: "Vender",
+      properties: "Listings",
       pricing: "Precios",
       howItWorks: "Cómo funciona",
       faq: "Preguntas",

@@ -75,12 +75,24 @@ export default async function Home({
               >
                 {copy.ctaPrimary}
               </Link>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
-                {BROKERAGE_NAME}
-                <br />
-                {copy.licensedBy} {BROKERAGE_LICENSED_ENTITY} · #
-                {BROKER_LICENSE}
-              </div>
+              <Link
+                href={`/${lang}/properties`}
+                className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center gap-2 group"
+              >
+                {copy.ctaSecondary}
+                <span
+                  aria-hidden
+                  className="transition-transform group-hover:translate-x-1"
+                >
+                  →
+                </span>
+              </Link>
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
+              {BROKERAGE_NAME}
+              <br />
+              {copy.licensedBy} {BROKERAGE_LICENSED_ENTITY} · #
+              {BROKER_LICENSE}
             </div>
 
             <div className="border-t border-gold-soft pt-10 mt-4">
