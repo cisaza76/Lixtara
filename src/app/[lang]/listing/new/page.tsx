@@ -5,11 +5,38 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { StepShell } from "@/components/step-shell";
 import { Field, SubmitButton, ErrorBanner } from "@/components/auth-shell";
+import {
+  PRICING_TIERS,
+  TIER_ORDER,
+  type PricingTierId,
+} from "@/lib/pricing-tiers";
 
 const TOTAL_STEPS = 8;
+const PROPERTY_TYPES = [
+  "single_family",
+  "condo",
+  "townhouse",
+  "multi_family",
+] as const;
 
 function clampStep(value: number): number {
   return Math.min(Math.max(value, 1), TOTAL_STEPS);
+}
+
+interface Draft {
+  id: string;
+  address_street: string;
+  address_city: string;
+  address_state: string;
+  address_zip: string;
+  pricing_tier: PricingTierId | null;
+  property_type: string;
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number;
+  lot_size: number | null;
+  year_built: number;
+  list_price: number;
 }
 
 export default async function ListingNewPage({
@@ -29,23 +56,18 @@ export default async function ListingNewPage({
   const draftId = sp.id ?? null;
   const copy = t(lang).listingForm;
 
-  // Load existing draft if id is present so we can pre-fill Step 1.
-  let draft: {
-    id: string;
-    address_street: string;
-    address_city: string;
-    address_state: string;
-    address_zip: string;
-  } | null = null;
+  let draft: Draft | null = null;
   if (draftId) {
     const supabase = await createClient();
     const { data } = await supabase
       .from("properties")
-      .select("id,address_street,address_city,address_state,address_zip")
+      .select(
+        "id,address_street,address_city,address_state,address_zip,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price",
+      )
       .eq("id", draftId)
       .eq("mls_status", "draft")
       .maybeSingle();
-    draft = data ?? null;
+    draft = (data as Draft | null) ?? null;
   }
 
   async function saveStep1(formData: FormData) {
@@ -70,7 +92,6 @@ export default async function ListingNewPage({
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
 
     if (id) {
-      // Update existing draft
       const { error } = await supabase
         .from("properties")
         .update({
@@ -87,8 +108,6 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?id=${id}&step=2`);
     }
 
-    // Create new draft. Schema requires bedrooms/bathrooms/sqft/year_built/
-    // list_price/property_type — we set placeholders that Steps 2-3 overwrite.
     const { data: created, error } = await supabase
       .from("properties")
       .insert({
@@ -113,14 +132,101 @@ export default async function ListingNewPage({
     redirect(`/${lang}/listing/new?id=${created.id}&step=2`);
   }
 
+  async function saveStep2(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    const tier = String(formData.get("pricing_tier") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    if (!["essentials", "pro", "concierge"].includes(tier)) {
+      redirect(`/${lang}/listing/new?step=2&id=${id}&error=required`);
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    const { error } = await supabase
+      .from("properties")
+      .update({ pricing_tier: tier })
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    if (error) {
+      redirect(`/${lang}/listing/new?step=2&id=${id}&error=save_failed`);
+    }
+    redirect(`/${lang}/listing/new?id=${id}&step=3`);
+  }
+
+  async function saveStep3(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+
+    const propertyType = String(formData.get("property_type") ?? "single_family");
+    const bedrooms = Number.parseInt(String(formData.get("bedrooms") ?? "0"), 10);
+    const bathrooms = Number.parseFloat(
+      String(formData.get("bathrooms") ?? "1"),
+    );
+    const sqft = Number.parseInt(String(formData.get("sqft") ?? "0"), 10);
+    const lotSizeRaw = String(formData.get("lot_size") ?? "").trim();
+    const lotSize = lotSizeRaw === "" ? null : Number.parseInt(lotSizeRaw, 10);
+    const yearBuilt = Number.parseInt(
+      String(formData.get("year_built") ?? "0"),
+      10,
+    );
+    const listPrice = Number.parseInt(
+      String(formData.get("list_price") ?? "0"),
+      10,
+    );
+
+    if (
+      !PROPERTY_TYPES.includes(propertyType as (typeof PROPERTY_TYPES)[number]) ||
+      bedrooms < 0 ||
+      bathrooms < 0 ||
+      sqft <= 0 ||
+      yearBuilt < 1800 ||
+      yearBuilt > new Date().getFullYear() + 2 ||
+      listPrice <= 0
+    ) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid`);
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    const { error } = await supabase
+      .from("properties")
+      .update({
+        property_type: propertyType,
+        bedrooms,
+        bathrooms,
+        sqft,
+        lot_size: lotSize,
+        year_built: yearBuilt,
+        list_price: listPrice,
+      })
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    if (error) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
+    }
+    redirect(`/${lang}/listing/new?id=${id}&step=4`);
+  }
+
   const errorMessage =
     sp.error === "required"
       ? "All fields are required."
       : sp.error === "fl_only"
         ? copy.step1.flOnly
-        : sp.error === "save_failed"
-          ? "Could not save. Please try again."
-          : null;
+        : sp.error === "invalid"
+          ? "Please check the values."
+          : sp.error === "save_failed"
+            ? "Could not save. Please try again."
+            : null;
 
   return (
     <StepShell
@@ -134,7 +240,8 @@ export default async function ListingNewPage({
       stepLabel={copy.stepLabel}
       ofLabel={copy.ofLabel}
     >
-      {step === 1 ? (
+      {/* ─── Step 1: Address ─── */}
+      {step === 1 && (
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-3">
             <h2 className="font-display text-2xl text-ink font-normal">
@@ -165,7 +272,6 @@ export default async function ListingNewPage({
                   label={copy.step1.stateLabel}
                   name="state"
                   defaultValue="FL"
-                  required
                   autoComplete="address-level1"
                 />
                 <Field
@@ -179,7 +285,183 @@ export default async function ListingNewPage({
             <SubmitButton>{copy.nextLabel} →</SubmitButton>
           </form>
         </div>
-      ) : (
+      )}
+
+      {/* ─── Step 2: Plan tier ─── */}
+      {step === 2 && (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-2xl text-ink font-normal">
+              {copy.step2.title}
+            </h2>
+            <p className="text-base leading-relaxed text-ink/70">
+              {copy.step2.body}
+            </p>
+          </div>
+          {errorMessage && <ErrorBanner message={errorMessage} />}
+          <form action={saveStep2} className="flex flex-col gap-6">
+            <input type="hidden" name="id" value={draftId ?? ""} />
+            <div className="flex flex-col gap-4">
+              {TIER_ORDER.map((tierId) => {
+                const tier = PRICING_TIERS[tierId];
+                const tierCopy =
+                  t(lang).pricing.tiers[tierId];
+                const checked = draft?.pricing_tier === tierId;
+                return (
+                  <label
+                    key={tierId}
+                    className={`flex items-start gap-5 p-6 border cursor-pointer transition-colors ${
+                      checked
+                        ? "border-gold bg-ivory-strong"
+                        : "border-gold-soft hover:border-gold/60"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pricing_tier"
+                      value={tierId}
+                      defaultChecked={checked}
+                      required
+                      className="mt-1.5 accent-gold"
+                    />
+                    <div className="flex-1 flex flex-col gap-2">
+                      <div className="flex items-baseline justify-between gap-4 flex-wrap">
+                        <span className="font-display text-xl text-ink">
+                          {tierCopy.name}
+                        </span>
+                        <span className="font-display italic text-2xl text-ink">
+                          <span className="text-gold text-base align-top">$</span>
+                          {tier.flatFee}{" "}
+                          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55 not-italic font-sans">
+                            {copy.step2.flatFeeSuffix}
+                          </span>
+                        </span>
+                      </div>
+                      <span className="text-sm text-ink/70">
+                        {tierCopy.tagline}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                        + {tier.commissionPct}% {copy.step2.commissionLabel}
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-6">
+              <Link
+                href={`/${lang}/listing/new?step=1&id=${draftId}`}
+                className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+              >
+                ← {copy.backLabel}
+              </Link>
+              <SubmitButton>{copy.nextLabel} →</SubmitButton>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ─── Step 3: Details ─── */}
+      {step === 3 && (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-2xl text-ink font-normal">
+              {copy.step3.title}
+            </h2>
+            <p className="text-base leading-relaxed text-ink/70">
+              {copy.step3.body}
+            </p>
+          </div>
+          {errorMessage && <ErrorBanner message={errorMessage} />}
+          <form action={saveStep3} className="flex flex-col gap-6">
+            <input type="hidden" name="id" value={draftId ?? ""} />
+
+            <label className="flex flex-col gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+                {copy.step3.propertyTypeLabel}
+              </span>
+              <select
+                name="property_type"
+                defaultValue={draft?.property_type ?? "single_family"}
+                className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
+              >
+                {PROPERTY_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {copy.step3.types[t]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <Field
+                label={copy.step3.bedroomsLabel}
+                name="bedrooms"
+                type="text"
+                defaultValue={draft?.bedrooms ? String(draft.bedrooms) : ""}
+              />
+              <Field
+                label={copy.step3.bathroomsLabel}
+                name="bathrooms"
+                type="text"
+                defaultValue={
+                  draft?.bathrooms ? String(draft.bathrooms) : ""
+                }
+              />
+              <Field
+                label={copy.step3.yearBuiltLabel}
+                name="year_built"
+                type="text"
+                defaultValue={
+                  draft?.year_built && draft.year_built > 1800
+                    ? String(draft.year_built)
+                    : ""
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <Field
+                label={copy.step3.sqftLabel}
+                name="sqft"
+                type="text"
+                defaultValue={draft?.sqft ? String(draft.sqft) : ""}
+              />
+              <Field
+                label={copy.step3.lotSizeLabel}
+                name="lot_size"
+                type="text"
+                required={false}
+                defaultValue={
+                  draft?.lot_size ? String(draft.lot_size) : ""
+                }
+              />
+            </div>
+
+            <Field
+              label={copy.step3.listPriceLabel}
+              name="list_price"
+              type="text"
+              defaultValue={
+                draft?.list_price ? String(draft.list_price) : ""
+              }
+            />
+
+            <div className="flex items-center gap-6">
+              <Link
+                href={`/${lang}/listing/new?step=2&id=${draftId}`}
+                className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+              >
+                ← {copy.backLabel}
+              </Link>
+              <SubmitButton>{copy.nextLabel} →</SubmitButton>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ─── Steps 4-8: placeholders ─── */}
+      {step > 3 && (
         <div className="flex flex-col gap-6">
           <h2 className="font-display text-2xl text-ink font-normal">
             {copy.stepNames[step - 1]}
@@ -188,14 +470,12 @@ export default async function ListingNewPage({
             {draftId ? copy.placeholderStepLater : copy.placeholderStep}
           </p>
           <div className="flex gap-4">
-            {step > 1 && (
-              <Link
-                href={`/${lang}/listing/new?step=${step - 1}${draftId ? `&id=${draftId}` : ""}`}
-                className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-              >
-                ← {copy.backLabel}
-              </Link>
-            )}
+            <Link
+              href={`/${lang}/listing/new?step=${step - 1}${draftId ? `&id=${draftId}` : ""}`}
+              className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+            >
+              ← {copy.backLabel}
+            </Link>
           </div>
         </div>
       )}
