@@ -2,7 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLocale, t, type Locale } from "@/lib/i18n";
-import { BROKER_LICENSE, BROKER_NAME, BROKERAGE_NAME } from "@/lib/broker";
+import {
+  BROKER_LICENSE,
+  BROKERAGE_NAME,
+  BROKERAGE_LICENSED_ENTITY,
+} from "@/lib/broker";
 import { BROKER_STATS } from "@/lib/broker-stats";
 
 export default async function Home({
@@ -16,6 +20,7 @@ export default async function Home({
   const copy = t(lang).hero;
   const vpCopy = t(lang).valueProps;
   const hiwCopy = t(lang).howItWorks;
+  const spCopy = t(lang).socialProof;
   const altLang: Locale = lang === "en" ? "es" : "en";
 
   const visibleMetrics: Array<{ value: string; label: string }> = [];
@@ -66,7 +71,7 @@ export default async function Home({
               <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
                 {BROKERAGE_NAME}
                 <br />
-                {copy.licenseCaption}
+                {copy.licensedBy} {BROKERAGE_LICENSED_ENTITY} · #
                 {BROKER_LICENSE}
               </div>
             </div>
@@ -109,8 +114,8 @@ export default async function Home({
               />
 
               <Image
-                src="/placeholder-broker.svg"
-                alt={`${BROKER_NAME} — Lixtara licensed broker (portrait pending)`}
+                src="/placeholder-property.svg"
+                alt="Lixtara — Florida residential brokerage (property image placeholder)"
                 fill
                 priority
                 sizes="(min-width: 1024px) 380px, 80vw"
@@ -202,6 +207,46 @@ export default async function Home({
                   {s.body}
                 </p>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-gold-soft">
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
+            {spCopy.eyebrow}
+          </p>
+          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-16 lg:mb-20">
+            {spCopy.titleBefore}
+            <em className="italic text-gold">{spCopy.titleAccent}</em>
+            {spCopy.titleAfter}
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10">
+            {spCopy.testimonials.map((tst) => (
+              <figure
+                key={tst.attribution}
+                className="flex flex-col justify-between gap-8 border border-gold-soft bg-ivory p-8 lg:p-10"
+              >
+                <div className="flex flex-col gap-5">
+                  <div
+                    aria-hidden
+                    className="font-display italic text-gold text-6xl leading-none -mb-4 select-none"
+                  >
+                    &ldquo;
+                  </div>
+                  <blockquote className="font-display text-lg lg:text-xl leading-snug text-ink">
+                    {tst.quote}
+                  </blockquote>
+                </div>
+                <figcaption className="flex flex-col gap-3">
+                  <div className="w-8 h-px bg-gold-soft" />
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+                    {tst.attribution}
+                  </div>
+                </figcaption>
+              </figure>
             ))}
           </div>
         </div>

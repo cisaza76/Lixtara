@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1d2435"/>
+      <stop offset="60%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#0a1020"/>
+    </linearGradient>
+    <linearGradient id="facade" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#4b5468"/>
+      <stop offset="100%" stop-color="#2c3548"/>
+    </linearGradient>
+    <linearGradient id="window" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#B49157" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#B49157" stop-opacity="0.18"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="1000" fill="url(#sky)"/>
+
+  <!-- Palm tree silhouette, left side -->
+  <g opacity="0.55">
+    <rect x="120" y="380" width="8" height="380" fill="#1a1f2e"/>
+    <!-- fronds -->
+    <path d="M 124 380 Q 50 350 30 280 Q 80 320 124 380 Z" fill="#1a1f2e"/>
+    <path d="M 124 380 Q 200 340 230 270 Q 180 320 124 380 Z" fill="#1a1f2e"/>
+    <path d="M 124 380 Q 60 410 20 470 Q 80 410 124 380 Z" fill="#1a1f2e"/>
+    <path d="M 124 380 Q 210 410 240 460 Q 180 410 124 380 Z" fill="#1a1f2e"/>
+    <path d="M 124 380 Q 70 360 50 320 Q 90 350 124 380 Z" fill="#1a1f2e"/>
+  </g>
+
+  <!-- Modern home — two-story flat-roof facade -->
+  <g transform="translate(220, 480)">
+    <!-- main volume -->
+    <rect x="0" y="0" width="460" height="320" fill="url(#facade)"/>
+    <!-- second floor cantilever -->
+    <rect x="-30" y="0" width="60" height="160" fill="url(#facade)"/>
+    <!-- horizontal break line -->
+    <rect x="-30" y="160" width="520" height="2" fill="#0F172A" opacity="0.4"/>
+
+    <!-- upper-floor large window strip -->
+    <rect x="40" y="40" width="380" height="80" fill="url(#window)" stroke="#B49157" stroke-width="1" stroke-opacity="0.35"/>
+    <line x1="160" y1="40" x2="160" y2="120" stroke="#0F172A" stroke-width="1" opacity="0.3"/>
+    <line x1="280" y1="40" x2="280" y2="120" stroke="#0F172A" stroke-width="1" opacity="0.3"/>
+
+    <!-- ground-floor door + side windows -->
+    <rect x="200" y="200" width="60" height="120" fill="#1a1f2e"/>
+    <rect x="40" y="200" width="120" height="120" fill="url(#window)" stroke="#B49157" stroke-width="1" stroke-opacity="0.3"/>
+    <rect x="300" y="200" width="120" height="120" fill="url(#window)" stroke="#B49157" stroke-width="1" stroke-opacity="0.3"/>
+  </g>
+
+  <!-- ground line / pool reflection hint -->
+  <rect x="0" y="800" width="800" height="200" fill="#080d18"/>
+  <rect x="180" y="800" width="540" height="6" fill="#B49157" opacity="0.18"/>
+
+  <!-- Editorial label -->
+  <g transform="translate(400, 900)" text-anchor="middle">
+    <text y="0" fill="#B49157" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="36" letter-spacing="1.5">Placeholder</text>
+    <line x1="-60" y1="22" x2="60" y2="22" stroke="#B49157" stroke-width="1" opacity="0.55"/>
+    <text y="56" fill="#B49157" font-family="ui-sans-serif, -apple-system, system-ui, sans-serif" font-size="12" letter-spacing="5" opacity="0.7">REPLACE WITH FLORIDA LISTING PHOTO</text>
+  </g>
+</svg>
