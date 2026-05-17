@@ -8,24 +8,40 @@ export function isLocale(value: string | undefined): value is Locale {
 
 const dictionaries = {
   en: {
-    landing: {
-      eyebrow: "Phase 0 — scaffold",
-      title: "Lixtara",
-      subtitle:
-        "Sell your Florida home for 0% commission, backed by a licensed broker.",
-      ctaPrimary: "Get started",
-      ctaSecondary: "How it works",
+    hero: {
+      eyebrow: "Established Florida Brokerage",
+      headlineBefore: "Keep up to ",
+      headlineAccent: "6%",
+      headlineAfter: " of your sale price.",
+      subheadline:
+        "Licensed brokerage. Full MLS exposure. You keep more equity.",
+      ctaPrimary: "Get my selling plan",
+      ctaSecondary: "See your savings",
+      licenseCaption: "License #",
+      metricMlsLabel: "MLS Visibility",
+      metricVolumeLabel: "Sales Volume",
+      metricYearsLabel: "Market Expertise",
+      badgeVerified: "Verified",
+      badgeBrokerage: "Licensed Real Estate Brokerage",
       langToggle: "Español",
     },
   },
   es: {
-    landing: {
-      eyebrow: "Fase 0 — scaffold",
-      title: "Lixtara",
-      subtitle:
-        "Vende tu casa en Florida con 0% de comisión, respaldado por una broker licenciada.",
-      ctaPrimary: "Empezar",
-      ctaSecondary: "Cómo funciona",
+    hero: {
+      eyebrow: "Brokerage establecido en Florida",
+      headlineBefore: "Quedate con hasta el ",
+      headlineAccent: "6%",
+      headlineAfter: " del precio de venta.",
+      subheadline:
+        "Brokerage licenciada. Visibilidad MLS completa. Te quedas con más equity.",
+      ctaPrimary: "Obtener mi plan de venta",
+      ctaSecondary: "Ver tu ahorro",
+      licenseCaption: "Licencia #",
+      metricMlsLabel: "Visibilidad MLS",
+      metricVolumeLabel: "Volumen de Ventas",
+      metricYearsLabel: "Experiencia",
+      badgeVerified: "Verificada",
+      badgeBrokerage: "Corretaje Inmobiliario Licenciado",
       langToggle: "English",
     },
   },

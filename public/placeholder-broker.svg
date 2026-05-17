@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#222a3a"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="figure" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#4b5468"/>
+      <stop offset="100%" stop-color="#2a3344"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="1000" fill="url(#bg)"/>
+
+  <!-- Silhouette: head + shoulders -->
+  <circle cx="400" cy="380" r="125" fill="url(#figure)"/>
+  <path d="M 180 1000 Q 180 690 400 690 Q 620 690 620 1000 Z" fill="url(#figure)"/>
+
+  <!-- Editorial label -->
+  <g transform="translate(400, 880)" text-anchor="middle">
+    <text y="0" fill="#B49157" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="38" letter-spacing="1.5">Placeholder</text>
+    <line x1="-60" y1="22" x2="60" y2="22" stroke="#B49157" stroke-width="1" opacity="0.6"/>
+    <text y="58" fill="#B49157" font-family="ui-sans-serif, -apple-system, system-ui, sans-serif" font-size="13" letter-spacing="5" opacity="0.7">TO REPLACE WITH BROKER PHOTO</text>
+  </g>
+</svg>

@@ -36,6 +36,15 @@ yarn-error.log*
 # vercel
 .vercel
 
+# superpowers brainstorming companion (mockups, session state)
+.superpowers/
+
+# playwright MCP session cache (browser tabs, console logs)
+.playwright-mcp/
+
+# one-off review screenshots — visual regression baselines go elsewhere (F4+)
+hero-*.png
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
