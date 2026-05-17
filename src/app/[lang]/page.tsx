@@ -14,6 +14,7 @@ export default async function Home({
   if (!isLocale(lang)) notFound();
 
   const copy = t(lang).hero;
+  const vpCopy = t(lang).valueProps;
   const altLang: Locale = lang === "en" ? "es" : "en";
 
   const visibleMetrics: Array<{ value: string; label: string }> = [];
@@ -131,7 +132,36 @@ export default async function Home({
         </div>
       </section>
 
-      <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 pb-10">
+      <section className="border-t border-gold-soft">
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
+            {vpCopy.eyebrow}
+          </p>
+          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-16 lg:mb-20">
+            {vpCopy.titleBefore}
+            <em className="italic text-gold">{vpCopy.titleAccent}</em>
+            {vpCopy.titleAfter}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-10 lg:gap-16">
+            {vpCopy.props.map((p, i) => (
+              <div
+                key={p.headline}
+                className="flex flex-col gap-5 pl-6 border-l border-gold-soft"
+              >
+                <div className="font-display italic text-5xl text-gold leading-none">
+                  {String(i + 1).padStart(2, "0")}
+                </div>
+                <h3 className="text-base font-semibold text-ink leading-snug">
+                  {p.headline}
+                </h3>
+                <p className="text-sm leading-relaxed text-ink/70">{p.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-10 border-t border-gold-soft mt-0">
         <Link
           href={`/${altLang}`}
           className="text-[10px] uppercase tracking-[0.22em] text-ink/50 hover:text-gold transition-colors"
