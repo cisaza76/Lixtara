@@ -1,0 +1,239 @@
+import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { isLocale, t } from "@/lib/i18n";
+import {
+  getPropertyById,
+  formatPropertyPrice,
+  mapboxStaticUrl,
+  isDemoListing,
+  cleanDemoPrefix,
+} from "@/lib/properties";
+import { BROKERAGE_NAME, BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
+
+export default async function PropertyDetailPage({
+  params,
+}: {
+  params: Promise<{ lang: string; id: string }>;
+}) {
+  const { lang, id } = await params;
+  if (!isLocale(lang)) notFound();
+
+  const copy = t(lang).property;
+  const property = await getPropertyById(id);
+
+  if (!property) {
+    return (
+      <main className="bg-background text-foreground flex-1 flex items-center justify-center px-6 py-32">
+        <div className="max-w-md text-center flex flex-col items-center gap-6">
+          <h1 className="font-display text-4xl text-ink font-normal">
+            {copy.notFoundTitle}
+          </h1>
+          <p className="text-base text-ink/70">{copy.notFoundBody}</p>
+          <Link
+            href={`/${lang}/properties`}
+            className="text-[10px] uppercase tracking-[0.22em] text-gold"
+          >
+            {copy.backToListings}
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  const street = cleanDemoPrefix(property.address_street);
+  const fullAddress = `${street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
+  const mapUrl =
+    property.latitude && property.longitude
+      ? mapboxStaticUrl(property.latitude, property.longitude, 600, 400)
+      : null;
+
+  // JSON-LD RealEstateListing schema for SEO.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateListing",
+    name: street,
+    description: property.description ?? undefined,
+    image: property.photos.map((ph) => ph.url),
+    url: `https://lixtara.vercel.app/${lang}/property/${property.id}`,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: street,
+      addressLocality: property.address_city,
+      addressRegion: property.address_state,
+      postalCode: property.address_zip,
+      addressCountry: "US",
+    },
+    geo:
+      property.latitude && property.longitude
+        ? {
+            "@type": "GeoCoordinates",
+            latitude: property.latitude,
+            longitude: property.longitude,
+          }
+        : undefined,
+    offers: {
+      "@type": "Offer",
+      price: property.list_price,
+      priceCurrency: "USD",
+    },
+    numberOfRooms: property.bedrooms,
+    numberOfBathroomsTotal: property.bathrooms,
+    floorSize: {
+      "@type": "QuantitativeValue",
+      value: property.sqft,
+      unitCode: "FTK",
+    },
+    yearBuilt: property.year_built,
+    broker: {
+      "@type": "RealEstateAgent",
+      name: BROKERAGE_LICENSED_ENTITY,
+    },
+  };
+
+  return (
+    <main className="bg-background text-foreground flex-1 flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
+      <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 pt-8 lg:pt-10">
+        <Link
+          href={`/${lang}/properties`}
+          className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+        >
+          ← {copy.backToListings}
+        </Link>
+      </div>
+
+      <section className="mx-auto w-full max-w-7xl px-6 lg:px-12 pt-8 pb-16 lg:pb-24">
+        {property.primary_photo_url && (
+          <div className="relative aspect-[16/10] lg:aspect-[2/1] overflow-hidden bg-ivory-strong mb-12 lg:mb-16">
+            <Image
+              src={property.primary_photo_url}
+              alt={street}
+              fill
+              priority
+              sizes="(min-width: 1024px) 1200px, 100vw"
+              className="object-cover"
+            />
+            {isDemoListing(property.address_street) && (
+              <div className="absolute top-4 left-4 bg-ivory text-ink text-[10px] font-semibold tracking-[0.22em] uppercase px-3 py-1.5">
+                {copy.demoBadge}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
+          {/* LEFT: details */}
+          <div className="lg:col-span-7 flex flex-col gap-10">
+            <div className="flex flex-col gap-4">
+              <h1 className="font-display text-3xl md:text-4xl lg:text-5xl leading-tight text-ink font-normal">
+                {street}
+              </h1>
+              <p className="text-base text-ink/60">
+                {property.address_city}, {property.address_state}{" "}
+                {property.address_zip}
+              </p>
+              <div className="font-display italic text-4xl lg:text-5xl leading-none">
+                <span className="text-gold text-2xl align-top">$</span>
+                <span className="text-ink">
+                  {property.list_price.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <dl className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-6 border-t border-gold-soft pt-10">
+              <div className="flex flex-col gap-1.5">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {copy.bedsLabel}
+                </dt>
+                <dd className="font-display text-2xl text-ink leading-none">
+                  {property.bedrooms}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {copy.bathsLabel}
+                </dt>
+                <dd className="font-display text-2xl text-ink leading-none">
+                  {property.bathrooms}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {copy.sqftLabel}
+                </dt>
+                <dd className="font-display text-2xl text-ink leading-none">
+                  {property.sqft.toLocaleString()}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {copy.yearBuiltLabel}
+                </dt>
+                <dd className="font-display text-2xl text-ink leading-none">
+                  {property.year_built}
+                </dd>
+              </div>
+            </dl>
+
+            {property.description && (
+              <div className="border-t border-gold-soft pt-10 flex flex-col gap-4">
+                <h2 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                  {copy.descriptionLabel}
+                </h2>
+                <p className="text-base leading-relaxed text-ink/80 max-w-prose">
+                  {property.description}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT: location + CTA */}
+          <div className="lg:col-span-5 flex flex-col gap-8">
+            <div className="border border-gold-soft p-8 flex flex-col gap-6">
+              <h2 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                {copy.locationLabel}
+              </h2>
+              {mapUrl ? (
+                <div className="relative aspect-[3/2] overflow-hidden bg-ivory-strong">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={mapUrl}
+                    alt={`Map of ${fullAddress}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="aspect-[3/2] bg-ivory-strong flex items-center justify-center text-[10px] uppercase tracking-[0.18em] text-ink/40">
+                  Location unavailable
+                </div>
+              )}
+              <div className="flex flex-col gap-1 text-sm leading-relaxed text-ink">
+                <div>{street}</div>
+                <div className="text-ink/60">
+                  {property.address_city}, {property.address_state}{" "}
+                  {property.address_zip}
+                </div>
+              </div>
+            </div>
+
+            <Link
+              href={`/${lang}/contact?listing=${property.id}`}
+              className="inline-flex items-center justify-center px-10 py-5 bg-ink text-ivory text-xs font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+            >
+              {copy.cta}
+            </Link>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed text-center">
+              {BROKERAGE_NAME} ·{" "}
+              {copy.buyerCommissionLabel}: {property.buyer_agent_commission}%
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
