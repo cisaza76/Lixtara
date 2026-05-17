@@ -1,4 +1,4 @@
-import { createService } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 
 export interface PropertySummary {
   id: string;
@@ -24,7 +24,11 @@ export interface PropertyDetail extends PropertySummary {
 }
 
 export async function getActiveProperties(): Promise<PropertySummary[]> {
-  const supabase = createService();
+  // Uses the publishable-key SSR client now that the RLS recursion is fixed
+  // (migration supabase/migrations/20260517_fix_rls_recursion.sql). The
+  // service-role client in src/lib/supabase/service.ts is reserved for admin
+  // operations that legitimately need to bypass RLS.
+  const supabase = await createClient();
   const { data: props } = await supabase
     .from("properties")
     .select(
@@ -56,7 +60,7 @@ export async function getActiveProperties(): Promise<PropertySummary[]> {
 export async function getPropertyById(
   id: string,
 ): Promise<PropertyDetail | null> {
-  const supabase = createService();
+  const supabase = await createClient();
   const { data: prop } = await supabase
     .from("properties")
     .select(
