@@ -35,6 +35,8 @@ export default async function SignUpPage({
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     const firstName = String(formData.get("first_name") ?? "").trim();
+    const lastName = String(formData.get("last_name") ?? "").trim();
+    const phone = String(formData.get("phone") ?? "").trim();
 
     if (password.length < 8) {
       redirect(`/${lang}/sign-up?error=weak_password`);
@@ -46,7 +48,13 @@ export default async function SignUpPage({
       password,
       options: {
         emailRedirectTo: `${SITE_URL}/${lang}/auth/callback?next=/${lang}`,
-        data: { first_name: firstName },
+        // raw_user_meta_data — the handle_new_user trigger reads these to
+        // populate the matching columns in public.users.
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+          phone: phone,
+        },
       },
     });
 
@@ -66,11 +74,26 @@ export default async function SignUpPage({
     >
       {errorMessage && <ErrorBanner message={errorMessage} />}
       <form action={signUpAction} className="flex flex-col gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <Field
+            label={copy.nameLabel}
+            name="first_name"
+            type="text"
+            autoComplete="given-name"
+          />
+          <Field
+            label={copy.lastNameLabel}
+            name="last_name"
+            type="text"
+            autoComplete="family-name"
+          />
+        </div>
         <Field
-          label={copy.nameLabel}
-          name="first_name"
+          label={copy.phoneLabel}
+          name="phone"
           type="text"
-          autoComplete="given-name"
+          autoComplete="tel"
+          help={copy.phoneHelp}
         />
         <Field
           label={copy.emailLabel}

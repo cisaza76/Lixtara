@@ -230,6 +230,9 @@ const dictionaries = {
         titleAccent: "listing",
         titleAfter: ".",
         nameLabel: "First name",
+        lastNameLabel: "Last name",
+        phoneLabel: "Phone",
+        phoneHelp: "Used for showings + agent contact. US format: +1 305 555 1234.",
         emailLabel: "Email",
         passwordLabel: "Password",
         passwordHelp: "At least 8 characters.",
@@ -278,6 +281,7 @@ const dictionaries = {
       nav: {
         signIn: "Sign in",
         signOut: "Sign out",
+        greetingPrefix: "Hi,",
       },
     },
     properties: {
@@ -625,6 +629,9 @@ const dictionaries = {
         titleAccent: "listing",
         titleAfter: ".",
         nameLabel: "Nombre",
+        lastNameLabel: "Apellido",
+        phoneLabel: "Teléfono",
+        phoneHelp: "Lo usamos para coordinar showings y contacto con agentes. Formato US: +1 305 555 1234.",
         emailLabel: "Email",
         passwordLabel: "Contraseña",
         passwordHelp: "Mínimo 8 caracteres.",
@@ -673,6 +680,7 @@ const dictionaries = {
       nav: {
         signIn: "Iniciar sesión",
         signOut: "Cerrar sesión",
+        greetingPrefix: "Hola,",
       },
     },
     properties: {

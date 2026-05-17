@@ -55,6 +55,16 @@ export default async function RootLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
+  let firstName: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("first_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    firstName = profile?.first_name ?? null;
+  }
+
   return (
     <html
       lang={lang}
@@ -113,14 +123,21 @@ export default async function RootLayout({
                 {navCopy.langToggle}
               </Link>
               {user ? (
-                <form action={`/${lang}/auth/sign-out`} method="POST">
-                  <button
-                    type="submit"
-                    className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-                  >
-                    {authNavCopy.signOut}
-                  </button>
-                </form>
+                <div className="flex items-center gap-4 lg:gap-5">
+                  {firstName && (
+                    <span className="hidden md:inline text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+                      {authNavCopy.greetingPrefix} {firstName}
+                    </span>
+                  )}
+                  <form action={`/${lang}/auth/sign-out`} method="POST">
+                    <button
+                      type="submit"
+                      className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+                    >
+                      {authNavCopy.signOut}
+                    </button>
+                  </form>
+                </div>
               ) : (
                 <Link
                   href={`/${lang}/sign-in`}
