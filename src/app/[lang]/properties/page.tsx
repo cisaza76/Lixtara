@@ -44,7 +44,7 @@ export default async function PropertiesPage({
           </p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12 lg:gap-x-10 lg:gap-y-16">
-            {properties.map((p) => (
+            {properties.map((p, i) => (
               <Link
                 key={p.id}
                 href={`/${lang}/property/${p.id}`}
@@ -56,6 +56,9 @@ export default async function PropertiesPage({
                       src={p.primary_photo_url}
                       alt={cleanDemoPrefix(p.address_street)}
                       fill
+                      // First 3 cards are above-the-fold on desktop — load eagerly
+                      // for LCP. Remaining 3 lazy by default.
+                      priority={i < 3}
                       sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     />
