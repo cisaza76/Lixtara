@@ -15,6 +15,7 @@ export default async function Home({
 
   const copy = t(lang).hero;
   const vpCopy = t(lang).valueProps;
+  const hiwCopy = t(lang).howItWorks;
   const altLang: Locale = lang === "en" ? "es" : "en";
 
   const visibleMetrics: Array<{ value: string; label: string }> = [];
@@ -155,6 +156,51 @@ export default async function Home({
                   {p.headline}
                 </h3>
                 <p className="text-sm leading-relaxed text-ink/70">{p.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-gold-soft">
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
+            {hiwCopy.eyebrow}
+          </p>
+          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-16 lg:mb-20">
+            {hiwCopy.titleBefore}
+            <em className="italic text-gold">{hiwCopy.titleAccent}</em>
+            {hiwCopy.titleAfter}
+          </h2>
+
+          {/* Timeline markers + connector — desktop only */}
+          <div className="hidden md:grid grid-cols-4 relative mb-8">
+            <div
+              aria-hidden
+              className="absolute top-1/2 left-[12.5%] right-[12.5%] h-px bg-gold-soft -translate-y-1/2 z-0"
+            />
+            {hiwCopy.steps.map((s) => (
+              <div key={s.label} className="flex justify-center relative z-10">
+                <div className="w-3 h-3 rounded-full bg-ivory border border-gold" />
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-8">
+            {hiwCopy.steps.map((s) => (
+              <div
+                key={s.label}
+                className="flex flex-col gap-3 md:items-center md:text-center"
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                  {s.label}
+                </div>
+                <h3 className="text-base font-semibold text-ink leading-snug">
+                  {s.headline}
+                </h3>
+                <p className="text-sm leading-relaxed text-ink/70 md:max-w-[18rem]">
+                  {s.body}
+                </p>
               </div>
             ))}
           </div>

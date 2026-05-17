@@ -45,6 +45,34 @@ const dictionaries = {
         },
       ],
     },
+    howItWorks: {
+      eyebrow: "How it works",
+      titleBefore: "From ",
+      titleAccent: "plan",
+      titleAfter: " to closed.",
+      steps: [
+        {
+          label: "Step 1",
+          headline: "Get your pricing report",
+          body: "Free, no obligation. Our broker reviews comparable sales and returns a realistic price band within 48 hours.",
+        },
+        {
+          label: "Step 2",
+          headline: "Choose your tier",
+          body: "Essentials, Pro, or Concierge — match the level of support to your needs and the complexity of your sale.",
+        },
+        {
+          label: "Step 3",
+          headline: "List on MLS",
+          body: "Your listing goes live on MLS, syndicated to Zillow, Realtor.com, Redfin, and Trulia — full buyer reach.",
+        },
+        {
+          label: "Step 4",
+          headline: "Close with broker support",
+          body: "Offers, negotiations, disclosures, DocuSign — AnaMaria and team handle the legal mechanics end-to-end.",
+        },
+      ],
+    },
   },
   es: {
     hero: {
@@ -81,6 +109,34 @@ const dictionaries = {
         {
           headline: "Exposición MLS completa, todos los sitios",
           body: "Tu listing llega a MLS, Zillow, Realtor.com, Redfin y Trulia — el mismo pool de compradores que un agente tradicional del 6%.",
+        },
+      ],
+    },
+    howItWorks: {
+      eyebrow: "Cómo funciona",
+      titleBefore: "Del ",
+      titleAccent: "plan",
+      titleAfter: " al cierre.",
+      steps: [
+        {
+          label: "Paso 1",
+          headline: "Recibe tu reporte de precio",
+          body: "Gratis, sin compromiso. La broker revisa ventas comparables y te entrega un rango realista en 48 horas.",
+        },
+        {
+          label: "Paso 2",
+          headline: "Elige tu tier",
+          body: "Essentials, Pro o Concierge — el nivel de soporte que se ajusta a tus necesidades y a la complejidad de tu venta.",
+        },
+        {
+          label: "Paso 3",
+          headline: "Publica en MLS",
+          body: "Tu listing va al MLS y se sindica a Zillow, Realtor.com, Redfin y Trulia — alcance completo de compradores.",
+        },
+        {
+          label: "Paso 4",
+          headline: "Cierra con respaldo del broker",
+          body: "Ofertas, negociaciones, disclosures, DocuSign — AnaMaria y su equipo manejan toda la mecánica legal.",
         },
       ],
     },
