@@ -85,18 +85,13 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
           initialCameraLookAt: [0, 0, 0],
           rootElement: hostRef.current,
           sharedMemoryForWorkers: false,
-          useBuiltInControls: true,
         });
         viewer = v;
         const arrayBuffer = plyBytes.buffer.slice(
           plyBytes.byteOffset,
           plyBytes.byteOffset + plyBytes.byteLength,
         );
-        await v.addSplatScene(arrayBuffer, {
-          format: 2, // .ply
-          showLoadingUI: false,
-          splatAlphaRemovalThreshold: 5,
-        });
+        await v.addSplatScene(arrayBuffer, { format: 2 });
         if (cancelled) {
           v.dispose();
           return;
