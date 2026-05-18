@@ -29,6 +29,7 @@ import { TourUploader } from "@/components/tour-uploader";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
+import { AgreementButton } from "@/components/agreement-button";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -95,6 +96,8 @@ export default async function ListingNewPage({
     success?: string;
     suggested_tier?: string;
     session_id?: string;
+    signed?: string;
+    event?: string;
   }>;
 }) {
   const { lang } = await params;
@@ -120,8 +123,12 @@ export default async function ListingNewPage({
     amount: number;
     tier: string | null;
   };
+  type AgreementRow = {
+    status: "pending" | "sent" | "delivered" | "signed" | "completed" | "declined" | "voided" | "expired";
+  };
   let tourJob: TourJobRow | null = null;
   let latestPayment: PaymentRow | null = null;
+  let latestAgreement: AgreementRow | null = null;
   if (draftId) {
     const supabase = await createClient();
     const { data } = await supabase
@@ -218,6 +225,17 @@ export default async function ListingNewPage({
         .limit(1)
         .maybeSingle();
       if (tourRow) tourJob = tourRow as TourJobRow;
+    }
+
+    if (step === 7 || step === 8) {
+      const { data: agRow } = await supabase
+        .from("agreements")
+        .select("status")
+        .eq("property_id", draftId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (agRow) latestAgreement = agRow as AgreementRow;
     }
 
     if (step === 8) {
@@ -2014,31 +2032,109 @@ export default async function ListingNewPage({
         </div>
       )}
 
-      {/* ─── Step 7: Agreement (DocuSign placeholder until F2.2.B) ─── */}
-      {step === 7 && (
-        <div className="flex flex-col gap-6">
-          <h2 className="font-display text-2xl text-ink font-normal">
-            {copy.stepNames[step - 1]}
-          </h2>
-          <p className="text-base leading-relaxed text-ink/70">
-            {draftId ? copy.placeholderStepLater : copy.placeholderStep}
-          </p>
-          <div className="flex gap-6 items-center">
-            <Link
-              href={`/${lang}/listing/new?step=6${draftId ? `&id=${draftId}` : ""}`}
-              className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-            >
-              ← {copy.backLabel}
-            </Link>
-            {draftId && (
-              <Link
-                href={`/${lang}/listing/new?step=8&id=${draftId}`}
-                className="text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
-              >
-                {copy.nextLabel} →
-              </Link>
-            )}
+      {/* ─── Step 7: Agreement (DocuSign) ─── */}
+      {step === 7 && draftId && (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-2xl text-ink font-normal">
+              {copy.step7.title}
+            </h2>
+            <p className="text-base leading-relaxed text-ink/70">
+              {copy.step7.body}
+            </p>
           </div>
+
+          {(() => {
+            const agStatus = latestAgreement?.status ?? null;
+            const isSigned = agStatus === "signed" || agStatus === "completed";
+
+            if (isSigned) {
+              return (
+                <div className="border border-gold bg-gold/5 p-6 flex flex-col gap-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                    {copy.step7.signedTitle}
+                  </p>
+                  <p className="text-base text-ink leading-relaxed">
+                    {copy.step7.signedBody}
+                  </p>
+                  <Link
+                    href={`/${lang}/listing/new?step=8&id=${draftId}`}
+                    className="self-start inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+                  >
+                    {copy.step7.continueButton}
+                  </Link>
+                </div>
+              );
+            }
+
+            if (agStatus === "declined" || agStatus === "voided" || agStatus === "expired") {
+              return (
+                <div className="flex flex-col gap-4">
+                  <div className="border border-red-300 bg-red-50 p-5 flex flex-col gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-red-800">
+                      {copy.step7.declinedTitle}
+                    </p>
+                    <p className="text-sm text-red-800 leading-relaxed">
+                      {copy.step7.declinedBody}
+                    </p>
+                  </div>
+                  <AgreementButton
+                    propertyId={draftId}
+                    lang={lang}
+                    labels={{
+                      startButton: copy.step7.restartButton,
+                      redirecting: copy.step7.redirecting,
+                      failed: copy.step7.failed,
+                    }}
+                  />
+                </div>
+              );
+            }
+
+            if (agStatus === "sent" || agStatus === "delivered") {
+              return (
+                <div className="flex flex-col gap-4">
+                  <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+                      {copy.step7.sentTitle}
+                    </p>
+                    <p className="text-sm text-ink/70 leading-relaxed">
+                      {copy.step7.sentBody}
+                    </p>
+                  </div>
+                  <AgreementButton
+                    propertyId={draftId}
+                    lang={lang}
+                    labels={{
+                      startButton: copy.step7.reopenButton,
+                      redirecting: copy.step7.redirecting,
+                      failed: copy.step7.failed,
+                    }}
+                  />
+                </div>
+              );
+            }
+
+            // No agreement yet — show the start button.
+            return (
+              <AgreementButton
+                propertyId={draftId}
+                lang={lang}
+                labels={{
+                  startButton: copy.step7.startButton,
+                  redirecting: copy.step7.redirecting,
+                  failed: copy.step7.failed,
+                }}
+              />
+            );
+          })()}
+
+          <Link
+            href={`/${lang}/listing/new?step=6&id=${draftId}`}
+            className="self-start text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+          >
+            ← {copy.backLabel}
+          </Link>
         </div>
       )}
 
@@ -2064,6 +2160,29 @@ export default async function ListingNewPage({
                 ? draft.pricing_tier
                 : null;
             const tier = tierId ? PRICING_TIERS[tierId] : null;
+            const agreementOk =
+              latestAgreement?.status === "signed" ||
+              latestAgreement?.status === "completed";
+
+            // Gate: agreement must be signed before payment is allowed.
+            if (!agreementOk) {
+              return (
+                <div className="border border-gold-soft bg-ivory-strong/40 p-6 flex flex-col gap-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+                    {copy.step8.agreementBlockedTitle}
+                  </p>
+                  <p className="text-base text-ink/80 leading-relaxed">
+                    {copy.step8.agreementBlockedBody}
+                  </p>
+                  <Link
+                    href={`/${lang}/listing/new?step=7&id=${draftId}`}
+                    className="self-start inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+                  >
+                    ← Back to agreement
+                  </Link>
+                </div>
+              );
+            }
 
             // Success path: payment succeeded OR property already advanced.
             const isSucceeded =

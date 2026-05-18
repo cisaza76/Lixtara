@@ -63,6 +63,21 @@ export async function POST(req: Request) {
     );
   }
 
+  // Server-side agreement gate — UI also blocks this but never trust the UI.
+  const { data: agreement } = await supabase
+    .from("agreements")
+    .select("status")
+    .eq("property_id", propertyId)
+    .in("status", ["signed", "completed"])
+    .limit(1)
+    .maybeSingle();
+  if (!agreement) {
+    return NextResponse.json(
+      { error: "agreement_not_signed" },
+      { status: 409 },
+    );
+  }
+
   const origin = new URL(req.url).origin;
   const tier = property.pricing_tier as PricingTierId;
   try {
