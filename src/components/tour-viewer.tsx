@@ -70,6 +70,8 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         setProgress(0.85);
 
         // mkkellogg viewer is a side-effecting module, only import on client.
+        // SceneFormat enum (per the library): Splat=0, KSplat=1, Ply=2.
+        // KIRI Engine outputs Inria/Kerbl-format .ply for 3DGS scenes.
         const GS = await import("@mkkellogg/gaussian-splats-3d");
         const Viewer = (GS as unknown as { Viewer: new (opts: Record<string, unknown>) => {
           addSplatScene: (url: string | ArrayBuffer, opts?: Record<string, unknown>) => Promise<void>;
@@ -83,15 +85,18 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
           initialCameraLookAt: [0, 0, 0],
           rootElement: hostRef.current,
           sharedMemoryForWorkers: false,
+          useBuiltInControls: true,
         });
         viewer = v;
-        await v.addSplatScene(
-          plyBytes.buffer.slice(
-            plyBytes.byteOffset,
-            plyBytes.byteOffset + plyBytes.byteLength,
-          ),
-          { format: 0 }, // PLY
+        const arrayBuffer = plyBytes.buffer.slice(
+          plyBytes.byteOffset,
+          plyBytes.byteOffset + plyBytes.byteLength,
         );
+        await v.addSplatScene(arrayBuffer, {
+          format: 2, // .ply
+          showLoadingUI: false,
+          splatAlphaRemovalThreshold: 5,
+        });
         if (cancelled) {
           v.dispose();
           return;
