@@ -91,6 +91,8 @@ export default async function ListingNewPage({
     uploaded?: string;
     deleted?: string;
     primary?: string;
+    success?: string;
+    suggested_tier?: string;
   }>;
 }) {
   const { lang } = await params;
@@ -247,6 +249,13 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?id=${id}&step=2`);
     }
 
+    const suggestedTierRaw = String(formData.get("suggested_tier") ?? "");
+    const suggestedTier = (
+      ["essentials", "pro", "concierge"] as const
+    ).includes(suggestedTierRaw as PricingTierId)
+      ? (suggestedTierRaw as PricingTierId)
+      : null;
+
     const { data: created, error } = await supabase
       .from("properties")
       .insert({
@@ -259,6 +268,7 @@ export default async function ListingNewPage({
         year_built: new Date().getFullYear(),
         list_price: 0,
         mls_status: "draft",
+        ...(suggestedTier ? { pricing_tier: suggestedTier } : {}),
       })
       .select("id")
       .single();
@@ -842,6 +852,13 @@ export default async function ListingNewPage({
           {errorMessage && <ErrorBanner message={errorMessage} />}
           <form action={saveStep1} className="flex flex-col gap-6">
             {draftId && <input type="hidden" name="id" value={draftId} />}
+            {sp.suggested_tier && (
+              <input
+                type="hidden"
+                name="suggested_tier"
+                value={sp.suggested_tier}
+              />
+            )}
             <AddressAutocomplete
               streetLabel={copy.step1.streetLabel}
               cityLabel={copy.step1.cityLabel}

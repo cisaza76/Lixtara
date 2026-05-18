@@ -14,21 +14,33 @@ import {
   DEFAULT_TIER,
   formatPrice,
 } from "@/lib/pricing-tiers";
+import { PlanQuiz } from "@/components/plan-quiz";
+import { SavingsSlider } from "@/components/savings-slider";
 
 export default async function Home({
   params,
+  searchParams,
 }: {
   params: Promise<{ lang: string }>;
+  searchParams: Promise<{ qv?: string; qp?: string }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  const sp = await searchParams;
 
   const copy = t(lang).hero;
   const vpCopy = t(lang).valueProps;
   const hiwCopy = t(lang).howItWorks;
   const spCopy = t(lang).socialProof;
   const prCopy = t(lang).pricing;
+  const quizCopy = t(lang).quiz;
+  const savingsCopy = t(lang).savings;
   const faqCopy = t(lang).faq;
+
+  const selectedValue =
+    sp.qv === "under" || sp.qv === "mid" || sp.qv === "over" ? sp.qv : null;
+  const selectedPhoto =
+    sp.qp === "self" || sp.qp === "pro" || sp.qp === "white" ? sp.qp : null;
 
   const visibleMetrics: Array<{ value: string; label: string }> = [];
   if (BROKER_STATS.salesVolume) {
@@ -268,6 +280,76 @@ export default async function Home({
               </figure>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-gold-soft">
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
+            {quizCopy.eyebrow}
+          </p>
+          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-6">
+            {quizCopy.titleBefore}
+            <em className="italic text-gold">{quizCopy.titleAccent}</em>
+            {quizCopy.titleAfter}
+          </h2>
+          <p className="max-w-2xl text-base leading-relaxed text-ink/70 mb-12 lg:mb-16">
+            {quizCopy.body}
+          </p>
+          <PlanQuiz
+            lang={lang}
+            valueLabel={quizCopy.valueLabel}
+            valueUnder={quizCopy.valueUnder}
+            valueMid={quizCopy.valueMid}
+            valueOver={quizCopy.valueOver}
+            photoLabel={quizCopy.photoLabel}
+            photoSelf={quizCopy.photoSelf}
+            photoPro={quizCopy.photoPro}
+            photoWhite={quizCopy.photoWhite}
+            submitLabel={quizCopy.submit}
+            resultLabel={quizCopy.resultLabel}
+            ctaLabel={quizCopy.ctaLabel}
+            whyByTier={{
+              essentials: quizCopy.essentialsWhy,
+              pro: quizCopy.proWhy,
+              concierge: quizCopy.conciergeWhy,
+            }}
+            tierNames={{
+              essentials: prCopy.tiers.essentials.name,
+              pro: prCopy.tiers.pro.name,
+              concierge: prCopy.tiers.concierge.name,
+            }}
+            selectedValue={selectedValue}
+            selectedPhoto={selectedPhoto}
+          />
+        </div>
+      </section>
+
+      <section className="border-t border-gold-soft bg-ivory-strong/30">
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
+            {savingsCopy.eyebrow}
+          </p>
+          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-6">
+            {savingsCopy.titleBefore}
+            <em className="italic text-gold">{savingsCopy.titleAccent}</em>
+            {savingsCopy.titleAfter}
+          </h2>
+          <p className="max-w-2xl text-base leading-relaxed text-ink/70 mb-12 lg:mb-16">
+            {savingsCopy.body}
+          </p>
+          <SavingsSlider
+            priceLabel={savingsCopy.priceLabel}
+            traditionalLabel={savingsCopy.traditionalLabel}
+            keepLabel={savingsCopy.keepLabel}
+            keepNote={savingsCopy.keepNote}
+            formulaLabel={savingsCopy.formulaLabel}
+            tierNames={{
+              essentials: prCopy.tiers.essentials.name,
+              pro: prCopy.tiers.pro.name,
+              concierge: prCopy.tiers.concierge.name,
+            }}
+          />
         </div>
       </section>
 
