@@ -128,8 +128,10 @@ export function TourUploader({ propertyId, initialJob, labels }: TourUploaderPro
         </div>
       )}
 
-      {error && status !== "failed" && (
-        <p className="text-sm text-red-700 italic">{error}</p>
+      {error && (
+        <p className="text-xs text-red-700 italic font-mono break-all">
+          {error}
+        </p>
       )}
 
       {showForm && (
