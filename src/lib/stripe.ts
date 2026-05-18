@@ -94,7 +94,7 @@ export function verifyWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
 ): Stripe.Event {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = (process.env.STRIPE_WEBHOOK_SECRET ?? "").trim();
   if (!secret) throw new Error("STRIPE_WEBHOOK_SECRET not configured");
   if (!signatureHeader) throw new Error("Missing stripe-signature header");
   return client().webhooks.constructEvent(rawBody, signatureHeader, secret);

@@ -87,9 +87,15 @@ export async function POST(req: Request) {
       status: "pending",
     });
     if (insErr) {
-      // Session was already created on Stripe's side — log and continue.
-      // Webhook will still reconcile when the user pays.
-      console.error("payments insert failed", insErr);
+      // Don't swallow this — surface the full Postgres detail so we know
+      // which column / constraint rejected the row. Webhook can still
+      // reconcile but only if it can find the row by session id.
+      console.error("payments insert failed:", JSON.stringify({
+        code: insErr.code,
+        message: insErr.message,
+        details: insErr.details,
+        hint: insErr.hint,
+      }));
     }
 
     return NextResponse.json({ url, session_id: sessionId });

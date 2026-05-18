@@ -27,10 +27,13 @@ export async function POST(req: Request) {
   try {
     event = verifyWebhookSignature(rawBody, sig);
   } catch (e) {
-    return NextResponse.json(
-      { error: "bad_signature", detail: e instanceof Error ? e.message : "" },
-      { status: 401 },
-    );
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("stripe webhook signature failed:", msg, {
+      hasSig: !!sig,
+      bodyLen: rawBody.length,
+      secretFirst6: (process.env.STRIPE_WEBHOOK_SECRET ?? "").slice(0, 6),
+    });
+    return NextResponse.json({ error: "bad_signature", detail: msg }, { status: 401 });
   }
 
   const supabase = serviceClient();
