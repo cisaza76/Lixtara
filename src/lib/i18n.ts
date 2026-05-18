@@ -178,12 +178,13 @@ const dictionaries = {
       minPhotos: 10,
       step1: {
         title: "Where is your property?",
-        body: "Enter the street address. We'll verify it and pull public records in Step 3.",
+        body: "Start typing and pick the address from Google's suggestions — we verify it and capture lat/lng so the map renders right on the listing page.",
         streetLabel: "Street address",
         cityLabel: "City",
         stateLabel: "State",
         zipLabel: "ZIP code",
         flOnly: "Lixtara serves Florida properties only.",
+        verifiedNote: "Address verified by Google Maps.",
       },
       step2: {
         title: "Pick your plan.",
@@ -619,12 +620,13 @@ const dictionaries = {
       minPhotos: 10,
       step1: {
         title: "¿Dónde está tu propiedad?",
-        body: "Ingresa la dirección. La verificamos y obtenemos registros públicos en el Paso 3.",
+        body: "Empieza a escribir y elige la dirección de las sugerencias de Google — la verificamos y capturamos lat/lng para que el mapa se renderice bien en el listado.",
         streetLabel: "Dirección",
         cityLabel: "Ciudad",
         stateLabel: "Estado",
         zipLabel: "Código postal",
         flOnly: "Lixtara opera solo en Florida.",
+        verifiedNote: "Dirección verificada por Google Maps.",
       },
       step2: {
         title: "Elige tu plan.",

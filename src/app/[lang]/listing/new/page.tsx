@@ -27,6 +27,7 @@ import {
   deletePropertyPhoto,
   storagePathFromUrl,
 } from "@/lib/storage";
+import { AddressAutocomplete } from "@/components/address-autocomplete";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -46,6 +47,8 @@ interface Draft {
   address_city: string;
   address_state: string;
   address_zip: string;
+  latitude: number | null;
+  longitude: number | null;
   pricing_tier: PricingTierId | null;
   property_type: string;
   bedrooms: number;
@@ -96,7 +99,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions",
+        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions",
       )
       .eq("id", draftId)
       .eq("mls_status", "draft")
@@ -119,6 +122,10 @@ export default async function ListingNewPage({
     const city = String(formData.get("city") ?? "").trim();
     const state = String(formData.get("state") ?? "FL").trim().toUpperCase();
     const zip = String(formData.get("zip") ?? "").trim();
+    const latRaw = String(formData.get("lat") ?? "").trim();
+    const lngRaw = String(formData.get("lng") ?? "").trim();
+    const latitude = latRaw ? Number.parseFloat(latRaw) : null;
+    const longitude = lngRaw ? Number.parseFloat(lngRaw) : null;
     const id = String(formData.get("id") ?? "");
 
     if (!street || !city || !zip) {
@@ -134,15 +141,19 @@ export default async function ListingNewPage({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
 
+    const addressUpdate = {
+      address_street: street,
+      address_city: city,
+      address_state: state,
+      address_zip: zip,
+      latitude: Number.isFinite(latitude) ? latitude : null,
+      longitude: Number.isFinite(longitude) ? longitude : null,
+    };
+
     if (id) {
       const { error } = await supabase
         .from("properties")
-        .update({
-          address_street: street,
-          address_city: city,
-          address_state: state,
-          address_zip: zip,
-        })
+        .update(addressUpdate)
         .eq("id", id)
         .eq("owner_id", user.id);
       if (error) {
@@ -155,10 +166,7 @@ export default async function ListingNewPage({
       .from("properties")
       .insert({
         owner_id: user.id,
-        address_street: street,
-        address_city: city,
-        address_state: state,
-        address_zip: zip,
+        ...addressUpdate,
         property_type: "single_family",
         bedrooms: 0,
         bathrooms: 1,
@@ -608,34 +616,18 @@ export default async function ListingNewPage({
           {errorMessage && <ErrorBanner message={errorMessage} />}
           <form action={saveStep1} className="flex flex-col gap-6">
             {draftId && <input type="hidden" name="id" value={draftId} />}
-            <Field
-              label={copy.step1.streetLabel}
-              name="street"
-              defaultValue={draft?.address_street ?? ""}
-              autoComplete="street-address"
+            <AddressAutocomplete
+              streetLabel={copy.step1.streetLabel}
+              cityLabel={copy.step1.cityLabel}
+              stateLabel={copy.step1.stateLabel}
+              zipLabel={copy.step1.zipLabel}
+              defaultStreet={draft?.address_street ?? ""}
+              defaultCity={draft?.address_city ?? "Miami"}
+              defaultZip={draft?.address_zip ?? ""}
+              defaultLat={draft?.latitude ?? null}
+              defaultLng={draft?.longitude ?? null}
+              verifiedNote={copy.step1.verifiedNote}
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <Field
-                label={copy.step1.cityLabel}
-                name="city"
-                defaultValue={draft?.address_city ?? "Miami"}
-                autoComplete="address-level2"
-              />
-              <div className="grid grid-cols-2 gap-6">
-                <Field
-                  label={copy.step1.stateLabel}
-                  name="state"
-                  defaultValue="FL"
-                  autoComplete="address-level1"
-                />
-                <Field
-                  label={copy.step1.zipLabel}
-                  name="zip"
-                  defaultValue={draft?.address_zip ?? ""}
-                  autoComplete="postal-code"
-                />
-              </div>
-            </div>
             <SubmitButton>{copy.nextLabel} →</SubmitButton>
           </form>
         </div>
