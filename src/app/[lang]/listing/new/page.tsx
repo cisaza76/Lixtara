@@ -22,6 +22,11 @@ import {
   improveShowingInstructions,
 } from "@/lib/ai";
 import { lookupMiamiDadeProperty } from "@/lib/miami-dade";
+import {
+  uploadPropertyPhoto,
+  deletePropertyPhoto,
+  storagePathFromUrl,
+} from "@/lib/storage";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -58,7 +63,16 @@ export default async function ListingNewPage({
   searchParams,
 }: {
   params: Promise<{ lang: string }>;
-  searchParams: Promise<{ step?: string; id?: string; error?: string }>;
+  searchParams: Promise<{
+    step?: string;
+    id?: string;
+    error?: string;
+    improved?: string;
+    autofill?: string;
+    uploaded?: string;
+    deleted?: string;
+    primary?: string;
+  }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
@@ -71,6 +85,12 @@ export default async function ListingNewPage({
   const copy = t(lang).listingForm;
 
   let draft: Draft | null = null;
+  let photos: Array<{
+    id: string;
+    url: string;
+    is_primary: boolean;
+    display_order: number;
+  }> = [];
   if (draftId) {
     const supabase = await createClient();
     const { data } = await supabase
@@ -82,6 +102,15 @@ export default async function ListingNewPage({
       .eq("mls_status", "draft")
       .maybeSingle();
     draft = (data as Draft | null) ?? null;
+
+    if (step === 5) {
+      const { data: photoRows } = await supabase
+        .from("property_photos")
+        .select("id,url,is_primary,display_order")
+        .eq("property_id", draftId)
+        .order("display_order", { ascending: true });
+      photos = (photoRows ?? []) as typeof photos;
+    }
   }
 
   async function saveStep1(formData: FormData) {
@@ -388,6 +417,140 @@ export default async function ListingNewPage({
     redirect(`/${lang}/listing/new?id=${id}&step=5`);
   }
 
+  async function uploadPhotosAction(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+
+    const files = formData.getAll("photos").filter(
+      (f): f is File => f instanceof File && f.size > 0,
+    );
+    if (files.length === 0) {
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=no_files`);
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    // Current max display_order so new uploads land at the end
+    const { data: existing } = await supabase
+      .from("property_photos")
+      .select("display_order")
+      .eq("property_id", id)
+      .order("display_order", { ascending: false })
+      .limit(1);
+    let nextOrder = existing && existing.length > 0 ? existing[0].display_order + 1 : 0;
+    const hasAnyExisting = (existing?.length ?? 0) > 0;
+
+    let failed = 0;
+    for (const file of files) {
+      try {
+        const { url } = await uploadPropertyPhoto(user.id, id, file);
+        await supabase.from("property_photos").insert({
+          property_id: id,
+          url,
+          is_primary: !hasAnyExisting && nextOrder === 0,
+          display_order: nextOrder,
+        });
+        nextOrder += 1;
+      } catch (e) {
+        console.error("upload failed for", file.name, e);
+        failed += 1;
+      }
+    }
+
+    if (failed > 0 && failed === files.length) {
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=upload_failed`);
+    }
+    redirect(`/${lang}/listing/new?step=5&id=${id}&uploaded=${files.length - failed}`);
+  }
+
+  async function deletePhotoAction(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    const photoId = String(formData.get("photo_id") ?? "");
+    const url = String(formData.get("url") ?? "");
+    if (!id || !photoId) {
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=required`);
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    // Verify ownership via the property
+    const { data: prop } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!prop) redirect(`/${lang}/listing/new?step=5&id=${id}&error=save_failed`);
+
+    const storagePath = storagePathFromUrl(url);
+    if (storagePath) {
+      await deletePropertyPhoto(storagePath);
+    }
+    await supabase.from("property_photos").delete().eq("id", photoId);
+    redirect(`/${lang}/listing/new?step=5&id=${id}&deleted=1`);
+  }
+
+  async function setPrimaryAction(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    const photoId = String(formData.get("photo_id") ?? "");
+    if (!id || !photoId) {
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=required`);
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    const { data: prop } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!prop) redirect(`/${lang}/listing/new?step=5&id=${id}&error=save_failed`);
+
+    await supabase
+      .from("property_photos")
+      .update({ is_primary: false })
+      .eq("property_id", id);
+    await supabase
+      .from("property_photos")
+      .update({ is_primary: true })
+      .eq("id", photoId);
+
+    redirect(`/${lang}/listing/new?step=5&id=${id}&primary=1`);
+  }
+
+  async function nextFromStep5(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from("property_photos")
+      .select("id", { count: "exact", head: true })
+      .eq("property_id", id);
+
+    if ((count ?? 0) < 10) {
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough`);
+    }
+    redirect(`/${lang}/listing/new?step=6&id=${id}`);
+  }
+
   const errorMessage =
     sp.error === "required"
       ? "All fields are required."
@@ -399,9 +562,15 @@ export default async function ListingNewPage({
             ? copy.step4.emptyToImprove
             : sp.error === "improve_failed"
               ? copy.step4.improveFailed
-              : sp.error === "save_failed"
-                ? "Could not save. Please try again."
-                : null;
+              : sp.error === "upload_failed"
+                ? copy.step5.uploadFailed
+                : sp.error === "not_enough"
+                  ? copy.step5.notEnoughPhotos
+                  : sp.error === "no_files"
+                    ? copy.step5.invalidFormat
+                    : sp.error === "save_failed"
+                      ? "Could not save. Please try again."
+                      : null;
   const improvedFlag =
     typeof sp === "object" && "improved" in sp ? (sp.improved as string) : null;
   const autofillResult =
@@ -748,8 +917,139 @@ export default async function ListingNewPage({
         </div>
       )}
 
-      {/* ─── Steps 5-8: placeholders ─── */}
-      {step > 4 && (
+      {/* ─── Step 5: Photos ─── */}
+      {step === 5 && (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between gap-4 flex-wrap">
+              <h2 className="font-display text-2xl text-ink font-normal">
+                {copy.step5.title}
+              </h2>
+              <span
+                className={`text-[10px] uppercase tracking-[0.22em] ${
+                  photos.length >= copy.minPhotos
+                    ? "text-gold font-semibold"
+                    : "text-ink/55"
+                }`}
+              >
+                {(photos.length >= copy.minPhotos
+                  ? copy.step5.photoCountReachedLabel
+                  : copy.step5.photoCountLabel
+                )
+                  .replace("{count}", String(photos.length))
+                  .replace("{min}", String(copy.minPhotos))}
+              </span>
+            </div>
+            <p className="text-base leading-relaxed text-ink/70">
+              {copy.step5.body}
+            </p>
+          </div>
+
+          {errorMessage && <ErrorBanner message={errorMessage} />}
+          {sp.uploaded && (
+            <SuccessBanner
+              message={`Uploaded ${sp.uploaded} ${
+                Number(sp.uploaded) === 1 ? "photo" : "photos"
+              }.`}
+            />
+          )}
+          {sp.deleted === "1" && (
+            <SuccessBanner message={copy.step5.deletedNotice} />
+          )}
+          {sp.primary === "1" && (
+            <SuccessBanner message={copy.step5.primaryUpdatedNotice} />
+          )}
+
+          {/* Upload form */}
+          <form
+            action={uploadPhotosAction}
+            encType="multipart/form-data"
+            className="flex flex-col gap-4 border border-gold-soft p-5"
+          >
+            <input type="hidden" name="id" value={draftId ?? ""} />
+            <input
+              type="file"
+              name="photos"
+              multiple
+              accept="image/jpeg,image/png,image/webp"
+              required
+              className="text-sm text-ink file:mr-4 file:py-2 file:px-4 file:border file:border-gold-soft file:bg-ivory file:text-ink file:text-[10px] file:font-semibold file:uppercase file:tracking-[0.22em] file:cursor-pointer hover:file:border-gold"
+            />
+            <SubmitButton>{copy.step5.uploadButton}</SubmitButton>
+          </form>
+
+          {/* Photo grid */}
+          {photos.length === 0 ? (
+            <p className="text-sm text-ink/60 italic">
+              {copy.step5.emptyState}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {photos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="relative aspect-square overflow-hidden bg-ivory-strong border border-gold-soft group"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                  {photo.is_primary && (
+                    <div className="absolute top-2 left-2 bg-gold text-ink text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1">
+                      {copy.step5.primaryBadge}
+                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/90 to-ink/0 p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {!photo.is_primary && (
+                      <form action={setPrimaryAction}>
+                        <input type="hidden" name="id" value={draftId ?? ""} />
+                        <input type="hidden" name="photo_id" value={photo.id} />
+                        <button
+                          type="submit"
+                          className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-gold"
+                        >
+                          {copy.step5.setPrimaryButton}
+                        </button>
+                      </form>
+                    )}
+                    <form action={deletePhotoAction} className="ml-auto">
+                      <input type="hidden" name="id" value={draftId ?? ""} />
+                      <input type="hidden" name="photo_id" value={photo.id} />
+                      <input type="hidden" name="url" value={photo.url} />
+                      <button
+                        type="submit"
+                        className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-red-300"
+                      >
+                        {copy.step5.deleteButton}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Next */}
+          <form
+            action={nextFromStep5}
+            className="flex items-center gap-6 border-t border-gold-soft pt-6"
+          >
+            <input type="hidden" name="id" value={draftId ?? ""} />
+            <Link
+              href={`/${lang}/listing/new?step=4&id=${draftId}`}
+              className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+            >
+              ← {copy.backLabel}
+            </Link>
+            <SubmitButton>{copy.nextLabel} →</SubmitButton>
+          </form>
+        </div>
+      )}
+
+      {/* ─── Steps 6-8: placeholders ─── */}
+      {step > 5 && (
         <div className="flex flex-col gap-6">
           <h2 className="font-display text-2xl text-ink font-normal">
             {copy.stepNames[step - 1]}
