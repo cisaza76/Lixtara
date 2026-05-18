@@ -36,6 +36,7 @@ export default async function Home({
   const prCopy = t(lang).pricing;
   const quizCopy = t(lang).quiz;
   const savingsCopy = t(lang).savings;
+  const toursCopy = t(lang).tours;
   const rebateCopy = t(lang).rebate;
   const investorCopy = t(lang).investor;
   const faqCopy = t(lang).faq;
@@ -462,6 +463,48 @@ export default async function Home({
                 </div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="virtual-tours"
+        className="border-t border-gold-soft bg-ivory-strong/30 scroll-mt-20"
+      >
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+            <div className="lg:col-span-7 flex flex-col gap-6">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                {toursCopy.eyebrow}
+              </p>
+              <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal">
+                {toursCopy.titleBefore}
+                <em className="italic text-gold">{toursCopy.titleAccent}</em>
+                {toursCopy.titleAfter}
+              </h2>
+              <p className="max-w-xl text-base leading-relaxed text-ink/70">
+                {toursCopy.body}
+              </p>
+              <span className="inline-flex items-center self-start border border-gold text-ink text-[10px] font-semibold uppercase tracking-[0.22em] px-3 py-1.5 bg-ivory">
+                {toursCopy.badge}
+              </span>
+              <p className="text-xs italic text-ink/55 leading-relaxed max-w-xl pt-2">
+                {toursCopy.techNote}
+              </p>
+            </div>
+            <ul className="lg:col-span-5 flex flex-col gap-3 border-l border-gold-soft pl-6 lg:pl-8 text-sm leading-relaxed text-ink/80">
+              {[
+                toursCopy.bullet1,
+                toursCopy.bullet2,
+                toursCopy.bullet3,
+                toursCopy.bullet4,
+              ].map((b) => (
+                <li key={b} className="flex items-start gap-3">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
