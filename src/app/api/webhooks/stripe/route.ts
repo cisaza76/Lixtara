@@ -74,7 +74,7 @@ export async function POST(req: Request) {
             user_id: userId,
             vendor: "stripe",
             tier,
-            payment_type: "tier",
+            payment_type: "flat_fee",
             stripe_checkout_session_id: sessionId,
             stripe_payment_intent_id: paymentIntentId,
             amount: (session.amount_total ?? 0) / 100,

@@ -80,7 +80,7 @@ export async function POST(req: Request) {
       user_id: user.id,
       vendor: "stripe",
       tier,
-      payment_type: "tier",
+      payment_type: "flat_fee",
       stripe_checkout_session_id: sessionId,
       amount: PRICING_TIERS[tier].flatFee,
       currency: "usd",

@@ -115,7 +115,7 @@ export default async function ListingNewPage({
   }> = [];
   type TourJobRow = { status: "uploading" | "queued" | "processing" | "ready" | "failed" | "expired" };
   type PaymentRow = {
-    status: "pending" | "processing" | "succeeded" | "failed" | "refunded" | "cancelled";
+    status: "pending" | "succeeded" | "failed" | "refunded";
     amount: number;
     tier: string | null;
   };
