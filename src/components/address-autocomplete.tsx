@@ -89,11 +89,19 @@ export function AddressAutocomplete({
       try {
         const places = await importLibrary("places");
         if (!streetInputRef.current) return;
-        autocomplete = new places.Autocomplete(streetInputRef.current, {
-          componentRestrictions: { country: "us" },
-          fields: ["address_components", "geometry", "formatted_address"],
-          types: ["address"],
-        });
+        try {
+          autocomplete = new places.Autocomplete(streetInputRef.current, {
+            componentRestrictions: { country: "us" },
+            fields: ["address_components", "geometry", "formatted_address"],
+            types: ["address"],
+          });
+        } catch (initErr) {
+          console.error("Places Autocomplete init failed", initErr);
+          setLoadError(
+            "Places API not enabled on the Google Cloud project. Type the address manually.",
+          );
+          return;
+        }
         autocomplete.addListener("place_changed", () => {
           if (!autocomplete) return;
           const place = autocomplete.getPlace();
@@ -137,7 +145,7 @@ export function AddressAutocomplete({
           type="text"
           required
           defaultValue={defaultStreet}
-          autoComplete="off"
+          autoComplete="address-line1"
           className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
         />
         {loadError ? (

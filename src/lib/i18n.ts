@@ -147,6 +147,7 @@ const dictionaries = {
       },
     },
     nav: {
+      buy: "Buy",
       sell: "Sell",
       properties: "Listings",
       pricing: "Pricing",
@@ -589,6 +590,7 @@ const dictionaries = {
       },
     },
     nav: {
+      buy: "Comprar",
       sell: "Vender",
       properties: "Listings",
       pricing: "Precios",

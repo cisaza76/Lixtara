@@ -86,7 +86,15 @@ export default async function RootLayout({
                   href={`/${lang}/properties`}
                   className="hover:text-gold transition-colors"
                 >
-                  {navCopy.properties}
+                  {navCopy.buy}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`/${lang}/listing/new`}
+                  className="hover:text-gold transition-colors"
+                >
+                  {navCopy.sell}
                 </Link>
               </li>
               <li>
