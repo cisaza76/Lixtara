@@ -338,6 +338,14 @@ export default async function Home({
                     className={`h-px ${isPopular ? "bg-ivory/15" : "bg-gold-soft"}`}
                   />
 
+                  <p
+                    className={`text-xs leading-relaxed italic ${
+                      isPopular ? "text-ivory/80" : "text-ink/70"
+                    }`}
+                  >
+                    {tCopy.forWhom}
+                  </p>
+
                   <ul className="flex flex-col gap-3 text-sm leading-snug flex-1">
                     {tCopy.features.map((feat) => (
                       <li key={feat} className="flex items-start gap-3">

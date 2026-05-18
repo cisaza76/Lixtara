@@ -351,6 +351,40 @@ export default async function ListingNewPage({
     redirect(`/${lang}/listing/new?id=${id}&step=4`);
   }
 
+  async function useSuggestedPrice(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    const { data: row } = await supabase
+      .from("properties")
+      .select("price_estimate_low,price_estimate_high")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+
+    if (!row?.price_estimate_low || !row.price_estimate_high) {
+      redirect(`/${lang}/listing/new?id=${id}&step=3&error=no_estimate`);
+    }
+
+    const avg = Math.round((row.price_estimate_low + row.price_estimate_high) / 2);
+    const { error } = await supabase
+      .from("properties")
+      .update({ list_price: avg })
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    if (error) {
+      redirect(`/${lang}/listing/new?id=${id}&step=3&error=save_failed`);
+    }
+    redirect(`/${lang}/listing/new?id=${id}&step=3&success=suggested_filled`);
+  }
+
   async function autofillStep3(formData: FormData) {
     "use server";
     const id = String(formData.get("id") ?? "");
@@ -630,6 +664,11 @@ export default async function ListingNewPage({
     const id = String(formData.get("id") ?? "");
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
 
+    const rightsConfirmed = formData.get("photos_rights_confirmed") === "1";
+    if (!rightsConfirmed) {
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=rights_required`);
+    }
+
     const supabase = await createClient();
     const { count } = await supabase
       .from("property_photos")
@@ -639,6 +678,14 @@ export default async function ListingNewPage({
     if ((count ?? 0) < 10) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough`);
     }
+
+    // Persist confirmation once migration 20260517_add_listing_extended_fields
+    // is applied (column added there). Until then this is a no-op update.
+    await supabase
+      .from("properties")
+      .update({ photos_rights_confirmed: true })
+      .eq("id", id);
+
     redirect(`/${lang}/listing/new?step=6&id=${id}`);
   }
 
@@ -683,7 +730,11 @@ export default async function ListingNewPage({
                                 ? copy.step5.invalidFormat
                                 : sp.error === "save_failed"
                                   ? "Could not save. Please try again."
-                                  : null;
+                                  : sp.error === "no_estimate"
+                                    ? "No price estimate available yet."
+                                    : sp.error === "rights_required"
+                                      ? copy.step5.ownershipRequired
+                                      : null;
   const improvedFlag =
     typeof sp === "object" && "improved" in sp ? (sp.improved as string) : null;
   const autofillResult =
@@ -694,6 +745,10 @@ export default async function ListingNewPage({
       : autofillResult && /^\d+$/.test(autofillResult)
         ? copy.step3.autofillSuccess.replace("{count}", autofillResult)
         : null;
+  const successFlag =
+    typeof sp === "object" && "success" in sp ? (sp.success as string) : null;
+  const suggestedFilledMessage =
+    successFlag === "suggested_filled" ? copy.step3.suggestedFilled : null;
 
   return (
     <StepShell
@@ -791,6 +846,9 @@ export default async function ListingNewPage({
                       <span className="text-sm text-ink/70">
                         {tierCopy.tagline}
                       </span>
+                      <span className="text-xs italic text-ink/65 leading-snug">
+                        {tierCopy.forWhom}
+                      </span>
                       <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
                         + {tier.commissionPct}% {copy.step2.commissionLabel}
                       </span>
@@ -859,6 +917,9 @@ export default async function ListingNewPage({
               <SuccessBanner message={autofillMessage} />
             )
           )}
+          {suggestedFilledMessage && (
+            <SuccessBanner message={suggestedFilledMessage} />
+          )}
 
           {/* Rentcast sales comparables panel */}
           {draft && draft.price_comps_fetched_at && draft.price_comps && (
@@ -873,25 +934,39 @@ export default async function ListingNewPage({
               </div>
 
               {draft.price_estimate_low && draft.price_estimate_high && (
-                <div className="flex flex-col gap-1 border-b border-gold-soft pb-4">
-                  <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                    {copy.step3.compsEstimateLabel}
-                  </span>
-                  <div className="font-display italic text-3xl text-ink leading-none">
-                    <span className="text-gold text-xl align-top">$</span>
-                    {Math.round(
-                      ((draft.price_estimate_low + draft.price_estimate_high) / 2) /
-                        1000,
-                    ).toLocaleString()}
-                    <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55 font-sans not-italic ml-1">
-                      K
+                <div className="flex flex-col gap-3 border-b border-gold-soft pb-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                      {copy.step3.compsEstimateLabel}
+                    </span>
+                    <div className="font-display italic text-3xl text-ink leading-none">
+                      <span className="text-gold text-xl align-top">$</span>
+                      {Math.round(
+                        ((draft.price_estimate_low + draft.price_estimate_high) / 2) /
+                          1000,
+                      ).toLocaleString()}
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55 font-sans not-italic ml-1">
+                        K
+                      </span>
+                    </div>
+                    <span className="text-xs text-ink/60">
+                      {copy.step3.compsRangeLabel}: ${" "}
+                      {draft.price_estimate_low.toLocaleString()} – $
+                      {draft.price_estimate_high.toLocaleString()}
                     </span>
                   </div>
-                  <span className="text-xs text-ink/60">
-                    {copy.step3.compsRangeLabel}: ${" "}
-                    {draft.price_estimate_low.toLocaleString()} – $
-                    {draft.price_estimate_high.toLocaleString()}
-                  </span>
+                  <form action={useSuggestedPrice}>
+                    <input type="hidden" name="id" value={draftId ?? ""} />
+                    <button
+                      type="submit"
+                      className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink border border-gold px-4 py-2 hover:bg-gold hover:text-ink transition"
+                    >
+                      {copy.step3.useSuggestedButton}
+                    </button>
+                    <p className="text-[11px] text-ink/55 italic mt-2 leading-snug">
+                      {copy.step3.useSuggestedCaption}
+                    </p>
+                  </form>
                 </div>
               )}
 
@@ -1167,6 +1242,49 @@ export default async function ListingNewPage({
             <SuccessBanner message={copy.step5.primaryUpdatedNotice} />
           )}
 
+          {/* Pro/Concierge: professional photography included banner */}
+          {(draft?.pricing_tier === "pro" ||
+            draft?.pricing_tier === "concierge") && (
+            <div className="border border-gold bg-gold/5 p-5 flex flex-col gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                {copy.step5.proIncludedTitle}
+              </p>
+              <p className="text-sm text-ink/80 leading-relaxed">
+                {copy.step5.proIncludedBody}
+              </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/70 pt-2 border-t border-gold-soft">
+                {copy.step5.proPhotosOr}
+              </p>
+            </div>
+          )}
+
+          {/* Photo ownership disclaimer */}
+          <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink">
+              {copy.step5.ownershipTitle}
+            </p>
+            <p className="text-sm text-ink/80 leading-relaxed">
+              {copy.step5.ownershipIntro}
+            </p>
+            <ul className="flex flex-col gap-2 text-sm text-ink/70 leading-relaxed">
+              <li className="flex items-start gap-3">
+                <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                <span>{copy.step5.ownershipBullet1}</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                <span>{copy.step5.ownershipBullet2}</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                <span>{copy.step5.ownershipBullet3}</span>
+              </li>
+            </ul>
+            <p className="text-xs text-ink/55 italic leading-relaxed border-t border-gold-soft pt-3">
+              {copy.step5.ownershipWarning}
+            </p>
+          </div>
+
           {/* Upload form */}
           <form
             action={uploadPhotosAction}
@@ -1184,6 +1302,16 @@ export default async function ListingNewPage({
             />
             <SubmitButton>{copy.step5.uploadButton}</SubmitButton>
           </form>
+
+          {/* Virtual Staging teaser */}
+          <div className="border border-gold-soft p-5 flex flex-col gap-2 bg-ivory-strong/30">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+              {copy.step5.stagingTitle}
+            </p>
+            <p className="text-sm text-ink/70 leading-relaxed">
+              {copy.step5.stagingBody}
+            </p>
+          </div>
 
           {/* Photo grid */}
           {photos.length === 0 ? (
@@ -1241,16 +1369,28 @@ export default async function ListingNewPage({
           {/* Next */}
           <form
             action={nextFromStep5}
-            className="flex items-center gap-6 border-t border-gold-soft pt-6"
+            className="flex flex-col gap-5 border-t border-gold-soft pt-6"
           >
             <input type="hidden" name="id" value={draftId ?? ""} />
-            <Link
-              href={`/${lang}/listing/new?step=4&id=${draftId}`}
-              className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-            >
-              ← {copy.backLabel}
-            </Link>
-            <SubmitButton>{copy.nextLabel} →</SubmitButton>
+            <label className="flex items-start gap-3 text-sm text-ink/80 leading-relaxed cursor-pointer">
+              <input
+                type="checkbox"
+                name="photos_rights_confirmed"
+                value="1"
+                required
+                className="mt-1 accent-gold w-4 h-4 shrink-0"
+              />
+              <span>{copy.step5.ownershipCheckLabel}</span>
+            </label>
+            <div className="flex items-center gap-6">
+              <Link
+                href={`/${lang}/listing/new?step=4&id=${draftId}`}
+                className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+              >
+                ← {copy.backLabel}
+              </Link>
+              <SubmitButton>{copy.nextLabel} →</SubmitButton>
+            </div>
           </form>
         </div>
       )}
