@@ -22,6 +22,7 @@ import {
   improveShowingInstructions,
 } from "@/lib/ai";
 import { lookupMiamiDadeProperty } from "@/lib/miami-dade";
+import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import {
   uploadPropertyPhoto,
   deletePropertyPhoto,
@@ -59,6 +60,10 @@ interface Draft {
   list_price: number;
   description: string | null;
   showing_instructions: string | null;
+  price_comps: RentcastComp[] | null;
+  price_estimate_low: number | null;
+  price_estimate_high: number | null;
+  price_comps_fetched_at: string | null;
 }
 
 export default async function ListingNewPage({
@@ -99,12 +104,81 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions",
+        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at",
       )
       .eq("id", draftId)
       .eq("mls_status", "draft")
       .maybeSingle();
     draft = (data as Draft | null) ?? null;
+
+    // Step 3 auto-fetch: Miami-Dade autofill (if zip is Miami-Dade + fields
+    // still placeholders) + Rentcast comps (if not fetched yet). Runs server-
+    // side on entry to Step 3 so the form pre-populates with real data + the
+    // comps panel renders immediately.
+    if (step === 3 && draft) {
+      const tasks: Promise<unknown>[] = [];
+      const updates: Record<string, unknown> = {};
+
+      const isMiamiDade = /^33\d{3}$/.test(draft.address_zip);
+      const fieldsEmpty =
+        draft.bedrooms === 0 &&
+        draft.sqft === 0 &&
+        draft.year_built <= new Date().getFullYear();
+      if (isMiamiDade && fieldsEmpty) {
+        tasks.push(
+          lookupMiamiDadeProperty(draft.address_street, draft.address_zip).then(
+            (result) => {
+              if (result.found && result.details) {
+                const d = result.details;
+                if (d.bedrooms != null) updates.bedrooms = d.bedrooms;
+                if (d.bathrooms != null) updates.bathrooms = d.bathrooms;
+                if (d.sqft != null) updates.sqft = d.sqft;
+                if (d.lot_size != null) updates.lot_size = d.lot_size;
+                if (d.year_built != null) updates.year_built = d.year_built;
+                if (d.property_type != null)
+                  updates.property_type = d.property_type;
+              }
+            },
+          ),
+        );
+      }
+
+      const compsEmpty = !draft.price_comps_fetched_at;
+      if (compsEmpty) {
+        tasks.push(
+          fetchRentcastEstimate(
+            draft.address_street,
+            draft.address_city,
+            draft.address_state,
+            draft.address_zip,
+          ).then((rc) => {
+            if (rc) {
+              updates.price_comps = rc.comps;
+              updates.price_estimate_low = rc.priceLow;
+              updates.price_estimate_high = rc.priceHigh;
+              updates.price_comps_fetched_at = new Date().toISOString();
+            } else {
+              // Mark as fetched to avoid retrying on every page load. Empty
+              // comps means "no data for this area" — user fills price manually.
+              updates.price_comps = [];
+              updates.price_comps_fetched_at = new Date().toISOString();
+            }
+          }),
+        );
+      }
+
+      if (tasks.length > 0) {
+        await Promise.allSettled(tasks);
+        if (Object.keys(updates).length > 0) {
+          await supabase
+            .from("properties")
+            .update(updates)
+            .eq("id", draftId);
+          // Re-merge into draft so the render uses fresh values.
+          draft = { ...draft, ...updates } as Draft;
+        }
+      }
+    }
 
     if (step === 5) {
       const { data: photoRows } = await supabase
@@ -232,15 +306,24 @@ export default async function ListingNewPage({
     );
 
     if (
-      !PROPERTY_TYPES.includes(propertyType as (typeof PROPERTY_TYPES)[number]) ||
-      bedrooms < 0 ||
-      bathrooms < 0 ||
-      sqft <= 0 ||
-      yearBuilt < 1800 ||
-      yearBuilt > new Date().getFullYear() + 2 ||
-      listPrice <= 0
+      !PROPERTY_TYPES.includes(propertyType as (typeof PROPERTY_TYPES)[number])
     ) {
-      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid`);
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_type`);
+    }
+    if (bedrooms < 0 || bedrooms > 30) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_beds`);
+    }
+    if (bathrooms <= 0 || bathrooms > 30) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_baths`);
+    }
+    if (sqft <= 0 || sqft > 100000) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_sqft`);
+    }
+    if (yearBuilt < 1800 || yearBuilt > new Date().getFullYear() + 2) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_year`);
+    }
+    if (listPrice <= 0 || listPrice > 1000000000) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_price`);
     }
 
     const supabase = await createClient();
@@ -566,19 +649,31 @@ export default async function ListingNewPage({
         ? copy.step1.flOnly
         : sp.error === "invalid"
           ? "Please check the values."
-          : sp.error === "empty_improve"
-            ? copy.step4.emptyToImprove
-            : sp.error === "improve_failed"
-              ? copy.step4.improveFailed
-              : sp.error === "upload_failed"
-                ? copy.step5.uploadFailed
-                : sp.error === "not_enough"
-                  ? copy.step5.notEnoughPhotos
-                  : sp.error === "no_files"
-                    ? copy.step5.invalidFormat
-                    : sp.error === "save_failed"
-                      ? "Could not save. Please try again."
-                      : null;
+          : sp.error === "invalid_type"
+            ? "Pick a property type."
+            : sp.error === "invalid_beds"
+              ? "Bedrooms must be 0–30."
+              : sp.error === "invalid_baths"
+                ? "Bathrooms must be a number greater than 0 (e.g. 2 or 2.5)."
+                : sp.error === "invalid_sqft"
+                  ? "Square feet must be greater than 0."
+                  : sp.error === "invalid_year"
+                    ? "Year built must be 1800 to current year + 2."
+                    : sp.error === "invalid_price"
+                      ? "List price must be greater than 0 (in USD, no commas)."
+                      : sp.error === "empty_improve"
+                        ? copy.step4.emptyToImprove
+                        : sp.error === "improve_failed"
+                          ? copy.step4.improveFailed
+                          : sp.error === "upload_failed"
+                            ? copy.step5.uploadFailed
+                            : sp.error === "not_enough"
+                              ? copy.step5.notEnoughPhotos
+                              : sp.error === "no_files"
+                                ? copy.step5.invalidFormat
+                                : sp.error === "save_failed"
+                                  ? "Could not save. Please try again."
+                                  : null;
   const improvedFlag =
     typeof sp === "object" && "improved" in sp ? (sp.improved as string) : null;
   const autofillResult =
@@ -734,7 +829,10 @@ export default async function ListingNewPage({
             </p>
           </div>
 
-          {/* Miami-Dade autofill */}
+          {/* Miami-Dade auto-fill notice (already ran on page entry) */}
+          {draft && draft.bedrooms > 0 && /^33\d{3}$/.test(draft.address_zip) && (
+            <SuccessBanner message={copy.step3.autoFilledNote} />
+          )}
           <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-3">
             <form action={autofillStep3}>
               <input type="hidden" name="id" value={draftId ?? ""} />
@@ -750,6 +848,113 @@ export default async function ListingNewPage({
             ) : (
               <SuccessBanner message={autofillMessage} />
             )
+          )}
+
+          {/* Rentcast sales comparables panel */}
+          {draft && draft.price_comps_fetched_at && draft.price_comps && (
+            <div className="border border-gold-soft p-6 flex flex-col gap-5">
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                  {copy.step3.compsEyebrow}
+                </p>
+                <h3 className="font-display text-2xl text-ink font-normal">
+                  {copy.step3.compsTitle}
+                </h3>
+              </div>
+
+              {draft.price_estimate_low && draft.price_estimate_high && (
+                <div className="flex flex-col gap-1 border-b border-gold-soft pb-4">
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                    {copy.step3.compsEstimateLabel}
+                  </span>
+                  <div className="font-display italic text-3xl text-ink leading-none">
+                    <span className="text-gold text-xl align-top">$</span>
+                    {Math.round(
+                      ((draft.price_estimate_low + draft.price_estimate_high) / 2) /
+                        1000,
+                    ).toLocaleString()}
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55 font-sans not-italic ml-1">
+                      K
+                    </span>
+                  </div>
+                  <span className="text-xs text-ink/60">
+                    {copy.step3.compsRangeLabel}: ${" "}
+                    {draft.price_estimate_low.toLocaleString()} – $
+                    {draft.price_estimate_high.toLocaleString()}
+                  </span>
+                </div>
+              )}
+
+              {draft.price_comps.length === 0 ? (
+                <p className="text-sm text-ink/60 italic">
+                  {copy.step3.compsEmpty}
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-ink/60 leading-relaxed">
+                    {copy.step3.compsSubtitle.replace(
+                      "{n}",
+                      String(draft.price_comps.length),
+                    )}
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    {draft.price_comps.map((c) => {
+                      const dateStr = c.removedDate || c.lastSeenDate;
+                      const daysAgo = dateStr
+                        ? Math.floor(
+                            (Date.now() - new Date(dateStr).getTime()) /
+                              (1000 * 60 * 60 * 24),
+                          )
+                        : null;
+                      return (
+                        <div
+                          key={c.formattedAddress}
+                          className="border-t border-gold-soft pt-3 flex flex-col gap-1"
+                        >
+                          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                            <span className="text-sm text-ink leading-snug">
+                              {c.formattedAddress}
+                            </span>
+                            <span className="font-display text-lg text-ink">
+                              ${c.price.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.12em] text-ink/55 flex-wrap">
+                            <span>
+                              {c.bedrooms}bd · {c.bathrooms}ba ·{" "}
+                              {c.squareFootage.toLocaleString()}sqft
+                            </span>
+                            <span className="text-gold-soft">·</span>
+                            <span>
+                              ${c.pricePerSqft}/{copy.step3.compsPerSqft}
+                            </span>
+                            <span className="text-gold-soft">·</span>
+                            <span>
+                              {c.distance.toFixed(2)} {copy.step3.compsMiles}
+                            </span>
+                            {daysAgo !== null && (
+                              <>
+                                <span className="text-gold-soft">·</span>
+                                <span
+                                  className={
+                                    c.isSold ? "text-gold" : "text-ink/55"
+                                  }
+                                >
+                                  {c.isSold
+                                    ? copy.step3.compsSold
+                                    : copy.step3.compsActive}{" "}
+                                  · {copy.step3.compsDaysAgo.replace("{n}", String(daysAgo))}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {errorMessage && <ErrorBanner message={errorMessage} />}
