@@ -28,6 +28,7 @@ import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { TourUploader } from "@/components/tour-uploader";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { CheckoutButton } from "@/components/checkout-button";
+import { PaymentStatusPoller } from "@/components/payment-status-poller";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -2089,7 +2090,8 @@ export default async function ListingNewPage({
             }
 
             // Pending path: returned from Stripe but webhook hasn't landed yet.
-            if (sp.session_id && latestPayment?.status === "pending") {
+            // Auto-poll until mls_status flips, then re-render the success card.
+            if (sp.session_id) {
               return (
                 <div className="border border-gold-soft bg-ivory-strong/40 p-6 flex flex-col gap-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
@@ -2098,6 +2100,10 @@ export default async function ListingNewPage({
                   <p className="text-sm text-ink/70 leading-relaxed">
                     {copy.step8.pendingBody}
                   </p>
+                  <PaymentStatusPoller
+                    propertyId={draftId}
+                    label="Waiting for confirmation"
+                  />
                 </div>
               );
             }
