@@ -42,6 +42,8 @@ function clampStep(value: number): number {
   return Math.min(Math.max(value, 1), TOTAL_STEPS);
 }
 
+type OccupancyStatus = "vacant" | "owner_occupied" | "tenant_occupied";
+
 interface Draft {
   id: string;
   address_street: string;
@@ -64,6 +66,15 @@ interface Draft {
   price_estimate_low: number | null;
   price_estimate_high: number | null;
   price_comps_fetched_at: string | null;
+  parking_spaces: number | null;
+  hoa_fee: number | null;
+  tax_annual_amount: number | null;
+  has_pool: boolean | null;
+  cash_only: boolean | null;
+  as_is_sale: boolean | null;
+  flood_zone: string | null;
+  occupancy_status: OccupancyStatus | null;
+  show_phone_on_portals: boolean | null;
 }
 
 export default async function ListingNewPage({
@@ -104,7 +115,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at",
+        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,show_phone_on_portals",
       )
       .eq("id", draftId)
       .eq("mls_status", "draft")
@@ -305,6 +316,28 @@ export default async function ListingNewPage({
       10,
     );
 
+    const parkingRaw = String(formData.get("parking_spaces") ?? "").trim();
+    const parkingSpaces =
+      parkingRaw === "" ? null : Number.parseInt(parkingRaw, 10);
+    const hoaRaw = String(formData.get("hoa_fee") ?? "").trim();
+    const hoaFee = hoaRaw === "" ? null : Number.parseInt(hoaRaw, 10);
+    const taxRaw = String(formData.get("tax_annual_amount") ?? "").trim();
+    const taxAnnual = taxRaw === "" ? null : Number.parseInt(taxRaw, 10);
+    const hasPool = formData.get("has_pool") === "1";
+    const cashOnly = formData.get("cash_only") === "1";
+    const asIsSale = formData.get("as_is_sale") === "1";
+    const floodZoneRaw = String(formData.get("flood_zone") ?? "")
+      .trim()
+      .toUpperCase();
+    const floodZone = floodZoneRaw === "" ? null : floodZoneRaw.slice(0, 10);
+    const occupancyRaw = String(formData.get("occupancy_status") ?? "");
+    const occupancyStatus = (
+      ["vacant", "owner_occupied", "tenant_occupied"] as const
+    ).includes(occupancyRaw as OccupancyStatus)
+      ? (occupancyRaw as OccupancyStatus)
+      : null;
+    const showPhone = formData.get("show_phone_on_portals") === "1";
+
     if (
       !PROPERTY_TYPES.includes(propertyType as (typeof PROPERTY_TYPES)[number])
     ) {
@@ -325,6 +358,24 @@ export default async function ListingNewPage({
     if (listPrice <= 0 || listPrice > 1000000000) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_price`);
     }
+    if (
+      parkingSpaces !== null &&
+      (Number.isNaN(parkingSpaces) || parkingSpaces < 0 || parkingSpaces > 50)
+    ) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_parking`);
+    }
+    if (
+      hoaFee !== null &&
+      (Number.isNaN(hoaFee) || hoaFee < 0 || hoaFee > 100000)
+    ) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_hoa`);
+    }
+    if (
+      taxAnnual !== null &&
+      (Number.isNaN(taxAnnual) || taxAnnual < 0 || taxAnnual > 10000000)
+    ) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_tax`);
+    }
 
     const supabase = await createClient();
     const {
@@ -342,6 +393,15 @@ export default async function ListingNewPage({
         lot_size: lotSize,
         year_built: yearBuilt,
         list_price: listPrice,
+        parking_spaces: parkingSpaces,
+        hoa_fee: hoaFee,
+        tax_annual_amount: taxAnnual,
+        has_pool: hasPool,
+        cash_only: cashOnly,
+        as_is_sale: asIsSale,
+        flood_zone: floodZone,
+        occupancy_status: occupancyStatus,
+        show_phone_on_portals: showPhone,
       })
       .eq("id", id)
       .eq("owner_id", user.id);
@@ -734,7 +794,13 @@ export default async function ListingNewPage({
                                     ? "No price estimate available yet."
                                     : sp.error === "rights_required"
                                       ? copy.step5.ownershipRequired
-                                      : null;
+                                      : sp.error === "invalid_parking"
+                                        ? "Parking spaces must be 0–50."
+                                        : sp.error === "invalid_hoa"
+                                          ? "HOA fee must be a non-negative dollar amount."
+                                          : sp.error === "invalid_tax"
+                                            ? "Property tax must be a non-negative dollar amount."
+                                            : null;
   const improvedFlag =
     typeof sp === "object" && "improved" in sp ? (sp.improved as string) : null;
   const autofillResult =
@@ -1116,6 +1182,140 @@ export default async function ListingNewPage({
                 draft?.list_price ? String(draft.list_price) : ""
               }
             />
+
+            {/* Optional details */}
+            <div className="border-t border-gold-soft pt-8 flex flex-col gap-6">
+              <div className="flex flex-col gap-2">
+                <h3 className="font-display text-xl text-ink font-normal">
+                  {copy.step3.moreSectionTitle}
+                </h3>
+                <p className="text-sm text-ink/65 leading-relaxed">
+                  {copy.step3.moreSectionBody}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Field
+                  label={copy.step3.parkingLabel}
+                  name="parking_spaces"
+                  type="text"
+                  defaultValue={
+                    draft?.parking_spaces != null
+                      ? String(draft.parking_spaces)
+                      : ""
+                  }
+                />
+                <Field
+                  label={copy.step3.hoaLabel}
+                  name="hoa_fee"
+                  type="text"
+                  defaultValue={
+                    draft?.hoa_fee != null ? String(draft.hoa_fee) : ""
+                  }
+                />
+                <Field
+                  label={copy.step3.taxLabel}
+                  name="tax_annual_amount"
+                  type="text"
+                  defaultValue={
+                    draft?.tax_annual_amount != null
+                      ? String(draft.tax_annual_amount)
+                      : ""
+                  }
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="flex flex-col gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+                    {copy.step3.floodZoneLabel}
+                  </span>
+                  <input
+                    type="text"
+                    name="flood_zone"
+                    defaultValue={draft?.flood_zone ?? ""}
+                    placeholder="X / AE / VE / …"
+                    maxLength={10}
+                    className="border border-gold-soft px-3 py-2 text-base text-ink bg-ivory focus:outline-none focus:border-gold uppercase"
+                  />
+                </label>
+                <p className="text-xs text-ink/55 leading-relaxed">
+                  {copy.step3.floodZoneHelp}
+                </p>
+              </div>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+                  {copy.step3.occupancyLabel}
+                </span>
+                <select
+                  name="occupancy_status"
+                  defaultValue={draft?.occupancy_status ?? ""}
+                  className="border border-gold-soft px-3 py-2 text-base text-ink bg-ivory focus:outline-none focus:border-gold"
+                >
+                  <option value="">—</option>
+                  <option value="vacant">{copy.step3.occupancyVacant}</option>
+                  <option value="owner_occupied">
+                    {copy.step3.occupancyOwner}
+                  </option>
+                  <option value="tenant_occupied">
+                    {copy.step3.occupancyTenant}
+                  </option>
+                </select>
+              </label>
+
+              <fieldset className="flex flex-col gap-3 border border-gold-soft p-4">
+                <legend className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 px-2">
+                  {copy.step3.boolGroupLabel}
+                </legend>
+                <label className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="has_pool"
+                    value="1"
+                    defaultChecked={draft?.has_pool ?? false}
+                    className="accent-gold w-4 h-4"
+                  />
+                  <span>{copy.step3.poolLabel}</span>
+                </label>
+                <label className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="cash_only"
+                    value="1"
+                    defaultChecked={draft?.cash_only ?? false}
+                    className="accent-gold w-4 h-4"
+                  />
+                  <span>{copy.step3.cashOnlyLabel}</span>
+                </label>
+                <label className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="as_is_sale"
+                    value="1"
+                    defaultChecked={draft?.as_is_sale ?? false}
+                    className="accent-gold w-4 h-4"
+                  />
+                  <span>{copy.step3.asIsLabel}</span>
+                </label>
+              </fieldset>
+
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="show_phone_on_portals"
+                    value="1"
+                    defaultChecked={draft?.show_phone_on_portals ?? false}
+                    className="accent-gold w-4 h-4"
+                  />
+                  <span>{copy.step3.showPhoneLabel}</span>
+                </label>
+                <p className="text-xs text-ink/55 leading-relaxed pl-7">
+                  {copy.step3.showPhoneHelp}
+                </p>
+              </div>
+            </div>
 
             <div className="flex items-center gap-6">
               <Link
@@ -1551,6 +1751,46 @@ export default async function ListingNewPage({
                         </span>
                         <span className="text-ink">{draft.year_built}</span>
                       </div>
+                      {(draft.parking_spaces != null ||
+                        draft.hoa_fee != null ||
+                        draft.tax_annual_amount != null ||
+                        draft.flood_zone ||
+                        draft.occupancy_status ||
+                        draft.has_pool ||
+                        draft.cash_only ||
+                        draft.as_is_sale) && (
+                        <div className="col-span-2 sm:col-span-4 border-t border-gold-soft pt-3 mt-1 flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink/75">
+                          {draft.parking_spaces != null && (
+                            <span>🚗 {draft.parking_spaces} parking</span>
+                          )}
+                          {draft.hoa_fee != null && (
+                            <span>
+                              🏢 HOA ${draft.hoa_fee.toLocaleString()}/mo
+                            </span>
+                          )}
+                          {draft.tax_annual_amount != null && (
+                            <span>
+                              🧾 Tax ${draft.tax_annual_amount.toLocaleString()}/yr
+                            </span>
+                          )}
+                          {draft.flood_zone && (
+                            <span>🌊 Flood zone {draft.flood_zone}</span>
+                          )}
+                          {draft.occupancy_status && (
+                            <span>
+                              🏠{" "}
+                              {draft.occupancy_status === "vacant"
+                                ? copy.step3.occupancyVacant
+                                : draft.occupancy_status === "owner_occupied"
+                                  ? copy.step3.occupancyOwner
+                                  : copy.step3.occupancyTenant}
+                            </span>
+                          )}
+                          {draft.has_pool && <span>🏊 Pool</span>}
+                          {draft.cash_only && <span>💵 Cash only</span>}
+                          {draft.as_is_sale && <span>📋 As-is</span>}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-ink/55 italic">
