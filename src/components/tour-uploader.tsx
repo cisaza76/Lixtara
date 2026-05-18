@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type JobStatus =
   | "uploading"
@@ -51,12 +52,35 @@ export function TourUploader({ propertyId, initialJob, labels }: TourUploaderPro
     setIsSubmitting(true);
     setStatus("uploading");
 
-    const fd = new FormData();
-    fd.append("property_id", propertyId);
-    fd.append("video", file);
-
     try {
-      const res = await fetch("/api/tours/submit", { method: "POST", body: fd });
+      // 1. Upload directly to Supabase Storage (bypasses Vercel 4.5MB cap)
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("not_authenticated");
+
+      const ext = (file.name.split(".").pop() ?? "mp4").toLowerCase();
+      const storagePath = `${propertyId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("tour-videos")
+        .upload(storagePath, file, {
+          contentType: file.type || "video/mp4",
+          upsert: false,
+        });
+      if (upErr) throw new Error(`storage_upload_failed: ${upErr.message}`);
+
+      // 2. POST tiny JSON to the server, which streams from Storage to KIRI
+      const res = await fetch("/api/tours/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          property_id: propertyId,
+          storage_path: storagePath,
+          size_bytes: file.size,
+          filename: file.name || `tour-${propertyId}.${ext}`,
+        }),
+      });
       const data = (await res.json()) as { error?: string; job_id?: string };
       if (!res.ok || data.error) {
         throw new Error(data.error ?? "submit_failed");

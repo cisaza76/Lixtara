@@ -1,21 +1,26 @@
 // POST /api/tours/submit
-// Accepts: multipart form with `property_id` + `video` (≤500MB, ≤3min, ≤1080p).
-// Stores raw upload in Supabase Storage bucket `tour-videos/{property_id}/{uuid}.mp4`,
-// submits to KIRI Engine, creates a `tour_jobs` row with the returned task_id.
-// Returns: { job_id, kiri_task_id }
+// Body (JSON): { property_id: string, storage_path: string, size_bytes: number, filename: string }
 //
-// Constraints: only the property owner can submit. Pro/Concierge tier only.
-// The video duration/resolution checks are best-effort (the seller's browser is
-// expected to enforce them via the upload UI); server-side is just size cap.
+// Client uploads the video directly to Supabase Storage (tour-videos bucket)
+// to bypass Vercel's 4.5 MB platform body limit, then POSTs ONLY the path here.
+// This endpoint then downloads the bytes from Storage server-side (no limit
+// on internal fetches) and forwards as multipart to KIRI.
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { submitVideo } from "@/lib/kiri";
 
-const MAX_BYTES = 500 * 1024 * 1024; // 500 MB
+const MAX_BYTES = 500 * 1024 * 1024;
 const ELIGIBLE_TIERS = new Set(["pro", "concierge"]);
 
 export const maxDuration = 300;
+
+interface SubmitBody {
+  property_id?: string;
+  storage_path?: string;
+  size_bytes?: number;
+  filename?: string;
+}
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -26,31 +31,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
 
-  const form = await req.formData();
-  const propertyId = String(form.get("property_id") ?? "");
-  const video = form.get("video");
+  let body: SubmitBody;
+  try {
+    body = (await req.json()) as SubmitBody;
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
 
-  if (!propertyId || !(video instanceof File)) {
+  const { property_id, storage_path, size_bytes, filename } = body;
+  if (!property_id || !storage_path || !filename) {
     return NextResponse.json(
-      { error: "property_id_and_video_required" },
+      { error: "property_id_storage_path_filename_required" },
       { status: 400 },
     );
   }
-  if (video.size > MAX_BYTES) {
+  if (size_bytes && size_bytes > MAX_BYTES) {
     return NextResponse.json(
       { error: "video_too_large", max_bytes: MAX_BYTES },
       { status: 400 },
     );
   }
 
-  // Verify ownership + tier eligibility in a single round-trip.
-  const { data: property, error: propErr } = await supabase
+  const { data: property } = await supabase
     .from("properties")
     .select("id, owner_id, pricing_tier")
-    .eq("id", propertyId)
+    .eq("id", property_id)
     .eq("owner_id", user.id)
     .maybeSingle();
-  if (propErr || !property) {
+  if (!property) {
     return NextResponse.json(
       { error: "property_not_found_or_not_yours" },
       { status: 404 },
@@ -63,31 +71,16 @@ export async function POST(req: Request) {
     );
   }
 
-  // Store the raw upload so we can re-submit if KIRI loses it within 3 days.
-  const ext = (video.name.split(".").pop() ?? "mp4").toLowerCase();
-  const storagePath = `${propertyId}/${crypto.randomUUID()}.${ext}`;
-  const { error: uploadErr } = await supabase.storage
-    .from("tour-videos")
-    .upload(storagePath, video, {
-      contentType: video.type || "video/mp4",
-      upsert: false,
-    });
-  if (uploadErr) {
-    return NextResponse.json(
-      { error: "storage_upload_failed", detail: uploadErr.message },
-      { status: 500 },
-    );
-  }
-
+  // Create the job row first so the UI can poll status while we download.
   const { data: job, error: jobInsertErr } = await supabase
     .from("tour_jobs")
     .insert({
-      property_id: propertyId,
+      property_id,
       owner_id: user.id,
       vendor: "kiri",
       status: "uploading",
-      source_video_path: storagePath,
-      source_video_size_bytes: video.size,
+      source_video_path: storage_path,
+      source_video_size_bytes: size_bytes ?? null,
     })
     .select("id")
     .single();
@@ -98,12 +91,26 @@ export async function POST(req: Request) {
     );
   }
 
-  // Hand off to KIRI. If submission fails we mark the job 'failed' so the
-  // seller sees the error in their dashboard rather than the job hanging.
+  // Pull the video back from Supabase Storage (server-side, no Vercel cap on
+  // internal fetches) and stream it to KIRI as multipart.
+  const { data: videoBlob, error: dlErr } = await supabase.storage
+    .from("tour-videos")
+    .download(storage_path);
+  if (dlErr || !videoBlob) {
+    await supabase
+      .from("tour_jobs")
+      .update({ status: "failed", error_message: `download: ${dlErr?.message}` })
+      .eq("id", job.id);
+    return NextResponse.json(
+      { error: "storage_download_failed", detail: dlErr?.message },
+      { status: 502 },
+    );
+  }
+
   try {
     const { serialize } = await submitVideo({
-      videoBytes: video,
-      filename: video.name || `tour-${propertyId}.${ext}`,
+      videoBytes: videoBlob,
+      filename,
     });
     await supabase
       .from("tour_jobs")

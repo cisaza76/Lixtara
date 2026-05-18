@@ -23,13 +23,10 @@ import {
 } from "@/lib/ai";
 import { lookupMiamiDadeProperty } from "@/lib/miami-dade";
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
-import {
-  uploadPropertyPhoto,
-  deletePropertyPhoto,
-  storagePathFromUrl,
-} from "@/lib/storage";
+import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { TourUploader } from "@/components/tour-uploader";
+import { PhotoUploader } from "@/components/photo-uploader";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -625,13 +622,17 @@ export default async function ListingNewPage({
 
   async function uploadPhotosAction(formData: FormData) {
     "use server";
+    // Direct-to-Supabase uploads happen client-side (browser uploads bypass
+    // Vercel's 4.5 MB platform body limit). This action only receives the
+    // resulting public URLs and persists property_photos rows.
     const id = String(formData.get("id") ?? "");
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
 
-    const files = formData.getAll("photos").filter(
-      (f): f is File => f instanceof File && f.size > 0,
-    );
-    if (files.length === 0) {
+    const urls = formData
+      .getAll("urls")
+      .map((u) => String(u))
+      .filter((u) => u.length > 0);
+    if (urls.length === 0) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=no_files`);
     }
 
@@ -641,37 +642,39 @@ export default async function ListingNewPage({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
 
-    // Current max display_order so new uploads land at the end
+    // Ownership gate — even though Storage RLS already prevented foreign
+    // uploads, double-check before inserting DB rows.
+    const { data: own } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!own) redirect(`/${lang}/listing/new?step=5&id=${id}&error=save_failed`);
+
     const { data: existing } = await supabase
       .from("property_photos")
       .select("display_order")
       .eq("property_id", id)
       .order("display_order", { ascending: false })
       .limit(1);
-    let nextOrder = existing && existing.length > 0 ? existing[0].display_order + 1 : 0;
+    let nextOrder =
+      existing && existing.length > 0 ? existing[0].display_order + 1 : 0;
     const hasAnyExisting = (existing?.length ?? 0) > 0;
 
-    let failed = 0;
-    for (const file of files) {
-      try {
-        const { url } = await uploadPropertyPhoto(user.id, id, file);
-        await supabase.from("property_photos").insert({
-          property_id: id,
-          url,
-          is_primary: !hasAnyExisting && nextOrder === 0,
-          display_order: nextOrder,
-        });
-        nextOrder += 1;
-      } catch (e) {
-        console.error("upload failed for", file.name, e);
-        failed += 1;
-      }
-    }
-
-    if (failed > 0 && failed === files.length) {
+    const rows = urls.map((url, i) => ({
+      property_id: id,
+      url,
+      is_primary: !hasAnyExisting && nextOrder + i === 0,
+      display_order: nextOrder + i,
+    }));
+    const { error: insErr } = await supabase
+      .from("property_photos")
+      .insert(rows);
+    if (insErr) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=upload_failed`);
     }
-    redirect(`/${lang}/listing/new?step=5&id=${id}&uploaded=${files.length - failed}`);
+    redirect(`/${lang}/listing/new?step=5&id=${id}&uploaded=${urls.length}`);
   }
 
   async function deletePhotoAction(formData: FormData) {
@@ -1513,23 +1516,17 @@ export default async function ListingNewPage({
             </p>
           </div>
 
-          {/* Upload form */}
-          <form
-            action={uploadPhotosAction}
-            encType="multipart/form-data"
-            className="flex flex-col gap-4 border border-gold-soft p-5"
-          >
-            <input type="hidden" name="id" value={draftId ?? ""} />
-            <input
-              type="file"
-              name="photos"
-              multiple
-              accept="image/jpeg,image/png,image/webp"
-              required
-              className="text-sm text-ink file:mr-4 file:py-2 file:px-4 file:border file:border-gold-soft file:bg-ivory file:text-ink file:text-[10px] file:font-semibold file:uppercase file:tracking-[0.22em] file:cursor-pointer hover:file:border-gold"
-            />
-            <SubmitButton>{copy.step5.uploadButton}</SubmitButton>
-          </form>
+          {/* Upload form — direct-to-Supabase to bypass Vercel 4.5MB cap */}
+          <PhotoUploader
+            propertyId={draftId ?? ""}
+            persistAction={uploadPhotosAction}
+            labels={{
+              uploadButton: copy.step5.uploadButton,
+              uploading: copy.step5.uploadingNote,
+              invalidFormat: copy.step5.invalidFormat,
+              genericError: copy.step5.uploadFailed,
+            }}
+          />
 
           {/* Virtual Staging teaser */}
           <div className="border border-gold-soft p-5 flex flex-col gap-2 bg-ivory-strong/30">
