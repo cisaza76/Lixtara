@@ -77,11 +77,12 @@ export async function POST(req: Request) {
 
     const { error: insErr } = await supabase.from("payments").insert({
       property_id: propertyId,
-      owner_id: user.id,
+      user_id: user.id,
       vendor: "stripe",
       tier,
-      stripe_session_id: sessionId,
-      amount_cents: PRICING_TIERS[tier].flatFee * 100,
+      payment_type: "tier",
+      stripe_checkout_session_id: sessionId,
+      amount: PRICING_TIERS[tier].flatFee,
       currency: "usd",
       status: "pending",
     });

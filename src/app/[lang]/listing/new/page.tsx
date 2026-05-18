@@ -116,8 +116,8 @@ export default async function ListingNewPage({
   type TourJobRow = { status: "uploading" | "queued" | "processing" | "ready" | "failed" | "expired" };
   type PaymentRow = {
     status: "pending" | "processing" | "succeeded" | "failed" | "refunded" | "cancelled";
-    amount_cents: number;
-    tier: string;
+    amount: number;
+    tier: string | null;
   };
   let tourJob: TourJobRow | null = null;
   let latestPayment: PaymentRow | null = null;
@@ -222,7 +222,7 @@ export default async function ListingNewPage({
     if (step === 8) {
       const { data: payRow } = await supabase
         .from("payments")
-        .select("status, amount_cents, tier")
+        .select("status, amount, tier")
         .eq("property_id", draftId)
         .order("created_at", { ascending: false })
         .limit(1)

@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       const { data: updatedRows, error: payErr } = await supabase
         .from("payments")
         .update(updateFields)
-        .eq("stripe_session_id", sessionId)
+        .eq("stripe_checkout_session_id", sessionId)
         .select("id, property_id");
       if (payErr) {
         console.error("stripe webhook: payment update failed", payErr);
@@ -68,12 +68,13 @@ export async function POST(req: Request) {
         if (tier && userId) {
           await supabase.from("payments").insert({
             property_id: propertyId,
-            owner_id: userId,
+            user_id: userId,
             vendor: "stripe",
             tier,
-            stripe_session_id: sessionId,
+            payment_type: "tier",
+            stripe_checkout_session_id: sessionId,
             stripe_payment_intent_id: paymentIntentId,
-            amount_cents: session.amount_total ?? 0,
+            amount: (session.amount_total ?? 0) / 100,
             currency: session.currency ?? "usd",
             status: "succeeded",
             completed_at: new Date().toISOString(),
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
       await supabase
         .from("payments")
         .update({ status: "failed", error_message: event.type })
-        .eq("stripe_session_id", session.id);
+        .eq("stripe_checkout_session_id", session.id);
       break;
     }
 
