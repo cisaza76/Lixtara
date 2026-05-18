@@ -9,6 +9,7 @@ import {
   BROKER_LICENSE,
 } from "@/lib/broker";
 import { createClient } from "@/lib/supabase/server";
+import { LouiWidget } from "@/components/loui-widget";
 import "../globals.css";
 
 const inter = Inter({
@@ -47,6 +48,7 @@ export default async function RootLayout({
   const navCopy = t(lang).nav;
   const authNavCopy = t(lang).auth.nav;
   const footerCopy = t(lang).footer;
+  const louiCopy = t(lang).loui;
   const altLang: Locale = lang === "en" ? "es" : "en";
   const year = new Date().getFullYear();
 
@@ -261,6 +263,21 @@ export default async function RootLayout({
             </div>
           </div>
         </footer>
+
+        <LouiWidget
+          openLabel={louiCopy.openLabel}
+          closeLabel={louiCopy.closeLabel}
+          headerEyebrow={louiCopy.headerEyebrow}
+          headerTitle={louiCopy.headerTitle}
+          headerSubtitle={louiCopy.headerSubtitle}
+          placeholder={louiCopy.placeholder}
+          sendLabel={louiCopy.sendLabel}
+          emptyTitle={louiCopy.emptyTitle}
+          emptyBody={louiCopy.emptyBody}
+          suggestions={[...louiCopy.suggestions]}
+          toolNotice={louiCopy.toolNotice}
+          disclaimer={louiCopy.disclaimer}
+        />
       </body>
     </html>
   );
