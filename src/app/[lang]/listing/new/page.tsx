@@ -27,6 +27,7 @@ import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { TourUploader } from "@/components/tour-uploader";
 import { PhotoUploader } from "@/components/photo-uploader";
+import { CheckoutButton } from "@/components/checkout-button";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -51,6 +52,7 @@ interface Draft {
   latitude: number | null;
   longitude: number | null;
   pricing_tier: PricingTierId | null;
+  mls_status: string;
   property_type: string;
   bedrooms: number;
   bathrooms: number;
@@ -91,6 +93,7 @@ export default async function ListingNewPage({
     primary?: string;
     success?: string;
     suggested_tier?: string;
+    session_id?: string;
   }>;
 }) {
   const { lang } = await params;
@@ -110,16 +113,22 @@ export default async function ListingNewPage({
     is_primary: boolean;
     display_order: number;
   }> = [];
-  let tourJob: { status: "uploading" | "queued" | "processing" | "ready" | "failed" | "expired" } | null = null;
+  type TourJobRow = { status: "uploading" | "queued" | "processing" | "ready" | "failed" | "expired" };
+  type PaymentRow = {
+    status: "pending" | "processing" | "succeeded" | "failed" | "refunded" | "cancelled";
+    amount_cents: number;
+    tier: string;
+  };
+  let tourJob: TourJobRow | null = null;
+  let latestPayment: PaymentRow | null = null;
   if (draftId) {
     const supabase = await createClient();
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,show_phone_on_portals",
+        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,show_phone_on_portals",
       )
       .eq("id", draftId)
-      .eq("mls_status", "draft")
       .maybeSingle();
     draft = (data as Draft | null) ?? null;
 
@@ -207,7 +216,18 @@ export default async function ListingNewPage({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (tourRow) tourJob = tourRow as NonNullable<typeof tourJob>;
+      if (tourRow) tourJob = tourRow as TourJobRow;
+    }
+
+    if (step === 8) {
+      const { data: payRow } = await supabase
+        .from("payments")
+        .select("status, amount_cents, tier")
+        .eq("property_id", draftId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (payRow) latestPayment = payRow as PaymentRow;
     }
   }
 
@@ -1993,8 +2013,8 @@ export default async function ListingNewPage({
         </div>
       )}
 
-      {/* ─── Steps 7-8: placeholders ─── */}
-      {step > 6 && (
+      {/* ─── Step 7: Agreement (DocuSign placeholder until F2.2.B) ─── */}
+      {step === 7 && (
         <div className="flex flex-col gap-6">
           <h2 className="font-display text-2xl text-ink font-normal">
             {copy.stepNames[step - 1]}
@@ -2002,14 +2022,141 @@ export default async function ListingNewPage({
           <p className="text-base leading-relaxed text-ink/70">
             {draftId ? copy.placeholderStepLater : copy.placeholderStep}
           </p>
-          <div className="flex gap-4">
+          <div className="flex gap-6 items-center">
             <Link
-              href={`/${lang}/listing/new?step=${step - 1}${draftId ? `&id=${draftId}` : ""}`}
+              href={`/${lang}/listing/new?step=6${draftId ? `&id=${draftId}` : ""}`}
               className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
             >
               ← {copy.backLabel}
             </Link>
+            {draftId && (
+              <Link
+                href={`/${lang}/listing/new?step=8&id=${draftId}`}
+                className="text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+              >
+                {copy.nextLabel} →
+              </Link>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* ─── Step 8: Payment (Stripe Checkout) ─── */}
+      {step === 8 && draft && draftId && (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-2xl text-ink font-normal">
+              {copy.step8.title}
+            </h2>
+            <p className="text-base leading-relaxed text-ink/70">
+              {copy.step8.body}
+            </p>
+          </div>
+
+          {sp.error === "cancelled" && (
+            <ErrorBanner message={copy.step8.cancelledNotice} />
+          )}
+
+          {(() => {
+            const tierId =
+              draft.pricing_tier && draft.pricing_tier in PRICING_TIERS
+                ? draft.pricing_tier
+                : null;
+            const tier = tierId ? PRICING_TIERS[tierId] : null;
+
+            // Success path: payment succeeded OR property already advanced.
+            const isSucceeded =
+              latestPayment?.status === "succeeded" ||
+              draft.mls_status === "pending_approval" ||
+              draft.mls_status === "active";
+            if (isSucceeded) {
+              return (
+                <div className="border border-gold bg-gold/5 p-6 flex flex-col gap-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                    {copy.step8.successTitle}
+                  </p>
+                  <p className="text-base text-ink leading-relaxed">
+                    {copy.step8.successBody}
+                  </p>
+                  <Link
+                    href={`/${lang}/properties`}
+                    className="self-start inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+                  >
+                    {copy.step8.viewDashboard}
+                  </Link>
+                </div>
+              );
+            }
+
+            // Pending path: returned from Stripe but webhook hasn't landed yet.
+            if (sp.session_id && latestPayment?.status === "pending") {
+              return (
+                <div className="border border-gold-soft bg-ivory-strong/40 p-6 flex flex-col gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+                    {copy.step8.pendingTitle}
+                  </p>
+                  <p className="text-sm text-ink/70 leading-relaxed">
+                    {copy.step8.pendingBody}
+                  </p>
+                </div>
+              );
+            }
+
+            if (!tierId || !tier) {
+              return (
+                <p className="text-sm text-ink/60 italic">
+                  Pricing tier not set — go back to Step 2.
+                </p>
+              );
+            }
+
+            return (
+              <div className="flex flex-col gap-6">
+                <div className="border border-gold-soft p-6 flex flex-col gap-3">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                      {copy.step8.tierLabel}
+                    </span>
+                    <span className="font-display text-xl text-ink">
+                      {tierId.charAt(0).toUpperCase() + tierId.slice(1)}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4 border-t border-gold-soft pt-3">
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                      {copy.step8.amountLabel}
+                    </span>
+                    <span className="font-display italic text-3xl text-ink leading-none">
+                      <span className="text-gold text-xl align-top">$</span>
+                      {tier.flatFee}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink/55 leading-relaxed">
+                    {copy.step8.feeNote.replace(
+                      "{pct}",
+                      String(tier.commissionPct),
+                    )}
+                  </p>
+                </div>
+
+                <CheckoutButton
+                  propertyId={draftId}
+                  lang={lang}
+                  labels={{
+                    payButton: copy.step8.payButton,
+                    redirecting: copy.step8.redirecting,
+                    failed: copy.step8.failed,
+                  }}
+                />
+
+                <Link
+                  href={`/${lang}/listing/new?step=7&id=${draftId}`}
+                  className="self-start text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+                >
+                  ← {copy.backLabel}
+                </Link>
+              </div>
+            );
+          })()}
         </div>
       )}
     </StepShell>
