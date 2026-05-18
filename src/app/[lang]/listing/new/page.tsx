@@ -29,6 +29,7 @@ import {
   storagePathFromUrl,
 } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
+import { TourUploader } from "@/components/tour-uploader";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -112,6 +113,7 @@ export default async function ListingNewPage({
     is_primary: boolean;
     display_order: number;
   }> = [];
+  let tourJob: { status: "uploading" | "queued" | "processing" | "ready" | "failed" | "expired" } | null = null;
   if (draftId) {
     const supabase = await createClient();
     const { data } = await supabase
@@ -200,6 +202,15 @@ export default async function ListingNewPage({
         .eq("property_id", draftId)
         .order("display_order", { ascending: true });
       photos = (photoRows ?? []) as typeof photos;
+
+      const { data: tourRow } = await supabase
+        .from("tour_jobs")
+        .select("status")
+        .eq("property_id", draftId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (tourRow) tourJob = tourRow as NonNullable<typeof tourJob>;
     }
   }
 
@@ -1528,6 +1539,44 @@ export default async function ListingNewPage({
             <p className="text-sm text-ink/70 leading-relaxed">
               {copy.step5.stagingBody}
             </p>
+          </div>
+
+          {/* 3D Walkthrough Tour (Pro + Concierge) */}
+          <div className="border border-gold-soft p-5 flex flex-col gap-4 bg-ivory-strong/30">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+              {copy.step5.tourTitle}
+            </p>
+            <p className="text-sm text-ink/70 leading-relaxed">
+              {copy.step5.tourBody}
+            </p>
+            {draft?.pricing_tier === "pro" || draft?.pricing_tier === "concierge" ? (
+              <>
+                <p className="text-xs text-ink/55 leading-relaxed italic border-t border-gold-soft pt-3">
+                  {copy.step5.tourCaptureGuide}
+                </p>
+                <TourUploader
+                  propertyId={draftId ?? ""}
+                  initialJob={tourJob}
+                  labels={{
+                    fileLabel: copy.step5.tourFileLabel,
+                    uploadButton: copy.step5.tourUploadButton,
+                    uploading: copy.step5.tourUploading,
+                    queued: copy.step5.tourQueued,
+                    processing: copy.step5.tourProcessing,
+                    ready: copy.step5.tourReady,
+                    failed: copy.step5.tourFailed,
+                    expired: copy.step5.tourExpired,
+                    replaceButton: copy.step5.tourReplaceButton,
+                    fileTooLarge: copy.step5.tourFileTooLarge,
+                    genericError: copy.step5.tourGenericError,
+                  }}
+                />
+              </>
+            ) : (
+              <p className="text-xs text-ink/55 italic border-t border-gold-soft pt-3">
+                {copy.step5.tourTierGate}
+              </p>
+            )}
           </div>
 
           {/* Photo grid */}

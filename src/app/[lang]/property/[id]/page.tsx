@@ -10,6 +10,8 @@ import {
   cleanDemoPrefix,
 } from "@/lib/properties";
 import { BROKERAGE_NAME, BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
+import { createClient } from "@/lib/supabase/server";
+import { TourViewer } from "@/components/tour-viewer";
 
 export default async function PropertyDetailPage({
   params,
@@ -43,6 +45,26 @@ export default async function PropertyDetailPage({
 
   const street = cleanDemoPrefix(property.address_street);
   const fullAddress = `${street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
+
+  // Latest ready 3D tour for this property (if any). Signed URL valid 1h.
+  let tourZipUrl: string | null = null;
+  {
+    const supabase = await createClient();
+    const { data: tourRow } = await supabase
+      .from("tour_jobs")
+      .select("ply_storage_path")
+      .eq("property_id", property.id)
+      .eq("status", "ready")
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (tourRow?.ply_storage_path) {
+      const { data: signed } = await supabase.storage
+        .from("tour-models")
+        .createSignedUrl(tourRow.ply_storage_path, 60 * 60);
+      tourZipUrl = signed?.signedUrl ?? null;
+    }
+  }
   const mapUrl =
     property.latitude && property.longitude
       ? mapboxStaticUrl(property.latitude, property.longitude, 600, 400)
@@ -123,6 +145,23 @@ export default async function PropertyDetailPage({
                 {copy.demoBadge}
               </div>
             )}
+          </div>
+        )}
+
+        {tourZipUrl && (
+          <div className="mb-12 lg:mb-16">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-3">
+              {copy.tourEyebrow}
+            </p>
+            <TourViewer
+              zipUrl={tourZipUrl}
+              posterUrl={property.primary_photo_url ?? undefined}
+              labels={{
+                loading: copy.tourLoading,
+                failed: copy.tourFailed,
+                fallback: copy.tourFallback,
+              }}
+            />
           </div>
         )}
 
