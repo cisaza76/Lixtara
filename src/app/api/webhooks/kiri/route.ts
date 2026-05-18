@@ -13,12 +13,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import {
-  getDownloadUrl,
-  getJobStatus,
-  type KiriStatus,
-  verifyWebhookSignature,
-} from "@/lib/kiri";
+import { getJobStatus, type KiriStatus, verifyWebhookSignature } from "@/lib/kiri";
 
 interface KiriWebhookPayload {
   serialize?: string;
@@ -84,20 +79,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, note: "unknown_serialize" });
   }
 
-  // Re-derive status from KIRI rather than trusting the webhook payload —
-  // their `status` int might not align with our enum, and the GET endpoint
-  // is canonical.
+  // Re-derive state from KIRI — payload.status int isn't trustworthy.
+  // getJobStatus internally hits getModelZip which returns either a usable
+  // modelUrl (= ready) or a documented envelope code for every other state.
   let kiriStatus: KiriStatus = "unknown";
+  let modelUrl: string | null = null;
   try {
     const fresh = await getJobStatus(payload.serialize);
     kiriStatus = fresh.status;
+    modelUrl = fresh.modelUrl;
   } catch {
     // fall through with unknown — recorded below
   }
 
-  if (kiriStatus === "ready") {
+  if (kiriStatus === "ready" && modelUrl) {
     try {
-      const modelUrl = await getDownloadUrl(payload.serialize);
       const storagePath = `${job.property_id}/${payload.serialize}.zip`;
       const { size } = await downloadAndStore(modelUrl, storagePath);
       await supabase

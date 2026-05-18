@@ -32,11 +32,6 @@ interface KiriSubmitData {
   calculateType: number;
 }
 
-interface KiriStatusData {
-  serialize: string;
-  status: number;
-}
-
 interface KiriModelData {
   serialize: string;
   modelUrl: string;
@@ -53,22 +48,17 @@ export type KiriStatus =
   | "expired"
   | "unknown";
 
-function mapStatus(rawCode: number, rawStatus?: number): KiriStatus {
-  // Envelope codes from /code-details (returned with HTTP 500 wrapper):
-  // 2000 processing · 2001 failed · 2002 expired · 2008 queued
-  if (rawCode === 2008) return "queued";
-  if (rawCode === 2000) return "processing";
-  if (rawCode === 2001) return "failed";
-  if (rawCode === 2002) return "expired";
-
-  // Successful envelope (code 0 or 200) means data.status reflects real state.
-  // Per docs example { status: 2 } corresponds to ready (model downloadable).
-  // Status enum from observed behaviour: 0 queued · 1 processing · 2 ready.
-  if (rawCode === 0 || rawCode === 200) {
-    if (rawStatus === 0) return "queued";
-    if (rawStatus === 1) return "processing";
-    if (rawStatus === 2) return "ready";
-  }
+// Map KIRI's envelope codes to our status enum. These codes are the
+// authoritative state — the inner `status` int from getStatus has values
+// (observed: 3=queued) that aren't documented and can't be relied upon.
+// Codes from docs.kiriengine.app/code-details:
+//   2000 processing · 2001 failed · 2002 expired · 2008 queued
+function mapEnvelopeCode(code: number, hasModelUrl: boolean): KiriStatus {
+  if (hasModelUrl && (code === 0 || code === 200)) return "ready";
+  if (code === 2008) return "queued";
+  if (code === 2000) return "processing";
+  if (code === 2001) return "failed";
+  if (code === 2002) return "expired";
   return "unknown";
 }
 
@@ -129,32 +119,35 @@ export interface JobStatus {
   serialize: string;
   status: KiriStatus;
   rawCode: number;
+  modelUrl: string | null;
 }
 
+// Canonical status check — uses getModelZip because its envelope codes are
+// documented and unambiguous: returns the model URL when ready, or one of
+// {2000 processing · 2001 failed · 2002 expired · 2008 queued} otherwise.
+// One round-trip handles both "what state is this in?" and "if ready, where
+// do I download it?".
 export async function getJobStatus(serialize: string): Promise<JobStatus> {
-  const env = await kiriRequest<KiriStatusData>(
-    "GET",
-    `/model/getStatus?serialize=${encodeURIComponent(serialize)}`,
-  );
-  return {
-    serialize,
-    status: mapStatus(env.code, env.data?.status),
-    rawCode: env.code,
-  };
-}
-
-export async function getDownloadUrl(serialize: string): Promise<string> {
   const env = await kiriRequest<KiriModelData>(
     "GET",
     `/model/getModelZip?serialize=${encodeURIComponent(serialize)}`,
   );
-  if (!env.data?.modelUrl) {
-    if (env.code === 2002) {
-      throw new Error("KIRI model expired (past 3-day retention window)");
-    }
-    throw new Error(`KIRI getModelZip failed (code ${env.code}): ${env.msg}`);
+  const modelUrl = env.data?.modelUrl ?? null;
+  return {
+    serialize,
+    status: mapEnvelopeCode(env.code, !!modelUrl),
+    rawCode: env.code,
+    modelUrl,
+  };
+}
+
+export async function getDownloadUrl(serialize: string): Promise<string> {
+  const { modelUrl, status, rawCode } = await getJobStatus(serialize);
+  if (modelUrl) return modelUrl;
+  if (status === "expired") {
+    throw new Error("KIRI model expired (past 3-day retention window)");
   }
-  return env.data.modelUrl;
+  throw new Error(`KIRI model not ready (status ${status}, code ${rawCode})`);
 }
 
 // Webhook verification — KIRI signs each webhook with a shared secret. The
