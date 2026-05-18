@@ -180,7 +180,7 @@ export default async function ListingNewPage({
       }
     }
 
-    if (step === 5) {
+    if (step === 5 || step === 6) {
       const { data: photoRows } = await supabase
         .from("property_photos")
         .select("id,url,is_primary,display_order")
@@ -640,6 +640,16 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough`);
     }
     redirect(`/${lang}/listing/new?step=6&id=${id}`);
+  }
+
+  async function nextFromStep6(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    // Step 7 (Agreement) is still a placeholder (DocuSign blocked). Just
+    // advance — no status change. Status flips to 'pending_approval' after
+    // Step 8 (payment) when F2.2 lands.
+    redirect(`/${lang}/listing/new?step=7&id=${id}`);
   }
 
   const errorMessage =
@@ -1245,8 +1255,303 @@ export default async function ListingNewPage({
         </div>
       )}
 
-      {/* ─── Steps 6-8: placeholders ─── */}
-      {step > 5 && (
+      {/* ─── Step 6: Review ─── */}
+      {step === 6 && draft && (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-2xl text-ink font-normal">
+              {copy.step6.title}
+            </h2>
+            <p className="text-base leading-relaxed text-ink/70">
+              {copy.step6.body}
+            </p>
+          </div>
+
+          {(() => {
+            const tier = draft.pricing_tier
+              ? PRICING_TIERS[draft.pricing_tier]
+              : null;
+            const tierCopy = draft.pricing_tier
+              ? t(lang).pricing.tiers[draft.pricing_tier]
+              : null;
+            const primaryPhoto = photos.find((p) => p.is_primary);
+            const incomplete =
+              !draft.address_street ||
+              !draft.pricing_tier ||
+              draft.bedrooms === 0 ||
+              draft.sqft === 0 ||
+              draft.list_price === 0 ||
+              !draft.description ||
+              photos.length < 10;
+
+            const SectionHeader = ({
+              title,
+              editStep,
+            }: {
+              title: string;
+              editStep: number;
+            }) => (
+              <div className="flex items-baseline justify-between gap-3 mb-3">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                  {title}
+                </h3>
+                <Link
+                  href={`/${lang}/listing/new?step=${editStep}&id=${draftId}`}
+                  className="text-[10px] uppercase tracking-[0.18em] text-ink/55 hover:text-gold transition-colors"
+                >
+                  {copy.step6.editLink}
+                </Link>
+              </div>
+            );
+
+            return (
+              <>
+                {incomplete && (
+                  <ErrorBanner message={copy.step6.incompleteWarn} />
+                )}
+
+                {/* Address */}
+                <div className="border border-gold-soft p-5">
+                  <SectionHeader title={copy.step6.sectionAddress} editStep={1} />
+                  {draft.address_street ? (
+                    <div className="flex flex-col gap-1 text-sm text-ink">
+                      <span>{draft.address_street}</span>
+                      <span className="text-ink/60">
+                        {draft.address_city}, {draft.address_state}{" "}
+                        {draft.address_zip}
+                      </span>
+                      {draft.latitude && draft.longitude && (
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45 mt-1">
+                          ✓ Verified · {draft.latitude.toFixed(4)},{" "}
+                          {draft.longitude.toFixed(4)}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ink/55 italic">
+                      {copy.step6.emptySection}
+                    </p>
+                  )}
+                </div>
+
+                {/* Plan */}
+                <div className="border border-gold-soft p-5">
+                  <SectionHeader title={copy.step6.sectionPlan} editStep={2} />
+                  {tier && tierCopy ? (
+                    <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-display text-lg text-ink">
+                          {tierCopy.name}
+                        </span>
+                        <span className="text-xs text-ink/60">
+                          {tierCopy.tagline}
+                        </span>
+                      </div>
+                      <div className="text-right text-sm text-ink">
+                        <div className="font-display italic">
+                          <span className="text-gold">$</span>
+                          {tier.flatFee}{" "}
+                          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55 not-italic font-sans">
+                            {copy.step6.flatLabel}
+                          </span>
+                        </div>
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          + {tier.commissionPct}% {copy.step6.commissionLabel} ·{" "}
+                          {copy.step6.termLabel}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ink/55 italic">
+                      {copy.step6.emptySection}
+                    </p>
+                  )}
+                </div>
+
+                {/* Details */}
+                <div className="border border-gold-soft p-5">
+                  <SectionHeader
+                    title={copy.step6.sectionDetails}
+                    editStep={3}
+                  />
+                  {draft.bedrooms > 0 && draft.sqft > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          Type
+                        </span>
+                        <span className="text-ink">
+                          {draft.property_type.replace("_", " ")}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          Beds / Baths
+                        </span>
+                        <span className="text-ink">
+                          {draft.bedrooms} bd / {draft.bathrooms} ba
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          {copy.step6.sqftLabel}
+                        </span>
+                        <span className="text-ink">
+                          {draft.sqft.toLocaleString()}
+                          {draft.lot_size && (
+                            <span className="text-ink/55 text-xs ml-1">
+                              · lot {draft.lot_size.toLocaleString()}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          {copy.step6.builtLabel}
+                        </span>
+                        <span className="text-ink">{draft.year_built}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ink/55 italic">
+                      {copy.step6.emptySection}
+                    </p>
+                  )}
+                </div>
+
+                {/* Description + showings */}
+                <div className="border border-gold-soft p-5">
+                  <SectionHeader
+                    title={copy.step6.sectionDescription}
+                    editStep={4}
+                  />
+                  {draft.description ? (
+                    <div className="flex flex-col gap-4">
+                      <p className="text-sm leading-relaxed text-ink/80 whitespace-pre-wrap">
+                        {draft.description}
+                      </p>
+                      <div className="border-t border-gold-soft pt-3">
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          {copy.step6.showingsLabel}:
+                        </span>{" "}
+                        <span className="text-sm text-ink/80">
+                          {draft.showing_instructions ?? copy.step6.noShowings}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ink/55 italic">
+                      {copy.step6.emptySection}
+                    </p>
+                  )}
+                </div>
+
+                {/* Photos */}
+                <div className="border border-gold-soft p-5">
+                  <SectionHeader title={copy.step6.sectionPhotos} editStep={5} />
+                  {photos.length > 0 ? (
+                    <>
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55 mb-3">
+                        {copy.step6.photosCountLabel
+                          .replace("{n}", String(photos.length))
+                          .replace(
+                            "{primary}",
+                            primaryPhoto
+                              ? "set"
+                              : copy.step6.primaryNone,
+                          )}
+                      </p>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {photos.slice(0, 12).map((p) => (
+                          <div
+                            key={p.id}
+                            className="relative aspect-square overflow-hidden bg-ivory-strong"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={p.url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                            {p.is_primary && (
+                              <div className="absolute top-1 left-1 bg-gold text-ink text-[7px] font-semibold tracking-wider uppercase px-1 py-0.5">
+                                P
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-ink/55 italic">
+                      {copy.step6.emptySection}
+                    </p>
+                  )}
+                </div>
+
+                {/* List price + comps */}
+                <div className="border border-gold-soft p-5">
+                  <SectionHeader
+                    title={copy.step6.sectionPricing}
+                    editStep={3}
+                  />
+                  {draft.list_price > 0 ? (
+                    <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                      <div className="font-display italic text-3xl text-ink">
+                        <span className="text-gold text-lg align-top">$</span>
+                        {draft.list_price.toLocaleString()}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                        {draft.price_estimate_low && draft.price_estimate_high
+                          ? copy.step6.compsCount
+                              .replace(
+                                "{n}",
+                                String(draft.price_comps?.length ?? 0),
+                              )
+                              .replace(
+                                "{range}",
+                                `${draft.price_estimate_low.toLocaleString()}–${draft.price_estimate_high.toLocaleString()}`,
+                              )
+                          : copy.step6.compsNone}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ink/55 italic">
+                      {copy.step6.emptySection}
+                    </p>
+                  )}
+                </div>
+
+                {/* Continue */}
+                <div className="border-t border-gold-soft pt-8 flex flex-col gap-4">
+                  <h3 className="font-display text-xl text-ink">
+                    {copy.step6.readyTitle}
+                  </h3>
+                  <p className="text-sm text-ink/70 leading-relaxed">
+                    {copy.step6.readyBody}
+                  </p>
+                  <form
+                    action={nextFromStep6}
+                    className="flex items-center gap-6"
+                  >
+                    <input type="hidden" name="id" value={draftId ?? ""} />
+                    <Link
+                      href={`/${lang}/listing/new?step=5&id=${draftId}`}
+                      className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+                    >
+                      ← {copy.backLabel}
+                    </Link>
+                    <SubmitButton>{copy.step6.continueButton}</SubmitButton>
+                  </form>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ─── Steps 7-8: placeholders ─── */}
+      {step > 6 && (
         <div className="flex flex-col gap-6">
           <h2 className="font-display text-2xl text-ink font-normal">
             {copy.stepNames[step - 1]}
