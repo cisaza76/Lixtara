@@ -1,9 +1,17 @@
 "use client";
 
+// 3D Gaussian Splatting viewer using `gsplat`. Swapped from
+// @mkkellogg/gaussian-splats-3d after that lib threw a "Cannot read
+// properties of undefined (reading 'splatCount')" error on KIRI's standard
+// Inria/Kerbl .ply output (349k splats, all expected fields present).
+//
+// Flow: fetch the .zip from Supabase Storage → fflate unzipSync →
+// extract 3DGS.ply → PLYLoader.LoadFromArrayBuffer → render loop.
+
 import { useEffect, useRef, useState } from "react";
 
 interface TourViewerProps {
-  /** Signed Supabase Storage URL pointing at the KIRI .zip (contains a .ply 3DGS scene). */
+  /** Signed Supabase Storage URL pointing at the KIRI .zip (contains 3DGS.ply). */
   zipUrl: string;
   /** Optional cover image shown until the splat loads. */
   posterUrl?: string;
@@ -17,18 +25,19 @@ interface TourViewerProps {
 type Status = "idle" | "downloading" | "unzipping" | "loading" | "ready" | "error";
 
 export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
-  const hostRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    let viewer: { dispose?: () => void } | null = null;
+    let rafId: number | null = null;
+    let cleanup: (() => void) | null = null;
 
     async function load() {
       try {
-        if (!hostRef.current) return;
+        if (!canvasRef.current) return;
         setStatus("downloading");
 
         const resp = await fetch(zipUrl);
@@ -56,10 +65,9 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         }
 
         setStatus("unzipping");
-        setProgress(0.65);
+        setProgress(0.7);
         const fflate = await import("fflate");
         const unzipped = fflate.unzipSync(zipBytes);
-        // KIRI returns either {name}.ply directly or wrapped — pick the first .ply.
         const plyEntry = Object.entries(unzipped).find(([n]) =>
           n.toLowerCase().endsWith(".ply"),
         );
@@ -69,34 +77,44 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         setStatus("loading");
         setProgress(0.85);
 
-        // mkkellogg viewer is a side-effecting module, only import on client.
-        // SceneFormat enum (per the library): Splat=0, KSplat=1, Ply=2.
-        // KIRI Engine outputs Inria/Kerbl-format .ply for 3DGS scenes.
-        const GS = await import("@mkkellogg/gaussian-splats-3d");
-        const Viewer = (GS as unknown as { Viewer: new (opts: Record<string, unknown>) => {
-          addSplatScene: (url: string | ArrayBuffer, opts?: Record<string, unknown>) => Promise<void>;
-          start: () => void;
-          dispose: () => void;
-        } }).Viewer;
+        const SPLAT = await import("gsplat");
+        const renderer = new SPLAT.WebGLRenderer(canvasRef.current);
+        const scene = new SPLAT.Scene();
+        const camera = new SPLAT.Camera();
+        const controls = new SPLAT.OrbitControls(camera, canvasRef.current);
 
-        const v = new Viewer({
-          cameraUp: [0, 1, 0],
-          initialCameraPosition: [0, 0, 5],
-          initialCameraLookAt: [0, 0, 0],
-          rootElement: hostRef.current,
-          sharedMemoryForWorkers: false,
-        });
-        viewer = v;
-        const arrayBuffer = plyBytes.buffer.slice(
-          plyBytes.byteOffset,
-          plyBytes.byteOffset + plyBytes.byteLength,
+        SPLAT.PLYLoader.LoadFromArrayBuffer(
+          plyBytes.buffer.slice(
+            plyBytes.byteOffset,
+            plyBytes.byteOffset + plyBytes.byteLength,
+          ),
+          scene,
         );
-        await v.addSplatScene(arrayBuffer, { format: 2 });
-        if (cancelled) {
-          v.dispose();
-          return;
-        }
-        v.start();
+
+        const handleResize = () => {
+          if (!canvasRef.current) return;
+          renderer.setSize(
+            canvasRef.current.clientWidth,
+            canvasRef.current.clientHeight,
+          );
+        };
+        handleResize();
+        window.addEventListener("resize", handleResize);
+
+        const frame = () => {
+          if (cancelled) return;
+          controls.update();
+          renderer.render(scene, camera);
+          rafId = requestAnimationFrame(frame);
+        };
+        frame();
+
+        cleanup = () => {
+          if (rafId !== null) cancelAnimationFrame(rafId);
+          window.removeEventListener("resize", handleResize);
+          renderer.dispose?.();
+        };
+
         setStatus("ready");
         setProgress(1);
       } catch (e) {
@@ -109,13 +127,13 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
     load();
     return () => {
       cancelled = true;
-      viewer?.dispose?.();
+      cleanup?.();
     };
   }, [zipUrl]);
 
   if (status === "error") {
     return (
-      <div className="aspect-video w-full bg-ivory-strong/40 border border-gold-soft flex items-center justify-center text-center p-8">
+      <div className="relative aspect-video w-full bg-ivory-strong/40 border border-gold-soft flex items-center justify-center text-center p-8">
         {posterUrl && (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
@@ -137,7 +155,10 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
 
   return (
     <div className="relative aspect-video w-full bg-ivory-strong/60 overflow-hidden border border-gold-soft">
-      <div ref={hostRef} className="absolute inset-0" />
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full"
+      />
       {status !== "ready" && (
         <div className="absolute inset-0 flex items-center justify-center bg-ivory-strong/80 backdrop-blur-sm">
           {posterUrl && (
