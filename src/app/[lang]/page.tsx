@@ -16,6 +16,7 @@ import {
 } from "@/lib/pricing-tiers";
 import { PlanQuiz } from "@/components/plan-quiz";
 import { SavingsSlider } from "@/components/savings-slider";
+import { RebateSlider } from "@/components/rebate-slider";
 
 export default async function Home({
   params,
@@ -35,6 +36,8 @@ export default async function Home({
   const prCopy = t(lang).pricing;
   const quizCopy = t(lang).quiz;
   const savingsCopy = t(lang).savings;
+  const rebateCopy = t(lang).rebate;
+  const investorCopy = t(lang).investor;
   const faqCopy = t(lang).faq;
 
   const selectedValue =
@@ -459,6 +462,140 @@ export default async function Home({
                 </div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="buyer-rebate"
+        className="border-t border-gold-soft scroll-mt-20"
+      >
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start mb-16 lg:mb-20">
+            <div className="lg:col-span-7 flex flex-col gap-6">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                {rebateCopy.eyebrow}
+              </p>
+              <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal">
+                {rebateCopy.titleBefore}
+                <em className="italic text-gold">{rebateCopy.titleAccent}</em>
+                {rebateCopy.titleAfter}
+              </h2>
+              <p className="max-w-xl text-base leading-relaxed text-ink/70">
+                {rebateCopy.body}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 sm:items-center pt-2">
+                <Link
+                  href={`/${lang}/properties`}
+                  className="inline-flex items-center justify-center px-8 py-4 bg-ink text-ivory text-[11px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+                >
+                  {rebateCopy.ctaPrimary}
+                </Link>
+                <Link
+                  href={`/${lang}/contact?topic=buyer-rebate`}
+                  className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center"
+                >
+                  {rebateCopy.ctaSecondary} →
+                </Link>
+              </div>
+            </div>
+            <ul className="lg:col-span-5 flex flex-col gap-3 border-l border-gold-soft pl-6 lg:pl-8 text-sm leading-relaxed text-ink/80">
+              {[
+                rebateCopy.bullet1,
+                rebateCopy.bullet2,
+                rebateCopy.bullet3,
+                rebateCopy.bullet4,
+              ].map((b) => (
+                <li key={b} className="flex items-start gap-3">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <RebateSlider
+            priceLabel={rebateCopy.priceLabel}
+            commissionLabel={rebateCopy.commissionLabel}
+            feeLabel={rebateCopy.feeLabel}
+            rebateLabel={rebateCopy.rebateLabel}
+            capNotice={rebateCopy.capNotice}
+            formulaLabel={rebateCopy.formulaLabel}
+          />
+        </div>
+      </section>
+
+      <section
+        id="investor-club"
+        className="border-t border-gold-soft bg-ink text-ivory scroll-mt-20"
+      >
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <div className="flex flex-col gap-5 mb-12 lg:mb-16">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+              {investorCopy.eyebrow}
+            </p>
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ivory font-normal max-w-2xl">
+              {investorCopy.titleBefore}
+              <em className="italic text-gold">{investorCopy.titleAccent}</em>
+              {investorCopy.titleAfter}
+            </h2>
+            <p className="max-w-2xl text-base leading-relaxed text-ivory/70">
+              {investorCopy.body}
+            </p>
+            <span className="inline-flex items-center self-start border border-gold text-gold text-[10px] font-semibold uppercase tracking-[0.22em] px-3 py-1.5">
+              {investorCopy.waitlistBadge}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+            {(["silver", "gold", "platinum"] as const).map((tierId) => {
+              const tCopy = investorCopy.tiers[tierId];
+              const isFeatured = tierId === "gold";
+              return (
+                <div
+                  key={tierId}
+                  className={`flex flex-col gap-6 p-8 lg:p-10 ${
+                    isFeatured
+                      ? "bg-ivory text-ink border border-gold"
+                      : "border border-ivory/15"
+                  }`}
+                >
+                  <div className="flex flex-col gap-2">
+                    <h3 className="font-display text-3xl font-normal leading-none">
+                      {tCopy.name}
+                    </h3>
+                    <p
+                      className={`text-sm ${isFeatured ? "text-ink/70" : "text-ivory/65"}`}
+                    >
+                      {tCopy.tagline}
+                    </p>
+                  </div>
+                  <div
+                    className={`h-px ${isFeatured ? "bg-gold-soft" : "bg-ivory/15"}`}
+                  />
+                  <ul className="flex flex-col gap-3 text-sm leading-snug flex-1">
+                    {tCopy.bullets.map((b) => (
+                      <li key={b} className="flex items-start gap-3">
+                        <span aria-hidden className="text-gold mt-1 leading-none">
+                          •
+                        </span>
+                        <span className={isFeatured ? "text-ink" : "text-ivory"}>
+                          {b}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-12 lg:mt-16 flex justify-center">
+            <Link
+              href={`/${lang}/contact?topic=investor-club`}
+              className="inline-flex items-center justify-center px-10 py-5 bg-gold text-ink text-xs font-medium tracking-[0.2em] uppercase hover:bg-gold/90 transition-colors"
+            >
+              {investorCopy.ctaWaitlist}
+            </Link>
           </div>
         </div>
       </section>
