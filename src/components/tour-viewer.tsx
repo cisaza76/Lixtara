@@ -74,6 +74,59 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         if (!plyEntry) throw new Error("no_ply_in_zip");
         const plyBytes = plyEntry[1];
 
+        // KIRI normalises bounds to ~100 units with outlier splats stretching
+        // the bounding box well past the actual room (sky / noise around the
+        // capture). Use cameras.json (the real iPhone path = inside the room)
+        // for centring + scale instead. Apply gsplat's 90° X rotation so
+        // positions match the rotated splat frame.
+        const camerasEntry = Object.entries(unzipped).find(([n]) =>
+          n.toLowerCase().endsWith("cameras.json"),
+        );
+        let targetX = 0;
+        let targetY = 0;
+        let targetZ = 0;
+        let radius = 4;
+        if (camerasEntry) {
+          try {
+            const txt = new TextDecoder().decode(camerasEntry[1]);
+            const cams = JSON.parse(txt) as Array<{
+              position: [number, number, number];
+            }>;
+            if (cams.length > 0) {
+              // Rotate 90° around X (gsplat convention): (x,y,z) → (x,-z,y)
+              const rotated = cams.map((c) => ({
+                x: c.position[0],
+                y: -c.position[2],
+                z: c.position[1],
+              }));
+              for (const p of rotated) {
+                targetX += p.x;
+                targetY += p.y;
+                targetZ += p.z;
+              }
+              targetX /= rotated.length;
+              targetY /= rotated.length;
+              targetZ /= rotated.length;
+              let maxDist = 0;
+              for (const p of rotated) {
+                const dx = p.x - targetX;
+                const dy = p.y - targetY;
+                const dz = p.z - targetZ;
+                const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if (d > maxDist) maxDist = d;
+              }
+              radius = Math.max(maxDist * 1.8, 2);
+            }
+          } catch {
+            // fall through with defaults
+          }
+        }
+        // eslint-disable-next-line no-console
+        console.log("tour-viewer orbit", {
+          target: [targetX, targetY, targetZ],
+          radius,
+        });
+
         setStatus("loading");
         setProgress(0.85);
 
@@ -82,37 +135,15 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         const scene = new SPLAT.Scene();
         const camera = new SPLAT.Camera();
 
-        // Load the splat first so we can read its real bounding box and
-        // position the orbit camera based on it. KIRI's cameras.json has
-        // the original capture positions, but gsplat rotates the .ply by
-        // 90° on import which puts those camera positions in a different
-        // frame than the splats — bounds straight from the loaded Splat
-        // are the most reliable signal.
-        const splat = SPLAT.PLYLoader.LoadFromArrayBuffer(
+        SPLAT.PLYLoader.LoadFromArrayBuffer(
           plyBytes.buffer.slice(
             plyBytes.byteOffset,
             plyBytes.byteOffset + plyBytes.byteLength,
           ),
           scene,
         );
-        splat.recalculateBounds();
-        const bounds = splat.bounds;
-        const centre = bounds.center();
-        const size = bounds.size();
-        const maxDim = Math.max(size.x, size.y, size.z);
-        // Distance ~0.8× the longest axis usually frames an interior scene
-        // nicely. Outliers in the splat set can blow up bounds.size() — cap
-        // the radius so we don't end up viewing from another building.
-        const rawRadius = maxDim * 0.8;
-        const radius = Math.min(Math.max(rawRadius, 2), 12);
-        // eslint-disable-next-line no-console
-        console.log("tour-viewer bounds", {
-          centre: [centre.x, centre.y, centre.z],
-          size: [size.x, size.y, size.z],
-          maxDim,
-          radius,
-        });
 
+        const target = new SPLAT.Vector3(targetX, targetY, targetZ);
         const controls = new SPLAT.OrbitControls(
           camera,
           canvasRef.current,
@@ -120,10 +151,10 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
           -Math.PI * 0.05,
           radius,
           false,
-          centre,
+          target,
         );
-        controls.minZoom = 0.5;
-        controls.maxZoom = Math.max(radius * 4, 30);
+        controls.minZoom = 0.3;
+        controls.maxZoom = Math.max(radius * 5, 40);
 
         const handleResize = () => {
           if (!canvasRef.current) return;
