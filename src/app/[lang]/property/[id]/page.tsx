@@ -12,6 +12,8 @@ import {
 import { BROKERAGE_NAME, BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { createClient } from "@/lib/supabase/server";
 import { TourViewer } from "@/components/tour-viewer";
+import { OfferForm } from "@/components/offer-form";
+import { SaveButton } from "@/components/save-button";
 
 export default async function PropertyDetailPage({
   params,
@@ -47,7 +49,12 @@ export default async function PropertyDetailPage({
   const fullAddress = `${street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
 
   // Latest ready 3D tour for this property (if any). Signed URL valid 1h.
+  // Also resolves current user + owner_id + saved state for the offer form
+  // and save button.
   let tourZipUrl: string | null = null;
+  let signedIn = false;
+  let isOwner = false;
+  let initiallySaved = false;
   {
     const supabase = await createClient();
     const { data: tourRow } = await supabase
@@ -64,7 +71,29 @@ export default async function PropertyDetailPage({
         .createSignedUrl(tourRow.ply_storage_path, 60 * 60);
       tourZipUrl = signed?.signedUrl ?? null;
     }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    signedIn = !!user;
+    if (user) {
+      const { data: ownerRow } = await supabase
+        .from("properties")
+        .select("owner_id")
+        .eq("id", property.id)
+        .maybeSingle();
+      isOwner = ownerRow?.owner_id === user.id;
+
+      const { data: savedRow } = await supabase
+        .from("saved_properties")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("property_id", property.id)
+        .maybeSingle();
+      initiallySaved = !!savedRow;
+    }
   }
+  const offerCopy = t(lang).offer;
+  const saveCopy = t(lang).save;
   const mapUrl =
     property.latitude && property.longitude
       ? mapboxStaticUrl(property.latitude, property.longitude, 600, 400)
@@ -169,9 +198,25 @@ export default async function PropertyDetailPage({
           {/* LEFT: details */}
           <div className="lg:col-span-7 flex flex-col gap-10">
             <div className="flex flex-col gap-4">
-              <h1 className="font-display text-3xl md:text-4xl lg:text-5xl leading-tight text-ink font-normal">
-                {street}
-              </h1>
+              <div className="flex items-start justify-between gap-4">
+                <h1 className="font-display text-3xl md:text-4xl lg:text-5xl leading-tight text-ink font-normal">
+                  {street}
+                </h1>
+                {!isOwner && (
+                  <SaveButton
+                    propertyId={property.id}
+                    initiallySaved={initiallySaved}
+                    signedIn={signedIn}
+                    signInHref={`/${lang}/sign-in?next=/property/${property.id}`}
+                    labels={{
+                      saveButton: saveCopy.saveButton,
+                      savedButton: saveCopy.savedButton,
+                      saveFailed: saveCopy.saveFailed,
+                      removeFailed: saveCopy.removeFailed,
+                    }}
+                  />
+                )}
+              </div>
               <p className="text-base text-ink/60">
                 {property.address_city}, {property.address_state}{" "}
                 {property.address_zip}
@@ -260,12 +305,15 @@ export default async function PropertyDetailPage({
               </div>
             </div>
 
-            <Link
-              href={`/${lang}/contact?listing=${property.id}`}
-              className="inline-flex items-center justify-center px-10 py-5 bg-ink text-ivory text-xs font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
-            >
-              {copy.cta}
-            </Link>
+            <OfferForm
+              propertyId={property.id}
+              lang={lang}
+              listPrice={property.list_price}
+              signedIn={signedIn}
+              signInHref={`/${lang}/sign-in?next=/property/${property.id}`}
+              isOwner={isOwner}
+              labels={offerCopy}
+            />
             <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed text-center">
               {BROKERAGE_NAME} ·{" "}
               {copy.buyerCommissionLabel}: {property.buyer_agent_commission}%

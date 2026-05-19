@@ -189,6 +189,69 @@ export default async function DashboardPage({
     toursByProperty.set(t.property_id, arr);
   }
 
+  // Buyer side: offers I've made + saved properties.
+  const [{ data: myOffers }, { data: savedRows }] = await Promise.all([
+    supabase
+      .from("offers")
+      .select("id,property_id,offer_amount,status,created_at")
+      .eq("buyer_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("saved_properties")
+      .select("property_id,created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+  const offers = (myOffers ?? []) as Array<{
+    id: string;
+    property_id: string;
+    offer_amount: number;
+    status: string;
+    created_at: string;
+  }>;
+  const savedIds = ((savedRows ?? []) as Array<{ property_id: string }>).map(
+    (s) => s.property_id,
+  );
+  const relatedPropertyIds = Array.from(
+    new Set([...offers.map((o) => o.property_id), ...savedIds]),
+  );
+  const propertyById = new Map<
+    string,
+    { address_street: string; address_city: string; address_state: string; list_price: number }
+  >();
+  if (relatedPropertyIds.length > 0) {
+    const { data: rows } = await supabase
+      .from("properties")
+      .select("id,address_street,address_city,address_state,list_price")
+      .in("id", relatedPropertyIds);
+    for (const r of (rows ?? []) as Array<{
+      id: string;
+      address_street: string;
+      address_city: string;
+      address_state: string;
+      list_price: number;
+    }>) {
+      propertyById.set(r.id, r);
+    }
+  }
+  const savedPhotoMap = new Map<string, string>();
+  if (savedIds.length > 0) {
+    const { data: photos } = await supabase
+      .from("property_photos")
+      .select("property_id,url,is_primary,display_order")
+      .in("property_id", savedIds)
+      .order("display_order", { ascending: true });
+    for (const ph of (photos ?? []) as PhotoRow[]) {
+      if (ph.is_primary) savedPhotoMap.set(ph.property_id, ph.url);
+      else if (!savedPhotoMap.has(ph.property_id))
+        savedPhotoMap.set(ph.property_id, ph.url);
+    }
+  }
+  const buyerCopy = t(lang).dashboardBuyer;
+  const hasBuyerActivity = offers.length > 0 || savedIds.length > 0;
+
   return (
     <main className="bg-background text-foreground flex-1 flex flex-col">
       <section className="mx-auto w-full max-w-7xl px-6 lg:px-12 pt-12 pb-20 lg:pt-16 lg:pb-28">
@@ -348,6 +411,128 @@ export default async function DashboardPage({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Buyer-side sections — only render if the user has activity here. */}
+        {hasBuyerActivity && (
+          <div className="mt-16 lg:mt-24 flex flex-col gap-12">
+            {offers.length > 0 && (
+              <div>
+                <h2 className="font-display text-2xl text-ink mb-6 border-b border-gold-soft pb-3">
+                  {buyerCopy.offersHeader}
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-ink/55 border-b border-gold-soft">
+                        <th className="py-3 pr-4">{buyerCopy.offerSubmitted}</th>
+                        <th className="py-3 pr-4">{buyerCopy.offerProperty}</th>
+                        <th className="py-3 pr-4">{buyerCopy.offerAmount}</th>
+                        <th className="py-3 pr-4">{buyerCopy.offerStatus}</th>
+                        <th className="py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {offers.map((o) => {
+                        const prop = propertyById.get(o.property_id);
+                        return (
+                          <tr key={o.id} className="border-b border-gold-soft/50">
+                            <td className="py-3 pr-4 text-ink/70 text-xs whitespace-nowrap">
+                              {new Date(o.created_at).toLocaleDateString(lang, {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </td>
+                            <td className="py-3 pr-4 text-ink text-xs">
+                              {prop
+                                ? `${prop.address_street}, ${prop.address_city}, ${prop.address_state}`
+                                : o.property_id.slice(0, 8)}
+                            </td>
+                            <td className="py-3 pr-4 font-display text-base text-ink whitespace-nowrap">
+                              <span className="text-gold text-xs align-top">$</span>
+                              {o.offer_amount.toLocaleString()}
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span
+                                className={`inline-block text-[9px] uppercase tracking-[0.18em] px-2.5 py-1 border ${
+                                  o.status === "accepted"
+                                    ? "border-gold bg-gold/5 text-ink"
+                                    : o.status === "rejected" || o.status === "withdrawn" || o.status === "expired"
+                                      ? "border-red-300 bg-red-50 text-red-800"
+                                      : "border-gold-soft bg-ivory-strong/40 text-ink/70"
+                                }`}
+                              >
+                                {o.status}
+                              </span>
+                            </td>
+                            <td className="py-3 text-xs">
+                              <Link
+                                href={`/${lang}/property/${o.property_id}`}
+                                className="text-gold hover:text-ink transition-colors"
+                              >
+                                {buyerCopy.viewProperty}
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {savedIds.length > 0 && (
+              <div>
+                <h2 className="font-display text-2xl text-ink mb-6 border-b border-gold-soft pb-3">
+                  {buyerCopy.savedHeader}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                  {savedIds.map((pid) => {
+                    const prop = propertyById.get(pid);
+                    const photo = savedPhotoMap.get(pid);
+                    if (!prop) return null;
+                    return (
+                      <Link
+                        key={pid}
+                        href={`/${lang}/property/${pid}`}
+                        className="flex flex-col gap-3 border border-gold-soft bg-ivory overflow-hidden hover:border-gold transition-colors"
+                      >
+                        <div className="aspect-[16/10] bg-ivory-strong relative">
+                          {photo ? (
+                            <Image
+                              src={photo}
+                              alt={prop.address_street}
+                              fill
+                              sizes="(min-width: 1024px) 400px, 100vw"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-[0.22em] text-ink/40">
+                              —
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 px-4 pb-4">
+                          <p className="font-display text-base text-ink leading-tight">
+                            {prop.address_street}
+                          </p>
+                          <p className="text-xs text-ink/55">
+                            {prop.address_city}, {prop.address_state}
+                          </p>
+                          <p className="font-display italic text-lg text-ink mt-1">
+                            <span className="text-gold text-sm align-top">$</span>
+                            {prop.list_price.toLocaleString()}
+                          </p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
