@@ -16,6 +16,7 @@ import {
   getRecipientView,
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
+import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 
 interface Body {
   property_id?: string;
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, bedrooms, bathrooms, sqft, year_built, folio, legal_description, has_pool, buyer_agent_commission, property_type",
+      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission",
     )
     .eq("id", propertyId)
     .eq("owner_id", user.id)
@@ -103,41 +104,48 @@ export async function POST(req: Request) {
     let agreementRowId = existing?.id ?? null;
 
     if (!envelopeId) {
-      // Pre-fill every field DocuSign asks for. Template should expose tabs
-      // with these labels — extras silently ignored if the template doesn't
-      // bind them yet (DocuSign is lenient on unknown tab labels).
+      // Labels MUST match the tabLabel values defined on the DocuSign
+      // template (Seller role). Verified via scripts/check-docusign-template.ts
+      // against the Lixtara Listing Agreement template
+      // (f9f29faf-d151-4975-a3ce-14a4ac1b5117). DocuSign silently ignores
+      // any tabLabel that the template doesn't bind.
       const tierId = (property.pricing_tier ?? "pro") as PricingTierId;
       const tier = PRICING_TIERS[tierId] ?? PRICING_TIERS.pro;
-      const tierName = tierId.charAt(0).toUpperCase() + tierId.slice(1);
       const buyerPct = Number(property.buyer_agent_commission ?? 0);
+
+      const today = new Date();
+      const startDate = today.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const terminationDate = new Date(today);
+      terminationDate.setMonth(
+        terminationDate.getMonth() + (tier.termMonths ?? 24),
+      );
+      const terminationDateStr = terminationDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      const fullAddress = `${property.address_street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
+
       const tabs: Record<string, string> = {
-        property_address: `${property.address_street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`,
-        property_street: property.address_street ?? "",
-        property_city: property.address_city ?? "",
-        property_state: property.address_state ?? "FL",
-        property_zip: property.address_zip ?? "",
-        list_price: `$${property.list_price.toLocaleString()}`,
-        list_price_numeric: String(property.list_price ?? 0),
-        pricing_tier: tierName,
-        seller_flat_fee: `$${tier.flatFee}`,
-        seller_commission_pct: `${tier.commissionPct}%`,
-        buyer_agent_commission_pct: `${buyerPct}%`,
-        seller_name: signerName,
-        seller_email: signerEmail,
-        bedrooms: String(property.bedrooms ?? ""),
-        bathrooms: String(property.bathrooms ?? ""),
-        sqft: String(property.sqft ?? ""),
-        year_built: String(property.year_built ?? ""),
-        property_type: property.property_type ?? "",
-        has_pool: property.has_pool ? "Yes" : "No",
-        folio: property.folio ?? "",
+        // Property
+        street_address: fullAddress,
         legal_description: property.legal_description ?? "",
-        listing_term_months: String(tier.termMonths ?? 24),
-        signing_date: new Date().toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        }),
+        list_price: `$${property.list_price.toLocaleString()}`,
+        // Parties
+        seller_name: signerName,
+        broker_name: BROKERAGE_LICENSED_ENTITY,
+        // Economics
+        flat_fee: `$${tier.flatFee}`,
+        commission_pct: `${tier.commissionPct}%`,
+        buyer_agent_commission: `${buyerPct}%`,
+        // Term
+        start_date: startDate,
+        termination_date: terminationDateStr,
       };
 
       const created = await createEnvelopeFromTemplate({
