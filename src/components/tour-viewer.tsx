@@ -74,46 +74,6 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         if (!plyEntry) throw new Error("no_ply_in_zip");
         const plyBytes = plyEntry[1];
 
-        // KIRI includes cameras.json with the camera positions for every
-        // frame of the original walkthrough. Use it to centre the orbit on
-        // the scene and pick a sensible starting distance — otherwise the
-        // default camera lives at (0,0,0) which is usually inside the
-        // splats (blurry mush).
-        const camerasEntry = Object.entries(unzipped).find(([n]) =>
-          n.toLowerCase().endsWith("cameras.json"),
-        );
-        let targetX = 0;
-        let targetY = 0;
-        let targetZ = 0;
-        let radius = 5;
-        if (camerasEntry) {
-          try {
-            const txt = new TextDecoder().decode(camerasEntry[1]);
-            const cams = JSON.parse(txt) as Array<{ position: [number, number, number] }>;
-            if (cams.length > 0) {
-              for (const c of cams) {
-                targetX += c.position[0];
-                targetY += c.position[1];
-                targetZ += c.position[2];
-              }
-              targetX /= cams.length;
-              targetY /= cams.length;
-              targetZ /= cams.length;
-              let maxDist = 0;
-              for (const c of cams) {
-                const dx = c.position[0] - targetX;
-                const dy = c.position[1] - targetY;
-                const dz = c.position[2] - targetZ;
-                const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                if (d > maxDist) maxDist = d;
-              }
-              radius = Math.max(maxDist * 1.4, 2);
-            }
-          } catch {
-            // fall through with defaults
-          }
-        }
-
         setStatus("loading");
         setProgress(0.85);
 
@@ -121,7 +81,27 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         const renderer = new SPLAT.WebGLRenderer(canvasRef.current);
         const scene = new SPLAT.Scene();
         const camera = new SPLAT.Camera();
-        const target = new SPLAT.Vector3(targetX, targetY, targetZ);
+
+        // Load the splat first so we can read its real bounding box and
+        // position the orbit camera based on it. KIRI's cameras.json has
+        // the original capture positions, but gsplat rotates the .ply by
+        // 90° on import which puts those camera positions in a different
+        // frame than the splats — bounds straight from the loaded Splat
+        // are the most reliable signal.
+        const splat = SPLAT.PLYLoader.LoadFromArrayBuffer(
+          plyBytes.buffer.slice(
+            plyBytes.byteOffset,
+            plyBytes.byteOffset + plyBytes.byteLength,
+          ),
+          scene,
+        );
+        splat.recalculateBounds();
+        const bounds = splat.bounds;
+        const centre = bounds.center();
+        const size = bounds.size();
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const radius = Math.max(maxDim * 1.4, 2);
+
         const controls = new SPLAT.OrbitControls(
           camera,
           canvasRef.current,
@@ -129,15 +109,7 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
           -0.3, // beta — slight elevation
           radius,
           true,
-          target,
-        );
-
-        SPLAT.PLYLoader.LoadFromArrayBuffer(
-          plyBytes.buffer.slice(
-            plyBytes.byteOffset,
-            plyBytes.byteOffset + plyBytes.byteLength,
-          ),
-          scene,
+          centre,
         );
 
         const handleResize = () => {
