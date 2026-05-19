@@ -27,6 +27,7 @@ import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { TourUploader } from "@/components/tour-uploader";
 import { PhotoUploader } from "@/components/photo-uploader";
+import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
 import { AgreementButton } from "@/components/agreement-button";
@@ -749,6 +750,39 @@ export default async function ListingNewPage({
     }
     await supabase.from("property_photos").delete().eq("id", photoId);
     redirect(`/${lang}/listing/new?step=5&id=${id}&deleted=1`);
+  }
+
+  async function reorderPhotosAction(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=5&id=${id}&error=required`);
+
+    const orderedIds = formData.getAll("ids").map((x) => String(x));
+    if (orderedIds.length === 0) return;
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    const { data: prop } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!prop) return;
+
+    // Sequential updates — Supabase doesn't support batch in this shape via
+    // postgrest; volume is small (≤30 photos per listing).
+    for (let i = 0; i < orderedIds.length; i++) {
+      await supabase
+        .from("property_photos")
+        .update({ is_primary: i === 0, display_order: i })
+        .eq("id", orderedIds[i])
+        .eq("property_id", id);
+    }
   }
 
   async function setPrimaryAction(formData: FormData) {
@@ -1579,33 +1613,6 @@ export default async function ListingNewPage({
             </div>
           )}
 
-          {/* Photo ownership disclaimer */}
-          <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink">
-              {copy.step5.ownershipTitle}
-            </p>
-            <p className="text-sm text-ink/80 leading-relaxed">
-              {copy.step5.ownershipIntro}
-            </p>
-            <ul className="flex flex-col gap-2 text-sm text-ink/70 leading-relaxed">
-              <li className="flex items-start gap-3">
-                <span aria-hidden className="text-gold mt-1 leading-none">•</span>
-                <span>{copy.step5.ownershipBullet1}</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span aria-hidden className="text-gold mt-1 leading-none">•</span>
-                <span>{copy.step5.ownershipBullet2}</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span aria-hidden className="text-gold mt-1 leading-none">•</span>
-                <span>{copy.step5.ownershipBullet3}</span>
-              </li>
-            </ul>
-            <p className="text-xs text-ink/55 italic leading-relaxed border-t border-gold-soft pt-3">
-              {copy.step5.ownershipWarning}
-            </p>
-          </div>
-
           {/* Upload form — direct-to-Supabase to bypass Vercel 4.5MB cap */}
           <PhotoUploader
             propertyId={draftId ?? ""}
@@ -1618,13 +1625,21 @@ export default async function ListingNewPage({
             }}
           />
 
-          {/* Virtual Staging teaser */}
-          <div className="border border-gold-soft p-5 flex flex-col gap-2 bg-ivory-strong/30">
+          {/* Virtual Staging teaser — friendlier how-it-works copy */}
+          <div className="border border-gold-soft p-5 flex flex-col gap-3 bg-ivory-strong/30">
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
               {copy.step5.stagingTitle}
             </p>
-            <p className="text-sm text-ink/70 leading-relaxed">
-              {copy.step5.stagingBody}
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70">
+              {copy.step5.stagingHow}
+            </p>
+            <ol className="flex flex-col gap-2 text-sm text-ink/80 leading-relaxed list-decimal list-inside marker:text-gold">
+              <li>{copy.step5.stagingStep1}</li>
+              <li>{copy.step5.stagingStep2}</li>
+              <li>{copy.step5.stagingStep3}</li>
+            </ol>
+            <p className="text-xs text-ink/55 italic leading-relaxed border-t border-gold-soft pt-3">
+              {copy.step5.stagingPricing}
             </p>
           </div>
 
@@ -1666,65 +1681,57 @@ export default async function ListingNewPage({
             )}
           </div>
 
-          {/* Photo grid */}
-          {photos.length === 0 ? (
-            <p className="text-sm text-ink/60 italic">
-              {copy.step5.emptyState}
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {photos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="relative aspect-square overflow-hidden bg-ivory-strong border border-gold-soft group"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={photo.url}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                  {photo.is_primary && (
-                    <div className="absolute top-2 left-2 bg-gold text-ink text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1">
-                      {copy.step5.primaryBadge}
-                    </div>
-                  )}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/90 to-ink/0 p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {!photo.is_primary && (
-                      <form action={setPrimaryAction}>
-                        <input type="hidden" name="id" value={draftId ?? ""} />
-                        <input type="hidden" name="photo_id" value={photo.id} />
-                        <button
-                          type="submit"
-                          className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-gold"
-                        >
-                          {copy.step5.setPrimaryButton}
-                        </button>
-                      </form>
-                    )}
-                    <form action={deletePhotoAction} className="ml-auto">
-                      <input type="hidden" name="id" value={draftId ?? ""} />
-                      <input type="hidden" name="photo_id" value={photo.id} />
-                      <input type="hidden" name="url" value={photo.url} />
-                      <button
-                        type="submit"
-                        className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-red-300"
-                      >
-                        {copy.step5.deleteButton}
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Next */}
+          {/* Photo grid + ownership disclaimer + Next — visually grouped */}
           <form
             action={nextFromStep5}
-            className="flex flex-col gap-5 border-t border-gold-soft pt-6"
+            className="border border-gold-soft p-5 lg:p-6 flex flex-col gap-6 bg-ivory"
           >
             <input type="hidden" name="id" value={draftId ?? ""} />
+            {photos.length === 0 ? (
+              <p className="text-sm text-ink/60 italic">
+                {copy.step5.emptyState}
+              </p>
+            ) : (
+              <PhotoGridDraggable
+                propertyId={draftId ?? ""}
+                initialPhotos={photos}
+                persistAction={reorderPhotosAction}
+                deleteAction={deletePhotoAction}
+                labels={{
+                  primaryBadge: copy.step5.primaryBadge,
+                  deleteButton: copy.step5.deleteButton,
+                  reorderHint: copy.step5.photoReorderHint,
+                }}
+              />
+            )}
+
+            {/* Ownership disclaimer — sits inside the same card as the grid */}
+            <div className="border border-gold-soft bg-ivory-strong/40 p-4 flex flex-col gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink">
+                {copy.step5.ownershipTitle}
+              </p>
+              <p className="text-sm text-ink/80 leading-relaxed">
+                {copy.step5.ownershipIntro}
+              </p>
+              <ul className="flex flex-col gap-2 text-sm text-ink/70 leading-relaxed">
+                <li className="flex items-start gap-3">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{copy.step5.ownershipBullet1}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{copy.step5.ownershipBullet2}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{copy.step5.ownershipBullet3}</span>
+                </li>
+              </ul>
+              <p className="text-xs text-ink/55 italic leading-relaxed border-t border-gold-soft pt-3">
+                {copy.step5.ownershipWarning}
+              </p>
+            </div>
+
             <label className="flex items-start gap-3 text-sm text-ink/80 leading-relaxed cursor-pointer">
               <input
                 type="checkbox"
