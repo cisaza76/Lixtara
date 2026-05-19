@@ -49,6 +49,7 @@ export default async function RootLayout({
   const authNavCopy = t(lang).auth.nav;
   const footerCopy = t(lang).footer;
   const louiCopy = t(lang).loui;
+  const closingCopy = t(lang).closingCosts;
   const altLang: Locale = lang === "en" ? "es" : "en";
   const year = new Date().getFullYear();
 
@@ -263,7 +264,55 @@ export default async function RootLayout({
               </div>
             </div>
 
-            <div className="mt-16 pt-8 border-t border-gold-soft flex flex-col md:flex-row md:items-center justify-between gap-3 text-[10px] uppercase tracking-[0.18em] text-ink/50">
+            <div className="mt-16 pt-10 border-t border-gold-soft grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12">
+              <div className="md:col-span-5 flex flex-col gap-3">
+                <h3 className="font-display text-lg text-ink leading-tight">
+                  {closingCopy.title}
+                </h3>
+                <p className="text-sm text-ink/70 leading-relaxed">
+                  {closingCopy.body}
+                </p>
+                <p className="text-xs italic text-ink/60 mt-1">
+                  {closingCopy.sameNote}
+                </p>
+              </div>
+              <ul className="md:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6 text-sm text-ink/80 leading-snug">
+                <li className="flex items-start gap-2.5">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{closingCopy.titleInsurance}</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{closingCopy.recordingFees}</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{closingCopy.inspection}</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{closingCopy.appraisal}</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{closingCopy.escrow}</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{closingCopy.transferTax}</span>
+                </li>
+              </ul>
+              <div className="md:col-span-2 flex md:justify-end items-start">
+                <Link
+                  href={`/${lang}/closing-costs`}
+                  className="text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+                >
+                  {closingCopy.learnMore}
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-10 pt-6 border-t border-gold-soft flex flex-col md:flex-row md:items-center justify-between gap-3 text-[10px] uppercase tracking-[0.18em] text-ink/50">
               <p>© {year} Lixtara. {footerCopy.copyright}</p>
               <p>{footerCopy.equalHousing}</p>
             </div>

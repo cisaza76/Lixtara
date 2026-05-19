@@ -16,6 +16,8 @@ import {
 } from "@/lib/pricing-tiers";
 import { PlanQuiz } from "@/components/plan-quiz";
 import { SavingsSlider } from "@/components/savings-slider";
+import { SavingsCalculator } from "@/components/savings-calculator";
+import { InvestorClubVolume } from "@/components/investor-club-volume";
 import { RebateSlider } from "@/components/rebate-slider";
 
 export default async function Home({
@@ -36,6 +38,8 @@ export default async function Home({
   const prCopy = t(lang).pricing;
   const quizCopy = t(lang).quiz;
   const savingsCopy = t(lang).savings;
+  const savingsCalcCopy = t(lang).savingsCalc;
+  const investorClubCopy = t(lang).investorClub;
   const toursCopy = t(lang).tours;
   const rebateCopy = t(lang).rebate;
   const investorCopy = t(lang).investor;
@@ -344,10 +348,45 @@ export default async function Home({
           </p>
           <SavingsSlider
             priceLabel={savingsCopy.priceLabel}
+            buyerCommissionLabel={savingsCopy.buyerCommissionLabel}
+            buyerCommissionHint={savingsCopy.buyerCommissionHint}
+            lineUpfront={savingsCopy.lineUpfront}
+            lineSellerCommission={savingsCopy.lineSellerCommission}
+            lineBuyerCommission={savingsCopy.lineBuyerCommission}
+            lineTotal={savingsCopy.lineTotal}
+            lineSavings={savingsCopy.lineSavings}
             traditionalLabel={savingsCopy.traditionalLabel}
-            keepLabel={savingsCopy.keepLabel}
-            keepNote={savingsCopy.keepNote}
-            formulaLabel={savingsCopy.formulaLabel}
+            howToRead={savingsCopy.howToRead}
+            howToReadBody={savingsCopy.howToReadBody}
+            tierNames={{
+              essentials: prCopy.tiers.essentials.name,
+              pro: prCopy.tiers.pro.name,
+              concierge: prCopy.tiers.concierge.name,
+            }}
+          />
+        </div>
+      </section>
+
+      <section
+        id="calculate-savings"
+        className="border-t border-gold-soft scroll-mt-20"
+      >
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+          <SavingsCalculator
+            lang={lang}
+            eyebrow={savingsCalcCopy.eyebrow}
+            titleBefore={savingsCalcCopy.titleBefore}
+            titleAccent={savingsCalcCopy.titleAccent}
+            titleAfter={savingsCalcCopy.titleAfter}
+            body={savingsCalcCopy.body}
+            planLabel={savingsCalcCopy.planLabel}
+            priceLabel={savingsCalcCopy.priceLabel}
+            buyerCommissionLabel={savingsCalcCopy.buyerCommissionLabel}
+            buyerCommissionRecommended={savingsCalcCopy.buyerCommissionRecommended}
+            traditionalHeader={savingsCalcCopy.traditionalHeader}
+            nexxosHeader={savingsCalcCopy.nexxosHeader}
+            youSaveLabel={savingsCalcCopy.youSaveLabel}
+            ctaLabel={savingsCalcCopy.ctaLabel}
             tierNames={{
               essentials: prCopy.tiers.essentials.name,
               pro: prCopy.tiers.pro.name,
@@ -569,76 +608,67 @@ export default async function Home({
 
       <section
         id="investor-club"
-        className="border-t border-gold-soft bg-ink text-ivory scroll-mt-20"
+        className="border-t border-gold-soft scroll-mt-20"
       >
         <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
           <div className="flex flex-col gap-5 mb-12 lg:mb-16">
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
-              {investorCopy.eyebrow}
+              {investorClubCopy.eyebrow}
             </p>
-            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ivory font-normal max-w-2xl">
-              {investorCopy.titleBefore}
-              <em className="italic text-gold">{investorCopy.titleAccent}</em>
-              {investorCopy.titleAfter}
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl">
+              {investorClubCopy.titleBefore}
+              <em className="italic text-gold">{investorClubCopy.titleAccent}</em>
+              {investorClubCopy.titleAfter}
             </h2>
-            <p className="max-w-2xl text-base leading-relaxed text-ivory/70">
-              {investorCopy.body}
+            <p className="max-w-2xl text-base leading-relaxed text-ink/70">
+              {investorClubCopy.body}
             </p>
-            <span className="inline-flex items-center self-start border border-gold text-gold text-[10px] font-semibold uppercase tracking-[0.22em] px-3 py-1.5">
-              {investorCopy.waitlistBadge}
-            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-            {(["silver", "gold", "platinum"] as const).map((tierId) => {
-              const tCopy = investorCopy.tiers[tierId];
-              const isFeatured = tierId === "gold";
-              return (
-                <div
-                  key={tierId}
-                  className={`flex flex-col gap-6 p-8 lg:p-10 ${
-                    isFeatured
-                      ? "bg-ivory text-ink border border-gold"
-                      : "border border-ivory/15"
-                  }`}
-                >
-                  <div className="flex flex-col gap-2">
-                    <h3 className="font-display text-3xl font-normal leading-none">
-                      {tCopy.name}
-                    </h3>
-                    <p
-                      className={`text-sm ${isFeatured ? "text-ink/70" : "text-ivory/65"}`}
-                    >
-                      {tCopy.tagline}
-                    </p>
-                  </div>
-                  <div
-                    className={`h-px ${isFeatured ? "bg-gold-soft" : "bg-ivory/15"}`}
-                  />
-                  <ul className="flex flex-col gap-3 text-sm leading-snug flex-1">
-                    {tCopy.bullets.map((b) => (
-                      <li key={b} className="flex items-start gap-3">
-                        <span aria-hidden className="text-gold mt-1 leading-none">
-                          •
-                        </span>
-                        <span className={isFeatured ? "text-ink" : "text-ivory"}>
-                          {b}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
+          <InvestorClubVolume
+            exampleHeader={investorClubCopy.exampleHeader}
+            exampleStandardLabel={investorClubCopy.exampleStandardLabel}
+            exampleSilverLabel={investorClubCopy.exampleSilverLabel}
+            exampleGoldLabel={investorClubCopy.exampleGoldLabel}
+            examplePlatinumLabel={investorClubCopy.examplePlatinumLabel}
+            exampleSavingsLabel={investorClubCopy.exampleSavingsLabel}
+            perDealLabel={investorClubCopy.perDealLabel}
+            tenDealsLabel={investorClubCopy.tenDealsLabel}
+            tierStandard={investorClubCopy.tierStandard}
+            tierSilver={investorClubCopy.tierSilver}
+            tierGold={investorClubCopy.tierGold}
+            tierPlatinum={investorClubCopy.tierPlatinum}
+            discountStandard={investorClubCopy.discountStandard}
+            discountSilver={investorClubCopy.discountSilver}
+            discountGold={investorClubCopy.discountGold}
+            discountPlatinum={investorClubCopy.discountPlatinum}
+            footerNote={investorClubCopy.footerNote}
+          />
 
-          <div className="mt-12 lg:mt-16 flex justify-center">
-            <Link
-              href={`/${lang}/contact?topic=investor-club`}
-              className="inline-flex items-center justify-center px-10 py-5 bg-gold text-ink text-xs font-medium tracking-[0.2em] uppercase hover:bg-gold/90 transition-colors"
-            >
-              {investorCopy.ctaWaitlist}
-            </Link>
+          <div className="mt-10 lg:mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+            <div className="border border-gold-soft bg-ivory-strong/30 p-6 flex flex-col gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                {investorClubCopy.requirementsTitle}
+              </p>
+              <ul className="flex flex-col gap-2 text-sm text-ink/80 leading-relaxed">
+                <li className="flex items-start gap-3">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{investorClubCopy.requirementClosed}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
+                  <span>{investorClubCopy.requirementListing}</span>
+                </li>
+              </ul>
+            </div>
+            <div className="flex items-center justify-center md:justify-end">
+              <Link
+                href={`/${lang}/contact?topic=investor-club`}
+                className="inline-flex items-center justify-center px-10 py-5 bg-ink text-ivory text-xs font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+              >
+                {investorClubCopy.applyCta}
+              </Link>
+            </div>
           </div>
         </div>
       </section>
