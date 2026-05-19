@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getJobStatus, type KiriStatus, verifyWebhookSignature } from "@/lib/kiri";
+import { sendTourReady } from "@/lib/email";
 
 interface KiriWebhookPayload {
   serialize?: string;
@@ -114,6 +115,34 @@ export async function POST(req: Request) {
           completed_at: new Date().toISOString(),
         })
         .eq("id", job.id);
+
+      // Notify the seller (best-effort).
+      try {
+        const { data: prop } = await supabase
+          .from("properties")
+          .select(
+            "address_street,address_city,address_state,address_zip,owner_id",
+          )
+          .eq("id", job.property_id)
+          .maybeSingle();
+        if (prop) {
+          const { data: sellerAuth } = await supabase.auth.admin.getUserById(
+            prop.owner_id,
+          );
+          const sellerEmail = sellerAuth.user?.email;
+          if (sellerEmail) {
+            const origin =
+              process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
+            await sendTourReady({
+              to: sellerEmail,
+              propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
+              listingUrl: `${origin}/en/property/${job.property_id}`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("kiri webhook tour-ready email failed:", e);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "download_failed";
       await supabase

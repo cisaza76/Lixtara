@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { verifyWebhookSignature } from "@/lib/stripe";
+import { sendPaymentReceipt, sendBrokerNewPending } from "@/lib/email";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -92,6 +93,61 @@ export async function POST(req: Request) {
           .update({ mls_status: "pending_approval" })
           .eq("id", propertyId)
           .eq("mls_status", "draft");
+
+        // Best-effort emails — never block the webhook on email failure.
+        try {
+          const { data: prop } = await supabase
+            .from("properties")
+            .select(
+              "address_street,address_city,address_state,address_zip,list_price,pricing_tier,owner_id",
+            )
+            .eq("id", propertyId)
+            .maybeSingle();
+          if (prop) {
+            const address = `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`;
+            const tier = (prop.pricing_tier ?? session.metadata?.tier ?? "pro") as string;
+            const amount = (session.amount_total ?? 0) / 100;
+            const origin =
+              process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
+            const { data: sellerAuth } = await supabase.auth.admin.getUserById(
+              prop.owner_id,
+            );
+            const sellerEmail = sellerAuth.user?.email;
+            const { data: sellerProfile } = await supabase
+              .from("users")
+              .select("first_name,last_name")
+              .eq("id", prop.owner_id)
+              .maybeSingle();
+            const sellerName = [
+              sellerProfile?.first_name,
+              sellerProfile?.last_name,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .trim() || sellerEmail || "Seller";
+
+            if (sellerEmail) {
+              await sendPaymentReceipt({
+                to: sellerEmail,
+                amount,
+                tier,
+                propertyAddress: address,
+                dashboardUrl: `${origin}/en/dashboard`,
+              });
+            }
+            // Notify the broker queue (Camilo while in test mode).
+            await sendBrokerNewPending({
+              to: process.env.BROKER_NOTIFICATION_EMAIL ?? "camilo.isaza@gmail.com",
+              sellerName,
+              propertyAddress: address,
+              tier,
+              listPrice: prop.list_price ?? 0,
+              adminUrl: `${origin}/en/admin`,
+            });
+          }
+        } catch (e) {
+          console.error("stripe webhook email side-effects failed:", e);
+        }
       }
       break;
     }

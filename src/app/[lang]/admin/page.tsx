@@ -4,6 +4,7 @@ import { isLocale, t, type Locale } from "@/lib/i18n";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SuccessBanner, ErrorBanner } from "@/components/auth-shell";
+import { sendListingApproved } from "@/lib/email";
 
 interface PendingListing {
   id: string;
@@ -129,14 +130,38 @@ export default async function AdminPage({
       redirect(`/${lang}/admin?error=not_authorized`);
     }
 
-    const { error } = await supabase
+    const { data: prop, error } = await supabase
       .from("properties")
       .update({ mls_status: "active" })
       .eq("id", id)
-      .eq("mls_status", "pending_approval");
-    if (error) {
+      .eq("mls_status", "pending_approval")
+      .select(
+        "id,address_street,address_city,address_state,address_zip,owner_id",
+      )
+      .maybeSingle();
+    if (error || !prop) {
       redirect(`/${lang}/admin?error=approve_failed`);
     }
+
+    // Notify seller (best-effort).
+    try {
+      const { data: sellerAuth } = await supabase.auth.admin.getUserById(
+        prop.owner_id,
+      );
+      const sellerEmail = sellerAuth.user?.email;
+      if (sellerEmail) {
+        const origin =
+          process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
+        await sendListingApproved({
+          to: sellerEmail,
+          propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
+          listingUrl: `${origin}/${lang}/property/${prop.id}`,
+        });
+      }
+    } catch (e) {
+      console.error("admin approve email failed:", e);
+    }
+
     redirect(`/${lang}/admin?approved=${id}`);
   }
 

@@ -13,6 +13,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getEnvelopeStatus, mapEnvelopeStatus } from "@/lib/docusign";
+import { sendAgreementSigned } from "@/lib/email";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -84,6 +85,36 @@ export async function POST(req: Request) {
     update.signed_at = signedAt ?? new Date().toISOString();
   }
   await supabase.from("agreements").update(update).eq("id", agreement.id);
+
+  // Notify seller on signed/completed.
+  if (ourStatus === "signed" || ourStatus === "completed") {
+    try {
+      const { data: prop } = await supabase
+        .from("properties")
+        .select(
+          "address_street,address_city,address_state,address_zip,owner_id",
+        )
+        .eq("id", agreement.property_id)
+        .maybeSingle();
+      if (prop) {
+        const { data: sellerAuth } = await supabase.auth.admin.getUserById(
+          prop.owner_id,
+        );
+        const sellerEmail = sellerAuth.user?.email;
+        if (sellerEmail) {
+          const origin =
+            process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
+          await sendAgreementSigned({
+            to: sellerEmail,
+            propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
+            paymentUrl: `${origin}/en/listing/new?id=${agreement.property_id}&step=8`,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("docusign webhook email failed:", e);
+    }
+  }
 
   return NextResponse.json({ ok: true, status: ourStatus });
 }
