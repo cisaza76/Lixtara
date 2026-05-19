@@ -2199,7 +2199,7 @@ export default async function ListingNewPage({
                     {copy.step8.successBody}
                   </p>
                   <Link
-                    href={`/${lang}/properties`}
+                    href={`/${lang}/dashboard`}
                     className="self-start inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
                   >
                     {copy.step8.viewDashboard}

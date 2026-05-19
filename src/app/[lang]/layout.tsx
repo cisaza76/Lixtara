@@ -139,6 +139,12 @@ export default async function RootLayout({
                       {authNavCopy.greetingPrefix} {firstName}
                     </span>
                   )}
+                  <Link
+                    href={`/${lang}/dashboard`}
+                    className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+                  >
+                    {authNavCopy.dashboard}
+                  </Link>
                   <form action={`/${lang}/auth/sign-out`} method="POST">
                     <button
                       type="submit"
