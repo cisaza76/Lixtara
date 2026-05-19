@@ -42,6 +42,8 @@ interface FieldProps {
   defaultValue?: string;
   autoComplete?: string;
   help?: string;
+  autofilled?: boolean;
+  autofilledLabel?: string;
 }
 
 export function Field({
@@ -52,11 +54,19 @@ export function Field({
   defaultValue,
   autoComplete,
   help,
+  autofilled,
+  autofilledLabel,
 }: FieldProps) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+      <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
         {label}
+        {autofilled && (
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold tracking-[0.18em] text-gold bg-gold/10 border border-gold/40 px-2 py-0.5">
+            <span aria-hidden>✓</span>
+            {autofilledLabel ?? "autofilled"}
+          </span>
+        )}
       </span>
       <input
         name={name}
@@ -64,7 +74,7 @@ export function Field({
         required={required}
         defaultValue={defaultValue}
         autoComplete={autoComplete}
-        className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
+        className="bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 text-base text-ink"
       />
       {help && (
         <span className="text-xs text-ink/50">{help}</span>

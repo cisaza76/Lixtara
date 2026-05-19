@@ -77,6 +77,7 @@ interface Draft {
   flood_zone: string | null;
   occupancy_status: OccupancyStatus | null;
   show_phone_on_portals: boolean | null;
+  folio: string | null;
 }
 
 export default async function ListingNewPage({
@@ -134,7 +135,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,show_phone_on_portals",
+        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,show_phone_on_portals,folio",
       )
       .eq("id", draftId)
       .maybeSingle();
@@ -157,6 +158,7 @@ export default async function ListingNewPage({
         tasks.push(
           lookupMiamiDadeProperty(draft.address_street, draft.address_zip).then(
             (result) => {
+              if (result.folio) updates.folio = result.folio;
               if (result.found && result.details) {
                 const d = result.details;
                 if (d.bedrooms != null) updates.bedrooms = d.bedrooms;
@@ -529,6 +531,7 @@ export default async function ListingNewPage({
     }
     const d = result.details;
     const update: Record<string, number | string | null> = {};
+    if (result.folio) update.folio = result.folio;
     if (d.bedrooms != null) update.bedrooms = d.bedrooms;
     if (d.bathrooms != null) update.bathrooms = d.bathrooms;
     if (d.sqft != null) update.sqft = d.sqft;
@@ -1033,7 +1036,29 @@ export default async function ListingNewPage({
             </p>
           </div>
 
-          {/* Miami-Dade auto-fill notice (already ran on page entry) */}
+          {/* Miami-Dade folio banner + auto-fill notice */}
+          {draft?.folio && (
+            <div className="border border-gold bg-gold/5 p-4 flex flex-col gap-2">
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
+                  {copy.step3.folioLabel}
+                </span>
+                <span className="font-mono text-sm text-ink">
+                  {draft.folio.length === 13
+                    ? `${draft.folio.slice(0, 2)}-${draft.folio.slice(2, 6)}-${draft.folio.slice(6, 9)}-${draft.folio.slice(9)}`
+                    : draft.folio}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {copy.step3.folioMatchedAddress}
+                </span>
+                <span className="text-sm text-ink/80">
+                  {draft.address_street}, {draft.address_city}, {draft.address_state} {draft.address_zip}
+                </span>
+              </div>
+            </div>
+          )}
           {draft && draft.bedrooms > 0 && /^33\d{3}$/.test(draft.address_zip) && (
             <SuccessBanner message={copy.step3.autoFilledNote} />
           )}
@@ -1183,13 +1208,19 @@ export default async function ListingNewPage({
             <input type="hidden" name="id" value={draftId ?? ""} />
 
             <label className="flex flex-col gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+              <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
                 {copy.step3.propertyTypeLabel}
+                {draft?.folio && (
+                  <span className="inline-flex items-center gap-1 text-[9px] font-semibold tracking-[0.18em] text-gold bg-gold/10 border border-gold/40 px-2 py-0.5">
+                    <span aria-hidden>✓</span>
+                    {copy.step3.autofilledBadge}
+                  </span>
+                )}
               </span>
               <select
                 name="property_type"
                 defaultValue={draft?.property_type ?? "single_family"}
-                className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
+                className="bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 text-base text-ink"
               >
                 {PROPERTY_TYPES.map((t) => (
                   <option key={t} value={t}>
@@ -1205,6 +1236,8 @@ export default async function ListingNewPage({
                 name="bedrooms"
                 type="text"
                 defaultValue={draft?.bedrooms ? String(draft.bedrooms) : ""}
+                autofilled={!!draft?.folio}
+                autofilledLabel={copy.step3.autofilledBadge}
               />
               <Field
                 label={copy.step3.bathroomsLabel}
@@ -1213,6 +1246,8 @@ export default async function ListingNewPage({
                 defaultValue={
                   draft?.bathrooms ? String(draft.bathrooms) : ""
                 }
+                autofilled={!!draft?.folio}
+                autofilledLabel={copy.step3.autofilledBadge}
               />
               <Field
                 label={copy.step3.yearBuiltLabel}
@@ -1223,6 +1258,8 @@ export default async function ListingNewPage({
                     ? String(draft.year_built)
                     : ""
                 }
+                autofilled={!!draft?.folio}
+                autofilledLabel={copy.step3.autofilledBadge}
               />
             </div>
 
@@ -1232,6 +1269,8 @@ export default async function ListingNewPage({
                 name="sqft"
                 type="text"
                 defaultValue={draft?.sqft ? String(draft.sqft) : ""}
+                autofilled={!!draft?.folio}
+                autofilledLabel={copy.step3.autofilledBadge}
               />
               <Field
                 label={copy.step3.lotSizeLabel}
@@ -1241,6 +1280,8 @@ export default async function ListingNewPage({
                 defaultValue={
                   draft?.lot_size ? String(draft.lot_size) : ""
                 }
+                autofilled={!!draft?.folio}
+                autofilledLabel={copy.step3.autofilledBadge}
               />
             </div>
 
@@ -1300,14 +1341,24 @@ export default async function ListingNewPage({
                   <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
                     {copy.step3.floodZoneLabel}
                   </span>
-                  <input
-                    type="text"
+                  <select
                     name="flood_zone"
                     defaultValue={draft?.flood_zone ?? ""}
-                    placeholder="X / AE / VE / …"
-                    maxLength={10}
-                    className="border border-gold-soft px-3 py-2 text-base text-ink bg-ivory focus:outline-none focus:border-gold uppercase"
-                  />
+                    className="bg-ivory border-2 border-gold-soft px-4 py-3 text-base text-ink focus:outline-none focus:border-gold"
+                  >
+                    <option value="">—</option>
+                    <option value="X">{copy.step3.floodZoneOptionX}</option>
+                    <option value="AE">{copy.step3.floodZoneOptionAE}</option>
+                    <option value="VE">{copy.step3.floodZoneOptionVE}</option>
+                    <option value="A">{copy.step3.floodZoneOptionA}</option>
+                    <option value="AH">{copy.step3.floodZoneOptionAH}</option>
+                    <option value="AO">{copy.step3.floodZoneOptionAO}</option>
+                    <option value="V">{copy.step3.floodZoneOptionV}</option>
+                    <option value="D">{copy.step3.floodZoneOptionD}</option>
+                    <option value="UNKNOWN">
+                      {copy.step3.floodZoneOptionUnknown}
+                    </option>
+                  </select>
                 </label>
                 <p className="text-xs text-ink/55 leading-relaxed">
                   {copy.step3.floodZoneHelp}
@@ -1321,7 +1372,7 @@ export default async function ListingNewPage({
                 <select
                   name="occupancy_status"
                   defaultValue={draft?.occupancy_status ?? ""}
-                  className="border border-gold-soft px-3 py-2 text-base text-ink bg-ivory focus:outline-none focus:border-gold"
+                  className="bg-ivory border-2 border-gold-soft px-4 py-3 text-base text-ink focus:outline-none focus:border-gold"
                 >
                   <option value="">—</option>
                   <option value="vacant">{copy.step3.occupancyVacant}</option>
