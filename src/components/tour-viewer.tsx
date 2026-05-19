@@ -93,29 +93,25 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
               position: [number, number, number];
             }>;
             if (cams.length > 0) {
-              // Rotate 90° around X (gsplat convention): (x,y,z) → (x,-z,y)
-              const rotated = cams.map((c) => ({
-                x: c.position[0],
-                y: -c.position[2],
-                z: c.position[1],
-              }));
-              for (const p of rotated) {
-                targetX += p.x;
-                targetY += p.y;
-                targetZ += p.z;
-              }
-              targetX /= rotated.length;
-              targetY /= rotated.length;
-              targetZ /= rotated.length;
+              // Median is more robust than mean against outlier frames.
+              const xs = cams.map((c) => c.position[0]).sort((a, b) => a - b);
+              const ys = cams.map((c) => c.position[1]).sort((a, b) => a - b);
+              const zs = cams.map((c) => c.position[2]).sort((a, b) => a - b);
+              const mid = Math.floor(cams.length / 2);
+              targetX = xs[mid];
+              targetY = ys[mid];
+              targetZ = zs[mid];
               let maxDist = 0;
-              for (const p of rotated) {
-                const dx = p.x - targetX;
-                const dy = p.y - targetY;
-                const dz = p.z - targetZ;
+              for (const c of cams) {
+                const dx = c.position[0] - targetX;
+                const dy = c.position[1] - targetY;
+                const dz = c.position[2] - targetZ;
                 const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
                 if (d > maxDist) maxDist = d;
               }
-              radius = Math.max(maxDist * 1.8, 2);
+              // Real-estate aerial: pull the camera way up and back so the
+              // whole interior fits in frame, then let the user orbit/dolly.
+              radius = Math.max(maxDist * 3.5, 6);
             }
           } catch {
             // fall through with defaults
@@ -147,14 +143,14 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         const controls = new SPLAT.OrbitControls(
           camera,
           canvasRef.current,
-          Math.PI * 0.25,
-          -Math.PI * 0.05,
+          0, // alpha — face forward, no twist
+          -Math.PI * 0.35, // beta — strong downward tilt (aerial real-estate view)
           radius,
           false,
           target,
         );
-        controls.minZoom = 0.3;
-        controls.maxZoom = Math.max(radius * 5, 40);
+        controls.minZoom = 0.5;
+        controls.maxZoom = Math.max(radius * 6, 60);
 
         const handleResize = () => {
           if (!canvasRef.current) return;
