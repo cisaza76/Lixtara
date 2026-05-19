@@ -100,17 +100,24 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         const centre = bounds.center();
         const size = bounds.size();
         const maxDim = Math.max(size.x, size.y, size.z);
-        const radius = Math.max(maxDim * 1.4, 2);
+        // Pull camera way back so the whole interior fits in frame on init.
+        // Sellers can dolly in with scroll once oriented.
+        const radius = Math.max(maxDim * 3.5, 5);
 
         const controls = new SPLAT.OrbitControls(
           camera,
           canvasRef.current,
-          0.5, // alpha — slight orbit angle
-          -0.3, // beta — slight elevation
+          Math.PI * 0.25, // alpha — 45° around so we don't start dead-on
+          -Math.PI * 0.15, // beta — slight downward tilt as if walking in
           radius,
-          true,
+          false, // disable keyboard controls (mouse + touch only)
           centre,
         );
+        // Generous zoom range so users can dolly all the way in or pull
+        // way out without hitting the floor.
+        controls.minZoom = Math.max(maxDim * 0.1, 0.2);
+        controls.maxZoom = maxDim * 10;
+        controls.dampening = 0.18;
 
         const handleResize = () => {
           if (!canvasRef.current) return;
