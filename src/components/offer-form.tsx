@@ -192,11 +192,11 @@ export function OfferForm({
             type="number"
             name="offer_amount"
             min="1"
-            step="1000"
+            step="1"
             required
             disabled={submitting}
             defaultValue={listPrice}
-            className="border border-gold-soft px-3 py-2 text-base text-ink bg-ivory focus:outline-none focus:border-gold disabled:opacity-50"
+            className="border-2 border-gold-soft px-4 py-3 text-base text-ink bg-ivory focus:outline-none focus:border-gold disabled:opacity-50"
           />
         </label>
 
