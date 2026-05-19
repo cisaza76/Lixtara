@@ -100,24 +100,30 @@ export function TourViewer({ zipUrl, posterUrl, labels }: TourViewerProps) {
         const centre = bounds.center();
         const size = bounds.size();
         const maxDim = Math.max(size.x, size.y, size.z);
-        // Pull camera way back so the whole interior fits in frame on init.
-        // Sellers can dolly in with scroll once oriented.
-        const radius = Math.max(maxDim * 3.5, 5);
+        // Distance ~0.8× the longest axis usually frames an interior scene
+        // nicely. Outliers in the splat set can blow up bounds.size() — cap
+        // the radius so we don't end up viewing from another building.
+        const rawRadius = maxDim * 0.8;
+        const radius = Math.min(Math.max(rawRadius, 2), 12);
+        // eslint-disable-next-line no-console
+        console.log("tour-viewer bounds", {
+          centre: [centre.x, centre.y, centre.z],
+          size: [size.x, size.y, size.z],
+          maxDim,
+          radius,
+        });
 
         const controls = new SPLAT.OrbitControls(
           camera,
           canvasRef.current,
-          Math.PI * 0.25, // alpha — 45° around so we don't start dead-on
-          -Math.PI * 0.15, // beta — slight downward tilt as if walking in
+          Math.PI * 0.25,
+          -Math.PI * 0.05,
           radius,
-          false, // disable keyboard controls (mouse + touch only)
+          false,
           centre,
         );
-        // Generous zoom range so users can dolly all the way in or pull
-        // way out without hitting the floor.
-        controls.minZoom = Math.max(maxDim * 0.1, 0.2);
-        controls.maxZoom = maxDim * 10;
-        controls.dampening = 0.18;
+        controls.minZoom = 0.5;
+        controls.maxZoom = Math.max(radius * 4, 30);
 
         const handleResize = () => {
           if (!canvasRef.current) return;
