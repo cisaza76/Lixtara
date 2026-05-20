@@ -126,11 +126,11 @@ The DB (`fizhoufepowilbhbtfkg`) is CLI-managed off a **baseline** captured 2026-
 3. Apply MANUALLY after owner sign-off: `supabase db push` (no auto-apply on merge, by design).
    Never alter the production schema outside this flow.
 
-### Known drift to fix (out of band)
-Code reads `agreements` and `schedule_requests`, but those tables **do not exist** (the real
-table is `listing_agreements`; `schedule_requests` was never created). This breaks DocuSign
-agreement persistence / the checkout gate and Loui scheduling. Fix via migration + code change,
-with owner confirmation.
+### Resolved drift
+`agreements` and `schedule_requests` were read by the code but never existed in the DB. Created
+2026-05-20 via `…_create_agreements.sql` / `…_create_schedule_requests.sql` (no code change —
+the code already targeted them). `public.listing_agreements` is a separate **legacy Lovable table**
+(empty, unused by current code) — leave it; drop later with owner confirmation if desired.
 
 ## Quality gates
 
@@ -160,9 +160,8 @@ copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit
 **Not yet done — go-live debt:** test coverage is unit-only (Vitest covers pure logic —
 pricing, buyer-rebate, status maps, i18n parity, webhook dedup; **webhooks, RLS, and route
 handlers have no integration tests**); error/product analytics (Sentry/PostHog); the full
-5-checkout Stripe set (only `tier` is wired); referrals; MLS sync; the FL DBPR / NAR
-compliance review; and the `agreements` / `schedule_requests` code-vs-schema bug (code reads
-tables that don't exist — see "Database migrations").
+5-checkout Stripe set (only `tier` is wired); referrals; MLS sync; and the FL DBPR / NAR
+compliance review.
 
 MVP scope and the original phase sequencing live in user memory (`mvp_scope_phase1.md`,
 `phase_plan.md`).
