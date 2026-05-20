@@ -347,17 +347,7 @@ export default async function Home({
             {savingsCopy.body}
           </p>
           <SavingsSlider
-            priceLabel={savingsCopy.priceLabel}
-            buyerCommissionLabel={savingsCopy.buyerCommissionLabel}
-            buyerCommissionHint={savingsCopy.buyerCommissionHint}
-            lineUpfront={savingsCopy.lineUpfront}
-            lineSellerCommission={savingsCopy.lineSellerCommission}
-            lineBuyerCommission={savingsCopy.lineBuyerCommission}
-            lineTotal={savingsCopy.lineTotal}
-            lineSavings={savingsCopy.lineSavings}
-            traditionalLabel={savingsCopy.traditionalLabel}
-            howToRead={savingsCopy.howToRead}
-            howToReadBody={savingsCopy.howToReadBody}
+            copy={savingsCopy}
             tierNames={{
               essentials: prCopy.tiers.essentials.name,
               pro: prCopy.tiers.pro.name,

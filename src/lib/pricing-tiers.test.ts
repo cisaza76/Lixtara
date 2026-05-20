@@ -3,6 +3,7 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   DEFAULT_TIER,
+  TRADITIONAL_COSTS,
   getTier,
   tierTotalCost,
   tierSavingsVsTraditional,
@@ -27,9 +28,24 @@ describe("PRICING_TIERS catalog", () => {
     }
   });
 
+  it("includes professional photography only on pro + concierge (essentials is DIY)", () => {
+    expect(PRICING_TIERS.essentials.includesPhotography).toBe(false);
+    expect(PRICING_TIERS.pro.includesPhotography).toBe(true);
+    expect(PRICING_TIERS.concierge.includesPhotography).toBe(true);
+  });
+
   it("orders tiers cheapest → priciest", () => {
     const fees = TIER_ORDER.map((id) => PRICING_TIERS[id].flatFee);
     expect(fees).toEqual([...fees].sort((a, b) => a - b));
+  });
+});
+
+describe("TRADITIONAL_COSTS (Radical Transparency comparison baseline)", () => {
+  it("holds the canonical traditional-agent comparison values", () => {
+    expect(TRADITIONAL_COSTS.listingCommissionPct).toBe(3);
+    expect(TRADITIONAL_COSTS.buyerCommissionPct).toBe(3);
+    expect(TRADITIONAL_COSTS.photography).toBe(300);
+    expect(TRADITIONAL_COSTS.docContracts).toBe(40);
   });
 });
 
