@@ -6,11 +6,12 @@
 // multiple function instances, so a per-instance counter leaks. Redis is the
 // shared source of truth across every instance and region.
 //
-// Env vars (set by the Upstash Marketplace integration):
-//   UPSTASH_REDIS_REST_URL
-//   UPSTASH_REDIS_REST_TOKEN
-// When they're absent (local dev / CI) the limiters return null and callers
-// fail open — see the production guard in enforceLimit().
+// Env vars: the Vercel Upstash Marketplace integration provisions the KV_*
+// names (KV_REST_API_URL / KV_REST_API_TOKEN); a manually-created Upstash DB
+// uses the UPSTASH_REDIS_REST_* names. We accept either so it works regardless
+// of how Redis was provisioned. When neither is present (local dev / CI) the
+// limiters return null and callers fail open — see the production guard in
+// enforceLimit().
 
 import { Ratelimit, type Duration } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
@@ -19,8 +20,10 @@ let _redis: Redis | null | undefined;
 
 function redis(): Redis | null {
   if (_redis !== undefined) return _redis;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url =
+    process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+  const token =
+    process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   _redis = url && token ? new Redis({ url, token }) : null;
   return _redis;
 }

@@ -80,9 +80,11 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   project still has them active because Lovable depends on them — drop after cutover (F3+).
 - Service keys for Stripe / DocuSign / Resend / Anthropic / Mapbox / Google Maps / Rentcast /
   Twilio are added phase by phase (see memory `phase_plan` and `api_inventory`).
-- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — server-only, set by the Upstash
-  Marketplace integration. Power `src/lib/ratelimit.ts` (Loui + Stripe/DocuSign route caps).
-  When absent (local dev / CI) the limiters fail open; `enforceLimit` logs loudly in prod.
+- Upstash Redis — server-only, powers `src/lib/ratelimit.ts` (Loui + Stripe/DocuSign route
+  caps). The Vercel Upstash Marketplace integration provisions `KV_REST_API_URL` /
+  `KV_REST_API_TOKEN`; a manual Upstash DB uses `UPSTASH_REDIS_REST_URL` /
+  `UPSTASH_REDIS_REST_TOKEN`. `ratelimit.ts` reads either. When absent (local dev / CI) the
+  limiters fail open; `enforceLimit` logs loudly in prod.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 
