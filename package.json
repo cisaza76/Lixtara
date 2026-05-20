@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrations:check": "bash scripts/check-migrations.sh"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.78",

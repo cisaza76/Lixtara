@@ -14,8 +14,11 @@ Project planning (phases, MVP scope, API inventory) lives in the user's auto-mem
 - **Next.js 16** App Router, Turbopack, React 19
 - **TypeScript** strict, ESLint flat config (`eslint-config-next`)
 - **Tailwind CSS v4** + **shadcn/ui** (style: `base-nova`, base color: `neutral`)
-- **Supabase** Auth + Postgres + Storage + RLS — reused project from Lovable
-  (`fizhoufepowilbhbtfkg.supabase.co`). `@supabase/ssr` clients in `src/lib/supabase/`.
+- **Supabase** Auth + Postgres + Storage + RLS — single project **`fizhoufepowilbhbtfkg`**
+  (Nexxos-Direct-MVP, us-east-1, **production**). This is the ONLY database; the Lovable
+  prototype used this same project from the start (there is no separate Lovable DB). Any
+  other project ref found in code is outdated — ignore it. `@supabase/ssr` clients in
+  `src/lib/supabase/`. Migrations are CLI-managed off a baseline — see "Database migrations".
 - **i18n**: `[lang]` segment with `en` and `es`. Default `en`. Proxy in `src/proxy.ts`
   redirects unmatched paths to `/en`.
 - **pnpm** (workspace: `allowBuilds` for `sharp` + `unrs-resolver`)
@@ -98,8 +101,36 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   post-go-live. (The earlier blanket "no AI / Investor Club / Loui in Fase 1" rule is obsolete:
   Loui chat, AI staging copy, the Investor Club volume teaser, and 3D tours all shipped ahead
   of the original plan — see Phase status.)
-- Do **not** rename the existing Supabase project or migrate schemas without an explicit
-  cutover plan (Lovable and Lixtara coexist on the same DB during the transition).
+- Do **not** create, alter, or drop any table, function, or RLS policy on the production
+  DB autonomously — schema changes go through a migration + explicit owner confirmation
+  (see "Database migrations"). Do **not** run `supabase db push` without sign-off.
+
+## Database migrations
+
+The DB (`fizhoufepowilbhbtfkg`) is CLI-managed off a **baseline** captured 2026-05-20.
+
+- **Baseline:** `supabase/migrations/20260520151434_remote_baseline.sql` — a schema-only dump of
+  the production `public` schema (15 tables, 39 RLS policies, 3 functions, 4 triggers). Marked
+  `applied` in the remote history via `migration repair`, so it is never re-run; it is the
+  source of truth for the schema as of that date.
+- **Archive:** the 15 pre-baseline files (date-only names, applied by hand before the pipeline
+  existed) live in `supabase/migrations_archive/` as **historical reference only** — outside
+  `supabase/migrations/` so the CLI ignores them. Do not move them back.
+- **Credentials** (local only, in `.env.local`, gitignored): `SUPABASE_ACCESS_TOKEN`
+  (Account → Access Tokens) and `SUPABASE_DB_PASSWORD` (Project Settings → Database).
+
+### Adding a migration
+1. `supabase migration new <name>` → `supabase/migrations/<14-digit-ts>_<name>.sql`.
+2. Write the SQL. Filenames MUST be `<14-digit-timestamp>_name.sql`, version unique
+   (`pnpm migrations:check` enforces this in CI).
+3. Apply MANUALLY after owner sign-off: `supabase db push` (no auto-apply on merge, by design).
+   Never alter the production schema outside this flow.
+
+### Known drift to fix (out of band)
+Code reads `agreements` and `schedule_requests`, but those tables **do not exist** (the real
+table is `listing_agreements`; `schedule_requests` was never created). This breaks DocuSign
+agreement persistence / the checkout gate and Loui scheduling. Fix via migration + code change,
+with owner confirmation.
 
 ## Quality gates
 
@@ -107,9 +138,10 @@ Local before commit:
 - `pnpm tsc --noEmit` must pass
 - `pnpm lint` must pass
 - `pnpm test` must pass (Vitest — `src/**/*.test.ts`, node env, `@/` alias)
+- `pnpm migrations:check` must pass (validates migration filenames; read-only, no DB)
 - `pnpm build` must pass
 
-CI runs the same four on every push and pull request.
+CI runs the same five on every push and pull request.
 
 ## Phase status
 
@@ -120,19 +152,17 @@ shipped ahead of the plan while F4 hardening is still outstanding.
 **Shipped (on `main`, deployed):** bilingual landing + marketing pages; public `properties`
 and `property/[id]`; full auth (sign-up/in, email verify, password reset); the 8-step seller
 listing flow + seller dashboard; Stripe tier checkout + signature-verified, idempotent webhook
-(dedup via `processed_webhook_events` — needs that migration applied to be active); DocuSign
+(dedup via `processed_webhook_events`, active since 2026-05-20); DocuSign
 listing agreements (JWT auth) + webhook; Resend transactional emails; the admin broker-approval
 queue + payments view; the buyer side (offers + saved properties); the Loui AI chat; AI staging
 copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit.ts`).
 
-**Not yet done — go-live debt:** test coverage is thin (Vitest is set up; only the pure money
-modules `pricing-tiers` + `buyer-rebate` are covered — webhooks, RLS, and route handlers are
-untested); error/product analytics
-(Sentry/PostHog); the full 5-checkout Stripe set (only `tier` is wired); referrals; MLS sync;
-and the FL DBPR / NAR
-compliance review. There is also **no migration pipeline** — schema changes are applied by hand
-against the shared Supabase project (`supabase/migrations/` is a log, not the source of truth),
-which the project still shares with the live Lovable app.
+**Not yet done — go-live debt:** test coverage is unit-only (Vitest covers pure logic —
+pricing, buyer-rebate, status maps, i18n parity, webhook dedup; **webhooks, RLS, and route
+handlers have no integration tests**); error/product analytics (Sentry/PostHog); the full
+5-checkout Stripe set (only `tier` is wired); referrals; MLS sync; the FL DBPR / NAR
+compliance review; and the `agreements` / `schedule_requests` code-vs-schema bug (code reads
+tables that don't exist — see "Database migrations").
 
 MVP scope and the original phase sequencing live in user memory (`mvp_scope_phase1.md`,
 `phase_plan.md`).

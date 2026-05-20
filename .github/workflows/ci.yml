@@ -32,6 +32,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Validate migrations
+        run: pnpm migrations:check
+
       - name: Build
         run: pnpm build
         env:
