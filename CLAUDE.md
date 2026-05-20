@@ -33,7 +33,7 @@ src/
   components/
     ui/                # shadcn components only — do not edit by hand, regen via shadcn CLI
   lib/
-    i18n.ts            # locale list + dictionaries (tiny inline for F0; F1 splits to namespaces)
+    i18n.ts            # locale list + all EN/ES dictionaries inline (~1.9k lines; namespace split never happened)
     utils.ts           # cn() helper
     supabase/
       client.ts        # browser client
@@ -53,8 +53,8 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   → `LIXTARA_*` constants.
 
 ### Pricing
-- Pricing tiers live in **one** module (will be `src/lib/pricing-tiers.ts`, ported in F2).
-  Never hardcode `199`, `495`, `995` in components.
+- Pricing tiers live in **one** module: `src/lib/pricing-tiers.ts`. Never hardcode
+  `199`, `495`, `995` in components — import from there (and Stripe amounts derive from it).
 - Virtual staging: `FREE_QUOTA = 3`, `PRICE_PER_ROOM = 500` cents, hard cap 30 rooms.
 - Buyer rebate: `LIXTARA_BUYER_FEE_PCT = 0.5`, `REBATE_CAP = 50_000`.
 
@@ -94,8 +94,10 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   manually with the env vars above.
 - Do **not** route through Lovable AI Gateway. AI calls go through Vercel AI Gateway or
   direct provider SDKs (Anthropic for text, separate provider for image gen).
-- Do **not** add AI features, the Investor Club, the Loui chatbot, or referrals in Fase 1.
-  All deferred to F5+.
+- Do **not** build referrals (`/r/:code` short links + attribution) yet — still deferred
+  post-go-live. (The earlier blanket "no AI / Investor Club / Loui in Fase 1" rule is obsolete:
+  Loui chat, AI staging copy, the Investor Club volume teaser, and 3D tours all shipped ahead
+  of the original plan — see Phase status.)
 - Do **not** rename the existing Supabase project or migrate schemas without an explicit
   cutover plan (Lovable and Lixtara coexist on the same DB during the transition).
 
@@ -110,7 +112,23 @@ CI runs the same three on every push and pull request.
 
 ## Phase status
 
-Current phase: **F0 — Setup**. Exit criterion: `git push` lands a Vercel preview URL with
-the bilingual placeholder + a Supabase auth smoke (signUp → email verify → signIn).
+The clean linear F0→F4 plan in user memory (`phase_plan.md`) was overtaken by parallel
+feature work — treat that file as historical intent, not current state. Some F5/F7 features
+shipped ahead of the plan while F4 hardening is still outstanding.
 
-Phase plan and MVP scope are in user memory (`mvp_scope_phase1.md`, `phase_plan.md`).
+**Shipped (on `main`, deployed):** bilingual landing + marketing pages; public `properties`
+and `property/[id]`; full auth (sign-up/in, email verify, password reset); the 8-step seller
+listing flow + seller dashboard; Stripe tier checkout + signature-verified webhook; DocuSign
+listing agreements (JWT auth) + webhook; Resend transactional emails; the admin broker-approval
+queue + payments view; the buyer side (offers + saved properties); the Loui AI chat; AI staging
+copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit.ts`).
+
+**Not yet done — go-live debt:** automated tests (none); error/product analytics
+(Sentry/PostHog); Stripe webhook idempotency (no `processed_webhook_events` dedup); the full
+5-checkout Stripe set (only `tier` is wired); referrals; MLS sync; and the FL DBPR / NAR
+compliance review. There is also **no migration pipeline** — schema changes are applied by hand
+against the shared Supabase project (`supabase/migrations/` is a log, not the source of truth),
+which the project still shares with the live Lovable app.
+
+MVP scope and the original phase sequencing live in user memory (`mvp_scope_phase1.md`,
+`phase_plan.md`).
