@@ -106,9 +106,10 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 Local before commit:
 - `pnpm tsc --noEmit` must pass
 - `pnpm lint` must pass
+- `pnpm test` must pass (Vitest — `src/**/*.test.ts`, node env, `@/` alias)
 - `pnpm build` must pass
 
-CI runs the same three on every push and pull request.
+CI runs the same four on every push and pull request.
 
 ## Phase status
 
@@ -123,7 +124,9 @@ listing agreements (JWT auth) + webhook; Resend transactional emails; the admin 
 queue + payments view; the buyer side (offers + saved properties); the Loui AI chat; AI staging
 copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit.ts`).
 
-**Not yet done — go-live debt:** automated tests (none); error/product analytics
+**Not yet done — go-live debt:** test coverage is thin (Vitest is set up; only the pure money
+modules `pricing-tiers` + `buyer-rebate` are covered — webhooks, RLS, and route handlers are
+untested); error/product analytics
 (Sentry/PostHog); Stripe webhook idempotency (no `processed_webhook_events` dedup); the full
 5-checkout Stripe set (only `tier` is wired); referrals; MLS sync; and the FL DBPR / NAR
 compliance review. There is also **no migration pipeline** — schema changes are applied by hand
