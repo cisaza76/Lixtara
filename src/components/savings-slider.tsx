@@ -1,47 +1,140 @@
 "use client";
 
-// Radical Transparency calculator — full per-tier table with:
-//   - Home value slider
-//   - Buyer-agent commission selector (2 / 2.5 / 3 %)
-//   - Per-tier breakdown: upfront / seller commission / buyer commission /
-//     total / you-save-vs-traditional
+// Radical Transparency calculator — full per-tier cost breakdown:
+//   - Home value slider + buyer-agent commission selector (2 / 2.5 / 3 %)
+//   - UPFRONT costs: listing fee, your commission, professional photos,
+//     DocuSign contracts, subtotal
+//   - CLOSING costs: buyer-agent commission, subtotal
+//   - Total cost + you-save-vs-traditional + a dynamic key-insight callout
 //
-// Traditional agent assumption: 6% total (3% listing + 3% buyer). When the
-// user chooses a buyer commission below 3% the traditional total drops the
-// same amount so we always compare apples-to-apples (the listing-side 3% is
-// the only thing Lixtara replaces with its flat fee + lower commission).
+// The buyer-agent commission applies to BOTH columns (you offer it either way),
+// so the savings reflect only what Lixtara replaces on the seller side. All
+// dollar inputs come from pricing-tiers.ts (TRADITIONAL_COSTS / PRICING_TIERS) —
+// never hardcode amounts here.
 
 import { useState } from "react";
-import { PRICING_TIERS, TIER_ORDER } from "@/lib/pricing-tiers";
+import {
+  PRICING_TIERS,
+  TIER_ORDER,
+  TRADITIONAL_COSTS,
+} from "@/lib/pricing-tiers";
 
-interface SavingsSliderProps {
+interface SavingsCopy {
   priceLabel: string;
   buyerCommissionLabel: string;
   buyerCommissionHint: string;
-  lineUpfront: string;
+  youSelected: string;
+  upfrontHeader: string;
+  closingHeader: string;
+  lineListingFee: string;
   lineSellerCommission: string;
+  linePhotos: string;
+  lineDocusign: string;
+  lineUpfrontSubtotal: string;
   lineBuyerCommission: string;
+  lineClosingSubtotal: string;
   lineTotal: string;
   lineSavings: string;
   traditionalLabel: string;
+  photoDiy: string;
+  included: string;
+  keyInsightLabel: string;
+  keyInsight: string;
   howToRead: string;
   howToReadBody: string;
+}
+
+interface SavingsSliderProps {
+  copy: SavingsCopy;
   tierNames: Record<"essentials" | "pro" | "concierge", string>;
 }
 
-const LISTING_SIDE_TRADITIONAL_PCT = 3;
+interface Column {
+  key: string;
+  label: string;
+  isTraditional: boolean;
+  listingFee: number;
+  sellerComm: number;
+  sellerPct: number;
+  /** dollar amount for traditional; null for tiers (show text instead) */
+  photos: number | null;
+  photosText: string;
+  docusign: number | null;
+  upfront: number;
+  buyer: number;
+  total: number;
+  savings: number;
+}
 
-function formatUSD(n: number): string {
+function usd(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
-export function SavingsSlider(props: SavingsSliderProps) {
-  const [price, setPrice] = useState<number>(500_000);
-  const [buyerPct, setBuyerPct] = useState<number>(3);
+export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
+  const [price, setPrice] = useState(500_000);
+  const [buyerPct, setBuyerPct] = useState(3);
 
-  const buyerCommissionDollars = price * (buyerPct / 100);
-  const traditionalListingDollars = price * (LISTING_SIDE_TRADITIONAL_PCT / 100);
-  const traditionalTotal = traditionalListingDollars + buyerCommissionDollars;
+  const buyerComm = price * (buyerPct / 100);
+
+  const tradSellerComm = price * (TRADITIONAL_COSTS.listingCommissionPct / 100);
+  const tradUpfront =
+    tradSellerComm + TRADITIONAL_COSTS.photography + TRADITIONAL_COSTS.docContracts;
+  const tradTotal = tradUpfront + buyerComm;
+
+  const columns: Column[] = [
+    {
+      key: "traditional",
+      label: copy.traditionalLabel,
+      isTraditional: true,
+      listingFee: 0,
+      sellerComm: tradSellerComm,
+      sellerPct: TRADITIONAL_COSTS.listingCommissionPct,
+      photos: TRADITIONAL_COSTS.photography,
+      photosText: "",
+      docusign: TRADITIONAL_COSTS.docContracts,
+      upfront: tradUpfront,
+      buyer: buyerComm,
+      total: tradTotal,
+      savings: 0,
+    },
+    ...TIER_ORDER.map((id): Column => {
+      const tier = PRICING_TIERS[id];
+      const sellerComm = price * (tier.commissionPct / 100);
+      const upfront = tier.flatFee + sellerComm; // photos + docusign are $0
+      const total = upfront + buyerComm;
+      return {
+        key: id,
+        label: tierNames[id],
+        isTraditional: false,
+        listingFee: tier.flatFee,
+        sellerComm,
+        sellerPct: tier.commissionPct,
+        photos: null,
+        photosText: tier.includesPhotography ? copy.included : copy.photoDiy,
+        docusign: null,
+        upfront,
+        buyer: buyerComm,
+        total,
+        savings: tradTotal - total,
+      };
+    }),
+  ];
+
+  const bestTier = columns
+    .filter((c) => !c.isTraditional)
+    .reduce((best, c) => (c.savings > best.savings ? c : best));
+  const keyInsightText = copy.keyInsight
+    .replace("{tier}", bestTier.label)
+    .replace("{pct}", `${buyerPct}%`)
+    .replace("{amount}", usd(bestTier.savings));
+
+  const headerCell =
+    "p-3 text-right text-[10px] uppercase tracking-[0.18em] font-semibold";
+  const labelCell = "p-3 text-ink/70 text-xs";
+  const moneyCell = "p-3 text-right text-ink text-sm";
+  const sectionRow =
+    "p-3 text-[10px] uppercase tracking-[0.22em] text-gold font-semibold bg-ivory-strong/50";
+  const pctTag = "text-[10px] text-ink/55 ml-1";
 
   return (
     <div className="flex flex-col gap-10">
@@ -50,7 +143,7 @@ export function SavingsSlider(props: SavingsSliderProps) {
         <div className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-4">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
-              {props.priceLabel}
+              {copy.priceLabel}
             </span>
             <span className="font-display italic text-3xl text-ink leading-none">
               <span className="text-gold text-lg align-top">$</span>
@@ -77,7 +170,7 @@ export function SavingsSlider(props: SavingsSliderProps) {
 
         <div className="flex flex-col gap-3">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
-            {props.buyerCommissionLabel}
+            {copy.buyerCommissionLabel}
           </span>
           <div className="flex gap-2">
             {[2, 2.5, 3].map((pct) => (
@@ -96,7 +189,7 @@ export function SavingsSlider(props: SavingsSliderProps) {
             ))}
           </div>
           <p className="text-xs text-ink/55 italic leading-relaxed">
-            {props.buyerCommissionHint}
+            {copy.buyerCommissionHint}
           </p>
         </div>
       </div>
@@ -106,127 +199,158 @@ export function SavingsSlider(props: SavingsSliderProps) {
         <table className="w-full text-sm border border-gold-soft">
           <thead>
             <tr className="bg-ivory-strong/40">
-              <th className="text-left p-4 text-[10px] uppercase tracking-[0.18em] text-ink/55 font-semibold w-1/5">
-                {/* header for line labels */}
-              </th>
-              <th className="text-right p-4 text-[10px] uppercase tracking-[0.18em] text-ink/55 font-semibold">
-                {props.traditionalLabel}
-              </th>
-              {TIER_ORDER.map((tierId) => (
+              <th className="text-left p-3 w-1/5" />
+              {columns.map((c) => (
                 <th
-                  key={tierId}
-                  className="text-right p-4 text-[10px] uppercase tracking-[0.18em] text-gold font-semibold"
+                  key={c.key}
+                  className={`${headerCell} ${c.isTraditional ? "text-ink/55" : "text-gold"}`}
                 >
-                  {props.tierNames[tierId]}
+                  {c.label}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            <tr className="border-t border-gold-soft">
-              <td className="p-4 text-ink/70 text-xs">{props.lineUpfront}</td>
-              <td className="p-4 text-right text-ink">{formatUSD(0)}</td>
-              {TIER_ORDER.map((tierId) => (
-                <td key={tierId} className="p-4 text-right text-ink">
-                  {formatUSD(PRICING_TIERS[tierId].flatFee)}
+            {/* UPFRONT */}
+            <tr>
+              <td colSpan={columns.length + 1} className={sectionRow}>
+                {copy.upfrontHeader}
+              </td>
+            </tr>
+            <tr className="border-t border-gold-soft/60">
+              <td className={labelCell}>{copy.lineListingFee}</td>
+              {columns.map((c) => (
+                <td key={c.key} className={moneyCell}>
+                  {usd(c.listingFee)}
                 </td>
               ))}
             </tr>
             <tr className="border-t border-gold-soft/60">
-              <td className="p-4 text-ink/70 text-xs">
-                {props.lineSellerCommission}
-              </td>
-              <td className="p-4 text-right text-ink">
-                {formatUSD(traditionalListingDollars)}
-                <span className="text-[10px] text-ink/55 ml-1">(3%)</span>
-              </td>
-              {TIER_ORDER.map((tierId) => {
-                const pct = PRICING_TIERS[tierId].commissionPct;
-                return (
-                  <td key={tierId} className="p-4 text-right text-ink">
-                    {formatUSD(price * (pct / 100))}
-                    <span className="text-[10px] text-ink/55 ml-1">
-                      ({pct}%)
-                    </span>
-                  </td>
-                );
-              })}
+              <td className={labelCell}>{copy.lineSellerCommission}</td>
+              {columns.map((c) => (
+                <td key={c.key} className={moneyCell}>
+                  {usd(c.sellerComm)}
+                  <span className={pctTag}>({c.sellerPct}%)</span>
+                </td>
+              ))}
             </tr>
             <tr className="border-t border-gold-soft/60">
-              <td className="p-4 text-ink/70 text-xs">
-                {props.lineBuyerCommission}
+              <td className={labelCell}>{copy.linePhotos}</td>
+              {columns.map((c) => (
+                <td key={c.key} className={moneyCell}>
+                  {c.photos === null ? (
+                    <span className="text-ink/60 italic">{c.photosText}</span>
+                  ) : (
+                    usd(c.photos)
+                  )}
+                </td>
+              ))}
+            </tr>
+            <tr className="border-t border-gold-soft/60">
+              <td className={labelCell}>{copy.lineDocusign}</td>
+              {columns.map((c) => (
+                <td key={c.key} className={moneyCell}>
+                  {c.docusign === null ? (
+                    <span className="text-ink/60 italic">{copy.included}</span>
+                  ) : (
+                    usd(c.docusign)
+                  )}
+                </td>
+              ))}
+            </tr>
+            <tr className="border-t border-gold-soft bg-ivory-strong/20">
+              <td className="p-3 text-[10px] uppercase tracking-[0.18em] text-ink/70 font-semibold">
+                {copy.lineUpfrontSubtotal}
               </td>
-              <td className="p-4 text-right text-ink">
-                {formatUSD(buyerCommissionDollars)}
-                <span className="text-[10px] text-ink/55 ml-1">
-                  ({buyerPct}%)
+              {columns.map((c) => (
+                <td key={c.key} className="p-3 text-right text-ink font-medium">
+                  {usd(c.upfront)}
+                </td>
+              ))}
+            </tr>
+
+            {/* CLOSING */}
+            <tr>
+              <td colSpan={columns.length + 1} className={sectionRow}>
+                {copy.closingHeader}
+              </td>
+            </tr>
+            <tr className="border-t border-gold-soft/60">
+              <td className={labelCell}>
+                {copy.lineBuyerCommission}
+                <span className="block text-[10px] text-ink/45 not-italic mt-0.5">
+                  {copy.youSelected} {buyerPct}%
                 </span>
               </td>
-              {TIER_ORDER.map((tierId) => (
-                <td key={tierId} className="p-4 text-right text-ink">
-                  {formatUSD(buyerCommissionDollars)}
-                  <span className="text-[10px] text-ink/55 ml-1">
-                    ({buyerPct}%)
-                  </span>
+              {columns.map((c) => (
+                <td key={c.key} className={moneyCell}>
+                  {usd(c.buyer)}
+                  <span className={pctTag}>({buyerPct}%)</span>
                 </td>
               ))}
             </tr>
-            <tr className="border-t-2 border-gold-soft bg-ivory-strong/30">
-              <td className="p-4 text-[10px] uppercase tracking-[0.18em] text-ink font-semibold">
-                {props.lineTotal}
+            <tr className="border-t border-gold-soft bg-ivory-strong/20">
+              <td className="p-3 text-[10px] uppercase tracking-[0.18em] text-ink/70 font-semibold">
+                {copy.lineClosingSubtotal}
               </td>
-              <td className="p-4 text-right font-display text-lg text-ink">
-                {formatUSD(traditionalTotal)}
-              </td>
-              {TIER_ORDER.map((tierId) => {
-                const tier = PRICING_TIERS[tierId];
-                const lixTotal =
-                  tier.flatFee +
-                  price * (tier.commissionPct / 100) +
-                  buyerCommissionDollars;
-                return (
-                  <td
-                    key={tierId}
-                    className="p-4 text-right font-display text-lg text-ink"
-                  >
-                    {formatUSD(lixTotal)}
-                  </td>
-                );
-              })}
+              {columns.map((c) => (
+                <td key={c.key} className="p-3 text-right text-ink font-medium">
+                  {usd(c.buyer)}
+                </td>
+              ))}
             </tr>
-            <tr className="border-t border-gold-soft bg-gold/5">
-              <td className="p-4 text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
-                {props.lineSavings}
+
+            {/* TOTAL */}
+            <tr className="border-t-2 border-gold-soft bg-ivory-strong/40">
+              <td className="p-3 text-[10px] uppercase tracking-[0.18em] text-ink font-semibold">
+                {copy.lineTotal}
               </td>
-              <td className="p-4 text-right text-ink/40 text-sm">—</td>
-              {TIER_ORDER.map((tierId) => {
-                const tier = PRICING_TIERS[tierId];
-                const lixTotal =
-                  tier.flatFee +
-                  price * (tier.commissionPct / 100) +
-                  buyerCommissionDollars;
-                const savings = traditionalTotal - lixTotal;
-                return (
-                  <td
-                    key={tierId}
-                    className="p-4 text-right font-display italic text-xl text-gold"
-                  >
-                    {formatUSD(savings)}
-                  </td>
-                );
-              })}
+              {columns.map((c) => (
+                <td
+                  key={c.key}
+                  className="p-3 text-right font-display text-lg text-ink"
+                >
+                  {usd(c.total)}
+                </td>
+              ))}
+            </tr>
+            {/* YOU SAVE */}
+            <tr className="border-t border-gold-soft bg-gold/5">
+              <td className="p-3 text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
+                {copy.lineSavings}
+              </td>
+              {columns.map((c) => (
+                <td
+                  key={c.key}
+                  className="p-3 text-right font-display italic text-xl text-gold"
+                >
+                  {c.isTraditional ? (
+                    <span className="text-ink/40 text-sm not-italic">—</span>
+                  ) : (
+                    usd(c.savings)
+                  )}
+                </td>
+              ))}
             </tr>
           </tbody>
         </table>
       </div>
 
+      {/* Key insight */}
+      <div className="border-l-2 border-gold bg-gold/5 px-5 py-4 flex flex-col gap-1">
+        <span className="text-[10px] uppercase tracking-[0.22em] text-gold font-semibold">
+          {copy.keyInsightLabel}
+        </span>
+        <p className="text-sm text-ink leading-relaxed">{keyInsightText}</p>
+      </div>
+
       {/* Explanation */}
       <details className="border border-gold-soft bg-ivory-strong/30 p-5">
         <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-gold font-semibold">
-          {props.howToRead}
+          {copy.howToRead}
         </summary>
         <p className="text-xs text-ink/70 leading-relaxed mt-3">
-          {props.howToReadBody}
+          {copy.howToReadBody}
         </p>
       </details>
     </div>

@@ -11,13 +11,28 @@ export interface PricingTier {
   /** seller-side commission as percent of sale price */
   commissionPct: number;
   termMonths: number;
+  /** true = professional photographer included; false = DIY smartphone guide */
+  includesPhotography: boolean;
 }
 
 export const PRICING_TIERS: Record<PricingTierId, PricingTier> = {
-  essentials: { id: "essentials", flatFee: 199, commissionPct: 0, termMonths: 24 },
-  pro: { id: "pro", flatFee: 495, commissionPct: 0.5, termMonths: 24 },
-  concierge: { id: "concierge", flatFee: 995, commissionPct: 1, termMonths: 24 },
+  essentials: { id: "essentials", flatFee: 199, commissionPct: 0, termMonths: 24, includesPhotography: false },
+  pro: { id: "pro", flatFee: 495, commissionPct: 0.5, termMonths: 24, includesPhotography: true },
+  concierge: { id: "concierge", flatFee: 995, commissionPct: 1, termMonths: 24, includesPhotography: true },
 };
+
+// Baseline costs of the traditional-agent comparison, in USD (flat) or percent.
+// Single source for the Radical Transparency table — never hardcode in the UI.
+export const TRADITIONAL_COSTS = {
+  /** listing-side commission a traditional agent charges (the part Lixtara replaces) */
+  listingCommissionPct: 3,
+  /** typical buyer-agent commission in the traditional 6% model */
+  buyerCommissionPct: 3,
+  /** typical out-of-pocket photography fee */
+  photography: 300,
+  /** typical document / e-signature fee */
+  docContracts: 40,
+} as const;
 
 export const TIER_ORDER: PricingTierId[] = ["essentials", "pro", "concierge"];
 
