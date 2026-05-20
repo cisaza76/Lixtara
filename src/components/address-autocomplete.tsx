@@ -113,21 +113,28 @@ export function AddressAutocomplete({
   const zipInputRef = useRef<HTMLInputElement | null>(null);
   const latInputRef = useRef<HTMLInputElement | null>(null);
   const lngInputRef = useRef<HTMLInputElement | null>(null);
-  const [status, setStatus] = useState<Status>("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Inlined at build time, so the missing-key state is known at render — derive
+  // it via lazy initializers instead of setState-in-effect.
+  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  // Effect runs once on mount and immediately loads Maps, so start in "loading"
+  // when the key is present — equivalent to the old setStatus("loading"), minus
+  // the synchronous setState-in-effect.
+  const [status, setStatus] = useState<Status>(() =>
+    mapsApiKey ? "loading" : "error",
+  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(() =>
+    mapsApiKey ? null : "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY missing.",
+  );
   const [verified, setVerified] = useState<boolean>(
     defaultLat !== null && defaultLng !== null,
   );
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      setStatus("error");
-      setErrorMessage("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY missing.");
-      return;
-    }
+    // Missing-key error is already reflected in initial state above; "loading"
+    // is the initial status when the key is present.
+    if (!apiKey) return;
 
-    setStatus("loading");
     let autocomplete: google.maps.places.Autocomplete | null = null;
 
     loadGoogleMaps(apiKey)

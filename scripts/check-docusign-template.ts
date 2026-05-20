@@ -29,7 +29,7 @@ try {
     if (v.startsWith('"')) {
       // Multi-line quoted value: keep absorbing lines until the closing quote.
       v = v.slice(1);
-      let parts: string[] = [];
+      const parts: string[] = [];
       if (v.endsWith('"') && v.length > 0 && !v.endsWith('\\"')) {
         parts.push(v.slice(0, -1));
         i += 1;
