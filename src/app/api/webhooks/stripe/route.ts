@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { verifyWebhookSignature } from "@/lib/stripe";
 import { sendPaymentReceipt, sendBrokerNewPending } from "@/lib/email";
+import { claimWebhookEvent } from "@/lib/webhook-dedup";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -38,6 +39,21 @@ export async function POST(req: Request) {
   }
 
   const supabase = serviceClient();
+
+  // Idempotency: claim the event before doing anything with side effects.
+  // Stripe redelivers events (retries, at-least-once), and without this a
+  // duplicate would re-send receipt/broker emails and re-run the side effects.
+  // "unavailable" (e.g. the migration isn't applied yet) falls through and
+  // processes anyway — see claimWebhookEvent.
+  const claim = await claimWebhookEvent(
+    supabase,
+    "stripe",
+    event.id,
+    event.type,
+  );
+  if (claim === "duplicate") {
+    return NextResponse.json({ received: true, deduped: true });
+  }
 
   switch (event.type) {
     case "checkout.session.completed": {
