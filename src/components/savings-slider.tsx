@@ -62,6 +62,8 @@ interface Column {
   docusign: number | null;
   upfront: number;
   buyer: number;
+  /** the buyer-agent % shown for this column (traditional is fixed; tiers follow the slider) */
+  buyerPctShown: number;
   total: number;
   savings: number;
 }
@@ -75,11 +77,15 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
   const [buyerPct, setBuyerPct] = useState(3);
 
   const buyerComm = price * (buyerPct / 100);
+  // Traditional buyer-agent commission is the FIXED 3% benchmark — it must NOT
+  // move with the slider. The slider only changes what YOU offer on Lixtara;
+  // the traditional column stays put so the comparison is a stable comparable.
+  const tradBuyerComm = price * (TRADITIONAL_COSTS.buyerCommissionPct / 100);
 
   const tradSellerComm = price * (TRADITIONAL_COSTS.listingCommissionPct / 100);
   const tradUpfront =
     tradSellerComm + TRADITIONAL_COSTS.photography + TRADITIONAL_COSTS.docContracts;
-  const tradTotal = tradUpfront + buyerComm;
+  const tradTotal = tradUpfront + tradBuyerComm;
 
   const columns: Column[] = [
     {
@@ -93,7 +99,8 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
       photosText: "",
       docusign: TRADITIONAL_COSTS.docContracts,
       upfront: tradUpfront,
-      buyer: buyerComm,
+      buyer: tradBuyerComm,
+      buyerPctShown: TRADITIONAL_COSTS.buyerCommissionPct,
       total: tradTotal,
       savings: 0,
     },
@@ -114,6 +121,7 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
         docusign: null,
         upfront,
         buyer: buyerComm,
+        buyerPctShown: buyerPct,
         total,
         savings: tradTotal - total,
       };
@@ -285,7 +293,7 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
               {columns.map((c) => (
                 <td key={c.key} className={moneyCell}>
                   {usd(c.buyer)}
-                  <span className={pctTag}>({buyerPct}%)</span>
+                  <span className={pctTag}>({c.buyerPctShown}%)</span>
                 </td>
               ))}
             </tr>

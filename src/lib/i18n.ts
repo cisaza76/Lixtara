@@ -768,7 +768,7 @@ const dictionaries = {
         "With Lixtara {tier} at {pct} co-broke, you save {amount} vs a traditional agent — while still offering competitive compensation to attract buyer agents.",
       howToRead: "How to read this table",
       howToReadBody:
-        "Upfront costs are paid when you list; closing costs come out of your sale proceeds. The traditional column assumes a 6% commission (3% listing + 3% buyer agent) plus a typical $300 photography fee and $40 in document fees. You choose the buyer-agent commission (2 / 2.5 / 3%) — higher percentages can attract more showings — and it applies to both columns, so the savings reflect what Lixtara replaces on the seller side. Every Lixtara plan includes MLS listing, Zillow / Realtor.com syndication, and DocuSign contracts; Essentials photography is DIY with our smartphone guide while Pro and Concierge include a professional photographer. Other closing costs (title, taxes, recording fees) are not shown here.",
+        "Upfront costs are paid when you list; closing costs come out of your sale proceeds. The traditional column is a fixed benchmark — a 6% commission (3% listing + 3% buyer agent) plus a typical $300 photography fee and $40 in document fees — and it doesn't change. On Lixtara you choose the buyer-agent commission you offer (2 / 2.5 / 3%); higher percentages can attract more showings. Every Lixtara plan includes MLS listing, Zillow / Realtor.com syndication, and DocuSign contracts; Essentials photography is DIY with our smartphone guide while Pro and Concierge include a professional photographer. Other closing costs (title, taxes, recording fees) are not shown here.",
     },
     savingsCalc: {
       eyebrow: "Calculate your savings",
@@ -1713,7 +1713,7 @@ const dictionaries = {
         "Con Lixtara {tier} al {pct} de co-broke, ahorras {amount} frente a un agente tradicional — ofreciendo igual una compensación competitiva para atraer agentes compradores.",
       howToRead: "Cómo leer esta tabla",
       howToReadBody:
-        "Los costos iniciales se pagan al listar; los de cierre salen del producto de tu venta. La columna tradicional asume 6% de comisión (3% listing + 3% agente comprador) más ~$300 de fotografía y $40 de documentos. Vos elegís la comisión del agente comprador (2 / 2.5 / 3%) — porcentajes más altos pueden atraer más visitas — y aplica a ambas columnas, así que el ahorro refleja lo que Lixtara reemplaza del lado vendedor. Todos los planes Lixtara incluyen listado en MLS, sindicación a Zillow / Realtor.com y contratos DocuSign; la fotografía de Essentials es DIY con nuestra guía para smartphone, mientras Pro y Concierge incluyen fotógrafo profesional. Otros costos de cierre (título, impuestos, registro) no se muestran aquí.",
+        "Los costos iniciales se pagan al listar; los de cierre salen del producto de tu venta. La columna tradicional es un comparable fijo — 6% de comisión (3% listing + 3% agente comprador) más ~$300 de fotografía y $40 de documentos — y no cambia. En Lixtara vos elegís la comisión del agente comprador que ofrecés (2 / 2.5 / 3%); porcentajes más altos pueden atraer más visitas. Todos los planes Lixtara incluyen listado en MLS, sindicación a Zillow / Realtor.com y contratos DocuSign; la fotografía de Essentials es DIY con nuestra guía para smartphone, mientras Pro y Concierge incluyen fotógrafo profesional. Otros costos de cierre (título, impuestos, registro) no se muestran aquí.",
     },
     savingsCalc: {
       eyebrow: "Calcula tus ahorros",
