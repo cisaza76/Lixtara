@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createTierCheckoutSession } from "@/lib/stripe";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
+import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 
 interface Body {
   property_id?: string;
@@ -25,6 +26,18 @@ export async function POST(req: Request) {
   if (!user || !user.email) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
+
+  // Each call creates a Stripe Checkout session — cap per user.
+  const limited = await enforceLimit(
+    apiLimiter("checkout:tier", 20, "1 h"),
+    `u:${user.id}`,
+    {
+      label: "checkout:tier",
+      message:
+        "Too many checkout attempts. Please wait a few minutes and try again.",
+    },
+  );
+  if (limited) return limited;
 
   let body: Body;
   try {

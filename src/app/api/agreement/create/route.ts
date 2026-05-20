@@ -17,6 +17,7 @@ import {
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
+import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 
 interface Body {
   property_id?: string;
@@ -33,6 +34,18 @@ export async function POST(req: Request) {
   if (!user || !user.email) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }
+
+  // Each call may mint a DocuSign envelope + JWT exchange — cap per user.
+  const limited = await enforceLimit(
+    apiLimiter("agreement:create", 20, "1 h"),
+    `u:${user.id}`,
+    {
+      label: "agreement:create",
+      message:
+        "Too many agreement attempts. Please wait a few minutes and try again.",
+    },
+  );
+  if (limited) return limited;
 
   let body: Body;
   try {
