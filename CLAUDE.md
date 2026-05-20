@@ -119,7 +119,8 @@ shipped ahead of the plan while F4 hardening is still outstanding.
 
 **Shipped (on `main`, deployed):** bilingual landing + marketing pages; public `properties`
 and `property/[id]`; full auth (sign-up/in, email verify, password reset); the 8-step seller
-listing flow + seller dashboard; Stripe tier checkout + signature-verified webhook; DocuSign
+listing flow + seller dashboard; Stripe tier checkout + signature-verified, idempotent webhook
+(dedup via `processed_webhook_events` — needs that migration applied to be active); DocuSign
 listing agreements (JWT auth) + webhook; Resend transactional emails; the admin broker-approval
 queue + payments view; the buyer side (offers + saved properties); the Loui AI chat; AI staging
 copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit.ts`).
@@ -127,8 +128,8 @@ copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit
 **Not yet done — go-live debt:** test coverage is thin (Vitest is set up; only the pure money
 modules `pricing-tiers` + `buyer-rebate` are covered — webhooks, RLS, and route handlers are
 untested); error/product analytics
-(Sentry/PostHog); Stripe webhook idempotency (no `processed_webhook_events` dedup); the full
-5-checkout Stripe set (only `tier` is wired); referrals; MLS sync; and the FL DBPR / NAR
+(Sentry/PostHog); the full 5-checkout Stripe set (only `tier` is wired); referrals; MLS sync;
+and the FL DBPR / NAR
 compliance review. There is also **no migration pipeline** — schema changes are applied by hand
 against the shared Supabase project (`supabase/migrations/` is a log, not the source of truth),
 which the project still shares with the live Lovable app.
