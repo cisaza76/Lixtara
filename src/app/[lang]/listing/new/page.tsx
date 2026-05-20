@@ -1220,6 +1220,9 @@ export default async function ListingNewPage({
                       const dateStr = c.removedDate || c.lastSeenDate;
                       const daysAgo = dateStr
                         ? Math.floor(
+                            // Relative "days ago" is inherently time-based; one
+                            // read per render is correct for this display value.
+                            // eslint-disable-next-line react-hooks/purity
                             (Date.now() - new Date(dateStr).getTime()) /
                               (1000 * 60 * 60 * 24),
                           )
