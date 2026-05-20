@@ -30,7 +30,7 @@ export interface MiamiDadeLookupResult {
 // Map county DOR use codes to our property_type enum.
 // 0001 single family, 0003 multi 2-9, 0004 condo, 0005 coop, 0008 multi 10+,
 // 0081 townhouse pud. Others fall through to null.
-function mapDorToType(dor: string | null | undefined): string | null {
+export function mapDorToType(dor: string | null | undefined): string | null {
   if (!dor) return null;
   const code = String(dor).trim();
   if (code.startsWith("0001")) return "single_family";
