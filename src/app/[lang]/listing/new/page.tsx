@@ -32,6 +32,7 @@ import { OccupancySection } from "@/components/occupancy-section";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
+import { DashboardRedirect } from "@/components/dashboard-redirect";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
 
@@ -2536,26 +2537,23 @@ export default async function ListingNewPage({
               draft.mls_status === "active";
             if (isSucceeded) {
               return (
-                <div className="border border-gold bg-gold/5 p-6 flex flex-col gap-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
-                    {copy.step8.successTitle}
-                  </p>
-                  <p className="text-base text-ink leading-relaxed">
-                    {copy.step8.successBody}
-                  </p>
-                  <Link
-                    href={`/${lang}/dashboard`}
-                    className="self-start inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
-                  >
-                    {copy.step8.viewDashboard}
-                  </Link>
-                </div>
+                <DashboardRedirect
+                  href={`/${lang}/dashboard`}
+                  title={copy.step8.successTitle}
+                  body={copy.step8.successBody}
+                  redirectingLabel={copy.step8.redirectingDashboard}
+                  manualLabel={copy.step8.viewDashboard}
+                />
               );
             }
 
+            // Failed/declined payment → clear notice + retry (takes precedence
+            // over the pending poller so the seller isn't stuck on a spinner).
+            const paymentFailed = latestPayment?.status === "failed";
+
             // Pending path: returned from Stripe but webhook hasn't landed yet.
             // Auto-poll until mls_status flips, then re-render the success card.
-            if (sp.session_id) {
+            if (sp.session_id && !paymentFailed) {
               return (
                 <div className="border border-gold-soft bg-ivory-strong/40 p-6 flex flex-col gap-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
@@ -2582,6 +2580,9 @@ export default async function ListingNewPage({
 
             return (
               <div className="flex flex-col gap-6">
+                {paymentFailed && (
+                  <ErrorBanner message={copy.step8.failedNotice} />
+                )}
                 <div className="border border-gold-soft p-6 flex flex-col gap-3">
                   <div className="flex items-baseline justify-between gap-4">
                     <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
