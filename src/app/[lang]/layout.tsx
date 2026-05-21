@@ -3,11 +3,7 @@ import Link from "next/link";
 import { Inter, Playfair_Display } from "next/font/google";
 import { notFound } from "next/navigation";
 import { isLocale, locales, t, type Locale } from "@/lib/i18n";
-import {
-  BROKERAGE_LICENSED_ENTITY,
-  BROKERAGE_LOCATION,
-  BROKER_LICENSE,
-} from "@/lib/broker";
+import { BROKERAGE_LOCATION, BROKER_LICENSE } from "@/lib/broker";
 import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
 import "../globals.css";
@@ -189,9 +185,9 @@ export default async function RootLayout({
                   {footerCopy.tagline}
                 </p>
                 <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
-                  {footerCopy.poweredBy} {BROKERAGE_LICENSED_ENTITY}
-                  <br />
-                  {footerCopy.licenseLabel} #{BROKER_LICENSE}
+                  {BROKER_LICENSE
+                    ? `${footerCopy.licenseLabel} #${BROKER_LICENSE}`
+                    : footerCopy.licensePending}
                   <br />
                   {BROKERAGE_LOCATION}
                 </div>

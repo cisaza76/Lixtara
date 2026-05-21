@@ -2,11 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
-import {
-  BROKER_LICENSE,
-  BROKERAGE_NAME,
-  BROKERAGE_LICENSED_ENTITY,
-} from "@/lib/broker";
+import { BROKER_LICENSE, BROKERAGE_NAME } from "@/lib/broker";
 import { BROKER_STATS } from "@/lib/broker-stats";
 import {
   PRICING_TIERS,
@@ -111,8 +107,9 @@ export default async function Home({
             <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
               {BROKERAGE_NAME}
               <br />
-              {copy.licensedBy} {BROKERAGE_LICENSED_ENTITY} · #
-              {BROKER_LICENSE}
+              {BROKER_LICENSE
+                ? `${copy.licensedBy} #${BROKER_LICENSE}`
+                : copy.licensePending}
             </div>
 
             <div className="border-t border-gold-soft pt-10 mt-4">
@@ -374,7 +371,7 @@ export default async function Home({
             buyerCommissionLabel={savingsCalcCopy.buyerCommissionLabel}
             buyerCommissionRecommended={savingsCalcCopy.buyerCommissionRecommended}
             traditionalHeader={savingsCalcCopy.traditionalHeader}
-            nexxosHeader={savingsCalcCopy.nexxosHeader}
+            lixtaraHeader={savingsCalcCopy.lixtaraHeader}
             youSaveLabel={savingsCalcCopy.youSaveLabel}
             ctaLabel={savingsCalcCopy.ctaLabel}
             tierNames={{

@@ -21,7 +21,7 @@ interface SavingsCalculatorProps {
   buyerCommissionLabel: string;
   buyerCommissionRecommended: string;
   traditionalHeader: string;
-  nexxosHeader: string;
+  lixtaraHeader: string;
   youSaveLabel: string;
   ctaLabel: string;
   tierNames: Record<PricingTierId, string>;
@@ -45,7 +45,7 @@ export function SavingsCalculator({
   buyerCommissionLabel,
   buyerCommissionRecommended,
   traditionalHeader,
-  nexxosHeader,
+  lixtaraHeader,
   youSaveLabel,
   ctaLabel,
   tierNames,
@@ -182,7 +182,7 @@ export function SavingsCalculator({
         </div>
         <div className="bg-ivory p-6 lg:p-8 flex flex-col gap-3">
           <span className="text-[10px] uppercase tracking-[0.22em] text-gold font-semibold">
-            {nexxosHeader} {tierNames[tierId]}
+            {lixtaraHeader} {tierNames[tierId]}
           </span>
           <span className="font-display text-3xl text-ink">
             {formatUSD(lixTotal)}
