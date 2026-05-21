@@ -18,6 +18,7 @@ const dictionaries = {
       ctaPrimary: "Get my selling plan",
       ctaSecondary: "Browse Florida listings",
       licensedBy: "Licensed by",
+      licensePending: "License pending",
       metricMlsLabel: "MLS Visibility",
       metricVolumeLabel: "Sales Volume",
       metricYearsLabel: "Market Expertise",
@@ -702,6 +703,7 @@ const dictionaries = {
       tagline: "Florida flat-fee brokerage. Full MLS exposure. You keep more equity.",
       poweredBy: "Powered by",
       licenseLabel: "License",
+      licensePending: "License pending",
       cols: {
         sell: "Sell",
         company: "Company",
@@ -783,7 +785,7 @@ const dictionaries = {
       buyerCommissionLabel: "Buyer-agent commission",
       buyerCommissionRecommended: "3% (recommended)",
       traditionalHeader: "Traditional agent",
-      nexxosHeader: "Lixtara",
+      lixtaraHeader: "Lixtara",
       youSaveLabel: "You save",
       ctaLabel: "Start with this plan →",
     },
@@ -925,7 +927,7 @@ const dictionaries = {
       items: [
         {
           q: "What is Lixtara?",
-          a: "Lixtara is a Florida flat-fee real estate brokerage powered by Nexxos Realty (License #BK3166173, 20 years on the ground). We help you sell your home for a flat fee plus low commission — full MLS exposure, licensed broker support, none of the traditional 6% drag.",
+          a: "Lixtara is a Florida flat-fee real estate brokerage (brokerage license pending). We help you sell your home for a flat fee plus low commission — full MLS exposure, licensed broker support, none of the traditional 6% drag.",
         },
         {
           q: "How is Lixtara different from a traditional 6% agent?",
@@ -937,7 +939,7 @@ const dictionaries = {
         },
         {
           q: "Is Lixtara a licensed brokerage?",
-          a: "Yes. Lixtara operates through Nexxos Realty, LLC — a fully licensed Florida real estate brokerage (License #BK3166173). All transactions are supervised by our licensed broker in compliance with Florida Statute 475 and FAR/BAR contracts.",
+          a: "Yes. Lixtara is a Florida real estate brokerage (license pending). All transactions are supervised by a licensed broker-of-record in compliance with Florida Statute 475 and FAR/BAR contracts.",
         },
         {
           q: "What about the buyer's agent commission?",
@@ -965,6 +967,7 @@ const dictionaries = {
       ctaPrimary: "Obtener mi plan de venta",
       ctaSecondary: "Ver listings en Florida",
       licensedBy: "Licenciado por",
+      licensePending: "Licencia en trámite",
       metricMlsLabel: "Visibilidad MLS",
       metricVolumeLabel: "Volumen de Ventas",
       metricYearsLabel: "Experiencia",
@@ -1649,6 +1652,7 @@ const dictionaries = {
       tagline: "Brokerage de tarifa fija en Florida. Visibilidad MLS completa. Te quedas con más equity.",
       poweredBy: "Powered by",
       licenseLabel: "Licencia",
+      licensePending: "Licencia en trámite",
       cols: {
         sell: "Vender",
         company: "Empresa",
@@ -1730,7 +1734,7 @@ const dictionaries = {
       buyerCommissionLabel: "Comisión agente comprador",
       buyerCommissionRecommended: "3% (recomendado)",
       traditionalHeader: "Agente tradicional",
-      nexxosHeader: "Lixtara",
+      lixtaraHeader: "Lixtara",
       youSaveLabel: "Ahorras",
       ctaLabel: "Empezar con este plan →",
     },
@@ -1872,7 +1876,7 @@ const dictionaries = {
       items: [
         {
           q: "¿Qué es Lixtara?",
-          a: "Lixtara es una correduría inmobiliaria de tarifa fija en Florida, powered by Nexxos Realty (Licencia #BK3166173, 20 años en el mercado). Te ayudamos a vender tu casa con una tarifa fija más una comisión baja — exposición completa en MLS, respaldo de broker licenciado, sin el 6% tradicional.",
+          a: "Lixtara es una correduría inmobiliaria de tarifa fija en Florida (licencia en trámite). Te ayudamos a vender tu casa con una tarifa fija más una comisión baja — exposición completa en MLS, respaldo de broker licenciado, sin el 6% tradicional.",
         },
         {
           q: "¿En qué se diferencia Lixtara de un agente tradicional del 6%?",
@@ -1884,7 +1888,7 @@ const dictionaries = {
         },
         {
           q: "¿Lixtara es una correduría licenciada?",
-          a: "Sí. Lixtara opera a través de Nexxos Realty, LLC — una correduría inmobiliaria totalmente licenciada en Florida (Licencia #BK3166173). Todas las transacciones son supervisadas por nuestro broker licenciado en cumplimiento con el Estatuto 475 de Florida y los contratos FAR/BAR.",
+          a: "Sí. Lixtara es una correduría inmobiliaria en Florida (licencia en trámite). Todas las transacciones son supervisadas por un broker-of-record licenciado en cumplimiento con el Estatuto 475 de Florida y los contratos FAR/BAR.",
         },
         {
           q: "¿Y la comisión del agente del comprador?",

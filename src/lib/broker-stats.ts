@@ -1,7 +1,7 @@
-// SOURCE: yearsExperience and mlsCoverage are factual claims about the licensed
-// brokerage (Nexxos Realty est. 20 yrs, MLS coverage is a product feature).
-// salesVolume requires sign-off from the broker before publication — keep null
-// until verified.
+// SOURCE: yearsExperience and mlsCoverage are factual claims about the
+// brokerage. NOTE: the 20-yr figure was inherited from the prior broker entity —
+// confirm it still applies to Lixtara before relying on it. salesVolume requires
+// sign-off from the broker before publication — keep null until verified.
 export const BROKER_STATS: {
   salesVolume: string | null;
   yearsExperience: number | null;
