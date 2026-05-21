@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { isLocale, t } from "@/lib/i18n";
 import { requireUser } from "@/lib/auth";
@@ -872,7 +873,11 @@ export default async function ListingNewPage({
       .eq("id", id)
       .eq("owner_id", user.id);
 
-    redirect(`/${lang}/listing/new?step=6&id=${id}&buyer_comm=${pct}`);
+    // Revalidate in place instead of redirecting. A redirect navigates, and the
+    // App Router scrolls to the top on navigation — yanking the seller away from
+    // the picker every time they choose a commission. Revalidating refreshes the
+    // current step server-side while preserving scroll position.
+    revalidatePath(`/${lang}/listing/new`);
   }
 
   async function nextFromStep6(formData: FormData) {
