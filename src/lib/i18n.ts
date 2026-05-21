@@ -403,7 +403,7 @@ const dictionaries = {
       placeholderStepLater: "We'll wire this step up in F2.1.",
       step7: {
         title: "Sign your listing agreement.",
-        body: "DocuSign opens in a secure window for you to review and sign the listing agreement with Nexxos Realty. Once signed, you'll come right back here to continue.",
+        body: "DocuSign opens in a secure window for you to review and sign the listing agreement with Lixtara. Once signed, you'll come right back here to continue.",
         startButton: "Open DocuSign →",
         redirecting: "Opening DocuSign…",
         failed: "Could not start the signature flow. Try again.",
@@ -657,7 +657,7 @@ const dictionaries = {
       descriptionLabel: "About this property",
       locationLabel: "Location",
       cta: "Contact about this listing",
-      ctaCaption: "Through Lixtara · Powered by Nexxos Realty",
+      ctaCaption: "Through Lixtara · Licensed Florida brokerage",
       demoBadge: "Demo listing",
       notFoundTitle: "Listing not found",
       notFoundBody: "This property is no longer active or never existed.",
@@ -682,7 +682,7 @@ const dictionaries = {
         },
         contact: {
           eyebrow: "Contact",
-          body: "The contact form is in the works. In the meantime, reach our brokerage at Nexxos Realty, Miami, Florida.",
+          body: "The contact form is in the works. In the meantime, reach our brokerage, Lixtara, in Miami, Florida.",
         },
         terms: {
           eyebrow: "Terms of service",
@@ -832,7 +832,7 @@ const dictionaries = {
       closeLabel: "Close Loui chat",
       headerEyebrow: "Lixtara concierge",
       headerTitle: "Ask Loui.",
-      headerSubtitle: "AI concierge supervised by Nexxos Realty's broker-of-record.",
+      headerSubtitle: "AI concierge supervised by Lixtara's broker-of-record.",
       placeholder: "Ask anything about your listing or buying in FL…",
       sendLabel: "Send",
       emptyTitle: "Hi — I'm Loui.",
@@ -1350,7 +1350,7 @@ const dictionaries = {
       placeholderStepLater: "Conectamos este paso en F2.1.",
       step7: {
         title: "Firma tu listing agreement.",
-        body: "DocuSign abre una ventana segura para que revises y firmes el acuerdo de listing con Nexxos Realty. Cuando firmes, vuelves directo acá para continuar.",
+        body: "DocuSign abre una ventana segura para que revises y firmes el acuerdo de listing con Lixtara. Cuando firmes, vuelves directo acá para continuar.",
         startButton: "Abrir DocuSign →",
         redirecting: "Abriendo DocuSign…",
         failed: "No pudimos iniciar el flujo de firma. Reintenta.",
@@ -1604,7 +1604,7 @@ const dictionaries = {
       descriptionLabel: "Sobre esta propiedad",
       locationLabel: "Ubicación",
       cta: "Contactar sobre este listing",
-      ctaCaption: "A través de Lixtara · Powered by Nexxos Realty",
+      ctaCaption: "A través de Lixtara · Correduría licenciada en Florida",
       demoBadge: "Listing demo",
       notFoundTitle: "Listing no encontrado",
       notFoundBody: "Esta propiedad ya no está activa o nunca existió.",
@@ -1629,7 +1629,7 @@ const dictionaries = {
         },
         contact: {
           eyebrow: "Contacto",
-          body: "El formulario de contacto está en construcción. Mientras tanto, contáctanos en Nexxos Realty, Miami, Florida.",
+          body: "El formulario de contacto está en construcción. Mientras tanto, contáctanos en Lixtara, Miami, Florida.",
         },
         terms: {
           eyebrow: "Términos de servicio",
@@ -1779,7 +1779,7 @@ const dictionaries = {
       closeLabel: "Cerrar chat Loui",
       headerEyebrow: "Concierge Lixtara",
       headerTitle: "Pregúntale a Loui.",
-      headerSubtitle: "Concierge IA supervisado por el broker-of-record de Nexxos Realty.",
+      headerSubtitle: "Concierge IA supervisado por el broker-of-record de Lixtara.",
       placeholder: "Pregunta sobre tu listing o comprar en FL…",
       sendLabel: "Enviar",
       emptyTitle: "Hola — soy Loui.",
