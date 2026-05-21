@@ -87,6 +87,57 @@ export default async function AdminPage({
     .limit(20);
   const payments = (payRows ?? []) as PaymentRowJoined[];
 
+  // ── Dashboard KPIs (adapted to the real schema; payments use 'succeeded',
+  // transactions have no 'title_order_sent' status so that KPI is omitted) ──
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const [
+    { count: pendingTasksCount },
+    { count: pendingApprovalsCount },
+    { count: activeDealsCount },
+    { data: monthPayments },
+    { data: activityRows },
+  ] = await Promise.all([
+    supabase
+      .from("broker_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("mls_status", "pending_approval"),
+    supabase
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .not("status", "in", "(closed,cancelled)"),
+    supabase
+      .from("payments")
+      .select("amount")
+      .eq("status", "succeeded")
+      .gte("created_at", monthStart.toISOString()),
+    supabase
+      .from("activity_log")
+      .select("description,action_type,created_at")
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
+  const monthRevenue = ((monthPayments ?? []) as Array<{ amount: number }>).reduce(
+    (sum, p) => sum + Number(p.amount ?? 0),
+    0,
+  );
+  const activity = (activityRows ?? []) as Array<{
+    description: string | null;
+    action_type: string;
+    created_at: string;
+  }>;
+  const kpis = [
+    { label: "Pending Tasks", value: String(pendingTasksCount ?? 0), href: `/${lang}/admin/tasks`, cta: "View Tasks →" },
+    { label: "Pending Approvals", value: String(pendingApprovalsCount ?? 0), href: `/${lang}/admin/listings?status=pending_approval`, cta: "Review Now →" },
+    { label: "Active Deals", value: String(activeDealsCount ?? 0), href: `/${lang}/admin/transactions`, cta: "View Deals →" },
+    { label: "This Month Revenue", value: `$${Math.round(monthRevenue).toLocaleString("en-US")}`, href: `/${lang}/admin/analytics`, cta: "View Report →" },
+  ];
+
   async function approveListing(formData: FormData) {
     "use server";
     const id = String(formData.get("id") ?? "");
@@ -160,6 +211,86 @@ export default async function AdminPage({
             <ErrorBanner message={copy.approveFailed} />
           </div>
         )}
+
+        {/* KPI cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12 lg:mb-16">
+          {kpis.map((k) => (
+            <div
+              key={k.label}
+              className="border border-gold-soft bg-ivory p-5 flex flex-col gap-2"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55">
+                {k.label}
+              </p>
+              <p className="font-display text-3xl text-ink leading-none">
+                {k.value}
+              </p>
+              <Link
+                href={k.href}
+                className="text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors mt-1"
+              >
+                {k.cta}
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        {/* Recent activity + quick actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 lg:mb-20">
+          <div className="lg:col-span-2">
+            <h2 className="font-display text-2xl text-ink mb-6 border-b border-gold-soft pb-3">
+              Recent Activity
+            </h2>
+            {activity.length === 0 ? (
+              <p className="text-sm text-ink/55 italic">No recent activity.</p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {activity.map((a, i) => (
+                  <li
+                    key={i}
+                    className="flex items-baseline justify-between gap-4 text-sm border-b border-gold-soft/50 pb-2"
+                  >
+                    <span className="text-ink/80">
+                      {a.description ?? a.action_type}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45 whitespace-nowrap">
+                      {new Date(a.created_at).toLocaleDateString(lang, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h2 className="font-display text-2xl text-ink mb-6 border-b border-gold-soft pb-3">
+              Quick Actions
+            </h2>
+            <div className="flex flex-col gap-3">
+              <Link
+                href={`/${lang}/admin/listings?status=pending_approval`}
+                className="border border-gold-soft px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-ink/70 hover:border-gold hover:text-ink transition-colors"
+              >
+                Review Pending Listings →
+              </Link>
+              <Link
+                href={`/${lang}/admin/tasks`}
+                className="border border-gold-soft px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-ink/70 hover:border-gold hover:text-ink transition-colors"
+              >
+                View All Tasks →
+              </Link>
+              <button
+                type="button"
+                disabled
+                className="border border-gold-soft px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-ink/30 cursor-not-allowed text-left"
+              >
+                Export Revenue Report (soon)
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Pending approval queue */}
         <div className="mb-16 lg:mb-20">
