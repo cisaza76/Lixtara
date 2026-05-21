@@ -377,6 +377,8 @@ const dictionaries = {
         emptyState: "No photos yet — upload your first batch.",
         notEnoughPhotos: "You need at least 10 photos before continuing.",
         uploadFailed: "Some photos failed to upload. Try again with fewer or smaller files.",
+        photoPartialFail: "{failed} of {total} photos couldn't be uploaded — {reason}. The rest were saved; try the failed ones again (often they're too large).",
+        photosOptionalPro: "Your plan includes professional photography, so uploading photos here is optional — you can continue without them and our photographer will handle it.",
         invalidFormat: "Only JPG, PNG, and WebP files are accepted.",
       },
       step4: {
@@ -1322,6 +1324,8 @@ const dictionaries = {
         emptyState: "Aún no hay fotos — sube tu primer batch.",
         notEnoughPhotos: "Necesitas al menos 10 fotos antes de continuar.",
         uploadFailed: "Algunas fotos no se subieron. Intenta de nuevo con menos o más livianas.",
+        photoPartialFail: "{failed} de {total} fotos no se pudieron subir — {reason}. El resto se guardó; reintenta las que fallaron (suele ser que pesan demasiado).",
+        photosOptionalPro: "Tu plan incluye fotografía profesional, así que subir fotos acá es opcional — podés continuar sin ellas y nuestro fotógrafo se encarga.",
         invalidFormat: "Solo se aceptan archivos JPG, PNG y WebP.",
       },
       step4: {
