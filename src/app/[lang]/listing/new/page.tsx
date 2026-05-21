@@ -172,6 +172,8 @@ export default async function ListingNewPage({
                 if (d.year_built != null) updates.year_built = d.year_built;
                 if (d.property_type != null)
                   updates.property_type = d.property_type;
+                if (d.legal_description != null)
+                  updates.legal_description = d.legal_description;
               }
             },
           ),
@@ -542,6 +544,8 @@ export default async function ListingNewPage({
     if (d.lot_size != null) update.lot_size = d.lot_size;
     if (d.year_built != null) update.year_built = d.year_built;
     if (d.property_type != null) update.property_type = d.property_type;
+    if (d.legal_description != null)
+      update.legal_description = d.legal_description;
 
     const filledCount = Object.keys(update).length;
     if (filledCount === 0) {

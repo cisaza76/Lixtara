@@ -17,6 +17,8 @@ export interface MiamiDadeDetails {
   lot_size: number | null;
   year_built: number | null;
   property_type: string | null;
+  /** Full county legal description (used to auto-fill the listing agreement) */
+  legal_description: string | null;
 }
 
 export interface MiamiDadeLookupResult {
@@ -128,6 +130,16 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
   const dor =
     (info.DORDescription as string) ?? (info.DORCode as string) ?? "";
 
+  // Legal description lives at the top level of the response, with "|" between
+  // its lines (e.g. "19 53 42 ... | SABAL PALM COURT PB 46-66 | BLOCK 1 | ...").
+  // Normalize the separators to newlines so it reads as it does on the county site.
+  const legalRaw = (json?.LegalDescription as Record<string, unknown> | undefined)
+    ?.Description;
+  const legalDescription =
+    typeof legalRaw === "string" && legalRaw.trim()
+      ? legalRaw.trim().replace(/\s*\|\s*/g, "\n")
+      : null;
+
   return {
     bedrooms: beds > 0 && beds < 30 ? beds : null,
     bathrooms: totalBaths > 0 && totalBaths < 30 ? totalBaths : null,
@@ -135,6 +147,7 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
     lot_size: lot > 0 ? lot : null,
     year_built: year > 1800 && year < 2100 ? year : null,
     property_type: mapDorToType(String(info.DORCode ?? dor)),
+    legal_description: legalDescription,
   };
 }
 
