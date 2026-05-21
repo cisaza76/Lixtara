@@ -28,6 +28,7 @@ import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { TourUploader } from "@/components/tour-uploader";
 import { PhotoUploader } from "@/components/photo-uploader";
+import { OccupancySection } from "@/components/occupancy-section";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
@@ -79,6 +80,10 @@ interface Draft {
   as_is_sale: boolean | null;
   flood_zone: string | null;
   occupancy_status: OccupancyStatus | null;
+  monthly_rent: number | null;
+  lease_end_date: string | null;
+  tenant_cooperation: string | null;
+  tenant_notes: string | null;
   show_phone_on_portals: boolean | null;
   folio: string | null;
   buyer_agent_commission: number | null;
@@ -139,7 +144,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,show_phone_on_portals,folio,buyer_agent_commission",
+        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission",
       )
       .eq("id", draftId)
       .maybeSingle();
@@ -403,6 +408,30 @@ export default async function ListingNewPage({
       : null;
     const showPhone = formData.get("show_phone_on_portals") === "1";
 
+    // Lease details — only persisted when a tenant occupies the property;
+    // cleared to null otherwise so changing occupancy doesn't leave stale data.
+    const isTenant = occupancyStatus === "tenant_occupied";
+    const rentRaw = String(formData.get("monthly_rent") ?? "").trim();
+    const monthlyRent =
+      isTenant && rentRaw !== "" && Number.isFinite(Number(rentRaw))
+        ? Number(rentRaw)
+        : null;
+    const leaseEndRaw = String(formData.get("lease_end_date") ?? "").trim();
+    const leaseEndDate = isTenant && leaseEndRaw !== "" ? leaseEndRaw : null;
+    const coopRaw = String(formData.get("tenant_cooperation") ?? "");
+    const tenantCooperation =
+      isTenant &&
+      (["cooperative", "advance_notice", "difficult"] as const).includes(
+        coopRaw as "cooperative" | "advance_notice" | "difficult",
+      )
+        ? coopRaw
+        : null;
+    const notesRaw = String(formData.get("tenant_notes") ?? "").trim();
+    const tenantNotes =
+      isTenant && tenantCooperation === "difficult" && notesRaw !== ""
+        ? notesRaw.slice(0, 1000)
+        : null;
+
     if (
       !PROPERTY_TYPES.includes(propertyType as (typeof PROPERTY_TYPES)[number])
     ) {
@@ -466,6 +495,10 @@ export default async function ListingNewPage({
         as_is_sale: asIsSale,
         flood_zone: floodZone,
         occupancy_status: occupancyStatus,
+        monthly_rent: monthlyRent,
+        lease_end_date: leaseEndDate,
+        tenant_cooperation: tenantCooperation,
+        tenant_notes: tenantNotes,
         show_phone_on_portals: showPhone,
       })
       .eq("id", id)
@@ -1463,25 +1496,36 @@ export default async function ListingNewPage({
                 </p>
               </div>
 
-              <label className="flex flex-col gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
-                  {copy.step3.occupancyLabel}
-                </span>
-                <select
-                  name="occupancy_status"
-                  defaultValue={draft?.occupancy_status ?? ""}
-                  className="bg-ivory border-2 border-gold-soft px-4 py-3 text-base text-ink focus:outline-none focus:border-gold"
-                >
-                  <option value="">—</option>
-                  <option value="vacant">{copy.step3.occupancyVacant}</option>
-                  <option value="owner_occupied">
-                    {copy.step3.occupancyOwner}
-                  </option>
-                  <option value="tenant_occupied">
-                    {copy.step3.occupancyTenant}
-                  </option>
-                </select>
-              </label>
+              <OccupancySection
+                initialOccupancy={draft?.occupancy_status ?? ""}
+                initialRent={
+                  draft?.monthly_rent != null ? String(draft.monthly_rent) : ""
+                }
+                initialLeaseEnd={draft?.lease_end_date ?? ""}
+                initialCooperation={
+                  (draft?.tenant_cooperation ?? "") as
+                    | ""
+                    | "cooperative"
+                    | "advance_notice"
+                    | "difficult"
+                }
+                initialNotes={draft?.tenant_notes ?? ""}
+                labels={{
+                  occupancyLabel: copy.step3.occupancyLabel,
+                  occupancyVacant: copy.step3.occupancyVacant,
+                  occupancyOwner: copy.step3.occupancyOwner,
+                  occupancyTenant: copy.step3.occupancyTenant,
+                  leaseInfoTitle: copy.step3.leaseInfoTitle,
+                  monthlyRentLabel: copy.step3.monthlyRentLabel,
+                  leaseEndLabel: copy.step3.leaseEndLabel,
+                  tenantCoopLabel: copy.step3.tenantCoopLabel,
+                  coopCooperative: copy.step3.coopCooperative,
+                  coopAdvanceNotice: copy.step3.coopAdvanceNotice,
+                  coopDifficult: copy.step3.coopDifficult,
+                  tenantNotesLabel: copy.step3.tenantNotesLabel,
+                  tenantNotesPlaceholder: copy.step3.tenantNotesPlaceholder,
+                }}
+              />
 
               <fieldset className="flex flex-col gap-3 border border-gold-soft p-4">
                 <legend className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 px-2">
