@@ -1,14 +1,14 @@
 "use client";
 
 // After the seller is redirected back from DocuSign embedded signing we
-// optimistically set ?signed=1 in the return URL, but the Connect webhook
-// that flips agreements.status to 'completed' can lag by a few seconds.
-// Poll the agreements row every 3s for up to ~60s. Refresh the SSR view
+// optimistically set ?signed=1 in the return URL. Rather than wait for the
+// Connect webhook (which hangs the step if Connect is misconfigured), we poll
+// /api/agreement/sync — it re-fetches the envelope status DIRECTLY from
+// DocuSign and updates the row. Every 3s for up to ~60s; refresh the SSR view
 // when status flips so the success card renders without a manual reload.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 interface AgreementStatusPollerProps {
   propertyId: string;
@@ -24,7 +24,6 @@ export function AgreementStatusPoller({
   const stopped = useRef(false);
 
   useEffect(() => {
-    const supabase = createClient();
     let cancelled = false;
     let attempts = 0;
     const maxAttempts = 20;
@@ -36,17 +35,20 @@ export function AgreementStatusPoller({
       }
       attempts += 1;
       setTick(attempts);
-      const { data } = await supabase
-        .from("agreements")
-        .select("status")
-        .eq("property_id", propertyId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (data?.status === "completed" || data?.status === "signed") {
-        stopped.current = true;
-        clearInterval(interval);
-        router.refresh();
+      try {
+        const res = await fetch("/api/agreement/sync", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ property_id: propertyId }),
+        });
+        const data = (await res.json()) as { status?: string };
+        if (data.status === "completed" || data.status === "signed") {
+          stopped.current = true;
+          clearInterval(interval);
+          router.refresh();
+        }
+      } catch {
+        // transient — try again next tick
       }
     }, 3000);
 
