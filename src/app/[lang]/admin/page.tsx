@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { isLocale, t, type Locale } from "@/lib/i18n";
-import { requireUser } from "@/lib/auth";
+import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { SuccessBanner, ErrorBanner } from "@/components/auth-shell";
 import { sendListingApproved } from "@/lib/email";
@@ -34,16 +33,6 @@ interface PaymentRowJoined {
   user_id: string;
 }
 
-async function isAdmin(): Promise<boolean> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("has_role", { _role: "admin" });
-  if (error) {
-    console.error("has_role rpc failed", error);
-    return false;
-  }
-  return data === true;
-}
-
 export default async function AdminPage({
   params,
   searchParams,
@@ -53,30 +42,9 @@ export default async function AdminPage({
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  await requireUser(lang as Locale, "/admin");
   const sp = await searchParams;
 
   const copy = t(lang).admin;
-  const admin = await isAdmin();
-
-  if (!admin) {
-    return (
-      <main className="bg-background text-foreground flex-1 flex items-center justify-center px-6 py-24">
-        <div className="max-w-md text-center flex flex-col items-center gap-5">
-          <h1 className="font-display text-3xl text-ink font-normal">
-            {copy.notAuthorized}
-          </h1>
-          <p className="text-base text-ink/70">{copy.notAuthorizedBody}</p>
-          <Link
-            href={`/${lang}`}
-            className="text-[10px] uppercase tracking-[0.22em] text-gold"
-          >
-            ← Home
-          </Link>
-        </div>
-      </main>
-    );
-  }
 
   const supabase = await createClient();
 
@@ -166,7 +134,7 @@ export default async function AdminPage({
   }
 
   return (
-    <main className="bg-background text-foreground flex-1 flex flex-col">
+    <div className="flex flex-col">
       <section className="mx-auto w-full max-w-7xl px-6 lg:px-12 pt-12 pb-20 lg:pt-16 lg:pb-28">
         <div className="flex flex-col gap-3 mb-10 lg:mb-14">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
@@ -381,6 +349,6 @@ export default async function AdminPage({
           )}
         </div>
       </section>
-    </main>
+    </div>
   );
 }
