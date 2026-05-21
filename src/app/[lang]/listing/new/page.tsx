@@ -827,18 +827,32 @@ export default async function ListingNewPage({
     const id = String(formData.get("id") ?? "");
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
 
-    const rightsConfirmed = formData.get("photos_rights_confirmed") === "1";
-    if (!rightsConfirmed) {
-      redirect(`/${lang}/listing/new?step=5&id=${id}&error=rights_required`);
-    }
-
     const supabase = await createClient();
+    const { data: prop } = await supabase
+      .from("properties")
+      .select("pricing_tier")
+      .eq("id", id)
+      .maybeSingle();
+    const tierId = prop?.pricing_tier as PricingTierId | null;
+    const photosIncluded = !!(tierId && PRICING_TIERS[tierId]?.includesPhotography);
+
     const { count } = await supabase
       .from("property_photos")
       .select("id", { count: "exact", head: true })
       .eq("property_id", id);
+    const photoCount = count ?? 0;
 
-    if ((count ?? 0) < 10) {
+    // Pro/Concierge include professional photography, so a seller who uploads
+    // none may skip the 10-photo minimum and the rights box. DIY (Essentials),
+    // and anyone who DID upload, still confirm rights; Essentials still needs 10.
+    const needsOwnPhotos = !photosIncluded;
+    if (
+      (needsOwnPhotos || photoCount > 0) &&
+      formData.get("photos_rights_confirmed") !== "1"
+    ) {
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=rights_required`);
+    }
+    if (needsOwnPhotos && photoCount < 10) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough`);
     }
 
@@ -1659,6 +1673,13 @@ export default async function ListingNewPage({
             </div>
           )}
 
+          {(draft?.pricing_tier === "pro" ||
+            draft?.pricing_tier === "concierge") && (
+            <p className="text-xs text-ink/70 italic border border-gold-soft bg-ivory-strong/40 p-3">
+              {copy.step5.photosOptionalPro}
+            </p>
+          )}
+
           {/* Upload form — direct-to-Supabase to bypass Vercel 4.5MB cap */}
           <PhotoUploader
             propertyId={draftId ?? ""}
@@ -1668,6 +1689,7 @@ export default async function ListingNewPage({
               uploading: copy.step5.uploadingNote,
               invalidFormat: copy.step5.invalidFormat,
               genericError: copy.step5.uploadFailed,
+              partialFail: copy.step5.photoPartialFail,
             }}
           />
 
@@ -1783,7 +1805,13 @@ export default async function ListingNewPage({
                 type="checkbox"
                 name="photos_rights_confirmed"
                 value="1"
-                required
+                required={
+                  photos.length > 0 ||
+                  !(
+                    draft?.pricing_tier === "pro" ||
+                    draft?.pricing_tier === "concierge"
+                  )
+                }
                 className="mt-1 accent-gold w-4 h-4 shrink-0"
               />
               <span>{copy.step5.ownershipCheckLabel}</span>
@@ -1828,7 +1856,7 @@ export default async function ListingNewPage({
               draft.sqft === 0 ||
               draft.list_price === 0 ||
               !draft.description ||
-              photos.length < 10;
+              (!tier?.includesPhotography && photos.length < 10);
 
             const SectionHeader = ({
               title,

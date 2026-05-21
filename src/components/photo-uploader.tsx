@@ -17,6 +17,8 @@ interface PhotoUploaderProps {
     uploading: string;
     invalidFormat: string;
     genericError: string;
+    /** template: "{failed} of {total} photos couldn't upload — {reason}" */
+    partialFail: string;
   };
 }
 
@@ -24,6 +26,7 @@ const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 
 export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUploaderProps) {
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [, startTransition] = useTransition();
@@ -31,6 +34,7 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setWarning(null);
 
     const formEl = e.currentTarget;
     const fileInput = formEl.elements.namedItem("photos") as HTMLInputElement;
@@ -57,6 +61,7 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
     }
 
     const uploadedUrls: string[] = [];
+    const failures: { name: string; reason: string }[] = [];
     for (const file of files) {
       const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase();
       const path = `${user.id}/${propertyId}/${crypto.randomUUID()}.${ext}`;
@@ -64,7 +69,10 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
         .from("property-photos")
         .upload(path, file, { contentType: file.type, upsert: false });
       if (upErr) {
+        // Don't drop failures silently — collect them so the seller learns
+        // which photos didn't make it and why (e.g. file too large).
         console.error("photo upload failed", file.name, upErr);
+        failures.push({ name: file.name, reason: upErr.message });
         continue;
       }
       const { data: pub } = supabase.storage
@@ -75,9 +83,17 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
     }
 
     if (uploadedUrls.length === 0) {
-      setError(labels.genericError);
+      setError(failures[0]?.reason ?? labels.genericError);
       setIsUploading(false);
       return;
+    }
+    if (failures.length > 0) {
+      setWarning(
+        labels.partialFail
+          .replace("{failed}", String(failures.length))
+          .replace("{total}", String(files.length))
+          .replace("{reason}", failures[0]!.reason),
+      );
     }
 
     const fd = new FormData();
@@ -121,6 +137,9 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
           : labels.uploadButton}
       </button>
       {error && <p className="text-xs italic text-red-700">{error}</p>}
+      {warning && (
+        <p className="text-xs italic text-amber-700">{warning}</p>
+      )}
     </form>
   );
 }
