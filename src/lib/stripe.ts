@@ -71,7 +71,10 @@ export async function createTierCheckoutSession(
       tier: input.tier,
       user_id: input.userId,
     },
-    success_url: `${input.successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+    // successUrl already carries query params (?step=8&id=...), so append the
+    // session id with the correct separator — using "?" here produced a
+    // malformed double-"?" URL that broke the return-from-Stripe page.
+    success_url: `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: input.cancelUrl,
   });
 
