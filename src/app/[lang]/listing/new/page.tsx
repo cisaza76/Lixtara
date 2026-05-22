@@ -532,6 +532,45 @@ export default async function ListingNewPage({
     redirect(`/${lang}/listing/new?id=${id}&step=4`);
   }
 
+  async function refreshComps(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) return;
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+    const { data: row } = await supabase
+      .from("properties")
+      .select("address_street,address_city,address_state,address_zip")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!row) return;
+    // Force a fresh fetch (the default flow only fetches once, for determinism).
+    const rc = await fetchRentcastEstimate(
+      row.address_street,
+      row.address_city,
+      row.address_state,
+      row.address_zip,
+    );
+    const update = rc
+      ? {
+          price_comps: rc.comps,
+          price_estimate_low: rc.priceLow,
+          price_estimate_high: rc.priceHigh,
+          price_comps_fetched_at: new Date().toISOString(),
+        }
+      : { price_comps: [], price_comps_fetched_at: new Date().toISOString() };
+    await supabase
+      .from("properties")
+      .update(update)
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    revalidatePath(`/${lang}/listing/new`);
+  }
+
   async function useSuggestedPrice(formData: FormData) {
     "use server";
     const id = String(formData.get("id") ?? "");
@@ -1246,6 +1285,25 @@ export default async function ListingNewPage({
                   {copy.step3.compsTitle}
                 </h3>
               </div>
+
+              <div className="flex items-center justify-between gap-3 flex-wrap border-b border-gold-soft pb-3">
+                <span className="text-[11px] text-ink/55">
+                  {copy.step3.compsUpdatedLabel}:{" "}
+                  {new Date(draft.price_comps_fetched_at).toLocaleDateString(lang)}
+                </span>
+                <form action={refreshComps}>
+                  <input type="hidden" name="id" value={draftId ?? ""} />
+                  <button
+                    type="submit"
+                    className="text-[10px] uppercase tracking-[0.18em] text-gold border border-gold-soft px-3 py-1.5 hover:border-gold transition-colors"
+                  >
+                    {copy.step3.compsRefreshButton}
+                  </button>
+                </form>
+              </div>
+              <p className="text-[11px] text-ink/55 italic leading-snug -mt-2">
+                {copy.step3.compsCacheNote}
+              </p>
 
               {draft.price_estimate_low && draft.price_estimate_high && (
                 <div className="flex flex-col gap-3 border-b border-gold-soft pb-4">
