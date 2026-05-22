@@ -3,6 +3,10 @@ import {
   PRICING_TIERS,
   type PricingTierId,
 } from "@/lib/pricing-tiers";
+import {
+  CONSULTATION_PRODUCTS,
+  type ConsultationProduct,
+} from "@/lib/consultations";
 
 function apiKey(): string {
   const k = process.env.STRIPE_SECRET_KEY;
@@ -82,6 +86,49 @@ export async function createTierCheckoutSession(
     throw new Error("Stripe returned a session without a redirect URL");
   }
 
+  return { sessionId: session.id, url: session.url };
+}
+
+export interface ConsultationCheckoutInput {
+  product: ConsultationProduct;
+  userId: string;
+  userEmail: string;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+export async function createConsultationCheckoutSession(
+  input: ConsultationCheckoutInput,
+): Promise<TierCheckoutResult> {
+  const p = CONSULTATION_PRODUCTS[input.product];
+  const session = await client().checkout.sessions.create({
+    mode: "payment",
+    customer_email: input.userEmail,
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: p.amount * 100,
+          product_data: { name: `Lixtara — ${p.name}` },
+        },
+      },
+    ],
+    payment_intent_data: { statement_descriptor_suffix: "CONSULT" },
+    // kind=consultation tells the webhook to grant hour tokens (not list a property).
+    metadata: {
+      kind: "consultation",
+      product: input.product,
+      user_id: input.userId,
+      realtor_hours: String(p.realtorHours),
+      attorney_hours: String(p.attorneyHours),
+    },
+    success_url: `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: input.cancelUrl,
+  });
+  if (!session.url) {
+    throw new Error("Stripe returned a session without a redirect URL");
+  }
   return { sessionId: session.id, url: session.url };
 }
 

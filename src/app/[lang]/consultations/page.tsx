@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import {
@@ -7,18 +6,24 @@ import {
   REALTOR_TIERS,
   BEST_VALUE,
   bestValueTotals,
+  type ConsultationProduct,
 } from "@/lib/consultations";
+import { ConsultationCheckoutButton } from "@/components/consultation-checkout-button";
 
 export default async function ConsultationsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ lang: string }>;
+  searchParams: Promise<{ purchased?: string; error?: string }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  const { purchased, error } = await searchParams;
   const copy = t(lang).consultations;
   const { totalValue, save, savePct } = bestValueTotals();
   const usd = (n: number) => `$${n.toLocaleString()}`;
+  const btnLabels = { redirecting: copy.redirecting, failed: copy.failed };
 
   return (
     <main className="bg-background text-foreground flex-1">
@@ -32,6 +37,20 @@ export default async function ConsultationsPage({
           </h1>
           <p className="text-lg leading-relaxed text-ink/70">{copy.body}</p>
         </div>
+
+        {purchased && (
+          <div className="border-2 border-gold bg-gold/5 p-6">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+              {copy.purchasedTitle}
+            </p>
+            <p className="text-sm text-ink mt-1">{copy.purchasedBody}</p>
+          </div>
+        )}
+        {error === "cancelled" && (
+          <div className="border border-gold-soft bg-ink/5 p-6">
+            <p className="text-sm text-ink/70">{copy.cancelledNotice}</p>
+          </div>
+        )}
 
         {/* Best Value package */}
         <div className="border-2 border-gold bg-gold/5 p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -54,12 +73,14 @@ export default async function ConsultationsPage({
               </span>
             </p>
           </div>
-          <Link
-            href={`/${lang}/contact`}
-            className="self-start lg:self-center inline-flex items-center px-8 py-4 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors whitespace-nowrap"
-          >
-            {copy.ctaBuy}
-          </Link>
+          <ConsultationCheckoutButton
+            product="best_value"
+            lang={lang}
+            label={copy.ctaBuy}
+            variant="primary"
+            className="self-start lg:self-center"
+            labels={btnLabels}
+          />
         </div>
 
         {/* Per-service */}
@@ -83,15 +104,22 @@ export default async function ConsultationsPage({
                   <span className="text-ink">
                     {tier.hours} {tier.hours === 1 ? copy.hour : copy.hours}
                   </span>
-                  <span className="flex items-center gap-2">
-                    <span className="font-display text-ink">
-                      {usd(tier.price)}
-                    </span>
+                  <span className="flex items-center gap-3">
                     {tier.savePct > 0 && (
                       <span className="text-[9px] uppercase tracking-[0.18em] text-gold border border-gold px-2 py-0.5">
                         {copy.save} {tier.savePct}%
                       </span>
                     )}
+                    <span className="font-display text-ink">
+                      {usd(tier.price)}
+                    </span>
+                    <ConsultationCheckoutButton
+                      product={`realtor_${tier.hours}` as ConsultationProduct}
+                      lang={lang}
+                      label={copy.buy}
+                      variant="secondary"
+                      labels={btnLabels}
+                    />
                   </span>
                 </li>
               ))}
@@ -111,12 +139,14 @@ export default async function ConsultationsPage({
             <p className="text-sm text-ink/70 leading-relaxed">
               {copy.attorneyDesc}
             </p>
-            <Link
-              href={`/${lang}/contact`}
-              className="self-start inline-flex items-center px-6 py-3 border border-gold-soft text-ink text-[10px] font-semibold tracking-[0.22em] uppercase hover:border-gold transition-colors"
-            >
-              {copy.ctaBuy}
-            </Link>
+            <ConsultationCheckoutButton
+              product="attorney_1"
+              lang={lang}
+              label={copy.ctaBuy}
+              variant="secondary"
+              className="self-start"
+              labels={btnLabels}
+            />
           </div>
         </div>
 

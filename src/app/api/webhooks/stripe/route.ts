@@ -58,6 +58,35 @@ export async function POST(req: Request) {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object;
+
+      // Consultation purchase → grant prepaid hour tokens (90-day validity is
+      // the column default). Dedup (claimWebhookEvent above) prevents double
+      // grants on a redelivered event.
+      if (session.metadata?.kind === "consultation") {
+        const buyerId = session.metadata?.user_id ?? null;
+        const realtorHours = Number(session.metadata?.realtor_hours ?? 0);
+        const attorneyHours = Number(session.metadata?.attorney_hours ?? 0);
+        if (buyerId) {
+          const rows: Array<{
+            user_id: string;
+            service_type: string;
+            hours_total: number;
+          }> = [];
+          if (realtorHours > 0)
+            rows.push({ user_id: buyerId, service_type: "realtor", hours_total: realtorHours });
+          if (attorneyHours > 0)
+            rows.push({ user_id: buyerId, service_type: "attorney", hours_total: attorneyHours });
+          if (rows.length > 0) {
+            const { error } = await supabase
+              .from("consultation_tokens")
+              .insert(rows);
+            if (error)
+              console.error("consultation token grant failed", error.message);
+          }
+        }
+        return NextResponse.json({ received: true, consultation: true });
+      }
+
       const sessionId = session.id;
       const paymentIntentId =
         typeof session.payment_intent === "string"
