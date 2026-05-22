@@ -109,6 +109,11 @@ export default async function RootLayout({
                     {navCopy.faq}
                   </Link>
                 </li>
+                <li>
+                  <Link href={`/${lang}/consultations`} className="hover:text-gold transition-colors">
+                    {navCopy.consultations}
+                  </Link>
+                </li>
               </ul>
             </div>
 
@@ -181,6 +186,7 @@ export default async function RootLayout({
                 howItWorks: navCopy.howItWorks,
                 pricing: navCopy.pricing,
                 faq: navCopy.faq,
+                consultations: navCopy.consultations,
               }}
               auth={{
                 greetingPrefix: authNavCopy.greetingPrefix,
