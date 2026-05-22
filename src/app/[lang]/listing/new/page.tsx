@@ -26,6 +26,7 @@ import { lookupMiamiDadeProperty } from "@/lib/miami-dade";
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
+import { validateUsAddress } from "@/lib/geocode";
 import { TourUploader } from "@/components/tour-uploader";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { OccupancySection } from "@/components/occupancy-section";
@@ -281,6 +282,27 @@ export default async function ListingNewPage({
     }
     if (state !== "FL") {
       redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=fl_only`);
+    }
+
+    // Address must be validated against Google: the autocomplete only sets
+    // lat/lng (and fills city/zip) when a real Google Places address is picked.
+    // Missing coords = the user free-typed an unverified address.
+    if (
+      latitude === null ||
+      longitude === null ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      redirect(
+        `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=address_invalid`,
+      );
+    }
+    // Best-effort server geocode (fails open on key/network issues).
+    const check = await validateUsAddress(street, city, state, zip);
+    if (!check.ok) {
+      redirect(
+        `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=address_invalid`,
+      );
     }
 
     const supabase = await createClient();
@@ -956,6 +978,8 @@ export default async function ListingNewPage({
       ? "All fields are required."
       : sp.error === "fl_only"
         ? copy.step1.flOnly
+        : sp.error === "address_invalid"
+          ? copy.step1.addressInvalid
         : sp.error === "invalid"
           ? "Please check the values."
           : sp.error === "invalid_type"

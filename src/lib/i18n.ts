@@ -203,6 +203,7 @@ const dictionaries = {
         stateLabel: "State",
         zipLabel: "ZIP code",
         flOnly: "Lixtara serves Florida properties only.",
+        addressInvalid: "Address not found. Please verify the street, city, and ZIP code, and pick your address from the suggestions.",
         verifiedNote: "Address verified by Google Maps.",
       },
       step2: {
@@ -1163,6 +1164,7 @@ const dictionaries = {
         stateLabel: "Estado",
         zipLabel: "Código postal",
         flOnly: "Lixtara opera solo en Florida.",
+        addressInvalid: "Dirección no encontrada. Por favor, verifica la calle, ciudad y código postal, y elige tu dirección de las sugerencias.",
         verifiedNote: "Dirección verificada por Google Maps.",
       },
       step2: {
