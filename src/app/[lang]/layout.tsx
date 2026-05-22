@@ -6,6 +6,8 @@ import { isLocale, locales, t, type Locale } from "@/lib/i18n";
 import { BROKERAGE_LOCATION, BROKER_LICENSE } from "@/lib/broker";
 import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
+import { MobileMenu } from "@/components/mobile-menu";
+import { Globe, LayoutDashboard, LogOut } from "lucide-react";
 import "../globals.css";
 
 const inter = Inter({
@@ -47,6 +49,7 @@ export default async function RootLayout({
   const louiCopy = t(lang).loui;
   const closingCopy = t(lang).closingCosts;
   const altLang: Locale = lang === "en" ? "es" : "en";
+  const langCode = lang.toUpperCase();
   const year = new Date().getFullYear();
 
   const supabase = await createClient();
@@ -70,102 +73,123 @@ export default async function RootLayout({
       className={`${inter.variable} ${playfair.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <header className="border-b border-gold-soft">
-          <nav className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-6 flex items-center justify-between gap-8">
-            <Link
-              href={`/${lang}`}
-              className="font-display italic text-2xl lg:text-3xl text-ink leading-none"
-            >
-              Lixtara
-            </Link>
+        <header className="relative border-b border-gold-soft">
+          <nav className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-6 flex items-center justify-between gap-6">
+            {/* Zone 1 — logo + primary navigation */}
+            <div className="flex items-center gap-8">
+              <Link
+                href={`/${lang}`}
+                className="font-display italic text-2xl lg:text-3xl text-ink leading-none"
+              >
+                Lixtara
+              </Link>
+              <ul className="hidden md:flex items-center gap-7 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+                <li>
+                  <Link href={`/${lang}/properties`} className="hover:text-gold transition-colors">
+                    {navCopy.buy}
+                  </Link>
+                </li>
+                <li>
+                  <Link href={`/${lang}/listing/new`} className="hover:text-gold transition-colors">
+                    {navCopy.sell}
+                  </Link>
+                </li>
+                <li>
+                  <Link href={`/${lang}#how-it-works`} className="hover:text-gold transition-colors">
+                    {navCopy.howItWorks}
+                  </Link>
+                </li>
+                <li>
+                  <Link href={`/${lang}#pricing`} className="hover:text-gold transition-colors">
+                    {navCopy.pricing}
+                  </Link>
+                </li>
+                <li>
+                  <Link href={`/${lang}#faq`} className="hover:text-gold transition-colors">
+                    {navCopy.faq}
+                  </Link>
+                </li>
+              </ul>
+            </div>
 
-            <ul className="hidden md:flex items-center gap-7 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
-              <li>
+            {/* Zone 2 (greeting) + Zone 3 (actions) — desktop */}
+            <div className="hidden md:flex items-center gap-5">
+              {user && firstName && (
+                <span className="text-[11px] tracking-wide text-ink/80">
+                  {authNavCopy.greetingPrefix} {firstName}
+                </span>
+              )}
+              <div className="flex items-center gap-4 border-l border-gold-soft pl-5">
                 <Link
-                  href={`/${lang}/properties`}
-                  className="hover:text-gold transition-colors"
+                  href={`/${altLang}`}
+                  aria-label="Switch language"
+                  className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55 hover:text-gold transition-colors"
                 >
-                  {navCopy.buy}
+                  <Globe className="w-4 h-4" />
+                  {langCode}
                 </Link>
-              </li>
-              <li>
+                {user ? (
+                  <>
+                    <Link
+                      href={`/${lang}/dashboard`}
+                      title={authNavCopy.dashboard}
+                      className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70 hover:text-gold transition-colors"
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      <span className="hidden lg:inline">{authNavCopy.dashboard}</span>
+                    </Link>
+                    <form action={`/${lang}/auth/sign-out`} method="POST">
+                      <button
+                        type="submit"
+                        title={authNavCopy.signOut}
+                        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55 hover:text-gold transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span className="hidden lg:inline">{authNavCopy.signOut}</span>
+                      </button>
+                    </form>
+                  </>
+                ) : (
+                  <Link
+                    href={`/${lang}/sign-in`}
+                    className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55 hover:text-gold transition-colors"
+                  >
+                    {authNavCopy.signIn}
+                  </Link>
+                )}
+              </div>
+              {!user && (
                 <Link
                   href={`/${lang}/listing/new`}
-                  className="hover:text-gold transition-colors"
+                  className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
                 >
-                  {navCopy.sell}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`/${lang}#how-it-works`}
-                  className="hover:text-gold transition-colors"
-                >
-                  {navCopy.howItWorks}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`/${lang}#pricing`}
-                  className="hover:text-gold transition-colors"
-                >
-                  {navCopy.pricing}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`/${lang}#faq`}
-                  className="hover:text-gold transition-colors"
-                >
-                  {navCopy.faq}
-                </Link>
-              </li>
-            </ul>
-
-            <div className="flex items-center gap-5 lg:gap-7">
-              <Link
-                href={`/${altLang}`}
-                className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-              >
-                {navCopy.langToggle}
-              </Link>
-              {user ? (
-                <div className="flex items-center gap-4 lg:gap-5">
-                  {firstName && (
-                    <span className="hidden md:inline text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
-                      {authNavCopy.greetingPrefix} {firstName}
-                    </span>
-                  )}
-                  <Link
-                    href={`/${lang}/dashboard`}
-                    className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-                  >
-                    {authNavCopy.dashboard}
-                  </Link>
-                  <form action={`/${lang}/auth/sign-out`} method="POST">
-                    <button
-                      type="submit"
-                      className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-                    >
-                      {authNavCopy.signOut}
-                    </button>
-                  </form>
-                </div>
-              ) : (
-                <Link
-                  href={`/${lang}/sign-in`}
-                  className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-                >
-                  {authNavCopy.signIn}
+                  {navCopy.cta}
                 </Link>
               )}
-              <Link
-                href={`/${lang}/listing/new`}
-                className="hidden md:inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
-              >
-                {navCopy.cta}
-              </Link>
             </div>
+
+            {/* Mobile — hamburger */}
+            <MobileMenu
+              lang={lang}
+              altLang={altLang}
+              langCode={langCode}
+              user={!!user}
+              firstName={firstName}
+              nav={{
+                buy: navCopy.buy,
+                sell: navCopy.sell,
+                howItWorks: navCopy.howItWorks,
+                pricing: navCopy.pricing,
+                faq: navCopy.faq,
+              }}
+              auth={{
+                greetingPrefix: authNavCopy.greetingPrefix,
+                dashboard: authNavCopy.dashboard,
+                signOut: authNavCopy.signOut,
+                signIn: authNavCopy.signIn,
+              }}
+              cta={navCopy.cta}
+            />
           </nav>
         </header>
 
