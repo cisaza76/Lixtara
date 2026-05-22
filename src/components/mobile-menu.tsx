@@ -16,6 +16,7 @@ interface Props {
     howItWorks: string;
     pricing: string;
     faq: string;
+    consultations: string;
   };
   auth: {
     greetingPrefix: string;
@@ -74,6 +75,9 @@ export function MobileMenu({
               </Link>
               <Link href={`/${lang}#faq`} className={link}>
                 {nav.faq}
+              </Link>
+              <Link href={`/${lang}/consultations`} className={link}>
+                {nav.consultations}
               </Link>
             </nav>
 
