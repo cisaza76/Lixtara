@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission",
+      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale",
     )
     .eq("id", propertyId)
     .eq("owner_id", user.id)
@@ -149,6 +149,16 @@ export async function POST(req: Request) {
         street_address: fullAddress,
         legal_description: property.legal_description ?? "",
         list_price: `$${property.list_price.toLocaleString()}`,
+        // Property details (auto-filled so the contract reaches the seller
+        // pre-populated, only awaiting signature). DocuSign silently ignores
+        // any tabLabel the template doesn't bind, so adding these is safe.
+        bedrooms: property.bedrooms != null ? String(property.bedrooms) : "",
+        bathrooms: property.bathrooms != null ? String(property.bathrooms) : "",
+        sqft: property.sqft != null ? property.sqft.toLocaleString() : "",
+        year_built: property.year_built != null ? String(property.year_built) : "",
+        pool: property.has_pool ? "Yes" : "No",
+        cash_only: property.cash_only ? "Yes" : "No",
+        as_is_sale: property.as_is_sale ? "Yes" : "No",
         // Parties
         seller_name: signerName,
         broker_name: BROKERAGE_LICENSED_ENTITY,
