@@ -160,7 +160,7 @@ copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit
 **Not yet done — go-live debt:** test coverage is unit-only (Vitest covers pure logic —
 pricing, buyer-rebate, status maps, i18n parity, webhook dedup; **webhooks, RLS, and route
 handlers have no integration tests**); error/product analytics (Sentry/PostHog); the full
-5-checkout Stripe set (only `tier` is wired); referrals; MLS sync; and the FL DBPR / NAR
+5-checkout Stripe set (`tier` + `consultation` are wired); referrals; MLS sync; and the FL DBPR / NAR
 compliance review.
 
 MVP scope and the original phase sequencing live in user memory (`mvp_scope_phase1.md`,
