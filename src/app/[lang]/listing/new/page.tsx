@@ -1851,28 +1851,35 @@ export default async function ListingNewPage({
               {copy.step5.tourBody}
             </p>
             {draft?.pricing_tier === "pro" || draft?.pricing_tier === "concierge" ? (
-              <>
-                <p className="text-xs text-ink/55 leading-relaxed italic border-t border-gold-soft pt-3">
-                  {copy.step5.tourCaptureGuide}
-                </p>
-                <TourUploader
-                  propertyId={draftId ?? ""}
-                  initialJob={tourJob}
-                  labels={{
-                    fileLabel: copy.step5.tourFileLabel,
-                    uploadButton: copy.step5.tourUploadButton,
-                    uploading: copy.step5.tourUploading,
-                    queued: copy.step5.tourQueued,
-                    processing: copy.step5.tourProcessing,
-                    ready: copy.step5.tourReady,
-                    failed: copy.step5.tourFailed,
-                    expired: copy.step5.tourExpired,
-                    replaceButton: copy.step5.tourReplaceButton,
-                    fileTooLarge: copy.step5.tourFileTooLarge,
-                    genericError: copy.step5.tourGenericError,
-                  }}
-                />
-              </>
+              <TourUploader
+                propertyId={draftId ?? ""}
+                initialJob={tourJob}
+                labels={{
+                  fileLabel: copy.step5.tourFileLabel,
+                  uploadButton: copy.step5.tourUploadButton,
+                  uploading: copy.step5.tourUploading,
+                  queued: copy.step5.tourQueued,
+                  processing: copy.step5.tourProcessing,
+                  ready: copy.step5.tourReady,
+                  failed: copy.step5.tourFailed,
+                  expired: copy.step5.tourExpired,
+                  replaceButton: copy.step5.tourReplaceButton,
+                  fileTooLarge: copy.step5.tourFileTooLarge,
+                  genericError: copy.step5.tourGenericError,
+                  coachingTitle: copy.step5.tourCoachingTitle,
+                  tip1: copy.step5.tourTip1,
+                  tip2: copy.step5.tourTip2,
+                  tip3: copy.step5.tourTip3,
+                  tip4: copy.step5.tourTip4,
+                  durationLabel: copy.step5.tourDurationLabel,
+                  resolutionLabel: copy.step5.tourResolutionLabel,
+                  preflightOk: copy.step5.tourPreflightOk,
+                  preflightWarn: copy.step5.tourPreflightWarn,
+                  preflightTooShort: copy.step5.tourPreflightTooShort,
+                  preflightTooLow: copy.step5.tourPreflightTooLow,
+                  preflightReading: copy.step5.tourPreflightReading,
+                }}
+              />
             ) : (
               <p className="text-xs text-ink/55 italic border-t border-gold-soft pt-3">
                 {copy.step5.tourTierGate}
