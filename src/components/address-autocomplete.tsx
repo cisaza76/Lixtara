@@ -61,13 +61,22 @@ function extractComponents(
   };
 }
 
+// Loads the Google Maps JS API. The `loading=async` flag is REQUIRED by
+// Google's current loader; with it, `script.onload` only signals the loader
+// itself is in place — actual libraries (places, geocoding, etc.) load
+// lazily via `await google.maps.importLibrary(...)`. We do NOT pass
+// `libraries=places` here because that hint is ignored in async mode and
+// triggers a console warning; callers explicitly importLibrary("places").
 function loadGoogleMaps(apiKey: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") {
       reject(new Error("not browser"));
       return;
     }
-    if (window.google?.maps?.places) {
+    // The @types define `google.maps` as always-present, but at runtime the
+    // global is undefined until the loader script attaches it. Cast to skip
+    // the misleading "condition always true" check.
+    if ((window as { google?: { maps?: unknown } }).google?.maps) {
       resolve();
       return;
     }
@@ -82,7 +91,7 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
     script.id = SCRIPT_ID;
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
       apiKey,
-    )}&libraries=places&loading=async&v=weekly`;
+    )}&loading=async&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onload = () => {
@@ -138,19 +147,38 @@ export function AddressAutocomplete({
     let autocomplete: google.maps.places.Autocomplete | null = null;
 
     loadGoogleMaps(apiKey)
-      .then(() => {
+      .then(async () => {
         if (!streetInputRef.current) {
           setStatus("error");
           setErrorMessage("Street input ref lost.");
           return;
         }
-        if (!window.google?.maps?.places?.Autocomplete) {
+        // With loading=async, libraries are NOT attached when script.onload
+        // fires — we must await importLibrary explicitly. This was the
+        // root cause of the "Places library unavailable after load" error
+        // surfacing immediately on page load.
+        let placesLib: google.maps.PlacesLibrary;
+        try {
+          placesLib = (await window.google.maps.importLibrary(
+            "places",
+          )) as google.maps.PlacesLibrary;
+        } catch (libErr) {
+          console.error("[AddressAutocomplete] importLibrary places failed", libErr);
           setStatus("error");
-          setErrorMessage("Places library unavailable after load.");
+          setErrorMessage(
+            "Places library failed to load — check that Places API is enabled and your domain is allowlisted on the Google Maps key.",
+          );
+          return;
+        }
+        if (!placesLib?.Autocomplete) {
+          setStatus("error");
+          setErrorMessage(
+            "Places.Autocomplete missing after importLibrary returned.",
+          );
           return;
         }
         try {
-          autocomplete = new window.google.maps.places.Autocomplete(
+          autocomplete = new placesLib.Autocomplete(
             streetInputRef.current,
             {
               componentRestrictions: { country: "us" },
