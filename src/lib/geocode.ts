@@ -1,16 +1,23 @@
-// Server-side address validation against the Google Geocoding API.
+// Server-side address validation + geocoding against the Google Geocoding API.
 //
-// The primary guarantee comes from the client: AddressAutocomplete only sets
-// lat/lng when the user picks a real Google Places suggestion (which also fills
-// city/zip from Google). This server check is a best-effort second pass that
-// FAILS OPEN — if the key is referrer-restricted, missing, or the API errors,
-// it returns ok:true so we never block a legitimate listing on key config.
-// It only returns ok:false when Google definitively says the address doesn't
-// exist or the ZIP/state clearly don't match.
+// Primary path: AddressAutocomplete (client) sets lat/lng when the user picks
+// a Google Places suggestion. This server function is BOTH a second-pass
+// validation AND a fallback geocoder for cases where the client autocomplete
+// failed (Maps script blocked, async timing, etc.) — it returns lat/lng so
+// the caller can save them even when the form arrived without coords.
+//
+// Fail policy:
+//   - Hard fail (ok:false) only when Google says the address definitively
+//     doesn't exist OR the state/zip clearly don't match what was typed.
+//   - Fail open (ok:true, lat/lng undefined) on key issues, network errors,
+//     REQUEST_DENIED, OVER_QUERY_LIMIT — never block a legitimate listing
+//     on Google's quota or our key config.
 
 export interface AddressCheck {
   ok: boolean;
   reason?: "not_found" | "zip_mismatch" | "state_mismatch";
+  lat?: number;
+  lng?: number;
 }
 
 export async function validateUsAddress(
@@ -30,7 +37,10 @@ export async function validateUsAddress(
   let data: {
     status?: string;
     results?: Array<{
-      geometry?: { location_type?: string };
+      geometry?: {
+        location_type?: string;
+        location?: { lat?: number; lng?: number };
+      };
       address_components?: Array<{
         short_name: string;
         long_name: string;
@@ -66,5 +76,10 @@ export async function validateUsAddress(
   if (resZip && zip && resZip.slice(0, 5) !== zip.slice(0, 5)) {
     return { ok: false, reason: "zip_mismatch" };
   }
-  return { ok: true };
+  const lat = result.geometry?.location?.lat;
+  const lng = result.geometry?.location?.lng;
+  return {
+    ok: true,
+    ...(typeof lat === "number" && typeof lng === "number" ? { lat, lng } : {}),
+  };
 }

@@ -286,22 +286,32 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=fl_only`);
     }
 
-    // Address must be validated against Google: the autocomplete only sets
-    // lat/lng (and fills city/zip) when a real Google Places address is picked.
-    // Missing coords = the user free-typed an unverified address.
-    if (
-      latitude === null ||
-      longitude === null ||
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude)
-    ) {
+    // Address verification: client autocomplete sets lat/lng when the seller
+    // picks a Google Places suggestion. If that didn't happen (Maps script
+    // failed, async timing, the seller didn't click a suggestion) we fall
+    // back to a server-side geocode — same Google API, just from our side.
+    // Only reject when BOTH paths fail to produce coords OR Google explicitly
+    // says the address doesn't exist.
+    const check = await validateUsAddress(street, city, state, zip);
+    if (!check.ok) {
       redirect(
         `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=address_invalid`,
       );
     }
-    // Best-effort server geocode (fails open on key/network issues).
-    const check = await validateUsAddress(street, city, state, zip);
-    if (!check.ok) {
+    // Prefer client-supplied coords (the seller actually picked a Places
+    // suggestion); otherwise use whatever the server geocode returned.
+    const finalLat =
+      latitude !== null && Number.isFinite(latitude)
+        ? latitude
+        : (check.lat ?? null);
+    const finalLng =
+      longitude !== null && Number.isFinite(longitude)
+        ? longitude
+        : (check.lng ?? null);
+    if (finalLat === null || finalLng === null) {
+      // No coords from either path means the address can't be placed on a
+      // map — block, with the same "Address not found" message that prompts
+      // the seller to re-type and pick a suggestion.
       redirect(
         `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=address_invalid`,
       );
@@ -318,8 +328,8 @@ export default async function ListingNewPage({
       address_city: city,
       address_state: state,
       address_zip: zip,
-      latitude: Number.isFinite(latitude) ? latitude : null,
-      longitude: Number.isFinite(longitude) ? longitude : null,
+      latitude: finalLat,
+      longitude: finalLng,
     };
 
     if (id) {
