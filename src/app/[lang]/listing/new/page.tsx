@@ -128,6 +128,8 @@ export default async function ListingNewPage({
     url: string;
     is_primary: boolean;
     display_order: number;
+    is_staged?: boolean;
+    original_photo_id?: string | null;
   }> = [];
   type TourJobRow = { status: "uploading" | "queued" | "processing" | "ready" | "failed" | "expired" };
   type PaymentRow = {
@@ -227,7 +229,7 @@ export default async function ListingNewPage({
     if (step === 5 || step === 6) {
       const { data: photoRows } = await supabase
         .from("property_photos")
-        .select("id,url,is_primary,display_order")
+        .select("id,url,is_primary,display_order,is_staged,original_photo_id")
         .eq("property_id", draftId)
         .order("display_order", { ascending: true });
       photos = (photoRows ?? []) as typeof photos;
@@ -1907,6 +1909,16 @@ export default async function ListingNewPage({
                   primaryBadge: copy.step5.primaryBadge,
                   deleteButton: copy.step5.deleteButton,
                   reorderHint: copy.step5.photoReorderHint,
+                  stageButton: copy.step5.stageButton,
+                  stagingNow: copy.step5.stagingNow,
+                  stagingFailed: copy.step5.stagingFailed,
+                  stagedBadge: copy.step5.stagedBadge,
+                  pickStyle: copy.step5.pickStyle,
+                  cancelStyle: copy.step5.cancelStyle,
+                  styleModern: copy.step5.styleModern,
+                  styleMinimalist: copy.step5.styleMinimalist,
+                  styleTraditional: copy.step5.styleTraditional,
+                  styleWarm: copy.step5.styleWarm,
                 }}
               />
             )}

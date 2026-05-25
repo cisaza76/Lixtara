@@ -194,6 +194,40 @@ export default async function PropertyDetailPage({
           </div>
         )}
 
+        {/* Public photo gallery. Staged photos carry a permanent on-image
+            badge + the disclaimer footer renders below for MLS compliance
+            (Stellar + Miami Realtors require visible labeling of virtually
+            staged imagery). */}
+        {property.photos.length > 1 && (
+          <div className="mb-12 lg:mb-16">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {property.photos.map((ph, i) => (
+                <div
+                  key={ph.url}
+                  className="relative aspect-[4/3] overflow-hidden bg-ivory-strong border border-gold-soft"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ph.url}
+                    alt={`${street} — photo ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  {ph.is_staged && (
+                    <div className="absolute top-2 right-2 bg-ink/85 text-ivory text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1">
+                      ✨ {copy.stagedBadge}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {property.photos.some((p) => p.is_staged) && (
+              <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-ink/55 italic">
+                {copy.stagedDisclaimer}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
           {/* LEFT: details */}
           <div className="lg:col-span-7 flex flex-col gap-10">

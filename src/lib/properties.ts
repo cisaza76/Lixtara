@@ -20,7 +20,12 @@ export interface PropertyDetail extends PropertySummary {
   year_built: number;
   description: string | null;
   buyer_agent_commission: number;
-  photos: { url: string; is_primary: boolean; display_order: number }[];
+  photos: {
+    url: string;
+    is_primary: boolean;
+    display_order: number;
+    is_staged?: boolean;
+  }[];
 }
 
 export async function getActiveProperties(): Promise<PropertySummary[]> {
@@ -74,7 +79,7 @@ export async function getPropertyById(
 
   const { data: photos } = await supabase
     .from("property_photos")
-    .select("url,is_primary,display_order")
+    .select("url,is_primary,display_order,is_staged")
     .eq("property_id", id)
     .order("display_order", { ascending: true });
 
