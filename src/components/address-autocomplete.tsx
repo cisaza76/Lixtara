@@ -30,6 +30,7 @@ type Status = "idle" | "loading" | "ready" | "error";
 declare global {
   interface Window {
     __lixtaraMapsCallbacks?: Array<() => void>;
+    __lixtaraMapsInit?: () => void;
   }
 }
 
@@ -61,22 +62,25 @@ function extractComponents(
   };
 }
 
-// Loads the Google Maps JS API. The `loading=async` flag is REQUIRED by
-// Google's current loader; with it, `script.onload` only signals the loader
-// itself is in place — actual libraries (places, geocoding, etc.) load
-// lazily via `await google.maps.importLibrary(...)`. We do NOT pass
-// `libraries=places` here because that hint is ignored in async mode and
-// triggers a console warning; callers explicitly importLibrary("places").
+// Loads the Google Maps JS API with the Places library. We use the legacy
+// script-tag + `&callback=` pattern (still supported, paired with
+// `loading=async` for performance) instead of `importLibrary`. Reason: the
+// script-tag URL ONLY exposes `google.maps.Load` / `google.maps.modules` —
+// it does NOT define `google.maps.importLibrary`. That function is exclusive
+// to Google's inline bootstrap loader. The previous code combined the two
+// and produced "TypeError: window.google.maps.importLibrary is not a
+// function" in production.
 function loadGoogleMaps(apiKey: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") {
       reject(new Error("not browser"));
       return;
     }
-    // The @types define `google.maps` as always-present, but at runtime the
-    // global is undefined until the loader script attaches it. Cast to skip
-    // the misleading "condition always true" check.
-    if ((window as { google?: { maps?: unknown } }).google?.maps) {
+    // Places already loaded? Done.
+    if (
+      (window as { google?: { maps?: { places?: unknown } } }).google?.maps
+        ?.places
+    ) {
       resolve();
       return;
     }
@@ -87,18 +91,19 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
       window.__lixtaraMapsCallbacks.push(resolve);
       return;
     }
-    const script = document.createElement("script");
-    script.id = SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
-      apiKey,
-    )}&loading=async&v=weekly`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
+    // Google invokes this once Maps + Places are attached to the global.
+    window.__lixtaraMapsInit = () => {
       resolve();
       for (const cb of window.__lixtaraMapsCallbacks ?? []) cb();
       window.__lixtaraMapsCallbacks = [];
     };
+    const script = document.createElement("script");
+    script.id = SCRIPT_ID;
+    script.src =
+      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}` +
+      `&libraries=places&v=weekly&loading=async&callback=__lixtaraMapsInit`;
+    script.async = true;
+    script.defer = true;
     script.onerror = () =>
       reject(new Error("Failed to load Google Maps script"));
     document.head.appendChild(script);
@@ -147,38 +152,24 @@ export function AddressAutocomplete({
     let autocomplete: google.maps.places.Autocomplete | null = null;
 
     loadGoogleMaps(apiKey)
-      .then(async () => {
+      .then(() => {
         if (!streetInputRef.current) {
           setStatus("error");
           setErrorMessage("Street input ref lost.");
           return;
         }
-        // With loading=async, libraries are NOT attached when script.onload
-        // fires — we must await importLibrary explicitly. This was the
-        // root cause of the "Places library unavailable after load" error
-        // surfacing immediately on page load.
-        let placesLib: google.maps.PlacesLibrary;
-        try {
-          placesLib = (await window.google.maps.importLibrary(
-            "places",
-          )) as google.maps.PlacesLibrary;
-        } catch (libErr) {
-          console.error("[AddressAutocomplete] importLibrary places failed", libErr);
+        // `callback=__lixtaraMapsInit` only fires after Maps + Places are
+        // both attached; window.google.maps.places.Autocomplete is ready.
+        const places = window.google?.maps?.places;
+        if (!places?.Autocomplete) {
           setStatus("error");
           setErrorMessage(
             "Places library failed to load — check that Places API is enabled and your domain is allowlisted on the Google Maps key.",
           );
           return;
         }
-        if (!placesLib?.Autocomplete) {
-          setStatus("error");
-          setErrorMessage(
-            "Places.Autocomplete missing after importLibrary returned.",
-          );
-          return;
-        }
         try {
-          autocomplete = new placesLib.Autocomplete(
+          autocomplete = new places.Autocomplete(
             streetInputRef.current,
             {
               componentRestrictions: { country: "us" },
