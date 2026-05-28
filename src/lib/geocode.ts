@@ -26,7 +26,13 @@ export async function validateUsAddress(
   state: string,
   zip: string,
 ): Promise<AddressCheck> {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  // Server-only key for Geocoding API: the public Maps JS key is restricted
+  // by HTTP referrer, which Google rejects on server calls with REQUEST_DENIED.
+  // Fall back to the public key for local dev so devs without the server key
+  // provisioned still get a (fail-open) response instead of a hard error.
+  const key =
+    process.env.GOOGLE_GEOCODING_API_KEY ??
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   if (!key) return { ok: true }; // can't validate → don't block
 
   const address = `${street}, ${city}, ${state} ${zip}`;
@@ -58,7 +64,17 @@ export async function validateUsAddress(
 
   // REQUEST_DENIED / OVER_QUERY_LIMIT / etc. → fail open.
   if (data.status === "ZERO_RESULTS") return { ok: false, reason: "not_found" };
-  if (data.status !== "OK" || !data.results?.length) return { ok: true };
+  if (data.status !== "OK" || !data.results?.length) {
+    // Surface mis-configured keys loudly — fail-open masked a referrer-
+    // restricted key being used server-side for months.
+    if (data.status && data.status !== "OK") {
+      console.warn(
+        `[geocode] Google Geocoding API returned status=${data.status}` +
+          " — falling open. Check GOOGLE_GEOCODING_API_KEY restrictions.",
+      );
+    }
+    return { ok: true };
+  }
 
   const result = data.results[0]!;
   // APPROXIMATE means the geocoder couldn't pin a real street address.
