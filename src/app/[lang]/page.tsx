@@ -150,8 +150,8 @@ export default async function Home({
               />
 
               <Image
-                src="/placeholder-property.svg"
-                alt="Lixtara — Florida residential brokerage (property image placeholder)"
+                src="/hero-living.jpg"
+                alt="Bright, elegantly furnished Florida living room"
                 fill
                 priority
                 sizes="(min-width: 1024px) 380px, 80vw"
