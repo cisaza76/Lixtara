@@ -36,11 +36,6 @@ interface AgreementRow {
   status: string;
 }
 
-interface TourJobRow {
-  property_id: string;
-  status: string;
-}
-
 function paymentLabel(
   payments: PaymentRow[],
   copy: ReturnType<typeof t>["dashboard"],
@@ -65,20 +60,6 @@ function agreementLabel(
   return { text: copy.agreementPending, tone: "warn" };
 }
 
-function tourLabel(
-  tours: TourJobRow[],
-  copy: ReturnType<typeof t>["dashboard"],
-): { text: string; tone: "ok" | "warn" | "fail" | "none" } | null {
-  if (tours.length === 0) return null;
-  if (tours.some((t) => t.status === "ready")) return { text: copy.tourReady, tone: "ok" };
-  if (tours.some((t) => t.status === "processing"))
-    return { text: copy.tourProcessing, tone: "warn" };
-  if (tours.some((t) => t.status === "queued"))
-    return { text: copy.tourQueued, tone: "warn" };
-  if (tours.some((t) => t.status === "failed" || t.status === "expired"))
-    return { text: copy.tourFailed, tone: "fail" };
-  return null;
-}
 
 function statusLabel(
   mlsStatus: string,
@@ -134,7 +115,7 @@ export default async function DashboardPage({
   const ids = listings.map((l) => l.id);
 
   // Fetch everything else in parallel and group by property_id client-side.
-  const [{ data: photoRows }, { data: payRows }, { data: agRows }, { data: tourRows }] =
+  const [{ data: photoRows }, { data: payRows }, { data: agRows }] =
     await Promise.all([
       ids.length > 0
         ? supabase
@@ -156,12 +137,6 @@ export default async function DashboardPage({
             .select("property_id,status")
             .in("property_id", ids)
         : Promise.resolve({ data: [] as AgreementRow[] }),
-      ids.length > 0
-        ? supabase
-            .from("tour_jobs")
-            .select("property_id,status")
-            .in("property_id", ids)
-        : Promise.resolve({ data: [] as TourJobRow[] }),
     ]);
 
   const photoByProperty = new Map<string, string>();
@@ -182,13 +157,6 @@ export default async function DashboardPage({
     arr.push(a);
     agreementsByProperty.set(a.property_id, arr);
   }
-  const toursByProperty = new Map<string, TourJobRow[]>();
-  for (const t of (tourRows ?? []) as TourJobRow[]) {
-    const arr = toursByProperty.get(t.property_id) ?? [];
-    arr.push(t);
-    toursByProperty.set(t.property_id, arr);
-  }
-
   // Buyer side: offers I've made + saved properties.
   const [{ data: myOffers }, { data: savedRows }] = await Promise.all([
     supabase
@@ -307,7 +275,6 @@ export default async function DashboardPage({
                 agreementsByProperty.get(l.id) ?? [],
                 copy,
               );
-              const tour = tourLabel(toursByProperty.get(l.id) ?? [], copy);
               const tierId = (l.pricing_tier ?? "") as PricingTierId | "";
               const tier = tierId && tierId in PRICING_TIERS
                 ? PRICING_TIERS[tierId as PricingTierId]
@@ -379,15 +346,6 @@ export default async function DashboardPage({
                           {agreement.text}
                         </span>
                       </li>
-                      {tour && (
-                        <li>
-                          <span
-                            className={`inline-block text-[9px] uppercase tracking-[0.16em] px-2.5 py-1 border ${TONE_CLASSES[tour.tone]}`}
-                          >
-                            {tour.text}
-                          </span>
-                        </li>
-                      )}
                     </ul>
 
                     <div className="flex flex-col gap-2 pt-2">
