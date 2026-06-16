@@ -738,6 +738,17 @@ const dictionaries = {
       stagedBadge: "Virtually Staged",
       stagedDisclaimer:
         "Some images on this listing are virtually staged. Original (unstaged) photos available on request.",
+      stagingEyebrow: "AI Virtual Staging",
+      stagingTitle: "See any room transformed — instantly.",
+      stagingBody:
+        "Lixtara furnishes empty rooms with photorealistic AI staging so buyers can picture the space. Drag the slider to compare the original room with the staged result.",
+      stagingBefore: "Original",
+      stagingAfter: "AI Staged",
+      stagingHandle: "Drag to compare",
+      stagingStyleMinimalist: "Scandinavian minimalist",
+      stagingStyleModern: "Contemporary modern",
+      stagingShowcaseDisclaimer:
+        "Illustrative examples of Lixtara AI staging. Staged images are always labeled; original photos available on request.",
     },
     comingSoon: {
       titleBefore: "Coming ",
@@ -1759,6 +1770,17 @@ const dictionaries = {
       stagedBadge: "Amoblada Virtualmente",
       stagedDisclaimer:
         "Algunas imágenes de este listing están amobladas virtualmente. Las originales (sin amoblar) están disponibles a solicitud.",
+      stagingEyebrow: "Staging Virtual con IA",
+      stagingTitle: "Ve cualquier espacio transformado — al instante.",
+      stagingBody:
+        "Lixtara amuebla cuartos vacíos con staging IA fotorrealista para que los compradores imaginen el espacio. Arrastra el control para comparar el cuarto original con el resultado amoblado.",
+      stagingBefore: "Original",
+      stagingAfter: "Amoblada con IA",
+      stagingHandle: "Arrastra para comparar",
+      stagingStyleMinimalist: "Minimalista escandinavo",
+      stagingStyleModern: "Moderno contemporáneo",
+      stagingShowcaseDisclaimer:
+        "Ejemplos ilustrativos del staging IA de Lixtara. Las imágenes amobladas siempre se etiquetan; las fotos originales disponibles a solicitud.",
     },
     comingSoon: {
       titleBefore: "Muy ",

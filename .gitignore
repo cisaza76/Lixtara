@@ -52,3 +52,9 @@ next-env.d.ts
 # Python (Modal POC scripts)
 __pycache__/
 *.pyc
+
+# UI eval / local screenshots (not for repo)
+staging-eval/
+.playwright-mcp/
+/prop-*.jpeg
+/prop-*.png
