@@ -189,8 +189,11 @@ export function PhotoGridDraggable({
               )}
 
               {photo.is_staged && (
-                <div className="absolute top-2 right-2 bg-ink/85 text-ivory text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1 pointer-events-none">
-                  ✨ {labels.stagedBadge}
+                <div className="absolute top-2 right-2 flex items-center gap-1 bg-ink/85 text-ivory text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1 pointer-events-none">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
+                  </svg>
+                  {labels.stagedBadge}
                 </div>
               )}
 
@@ -235,9 +238,12 @@ export function PhotoGridDraggable({
                     <button
                       type="button"
                       onClick={() => setPickerFor(photo.id)}
-                      className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-gold"
+                      className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-gold"
                     >
-                      ✨ {labels.stageButton}
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
+                      </svg>
+                      {labels.stageButton}
                     </button>
                   )}
                   <button

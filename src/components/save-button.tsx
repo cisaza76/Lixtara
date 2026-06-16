@@ -64,9 +64,18 @@ export function SaveButton({
             : "border-gold-soft bg-ivory text-ink/70 hover:border-gold hover:text-ink"
         }`}
       >
-        <span aria-hidden className={saved ? "text-gold" : "text-ink/40"}>
-          {saved ? "♥" : "♡"}
-        </span>
+        <svg
+          aria-hidden="true"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill={saved ? "currentColor" : "none"}
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className={saved ? "text-gold" : "text-ink/40"}
+        >
+          <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.7 1-1a5.5 5.5 0 0 0 0-7.8z" />
+        </svg>
         <span>{saved ? labels.savedButton : labels.saveButton}</span>
       </button>
       {error && <p className="text-[10px] italic text-red-700">{error}</p>}
