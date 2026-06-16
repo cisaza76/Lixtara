@@ -8,7 +8,7 @@
 //
 // All public helpers (sendPaymentReceipt, sendAgreementSigned, etc.) are
 // fire-and-forget from the caller's perspective — they NEVER throw. The
-// surrounding flow (Stripe webhook, KIRI webhook, admin approve) must not
+// surrounding flow (Stripe webhook, DocuSign webhook, admin approve) must not
 // fail just because the email send did. We log errors instead.
 
 import { Resend } from "resend";
@@ -173,42 +173,6 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
     text: isEs
       ? `Tu acuerdo de listing está firmado. Continúa al pago: ${input.paymentUrl}`
       : `Your listing agreement is signed. Continue to payment: ${input.paymentUrl}`,
-  });
-}
-
-export interface TourReadyInput {
-  to: string;
-  lang?: Lang;
-  propertyAddress: string;
-  listingUrl: string;
-}
-
-export async function sendTourReady(input: TourReadyInput) {
-  const lang = input.lang ?? "en";
-  const isEs = lang === "es";
-  const subject = isEs
-    ? `Tu tour 3D está listo — Lixtara`
-    : `Your 3D walkthrough tour is live — Lixtara`;
-
-  const body = isEs
-    ? `
-    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Tu tour 3D está listo. ✓</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Procesamos el video que subiste de <strong>${input.propertyAddress}</strong> y la escena 3D Gaussian Splatting está ahora embebida en tu página de listing. Los compradores pueden recorrerla en cualquier navegador.</p>
-    ${button(input.listingUrl, "Ver mi listing")}
-  `
-    : `
-    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Your 3D tour is live. ✓</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">We processed the walkthrough video you uploaded for <strong>${input.propertyAddress}</strong> and the 3D Gaussian Splatting scene is now embedded on your listing page. Buyers can navigate it from any browser.</p>
-    ${button(input.listingUrl, "View my listing")}
-  `;
-
-  return send({
-    to: input.to,
-    subject,
-    html: shell({ preheader: isEs ? "Tu tour 3D está listo" : "Your 3D tour is ready", body }),
-    text: isEs
-      ? `Tu tour 3D está listo para ${input.propertyAddress}. Verlo: ${input.listingUrl}`
-      : `Your 3D tour is ready for ${input.propertyAddress}. View it: ${input.listingUrl}`,
   });
 }
 

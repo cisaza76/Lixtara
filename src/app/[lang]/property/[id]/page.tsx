@@ -11,7 +11,7 @@ import {
 } from "@/lib/properties";
 import { BROKERAGE_NAME, BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { createClient } from "@/lib/supabase/server";
-import { TourViewer } from "@/components/tour-viewer";
+import { TourComingSoon } from "@/components/tour-coming-soon";
 import { OfferForm } from "@/components/offer-form";
 import { SaveButton } from "@/components/save-button";
 
@@ -48,29 +48,13 @@ export default async function PropertyDetailPage({
   const street = cleanDemoPrefix(property.address_street);
   const fullAddress = `${street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
 
-  // Latest ready 3D tour for this property (if any). Signed URL valid 1h.
-  // Also resolves current user + owner_id + saved state for the offer form
+  // Resolves current user + owner_id + saved state for the offer form
   // and save button.
-  let tourZipUrl: string | null = null;
   let signedIn = false;
   let isOwner = false;
   let initiallySaved = false;
   {
     const supabase = await createClient();
-    const { data: tourRow } = await supabase
-      .from("tour_jobs")
-      .select("ply_storage_path")
-      .eq("property_id", property.id)
-      .eq("status", "ready")
-      .order("completed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (tourRow?.ply_storage_path) {
-      const { data: signed } = await supabase.storage
-        .from("tour-models")
-        .createSignedUrl(tourRow.ply_storage_path, 60 * 60);
-      tourZipUrl = signed?.signedUrl ?? null;
-    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -177,22 +161,14 @@ export default async function PropertyDetailPage({
           </div>
         )}
 
-        {tourZipUrl && (
-          <div className="mb-12 lg:mb-16">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-3">
-              {copy.tourEyebrow}
-            </p>
-            <TourViewer
-              zipUrl={tourZipUrl}
-              posterUrl={property.primary_photo_url ?? undefined}
-              labels={{
-                loading: copy.tourLoading,
-                failed: copy.tourFailed,
-                fallback: copy.tourFallback,
-              }}
-            />
-          </div>
-        )}
+        <div className="mb-12 lg:mb-16">
+          <TourComingSoon
+            eyebrow={copy.tourEyebrow}
+            title={copy.tourSoonTitle}
+            body={copy.tourSoonBody}
+            badge={copy.tourSoonBadge}
+          />
+        </div>
 
         {/* Public photo gallery. Staged photos carry a permanent on-image
             badge + the disclaimer footer renders below for MLS compliance
