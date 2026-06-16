@@ -12,6 +12,7 @@ import {
 import { BROKERAGE_NAME, BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { createClient } from "@/lib/supabase/server";
 import { TourComingSoon } from "@/components/tour-coming-soon";
+import { StagingShowcase } from "@/components/staging-showcase";
 import { OfferForm } from "@/components/offer-form";
 import { SaveButton } from "@/components/save-button";
 
@@ -161,15 +162,6 @@ export default async function PropertyDetailPage({
           </div>
         )}
 
-        <div className="mb-12 lg:mb-16">
-          <TourComingSoon
-            eyebrow={copy.tourEyebrow}
-            title={copy.tourSoonTitle}
-            body={copy.tourSoonBody}
-            badge={copy.tourSoonBadge}
-          />
-        </div>
-
         {/* Public photo gallery. Staged photos carry a permanent on-image
             badge + the disclaimer footer renders below for MLS compliance
             (Stellar + Miami Realtors require visible labeling of virtually
@@ -189,8 +181,11 @@ export default async function PropertyDetailPage({
                     className="w-full h-full object-cover"
                   />
                   {ph.is_staged && (
-                    <div className="absolute top-2 right-2 bg-ink/85 text-ivory text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1">
-                      ✨ {copy.stagedBadge}
+                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-ink/85 text-ivory text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
+                      </svg>
+                      {copy.stagedBadge}
                     </div>
                   )}
                 </div>
@@ -203,6 +198,29 @@ export default async function PropertyDetailPage({
             )}
           </div>
         )}
+
+        <StagingShowcase
+          copy={{
+            eyebrow: copy.stagingEyebrow,
+            title: copy.stagingTitle,
+            body: copy.stagingBody,
+            beforeLabel: copy.stagingBefore,
+            afterLabel: copy.stagingAfter,
+            handleLabel: copy.stagingHandle,
+            styleMinimalist: copy.stagingStyleMinimalist,
+            styleModern: copy.stagingStyleModern,
+            disclaimer: copy.stagingShowcaseDisclaimer,
+          }}
+        />
+
+        <div className="mb-12 lg:mb-16">
+          <TourComingSoon
+            eyebrow={copy.tourEyebrow}
+            title={copy.tourSoonTitle}
+            body={copy.tourSoonBody}
+            badge={copy.tourSoonBadge}
+          />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
           {/* LEFT: details */}
