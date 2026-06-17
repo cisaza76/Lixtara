@@ -5,10 +5,12 @@ import { Field } from "@/components/auth-shell";
 
 interface Props {
   streetLabel: string;
+  unitLabel: string;
   cityLabel: string;
   stateLabel: string;
   zipLabel: string;
   defaultStreet?: string;
+  defaultUnit?: string;
   defaultCity?: string;
   defaultZip?: string;
   defaultLat?: number | null;
@@ -112,10 +114,12 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
 
 export function AddressAutocomplete({
   streetLabel,
+  unitLabel,
   cityLabel,
   stateLabel,
   zipLabel,
   defaultStreet = "",
+  defaultUnit = "",
   defaultCity = "Miami",
   defaultZip = "",
   defaultLat = null,
@@ -271,6 +275,19 @@ export function AddressAutocomplete({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <label className="flex flex-col gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+            {unitLabel}
+          </span>
+          <input
+            name="unit"
+            type="text"
+            defaultValue={defaultUnit}
+            autoComplete="address-line2"
+            placeholder="4502"
+            className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
+          />
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
             {cityLabel}
           </span>
           <input
@@ -283,28 +300,28 @@ export function AddressAutocomplete({
             className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
           />
         </label>
-        <div className="grid grid-cols-2 gap-6">
-          <Field
-            label={stateLabel}
-            name="state"
-            defaultValue="FL"
-            autoComplete="address-level1"
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <Field
+          label={stateLabel}
+          name="state"
+          defaultValue="FL"
+          autoComplete="address-level1"
+        />
+        <label className="flex flex-col gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+            {zipLabel}
+          </span>
+          <input
+            ref={zipInputRef}
+            name="zip"
+            type="text"
+            required
+            defaultValue={defaultZip}
+            autoComplete="postal-code"
+            className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
           />
-          <label className="flex flex-col gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
-              {zipLabel}
-            </span>
-            <input
-              ref={zipInputRef}
-              name="zip"
-              type="text"
-              required
-              defaultValue={defaultZip}
-              autoComplete="postal-code"
-              className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
-            />
-          </label>
-        </div>
+        </label>
       </div>
     </div>
   );
