@@ -27,7 +27,7 @@ import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { validateUsAddress } from "@/lib/geocode";
-import { TourComingSoon } from "@/components/tour-coming-soon";
+import { TourCoaching } from "@/components/tour-coaching";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { OccupancySection } from "@/components/occupancy-section";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
@@ -1846,12 +1846,8 @@ export default async function ListingNewPage({
             </p>
           </div>
 
-          {/* 3D Walkthrough Tour — provider being upgraded; shown as coming soon */}
-          <TourComingSoon
-            title={copy.step5.tourTitle}
-            body={copy.step5.tourSoonBody}
-            badge={copy.step5.tourSoonBadge}
-          />
+          {/* 3D / premium video tour — coaching + "in preparation" (no upload yet) */}
+          <TourCoaching copy={copy.step5.tourCoach} />
 
           {/* Photo grid + ownership disclaimer + Next — visually grouped */}
           <form
