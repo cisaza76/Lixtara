@@ -10,6 +10,7 @@ import {
   cleanDemoPrefix,
 } from "@/lib/properties";
 import { BROKERAGE_NAME, BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
+import { validateUsAddress } from "@/lib/geocode";
 import { createClient } from "@/lib/supabase/server";
 import { TourComingSoon } from "@/components/tour-coming-soon";
 import { StagingShowcase } from "@/components/staging-showcase";
@@ -79,9 +80,24 @@ export default async function PropertyDetailPage({
   }
   const offerCopy = t(lang).offer;
   const saveCopy = t(lang).save;
+  // Map coords: prefer the stored lat/lng; if missing (geocode never ran when
+  // the listing was saved), best-effort geocode at render so the Location map
+  // still shows instead of "unavailable".
+  let mapLat = property.latitude;
+  let mapLng = property.longitude;
+  if (mapLat == null || mapLng == null) {
+    const geo = await validateUsAddress(
+      street,
+      property.address_city,
+      property.address_state,
+      property.address_zip,
+    );
+    mapLat = geo.lat ?? null;
+    mapLng = geo.lng ?? null;
+  }
   const mapUrl =
-    property.latitude && property.longitude
-      ? mapboxStaticUrl(property.latitude, property.longitude, 600, 400)
+    mapLat != null && mapLng != null
+      ? mapboxStaticUrl(mapLat, mapLng, 600, 400)
       : null;
 
   // JSON-LD RealEstateListing schema for SEO.
