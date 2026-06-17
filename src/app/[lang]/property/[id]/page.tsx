@@ -145,20 +145,24 @@ export default async function PropertyDetailPage({
 
       <section className="mx-auto w-full max-w-7xl px-6 lg:px-12 pt-8 pb-16 lg:pb-24">
         {property.primary_photo_url && (
-          <div className="relative aspect-[16/10] lg:aspect-[2/1] overflow-hidden bg-ivory-strong mb-12 lg:mb-16">
+          <div className="group relative aspect-[16/10] lg:aspect-[2/1] overflow-hidden bg-ivory-strong mb-12 lg:mb-16">
             <Image
               src={property.primary_photo_url}
               alt={street}
               fill
               priority
               sizes="(min-width: 1024px) 1200px, 100vw"
-              className="object-cover"
+              className="object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.03]"
             />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/45 via-transparent to-transparent" />
             {isDemoListing(property.address_street) && (
               <div className="absolute top-4 left-4 bg-ivory text-ink text-[10px] font-semibold tracking-[0.22em] uppercase px-3 py-1.5">
                 {copy.demoBadge}
               </div>
             )}
+            <span className="absolute bottom-5 left-5 lg:bottom-7 lg:left-8 text-[10px] font-semibold uppercase tracking-[0.22em] text-ivory/85">
+              {copy.forSale}
+            </span>
           </div>
         )}
 
@@ -172,13 +176,13 @@ export default async function PropertyDetailPage({
               {property.photos.map((ph, i) => (
                 <div
                   key={ph.url}
-                  className="relative aspect-[4/3] overflow-hidden bg-ivory-strong border border-gold-soft"
+                  className="group/photo relative aspect-[4/3] overflow-hidden border border-gold-soft bg-ivory-strong transition-colors duration-300 hover:border-gold/60"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={ph.url}
                     alt={`${street} — photo ${i + 1}`}
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-[600ms] ease-out group-hover/photo:scale-[1.05]"
                   />
                   {ph.is_staged && (
                     <div className="absolute top-2 right-2 flex items-center gap-1 bg-ink/85 text-ivory text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1">
