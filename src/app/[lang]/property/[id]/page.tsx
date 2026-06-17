@@ -226,6 +226,17 @@ export default async function PropertyDetailPage({
           {/* LEFT: details */}
           <div className="lg:col-span-7 flex flex-col gap-10">
             <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2.5">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                  {copy.forSale}
+                </span>
+                <span className="text-gold-soft">·</span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {(copy.propertyType as Record<string, string>)[
+                    property.property_type
+                  ] ?? copy.typeLabel}
+                </span>
+              </div>
               <div className="flex items-start justify-between gap-4">
                 <h1 className="font-display text-3xl md:text-4xl lg:text-5xl leading-tight text-ink font-normal">
                   {street}
@@ -258,38 +269,77 @@ export default async function PropertyDetailPage({
             </div>
 
             <dl className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-6 border-t border-gold-soft pt-10">
-              <div className="flex flex-col gap-1.5">
-                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                  {copy.bedsLabel}
-                </dt>
-                <dd className="font-display text-2xl text-ink leading-none">
-                  {property.bedrooms}
-                </dd>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                  {copy.bathsLabel}
-                </dt>
-                <dd className="font-display text-2xl text-ink leading-none">
-                  {property.bathrooms}
-                </dd>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                  {copy.sqftLabel}
-                </dt>
-                <dd className="font-display text-2xl text-ink leading-none">
-                  {property.sqft.toLocaleString()}
-                </dd>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                  {copy.yearBuiltLabel}
-                </dt>
-                <dd className="font-display text-2xl text-ink leading-none">
-                  {property.year_built}
-                </dd>
-              </div>
+              {[
+                {
+                  label: copy.bedsLabel,
+                  value: String(property.bedrooms),
+                  icon: (
+                    <>
+                      <path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6" />
+                      <path d="M3 14h18" />
+                      <path d="M7 10V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2" />
+                      <path d="M13 10V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2" />
+                      <path d="M4 18v2M20 18v2" />
+                    </>
+                  ),
+                },
+                {
+                  label: copy.bathsLabel,
+                  value: String(property.bathrooms),
+                  icon: (
+                    <>
+                      <path d="M4 12V6a2 2 0 0 1 3.9-.6" />
+                      <path d="M2 12h20v3a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z" />
+                      <path d="M7 19l-1 2M17 19l1 2" />
+                    </>
+                  ),
+                },
+                {
+                  label: copy.sqftLabel,
+                  value: property.sqft.toLocaleString(),
+                  icon: (
+                    <>
+                      <path d="M3 8V5a2 2 0 0 1 2-2h3" />
+                      <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+                      <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
+                      <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+                    </>
+                  ),
+                },
+                {
+                  label: copy.yearBuiltLabel,
+                  value: String(property.year_built),
+                  icon: (
+                    <>
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M3 10h18M8 2v4M16 2v4" />
+                    </>
+                  ),
+                },
+              ].map((s) => (
+                <div key={s.label} className="flex flex-col gap-2.5">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className="text-gold"
+                  >
+                    {s.icon}
+                  </svg>
+                  <dd className="font-display text-2xl text-ink leading-none">
+                    {s.value}
+                  </dd>
+                  <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                    {s.label}
+                  </dt>
+                </div>
+              ))}
             </dl>
 
             {property.description && (
@@ -342,10 +392,48 @@ export default async function PropertyDetailPage({
               isOwner={isOwner}
               labels={offerCopy}
             />
-            <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed text-center">
-              {BROKERAGE_NAME} ·{" "}
-              {copy.buyerCommissionLabel}: {property.buyer_agent_commission}%
-            </p>
+            <div className="flex flex-col gap-3 border-t border-gold-soft pt-5 text-[11px] leading-relaxed text-ink/75">
+              {[
+                {
+                  text: `${BROKERAGE_NAME} — ${copy.trustLicensed}`,
+                  icon: (
+                    <path d="M12 22s7-3.5 7-9V5.5L12 3 5 5.5V13c0 5.5 7 9 7 9zM9 12l2 2 4-4" />
+                  ),
+                },
+                {
+                  text: copy.trustMls,
+                  icon: <path d="M20 6 9 17l-5-5" />,
+                },
+                {
+                  text: `${copy.buyerCommissionLabel}: ${property.buyer_agent_commission}%`,
+                  icon: (
+                    <>
+                      <line x1="19" y1="5" x2="5" y2="19" />
+                      <circle cx="6.5" cy="6.5" r="2.5" />
+                      <circle cx="17.5" cy="17.5" r="2.5" />
+                    </>
+                  ),
+                },
+              ].map((item) => (
+                <div key={item.text} className="flex items-center gap-2.5">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className="shrink-0 text-gold"
+                  >
+                    {item.icon}
+                  </svg>
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
