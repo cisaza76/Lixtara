@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import {
   PRICING_TIERS,
+  PHOTOGRAPHY_ADDON_PRICE,
   type PricingTierId,
 } from "@/lib/pricing-tiers";
 import {
@@ -122,6 +123,49 @@ export async function createConsultationCheckoutSession(
       user_id: input.userId,
       realtor_hours: String(p.realtorHours),
       attorney_hours: String(p.attorneyHours),
+    },
+    success_url: `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: input.cancelUrl,
+  });
+  if (!session.url) {
+    throw new Error("Stripe returned a session without a redirect URL");
+  }
+  return { sessionId: session.id, url: session.url };
+}
+
+export interface PhotographyCheckoutInput {
+  propertyId: string;
+  userId: string;
+  userEmail: string;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+export async function createPhotographyCheckoutSession(
+  input: PhotographyCheckoutInput,
+): Promise<TierCheckoutResult> {
+  const session = await client().checkout.sessions.create({
+    mode: "payment",
+    customer_email: input.userEmail,
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: PHOTOGRAPHY_ADDON_PRICE * 100,
+          product_data: {
+            name: "Lixtara — Professional photography",
+            description: "Professional listing photography add-on.",
+          },
+        },
+      },
+    ],
+    payment_intent_data: { statement_descriptor_suffix: "PHOTOGRAPHY" },
+    // kind=photography tells the webhook to mark the add-on paid (no listing flip).
+    metadata: {
+      kind: "photography",
+      property_id: input.propertyId,
+      user_id: input.userId,
     },
     success_url: `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: input.cancelUrl,

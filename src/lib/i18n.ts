@@ -461,6 +461,13 @@ const dictionaries = {
         uploadFailed: "Some photos failed to upload. Try again with fewer or smaller files.",
         photoPartialFail: "{failed} of {total} photos couldn't be uploaded — {reason}. The rest were saved; try the failed ones again (often they're too large).",
         photosOptionalPro: "Your plan includes professional photography, so uploading photos here is optional — you can continue without them and our photographer will handle it.",
+        photoAddon: {
+          title: "Add professional photography",
+          body: "Your Essentials plan doesn't include professional photos. Add a professional listing photoshoot for $495 — included free on Pro and Concierge.",
+          cta: "Add photography — $495",
+          redirecting: "Redirecting to checkout…",
+          failed: "Something went wrong. Please try again.",
+        },
         invalidFormat: "Only JPG, PNG, and WebP files are accepted.",
       },
       step4: {
@@ -1528,6 +1535,13 @@ const dictionaries = {
         uploadFailed: "Algunas fotos no se subieron. Intenta de nuevo con menos o más livianas.",
         photoPartialFail: "{failed} de {total} fotos no se pudieron subir — {reason}. El resto se guardó; reintenta las que fallaron (suele ser que pesan demasiado).",
         photosOptionalPro: "Tu plan incluye fotografía profesional, así que subir fotos acá es opcional — podés continuar sin ellas y nuestro fotógrafo se encarga.",
+        photoAddon: {
+          title: "Agrega fotografía profesional",
+          body: "Tu plan Essentials no incluye fotos profesionales. Agrega una sesión profesional para tu listing por $495 — incluida gratis en Pro y Concierge.",
+          cta: "Agregar fotografía — $495",
+          redirecting: "Redirigiendo al pago…",
+          failed: "Algo salió mal. Intenta de nuevo.",
+        },
         invalidFormat: "Solo se aceptan archivos JPG, PNG y WebP.",
       },
       step4: {

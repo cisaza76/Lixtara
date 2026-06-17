@@ -58,6 +58,25 @@ async function fulfillCheckout(
     return;
   }
 
+  // Professional-photography add-on → mark the payment paid. It's an add-on,
+  // NOT the listing flat fee, so we do NOT flip the property's mls_status.
+  if (session.metadata?.kind === "photography") {
+    const piId =
+      typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : session.payment_intent?.id ?? null;
+    const { error } = await supabase
+      .from("payments")
+      .update({
+        status: "succeeded",
+        stripe_payment_intent_id: piId,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("stripe_checkout_session_id", session.id);
+    if (error) console.error("photography payment update failed", error.message);
+    return;
+  }
+
   const sessionId = session.id;
   const paymentIntentId =
     typeof session.payment_intent === "string"
