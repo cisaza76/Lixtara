@@ -224,8 +224,9 @@ const dictionaries = {
       minPhotos: 10,
       step1: {
         title: "Where is your property?",
-        body: "Start typing and pick the address from Google's suggestions — we verify it and capture lat/lng so the map renders right on the listing page.",
+        body: "Enter your property address — pick a Google suggestion if it appears, or just type it in. We place it on the map automatically.",
         streetLabel: "Street address",
+        unitLabel: "Unit / Apt (optional)",
         cityLabel: "City",
         stateLabel: "State",
         zipLabel: "ZIP code",
@@ -1256,8 +1257,9 @@ const dictionaries = {
       minPhotos: 10,
       step1: {
         title: "¿Dónde está tu propiedad?",
-        body: "Empieza a escribir y elige la dirección de las sugerencias de Google — la verificamos y capturamos lat/lng para que el mapa se renderice bien en el listado.",
+        body: "Ingresa la dirección de tu propiedad — elige una sugerencia de Google si aparece, o simplemente escríbela. La ubicamos en el mapa automáticamente.",
         streetLabel: "Dirección",
+        unitLabel: "Unidad / Apto (opcional)",
         cityLabel: "Ciudad",
         stateLabel: "Estado",
         zipLabel: "Código postal",

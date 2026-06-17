@@ -49,6 +49,14 @@ function clampStep(value: number): number {
   return Math.min(Math.max(value, 1), TOTAL_STEPS);
 }
 
+// Strip a trailing unit/apt token so county + comps lookups match the building
+// (the stored address keeps the unit for contracts/forms).
+function baseStreetForLookup(street: string): string {
+  return street
+    .replace(/[,\s]*\b(?:unit|apt|apartment|suite|ste|#)\b.*$/i, "")
+    .trim();
+}
+
 type OccupancyStatus = "vacant" | "owner_occupied" | "tenant_occupied";
 
 interface Draft {
@@ -167,7 +175,7 @@ export default async function ListingNewPage({
         draft.year_built <= new Date().getFullYear();
       if (isMiamiDade && fieldsEmpty) {
         tasks.push(
-          lookupMiamiDadeProperty(draft.address_street, draft.address_zip).then(
+          lookupMiamiDadeProperty(baseStreetForLookup(draft.address_street), draft.address_zip).then(
             (result) => {
               if (result.folio) updates.folio = result.folio;
               if (result.found && result.details) {
@@ -191,7 +199,7 @@ export default async function ListingNewPage({
       if (compsEmpty) {
         tasks.push(
           fetchRentcastEstimate(
-            draft.address_street,
+            baseStreetForLookup(draft.address_street),
             draft.address_city,
             draft.address_state,
             draft.address_zip,
@@ -258,7 +266,8 @@ export default async function ListingNewPage({
 
   async function saveStep1(formData: FormData) {
     "use server";
-    const street = String(formData.get("street") ?? "").trim();
+    const rawStreet = String(formData.get("street") ?? "").trim();
+    const unit = String(formData.get("unit") ?? "").trim();
     const city = String(formData.get("city") ?? "").trim();
     const state = String(formData.get("state") ?? "FL").trim().toUpperCase();
     const zip = String(formData.get("zip") ?? "").trim();
@@ -268,27 +277,28 @@ export default async function ListingNewPage({
     const longitude = lngRaw ? Number.parseFloat(lngRaw) : null;
     const id = String(formData.get("id") ?? "");
 
-    if (!street || !city || !zip) {
+    // Base street without any unit/apt token (for clean geocoding + county
+    // lookup). The STORED street re-appends the unit so contracts and forms
+    // carry the complete address.
+    const baseStreet = rawStreet
+      .replace(/[,\s]*\b(?:unit|apt|apartment|suite|ste|#)\b.*$/i, "")
+      .trim();
+    const street = unit ? `${baseStreet}, Unit ${unit}` : rawStreet;
+
+    if (!baseStreet || !city || !zip) {
       redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=required`);
     }
     if (state !== "FL") {
       redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=fl_only`);
     }
 
-    // Address verification: client autocomplete sets lat/lng when the seller
-    // picks a Google Places suggestion. If that didn't happen (Maps script
-    // failed, async timing, the seller didn't click a suggestion) we fall
-    // back to a server-side geocode — same Google API, just from our side.
-    // Only reject when BOTH paths fail to produce coords OR Google explicitly
-    // says the address doesn't exist.
-    const check = await validateUsAddress(street, city, state, zip);
-    if (!check.ok) {
-      redirect(
-        `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=address_invalid`,
-      );
-    }
-    // Prefer client-supplied coords (the seller actually picked a Places
-    // suggestion); otherwise use whatever the server geocode returned.
+    // Geocoding is BEST-EFFORT only — it drops a map pin, it NEVER gates the
+    // seller's progress. Google Maps can be unavailable (referrer-restricted
+    // key, quota, network) and a real seller must always be able to type their
+    // address and continue. Prefer client coords (seller picked a Places
+    // suggestion); otherwise a server geocode of the base street; otherwise
+    // null (the listing simply has no precise pin yet — fixable later).
+    const check = await validateUsAddress(baseStreet, city, state, zip);
     const finalLat =
       latitude !== null && Number.isFinite(latitude)
         ? latitude
@@ -297,14 +307,6 @@ export default async function ListingNewPage({
       longitude !== null && Number.isFinite(longitude)
         ? longitude
         : (check.lng ?? null);
-    if (finalLat === null || finalLng === null) {
-      // No coords from either path means the address can't be placed on a
-      // map — block, with the same "Address not found" message that prompts
-      // the seller to re-type and pick a suggestion.
-      redirect(
-        `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=address_invalid`,
-      );
-    }
 
     const supabase = await createClient();
     const {
@@ -551,7 +553,7 @@ export default async function ListingNewPage({
     if (!row) return;
     // Force a fresh fetch (the default flow only fetches once, for determinism).
     const rc = await fetchRentcastEstimate(
-      row.address_street,
+      baseStreetForLookup(row.address_street),
       row.address_city,
       row.address_state,
       row.address_zip,
@@ -627,7 +629,7 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
     }
 
-    const result = await lookupMiamiDadeProperty(row.address_street, row.address_zip);
+    const result = await lookupMiamiDadeProperty(baseStreetForLookup(row.address_street), row.address_zip);
     if (!result.found || !result.details) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=notfound`);
     }
@@ -1110,6 +1112,7 @@ export default async function ListingNewPage({
             )}
             <AddressAutocomplete
               streetLabel={copy.step1.streetLabel}
+              unitLabel={copy.step1.unitLabel}
               cityLabel={copy.step1.cityLabel}
               stateLabel={copy.step1.stateLabel}
               zipLabel={copy.step1.zipLabel}
