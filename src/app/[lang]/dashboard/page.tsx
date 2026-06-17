@@ -220,6 +220,11 @@ export default async function DashboardPage({
   const buyerCopy = t(lang).dashboardBuyer;
   const hasBuyerActivity = offers.length > 0 || savedIds.length > 0;
 
+  // Portfolio metrics (derived from the listings already fetched — no extra query).
+  const activeCount = listings.filter((l) => l.mls_status === "active").length;
+  const draftCount = listings.filter((l) => l.mls_status === "draft").length;
+  const portfolioValue = listings.reduce((sum, l) => sum + (l.list_price ?? 0), 0);
+
   return (
     <main className="bg-background text-foreground flex-1 flex flex-col">
       <section className="mx-auto w-full max-w-7xl px-6 lg:px-12 pt-12 pb-20 lg:pt-16 lg:pb-28">
@@ -263,6 +268,56 @@ export default async function DashboardPage({
             </Link>
           </div>
         ) : (
+          <>
+          {/* Portfolio metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 lg:mb-10">
+            {[
+              { label: copy.statsActive, value: String(activeCount) },
+              { label: copy.statsDrafts, value: String(draftCount) },
+              { label: copy.statsValue, value: formatPrice(portfolioValue) },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="flex flex-col gap-1.5 border border-gold-soft bg-ivory-strong/30 p-5"
+              >
+                <span className="font-display text-2xl leading-none text-ink lg:text-3xl">
+                  {s.value}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {s.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* AI value message */}
+          <div className="mb-8 flex flex-col gap-4 border border-gold-soft bg-ink p-6 text-ivory sm:flex-row sm:items-center sm:justify-between lg:mb-10 lg:px-8">
+            <div className="flex items-start gap-4">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                className="mt-0.5 shrink-0 text-gold"
+              >
+                <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
+              </svg>
+              <div className="flex flex-col gap-1">
+                <p className="font-display text-lg text-ivory">{copy.aiTitle}</p>
+                <p className="max-w-xl text-sm leading-relaxed text-ivory/70">
+                  {copy.aiBody}
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/${lang}/listing/new`}
+              className="inline-flex shrink-0 items-center justify-center bg-gold px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink transition-colors hover:bg-gold/90"
+            >
+              {copy.aiCta} →
+            </Link>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {listings.map((l) => {
               const photo = photoByProperty.get(l.id);
@@ -284,7 +339,7 @@ export default async function DashboardPage({
               return (
                 <div
                   key={l.id}
-                  className="flex flex-col gap-4 border border-gold-soft bg-ivory overflow-hidden"
+                  className="flex flex-col gap-4 overflow-hidden border border-gold-soft bg-ivory transition-all duration-300 hover:-translate-y-0.5 hover:border-gold/50 hover:shadow-[0_22px_44px_-26px_rgba(28,28,28,0.32)]"
                 >
                   <div className="aspect-[16/10] bg-ivory-strong relative">
                     {photo ? (
@@ -370,6 +425,7 @@ export default async function DashboardPage({
               );
             })}
           </div>
+          </>
         )}
 
         {/* Buyer-side sections — only render if the user has activity here. */}
