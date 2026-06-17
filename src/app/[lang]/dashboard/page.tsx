@@ -36,6 +36,14 @@ interface AgreementRow {
   status: string;
 }
 
+interface OfferRow {
+  id: string;
+  property_id: string;
+  offer_amount: number;
+  status: string;
+  created_at: string;
+}
+
 function paymentLabel(
   payments: PaymentRow[],
   copy: ReturnType<typeof t>["dashboard"],
@@ -158,20 +166,39 @@ export default async function DashboardPage({
     agreementsByProperty.set(a.property_id, arr);
   }
   // Buyer side: offers I've made + saved properties.
-  const [{ data: myOffers }, { data: savedRows }] = await Promise.all([
-    supabase
-      .from("offers")
-      .select("id,property_id,offer_amount,status,created_at")
-      .eq("buyer_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("saved_properties")
-      .select("property_id,created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50),
-  ]);
+  // Seller side: offers received on my listings (RLS: "offers seller select").
+  const [{ data: myOffers }, { data: savedRows }, { data: receivedRows }] =
+    await Promise.all([
+      supabase
+        .from("offers")
+        .select("id,property_id,offer_amount,status,created_at")
+        .eq("buyer_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("saved_properties")
+        .select("property_id,created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      ids.length > 0
+        ? supabase
+            .from("offers")
+            .select("id,property_id,offer_amount,status,created_at")
+            .eq("seller_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(50)
+        : Promise.resolve({ data: [] as OfferRow[] }),
+    ]);
+  const receivedOffers = (receivedRows ?? []) as OfferRow[];
+  const offerCountByProperty = new Map<string, number>();
+  for (const o of receivedOffers) {
+    offerCountByProperty.set(
+      o.property_id,
+      (offerCountByProperty.get(o.property_id) ?? 0) + 1,
+    );
+  }
+  const listingById = new Map(listings.map((l) => [l.id, l] as const));
   const offers = (myOffers ?? []) as Array<{
     id: string;
     property_id: string;
@@ -270,11 +297,12 @@ export default async function DashboardPage({
         ) : (
           <>
           {/* Portfolio metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 lg:mb-10">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 lg:mb-10">
             {[
               { label: copy.statsActive, value: String(activeCount) },
               { label: copy.statsDrafts, value: String(draftCount) },
               { label: copy.statsValue, value: formatPrice(portfolioValue) },
+              { label: copy.statsOffers, value: String(receivedOffers.length) },
             ].map((s) => (
               <div
                 key={s.label}
@@ -362,6 +390,13 @@ export default async function DashboardPage({
                         {status.text}
                       </span>
                     </div>
+                    {(offerCountByProperty.get(l.id) ?? 0) > 0 && (
+                      <div className="absolute top-3 right-3">
+                        <span className="inline-block bg-gold px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink">
+                          {offerCountByProperty.get(l.id)} {copy.offersUnit}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-4 px-5 pb-5">
@@ -426,6 +461,67 @@ export default async function DashboardPage({
             })}
           </div>
           </>
+        )}
+
+        {/* Seller: offers received on my listings */}
+        {receivedOffers.length > 0 && (
+          <div className="mt-16 lg:mt-24">
+            <h2 className="font-display text-2xl text-ink mb-6 border-b border-gold-soft pb-3">
+              {copy.statsOffers}
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-ink/55 border-b border-gold-soft">
+                    <th className="py-3 pr-4">{buyerCopy.offerSubmitted}</th>
+                    <th className="py-3 pr-4">{buyerCopy.offerProperty}</th>
+                    <th className="py-3 pr-4">{buyerCopy.offerAmount}</th>
+                    <th className="py-3">{buyerCopy.offerStatus}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receivedOffers.map((o) => {
+                    const prop = listingById.get(o.property_id);
+                    return (
+                      <tr key={o.id} className="border-b border-gold-soft/50">
+                        <td className="py-3 pr-4 text-ink/70 text-xs whitespace-nowrap">
+                          {new Date(o.created_at).toLocaleDateString(lang, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </td>
+                        <td className="py-3 pr-4 text-ink text-xs">
+                          {prop
+                            ? `${prop.address_street}, ${prop.address_city}, ${prop.address_state}`
+                            : o.property_id.slice(0, 8)}
+                        </td>
+                        <td className="py-3 pr-4 font-display text-base text-ink whitespace-nowrap">
+                          <span className="text-gold text-xs align-top">$</span>
+                          {o.offer_amount.toLocaleString()}
+                        </td>
+                        <td className="py-3">
+                          <span
+                            className={`inline-block text-[9px] uppercase tracking-[0.18em] px-2.5 py-1 border ${
+                              o.status === "accepted"
+                                ? "border-gold bg-gold/5 text-ink"
+                                : o.status === "rejected" ||
+                                    o.status === "withdrawn" ||
+                                    o.status === "expired"
+                                  ? "border-red-300 bg-red-50 text-red-800"
+                                  : "border-gold-soft bg-ivory-strong/40 text-ink/70"
+                            }`}
+                          >
+                            {o.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* Buyer-side sections — only render if the user has activity here. */}
