@@ -8,6 +8,7 @@ import {
   CONSULTATION_PRODUCTS,
   type ConsultationProduct,
 } from "@/lib/consultations";
+import { STAGING_OVERAGE_PRICE, STAGING_MAX_PURCHASE } from "@/lib/staging";
 
 function apiKey(): string {
   const k = process.env.STRIPE_SECRET_KEY;
@@ -166,6 +167,51 @@ export async function createPhotographyCheckoutSession(
       kind: "photography",
       property_id: input.propertyId,
       user_id: input.userId,
+    },
+    success_url: `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: input.cancelUrl,
+  });
+  if (!session.url) {
+    throw new Error("Stripe returned a session without a redirect URL");
+  }
+  return { sessionId: session.id, url: session.url };
+}
+
+export interface StagingOverageCheckoutInput {
+  /** number of extra staging actions to buy ($STAGING_OVERAGE_PRICE each) */
+  quantity: number;
+  userId: string;
+  userEmail: string;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+export async function createStagingOverageCheckoutSession(
+  input: StagingOverageCheckoutInput,
+): Promise<TierCheckoutResult> {
+  const qty = Math.max(1, Math.min(STAGING_MAX_PURCHASE, Math.floor(input.quantity)));
+  const session = await client().checkout.sessions.create({
+    mode: "payment",
+    customer_email: input.userEmail,
+    line_items: [
+      {
+        quantity: qty,
+        price_data: {
+          currency: "usd",
+          unit_amount: STAGING_OVERAGE_PRICE * 100,
+          product_data: {
+            name: "Lixtara — AI virtual staging (extra room)",
+            description: "One additional AI-staged photo beyond your free quota.",
+          },
+        },
+      },
+    ],
+    payment_intent_data: { statement_descriptor_suffix: "STAGING" },
+    // kind=staging_overage tells the webhook to grant `credits` staging credits.
+    metadata: {
+      kind: "staging_overage",
+      user_id: input.userId,
+      credits: String(qty),
     },
     success_url: `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: input.cancelUrl,

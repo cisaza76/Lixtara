@@ -24,6 +24,13 @@ export function isStagingStyle(v: string): v is StagingStyle {
   return (STAGING_STYLES as string[]).includes(v);
 }
 
+// Overage billing: each listing gets STAGING_FREE_QUOTA free staged photos;
+// beyond that the seller buys credits at STAGING_OVERAGE_PRICE (USD) per action.
+// STAGING_MAX_PURCHASE caps a single credit purchase.
+export const STAGING_FREE_QUOTA = 5;
+export const STAGING_OVERAGE_PRICE = 5;
+export const STAGING_MAX_PURCHASE = 30;
+
 // Each prompt ends with the same "preserve architecture" tail so the model
 // is consistently constrained. Only the furniture style changes.
 const ARCH_TAIL =

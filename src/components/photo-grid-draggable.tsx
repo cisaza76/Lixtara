@@ -38,6 +38,10 @@ interface PhotoGridDraggableProps {
     styleMinimalist: string;
     styleTraditional: string;
     styleWarm: string;
+    creditsTitle: string;
+    creditsBody: string;
+    creditsCta: string;
+    creditsRedirecting: string;
   };
 }
 
@@ -53,7 +57,31 @@ export function PhotoGridDraggable({
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [stagingInFlight, setStagingInFlight] = useState<Set<string>>(new Set());
   const [stagingError, setStagingError] = useState<string | null>(null);
+  const [needsCredits, setNeedsCredits] = useState(false);
+  const [buyingCredits, setBuyingCredits] = useState(false);
   const [, startTransition] = useTransition();
+
+  async function handleBuyCredits() {
+    setBuyingCredits(true);
+    try {
+      const lang =
+        window.location.pathname.split("/")[1] === "es" ? "es" : "en";
+      const res = await fetch("/api/checkout/staging-overage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ property_id: propertyId, quantity: 1, lang }),
+      });
+      if (res.status === 401) {
+        window.location.href = `/${lang}/sign-in`;
+        return;
+      }
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error ?? "no_url");
+      window.location.href = data.url;
+    } catch {
+      setBuyingCredits(false);
+    }
+  }
 
   const styleLabel: Record<StagingStyle, string> = {
     modern: labels.styleModern,
@@ -107,6 +135,7 @@ export function PhotoGridDraggable({
   async function handleStage(photoId: string, style: StagingStyle) {
     setPickerFor(null);
     setStagingError(null);
+    setNeedsCredits(false);
     setStagingInFlight((s) => new Set(s).add(photoId));
     try {
       const res = await fetch("/api/staging/generate", {
@@ -123,6 +152,11 @@ export function PhotoGridDraggable({
         };
         error?: string;
       };
+      // Free quota used up → prompt to buy credits instead of erroring.
+      if (res.status === 402 || data.error === "staging_payment_required") {
+        setNeedsCredits(true);
+        return;
+      }
       if (!res.ok || !data.photo) {
         throw new Error(data.error ?? "stage_failed");
       }
@@ -159,6 +193,24 @@ export function PhotoGridDraggable({
         <p className="text-xs text-red-700 italic font-mono break-all">
           {stagingError}
         </p>
+      )}
+      {needsCredits && (
+        <div className="flex flex-col gap-2 border border-gold bg-gold/5 p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+            {labels.creditsTitle}
+          </p>
+          <p className="text-sm leading-relaxed text-ink/80">
+            {labels.creditsBody}
+          </p>
+          <button
+            type="button"
+            onClick={handleBuyCredits}
+            disabled={buyingCredits}
+            className="mt-1 inline-flex items-center justify-center self-start bg-ink px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-ivory transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {buyingCredits ? labels.creditsRedirecting : labels.creditsCta}
+          </button>
+        </div>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {photos.map((photo) => {

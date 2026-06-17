@@ -16,7 +16,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { startImageEdit, waitForCompletion } from "@/lib/luma";
-import { promptFor, isStagingStyle } from "@/lib/staging";
+import {
+  promptFor,
+  isStagingStyle,
+  STAGING_FREE_QUOTA,
+  STAGING_OVERAGE_PRICE,
+} from "@/lib/staging";
+import { getStagingBalance, consumeStagingCredit } from "@/lib/staging-credits";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 
 const BUCKET = "property-photos";
@@ -83,6 +89,31 @@ export async function POST(req: Request) {
     );
   }
 
+  // Quota: STAGING_FREE_QUOTA free staged photos per listing. Beyond that the
+  // action requires a purchased credit ($STAGING_OVERAGE_PRICE each). Check
+  // availability BEFORE spending Luma credits; only consume AFTER a successful
+  // generation so failures are never charged.
+  const svc = serviceClient();
+  const { count: stagedCount } = await svc
+    .from("property_photos")
+    .select("id", { count: "exact", head: true })
+    .eq("property_id", photo.property_id)
+    .eq("is_staged", true);
+  const isOverage = (stagedCount ?? 0) >= STAGING_FREE_QUOTA;
+  if (isOverage) {
+    const balance = await getStagingBalance(svc, user.id);
+    if (balance.remaining <= 0) {
+      return NextResponse.json(
+        {
+          error: "staging_payment_required",
+          free_quota: STAGING_FREE_QUOTA,
+          price_per_action: STAGING_OVERAGE_PRICE,
+        },
+        { status: 402 },
+      );
+    }
+  }
+
   // 1. Submit to Luma + wait for the edited image URL.
   let resultUrl: string;
   try {
@@ -122,7 +153,6 @@ export async function POST(req: Request) {
   // 3. Upload to our public bucket + create property_photos row.
   // Use service client because user-scoped RLS doesn't let us insert rows
   // with is_staged=true (admin gate); this is server-side, post-auth.
-  const svc = serviceClient();
   const ext = contentType.includes("png") ? "png" : "jpg";
   const storagePath = `${photo.property_id}/staged-${crypto.randomUUID()}.${ext}`;
   const { error: upErr } = await svc.storage
@@ -155,6 +185,11 @@ export async function POST(req: Request) {
       { error: "db_insert_failed", detail: insErr?.message ?? "no row" },
       { status: 502 },
     );
+  }
+
+  // Charge the overage credit only now that the staged photo exists.
+  if (isOverage) {
+    await consumeStagingCredit(svc, user.id);
   }
 
   return NextResponse.json({ photo: inserted, style });
