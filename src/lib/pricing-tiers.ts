@@ -34,6 +34,10 @@ export const TRADITIONAL_COSTS = {
   docContracts: 40,
 } as const;
 
+// Standalone professional-photography add-on (USD). Included in Pro/Concierge;
+// sellers on Essentials can purchase it separately. Single source of truth.
+export const PHOTOGRAPHY_ADDON_PRICE = 495;
+
 export const TIER_ORDER: PricingTierId[] = ["essentials", "pro", "concierge"];
 
 export const DEFAULT_TIER: PricingTierId = "pro";

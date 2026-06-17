@@ -28,6 +28,7 @@ import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { validateUsAddress } from "@/lib/geocode";
 import { TourCoaching } from "@/components/tour-coaching";
+import { PhotographyCheckoutButton } from "@/components/photography-checkout-button";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { OccupancySection } from "@/components/occupancy-section";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
@@ -1813,6 +1814,29 @@ export default async function ListingNewPage({
             <p className="text-xs text-ink/70 italic border border-gold-soft bg-ivory-strong/40 p-3">
               {copy.step5.photosOptionalPro}
             </p>
+          )}
+
+          {/* Essentials: optional professional-photography add-on ($495) */}
+          {draft?.pricing_tier === "essentials" && draftId && (
+            <div className="border border-gold-soft bg-ivory-strong/30 p-5 flex flex-col gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                {copy.step5.photoAddon.title}
+              </p>
+              <p className="text-sm text-ink/80 leading-relaxed">
+                {copy.step5.photoAddon.body}
+              </p>
+              <div className="border-t border-gold-soft pt-3">
+                <PhotographyCheckoutButton
+                  propertyId={draftId}
+                  lang={lang}
+                  label={copy.step5.photoAddon.cta}
+                  labels={{
+                    redirecting: copy.step5.photoAddon.redirecting,
+                    failed: copy.step5.photoAddon.failed,
+                  }}
+                />
+              </div>
+            </div>
           )}
 
           {/* Upload form — direct-to-Supabase to bypass Vercel 4.5MB cap */}
