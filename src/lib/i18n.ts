@@ -592,6 +592,7 @@ const dictionaries = {
       countSuffixMany: "listings",
       card: {
         viewDetails: "View details",
+        forSale: "For sale",
         bedsShort: "bd",
         bathsShort: "ba",
         sqftSuffix: "sqft",
@@ -1625,6 +1626,7 @@ const dictionaries = {
       countSuffixMany: "listings",
       card: {
         viewDetails: "Ver detalles",
+        forSale: "En venta",
         bedsShort: "hab",
         bathsShort: "ba",
         sqftSuffix: "sqft",
