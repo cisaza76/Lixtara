@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale",
+      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description",
     )
     .eq("id", propertyId)
     .eq("owner_id", user.id)
@@ -144,29 +144,79 @@ export async function POST(req: Request) {
 
       const fullAddress = `${property.address_street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
 
+      // Formatters so every value lands human-readable on the contract.
+      const yn = (v: unknown) => (v === true ? "Yes" : v === false ? "No" : "");
+      const money = (v: unknown) =>
+        v != null && Number.isFinite(Number(v)) && Number(v) > 0
+          ? `$${Number(v).toLocaleString()}`
+          : "";
+      const num = (v: unknown) =>
+        v != null && Number.isFinite(Number(v)) ? Number(v).toLocaleString() : "";
+      const PROPERTY_TYPE_LABEL: Record<string, string> = {
+        single_family: "Single Family",
+        condo: "Condominium",
+        townhouse: "Townhouse",
+        multi_family: "Multi-Family",
+      };
+      const OCCUPANCY_LABEL: Record<string, string> = {
+        vacant: "Vacant",
+        owner_occupied: "Owner-occupied",
+        tenant_occupied: "Tenant-occupied",
+      };
+
+      // EVERY seller-entered + Miami-Dade-sourced field is sent so the contract
+      // reaches the seller fully pre-populated — only awaiting signature.
+      // DocuSign silently ignores any tabLabel the template doesn't bind, so
+      // the template must define a text field per label below to display it.
+      // Keep this list in sync with scripts/check-docusign-template.ts.
       const tabs: Record<string, string> = {
-        // Property
+        // ── Property: identity ──
         street_address: fullAddress,
+        city: property.address_city ?? "",
+        state: property.address_state ?? "",
+        zip: property.address_zip ?? "",
+        folio: property.folio ?? "",
         legal_description: property.legal_description ?? "",
-        list_price: `$${property.list_price.toLocaleString()}`,
-        // Property details (auto-filled so the contract reaches the seller
-        // pre-populated, only awaiting signature). DocuSign silently ignores
-        // any tabLabel the template doesn't bind, so adding these is safe.
+        property_type:
+          PROPERTY_TYPE_LABEL[property.property_type ?? ""] ??
+          property.property_type ??
+          "",
+        // ── Property: characteristics ──
         bedrooms: property.bedrooms != null ? String(property.bedrooms) : "",
         bathrooms: property.bathrooms != null ? String(property.bathrooms) : "",
-        sqft: property.sqft != null ? property.sqft.toLocaleString() : "",
-        year_built: property.year_built != null ? String(property.year_built) : "",
-        pool: property.has_pool ? "Yes" : "No",
-        cash_only: property.cash_only ? "Yes" : "No",
-        as_is_sale: property.as_is_sale ? "Yes" : "No",
-        // Parties
+        sqft: num(property.sqft),
+        lot_size: num(property.lot_size),
+        year_built:
+          property.year_built != null ? String(property.year_built) : "",
+        parking_spaces:
+          property.parking_spaces != null
+            ? String(property.parking_spaces)
+            : "",
+        pool: yn(property.has_pool),
+        flood_zone: property.flood_zone ?? "",
+        property_description: property.description ?? "",
+        // ── Financial ──
+        list_price: `$${property.list_price.toLocaleString()}`,
+        hoa_fee: money(property.hoa_fee),
+        tax_annual: money(property.tax_annual_amount),
+        cash_only: yn(property.cash_only),
+        as_is_sale: yn(property.as_is_sale),
+        // ── Occupancy / tenancy ──
+        occupancy_status:
+          OCCUPANCY_LABEL[property.occupancy_status ?? ""] ??
+          property.occupancy_status ??
+          "",
+        monthly_rent: money(property.monthly_rent),
+        lease_end_date: property.lease_end_date ?? "",
+        tenant_cooperation: property.tenant_cooperation ?? "",
+        // ── Parties ──
         seller_name: signerName,
         broker_name: BROKERAGE_LICENSED_ENTITY,
-        // Economics
+        // ── Economics (Lixtara plan) ──
         flat_fee: `$${tier.flatFee}`,
         commission_pct: `${tier.commissionPct}%`,
         buyer_agent_commission: `${buyerPct}%`,
-        // Term
+        // ── Term ──
         start_date: startDate,
         termination_date: terminationDateStr,
       };
