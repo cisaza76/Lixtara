@@ -798,6 +798,33 @@ const dictionaries = {
       stagingShowcaseDisclaimer:
         "Illustrative examples of Lixtara AI staging. Staged images are always labeled; original photos available on request.",
     },
+    services: {
+      eyebrow: "Services",
+      titleBefore: "Everything you need, ",
+      titleAccent: "à la carte",
+      titleAfter: ".",
+      body: "Add the help you want — nothing you don't. Every Lixtara service complements your flat-fee listing.",
+      items: [
+        {
+          name: "Professional photography",
+          price: "$495",
+          body: "A professional listing photoshoot — included free on Pro and Concierge, or add it to any listing.",
+          cta: "Add in your listing",
+        },
+        {
+          name: "Broker & attorney consultations",
+          price: "From $150/hr",
+          body: "On-demand time with a licensed Florida realtor ($150/hr) or a real-estate attorney ($450/hr). Buy hour packages as you need them.",
+          cta: "Book a consultation",
+        },
+        {
+          name: "AI virtual staging",
+          price: "5 free, then $5/room",
+          body: "Furnish empty rooms with photorealistic AI staging so buyers can picture the space. Five free per listing, then $5 per room.",
+          cta: "Stage in your listing",
+        },
+      ],
+    },
     comingSoon: {
       titleBefore: "Coming ",
       titleAccent: "soon",
@@ -1877,6 +1904,33 @@ const dictionaries = {
       stagingStyleModern: "Moderno contemporáneo",
       stagingShowcaseDisclaimer:
         "Ejemplos ilustrativos del staging IA de Lixtara. Las imágenes amobladas siempre se etiquetan; las fotos originales disponibles a solicitud.",
+    },
+    services: {
+      eyebrow: "Servicios",
+      titleBefore: "Todo lo que necesitas, ",
+      titleAccent: "a la carta",
+      titleAfter: ".",
+      body: "Agrega la ayuda que quieras — nada que no. Cada servicio de Lixtara complementa tu listing de tarifa plana.",
+      items: [
+        {
+          name: "Fotografía profesional",
+          price: "$495",
+          body: "Una sesión profesional para tu listing — incluida gratis en Pro y Concierge, o agrégala a cualquier listing.",
+          cta: "Agregar en tu listing",
+        },
+        {
+          name: "Consultas con broker y abogado",
+          price: "Desde $150/hr",
+          body: "Tiempo on-demand con un realtor licenciado de Florida ($150/hr) o un abogado de bienes raíces ($450/hr). Compra paquetes de horas según los necesites.",
+          cta: "Reservar consulta",
+        },
+        {
+          name: "Staging virtual con IA",
+          price: "5 gratis, luego $5/cuarto",
+          body: "Amuebla cuartos vacíos con staging IA fotorrealista para que los compradores imaginen el espacio. Cinco gratis por listing, luego $5 por cuarto.",
+          cta: "Amoblar en tu listing",
+        },
+      ],
     },
     comingSoon: {
       titleBefore: "Muy ",
