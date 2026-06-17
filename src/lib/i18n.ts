@@ -474,6 +474,12 @@ const dictionaries = {
           cta: "Buy staging — $5/room",
           redirecting: "Redirecting to checkout…",
         },
+        living: {
+          button: "Cinematic video",
+          generating: "Generating cinematic video… (~2 min)",
+          failed: "Couldn't generate the video. Please try again.",
+          view: "View video",
+        },
         invalidFormat: "Only JPG, PNG, and WebP files are accepted.",
       },
       step4: {
@@ -783,6 +789,13 @@ const dictionaries = {
       tourSoonTitle: "Interactive 3D tours are coming soon",
       tourSoonBody: "We're upgrading our 3D walkthrough technology so buyers will soon be able to explore this home in immersive 3D from any browser.",
       tourSoonBadge: "Coming soon",
+      livingEyebrow: "Living Listing",
+      livingTitle: "This home, in motion",
+      livingBody:
+        "A subtle cinematic pass over the real listing photos — no new rooms, no altered architecture, just gentle motion to bring the space to life.",
+      livingBadge: "AI-generated motion",
+      livingDisclaimer:
+        "AI-generated motion from the original listing photo. No rooms, furniture, or features were added or altered.",
       stagedBadge: "Virtually Staged",
       stagedDisclaimer:
         "Some images on this listing are virtually staged. Original (unstaged) photos available on request.",
@@ -1581,6 +1594,12 @@ const dictionaries = {
           cta: "Comprar staging — $5/cuarto",
           redirecting: "Redirigiendo al pago…",
         },
+        living: {
+          button: "Video cinemático",
+          generating: "Generando video cinemático… (~2 min)",
+          failed: "No se pudo generar el video. Intenta de nuevo.",
+          view: "Ver video",
+        },
         invalidFormat: "Solo se aceptan archivos JPG, PNG y WebP.",
       },
       step4: {
@@ -1890,6 +1909,13 @@ const dictionaries = {
       tourSoonTitle: "Los tours 3D interactivos llegan muy pronto",
       tourSoonBody: "Estamos mejorando nuestra tecnología de recorridos 3D para que pronto los compradores puedan explorar esta casa en 3D inmersivo desde cualquier navegador.",
       tourSoonBadge: "Muy pronto",
+      livingEyebrow: "Living Listing",
+      livingTitle: "Esta casa, en movimiento",
+      livingBody:
+        "Un sutil recorrido cinemático sobre las fotos reales del inmueble — sin habitaciones nuevas ni arquitectura alterada, solo un movimiento suave que da vida al espacio.",
+      livingBadge: "Movimiento generado con IA",
+      livingDisclaimer:
+        "Movimiento generado con IA a partir de la foto original. No se agregaron ni alteraron habitaciones, muebles ni elementos.",
       stagedBadge: "Amoblada Virtualmente",
       stagedDisclaimer:
         "Algunas imágenes de este listing están amobladas virtualmente. Las originales (sin amoblar) están disponibles a solicitud.",

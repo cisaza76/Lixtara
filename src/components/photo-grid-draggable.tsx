@@ -42,6 +42,10 @@ interface PhotoGridDraggableProps {
     creditsBody: string;
     creditsCta: string;
     creditsRedirecting: string;
+    livingButton: string;
+    livingGenerating: string;
+    livingFailed: string;
+    livingView: string;
   };
 }
 
@@ -59,6 +63,52 @@ export function PhotoGridDraggable({
   const [stagingError, setStagingError] = useState<string | null>(null);
   const [needsCredits, setNeedsCredits] = useState(false);
   const [buyingCredits, setBuyingCredits] = useState(false);
+  const [livingInFlight, setLivingInFlight] = useState<Set<string>>(new Set());
+  const [livingVideos, setLivingVideos] = useState<Map<string, string>>(
+    new Map(),
+  );
+  const [livingError, setLivingError] = useState<string | null>(null);
+
+  // "Living Listing": turn a real photo into a subtle cinematic clip via Veo.
+  // Synchronous engine → the request blocks ~1-3 min; show a generating state.
+  async function handleLivingVideo(photoId: string) {
+    setLivingError(null);
+    setLivingInFlight((s) => new Set(s).add(photoId));
+    try {
+      const res = await fetch("/api/tours/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ property_id: propertyId, photo_id: photoId }),
+      });
+      if (res.status === 401) {
+        const lang =
+          window.location.pathname.split("/")[1] === "es" ? "es" : "en";
+        window.location.assign(`/${lang}/sign-in`);
+        return;
+      }
+      const data = (await res.json()) as {
+        video_url?: string;
+        status?: string;
+        error?: string;
+      };
+      if (!res.ok || data.status !== "ready" || !data.video_url) {
+        throw new Error(data.error ?? data.status ?? "failed");
+      }
+      setLivingVideos((m) => new Map(m).set(photoId, data.video_url as string));
+    } catch (e) {
+      setLivingError(
+        e instanceof Error
+          ? `${labels.livingFailed} (${e.message})`
+          : labels.livingFailed,
+      );
+    } finally {
+      setLivingInFlight((s) => {
+        const n = new Set(s);
+        n.delete(photoId);
+        return n;
+      });
+    }
+  }
   const [, startTransition] = useTransition();
 
   async function handleBuyCredits() {
@@ -194,6 +244,11 @@ export function PhotoGridDraggable({
           {stagingError}
         </p>
       )}
+      {livingError && (
+        <p className="text-xs text-red-700 italic font-mono break-all">
+          {livingError}
+        </p>
+      )}
       {needsCredits && (
         <div className="flex flex-col gap-2 border border-gold bg-gold/5 p-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
@@ -215,6 +270,8 @@ export function PhotoGridDraggable({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {photos.map((photo) => {
           const isStaging = stagingInFlight.has(photo.id);
+          const isLiving = livingInFlight.has(photo.id);
+          const livingUrl = livingVideos.get(photo.id);
           const showPicker = pickerFor === photo.id;
           return (
             <div
@@ -257,6 +314,28 @@ export function PhotoGridDraggable({
                 </div>
               )}
 
+              {isLiving && (
+                <div className="absolute inset-0 flex items-center justify-center bg-ivory/80 pointer-events-none p-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink text-center animate-pulse">
+                    {labels.livingGenerating}
+                  </p>
+                </div>
+              )}
+
+              {livingUrl && (
+                <a
+                  href={livingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 bg-gold px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink"
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M5 3l14 9-14 9V3z" />
+                  </svg>
+                  {labels.livingView}
+                </a>
+              )}
+
               {/* Style picker overlay — shown only when user clicked Stage */}
               {showPicker && !isStaging && (
                 <div className="absolute inset-0 bg-ink/90 p-3 flex flex-col gap-2 justify-center">
@@ -283,8 +362,8 @@ export function PhotoGridDraggable({
                 </div>
               )}
 
-              {/* Hover action bar — Stage + Delete */}
-              {!showPicker && !isStaging && (
+              {/* Hover action bar — Stage + Living video + Delete */}
+              {!showPicker && !isStaging && !isLiving && (
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/90 to-ink/0 p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   {!photo.is_staged && (
                     <button
@@ -296,6 +375,18 @@ export function PhotoGridDraggable({
                         <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
                       </svg>
                       {labels.stageButton}
+                    </button>
+                  )}
+                  {!livingUrl && (
+                    <button
+                      type="button"
+                      onClick={() => handleLivingVideo(photo.id)}
+                      className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-gold"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M5 3l14 9-14 9V3z" />
+                      </svg>
+                      {labels.livingButton}
                     </button>
                   )}
                   <button

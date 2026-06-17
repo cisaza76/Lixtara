@@ -12,8 +12,10 @@ import {
 import { BROKERAGE_NAME, BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { validateUsAddress } from "@/lib/geocode";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { TourComingSoon } from "@/components/tour-coming-soon";
 import { StagingShowcase } from "@/components/staging-showcase";
+import { LivingListingShowcase } from "@/components/living-listing-showcase";
 import { OfferForm } from "@/components/offer-form";
 import { SaveButton } from "@/components/save-button";
 
@@ -99,6 +101,40 @@ export default async function PropertyDetailPage({
     mapLat != null && mapLng != null
       ? mapboxStaticUrl(mapLat, mapLng, 600, 400)
       : null;
+
+  // "Living Listing" clips: ready AI-motion videos for this property. The
+  // tour-videos bucket is private and tour_jobs RLS is owner-only, so a public
+  // viewer can't read them through the normal client — use the service client
+  // (read-only here) to list ready video jobs and sign short-lived playback URLs.
+  const livingVideos: { url: string; poster: string | null }[] = [];
+  {
+    const svcUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const svcKey = process.env.SUPABASE_SECRET_KEY;
+    if (svcUrl && svcKey) {
+      const svc = createServiceClient(svcUrl, svcKey, {
+        auth: { persistSession: false },
+      });
+      const { data: jobs } = await svc
+        .from("tour_jobs")
+        .select("output_path, completed_at")
+        .eq("property_id", property.id)
+        .eq("tour_kind", "video")
+        .eq("status", "ready")
+        .not("output_path", "is", null)
+        .order("completed_at", { ascending: false });
+      const poster = property.photos[0]?.url ?? null;
+      for (const job of jobs ?? []) {
+        const path = job.output_path as string | null;
+        if (!path) continue;
+        const { data: signed } = await svc.storage
+          .from("tour-videos")
+          .createSignedUrl(path, 60 * 60);
+        if (signed?.signedUrl) {
+          livingVideos.push({ url: signed.signedUrl, poster });
+        }
+      }
+    }
+  }
 
   // JSON-LD RealEstateListing schema for SEO.
   const jsonLd = {
@@ -230,6 +266,17 @@ export default async function PropertyDetailPage({
             styleMinimalist: copy.stagingStyleMinimalist,
             styleModern: copy.stagingStyleModern,
             disclaimer: copy.stagingShowcaseDisclaimer,
+          }}
+        />
+
+        <LivingListingShowcase
+          videos={livingVideos}
+          copy={{
+            eyebrow: copy.livingEyebrow,
+            title: copy.livingTitle,
+            body: copy.livingBody,
+            badge: copy.livingBadge,
+            disclaimer: copy.livingDisclaimer,
           }}
         />
 

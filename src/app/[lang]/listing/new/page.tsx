@@ -1907,6 +1907,10 @@ export default async function ListingNewPage({
                   creditsBody: copy.step5.stagingCredits.body,
                   creditsCta: copy.step5.stagingCredits.cta,
                   creditsRedirecting: copy.step5.stagingCredits.redirecting,
+                  livingButton: copy.step5.living.button,
+                  livingGenerating: copy.step5.living.generating,
+                  livingFailed: copy.step5.living.failed,
+                  livingView: copy.step5.living.view,
                 }}
               />
             )}
