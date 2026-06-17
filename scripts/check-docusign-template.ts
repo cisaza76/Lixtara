@@ -70,14 +70,43 @@ import { getAccessToken } from "../src/lib/docusign";
 // The labels POST /api/agreement/create currently sends. Order matches the
 // route handler so the diff at the bottom is easy to scan.
 const SENT_LABELS = [
+  // identity
   "street_address",
+  "city",
+  "state",
+  "zip",
+  "folio",
   "legal_description",
+  "property_type",
+  // characteristics
+  "bedrooms",
+  "bathrooms",
+  "sqft",
+  "lot_size",
+  "year_built",
+  "parking_spaces",
+  "pool",
+  "flood_zone",
+  "property_description",
+  // financial
   "list_price",
+  "hoa_fee",
+  "tax_annual",
+  "cash_only",
+  "as_is_sale",
+  // occupancy / tenancy
+  "occupancy_status",
+  "monthly_rent",
+  "lease_end_date",
+  "tenant_cooperation",
+  // parties
   "seller_name",
   "broker_name",
+  // economics
   "flat_fee",
   "commission_pct",
   "buyer_agent_commission",
+  // term
   "start_date",
   "termination_date",
 ];
