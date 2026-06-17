@@ -468,6 +468,12 @@ const dictionaries = {
           redirecting: "Redirecting to checkout…",
           failed: "Something went wrong. Please try again.",
         },
+        stagingCredits: {
+          title: "Free staging used up",
+          body: "You've used your 5 free AI staging actions for this listing. Buy more at $5 each to keep staging rooms.",
+          cta: "Buy staging — $5/room",
+          redirecting: "Redirecting to checkout…",
+        },
         invalidFormat: "Only JPG, PNG, and WebP files are accepted.",
       },
       step4: {
@@ -1541,6 +1547,12 @@ const dictionaries = {
           cta: "Agregar fotografía — $495",
           redirecting: "Redirigiendo al pago…",
           failed: "Algo salió mal. Intenta de nuevo.",
+        },
+        stagingCredits: {
+          title: "Staging gratis agotado",
+          body: "Usaste tus 5 acciones gratis de staging IA para este listing. Compra más a $5 cada una para seguir amoblando cuartos.",
+          cta: "Comprar staging — $5/cuarto",
+          redirecting: "Redirigiendo al pago…",
         },
         invalidFormat: "Solo se aceptan archivos JPG, PNG y WebP.",
       },

@@ -1903,6 +1903,10 @@ export default async function ListingNewPage({
                   styleMinimalist: copy.step5.styleMinimalist,
                   styleTraditional: copy.step5.styleTraditional,
                   styleWarm: copy.step5.styleWarm,
+                  creditsTitle: copy.step5.stagingCredits.title,
+                  creditsBody: copy.step5.stagingCredits.body,
+                  creditsCta: copy.step5.stagingCredits.cta,
+                  creditsRedirecting: copy.step5.stagingCredits.redirecting,
                 }}
               />
             )}

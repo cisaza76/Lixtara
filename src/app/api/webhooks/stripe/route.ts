@@ -14,6 +14,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { verifyWebhookSignature } from "@/lib/stripe";
 import { sendPaymentReceipt, sendBrokerNewPending } from "@/lib/email";
 import { claimWebhookEvent } from "@/lib/webhook-dedup";
+import { grantStagingCredits } from "@/lib/staging-credits";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -74,6 +75,16 @@ async function fulfillCheckout(
       })
       .eq("stripe_checkout_session_id", session.id);
     if (error) console.error("photography payment update failed", error.message);
+    return;
+  }
+
+  // AI staging overage → grant the purchased credits to the user's wallet.
+  if (session.metadata?.kind === "staging_overage") {
+    const userId = session.metadata?.user_id ?? null;
+    const credits = Number(session.metadata?.credits ?? 0);
+    if (userId && credits > 0) {
+      await grantStagingCredits(supabase, userId, credits);
+    }
     return;
   }
 
