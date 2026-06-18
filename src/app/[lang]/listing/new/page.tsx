@@ -192,6 +192,12 @@ export default async function ListingNewPage({
                   updates.property_type = d.property_type;
                 if (d.legal_description != null)
                   updates.legal_description = d.legal_description;
+                // Estimated annual tax — only when the seller hasn't entered one.
+                if (
+                  d.tax_annual_amount != null &&
+                  draft?.tax_annual_amount == null
+                )
+                  updates.tax_annual_amount = d.tax_annual_amount;
               }
             },
           ),
@@ -669,6 +675,8 @@ export default async function ListingNewPage({
     if (d.property_type != null) update.property_type = d.property_type;
     if (d.legal_description != null)
       update.legal_description = d.legal_description;
+    if (d.tax_annual_amount != null)
+      update.tax_annual_amount = d.tax_annual_amount;
 
     const filledCount = Object.keys(update).length;
     if (filledCount === 0) {
@@ -1591,6 +1599,7 @@ export default async function ListingNewPage({
                       ? String(draft.tax_annual_amount)
                       : ""
                   }
+                  help={copy.step3.taxEstimateHint}
                 />
               </div>
 
