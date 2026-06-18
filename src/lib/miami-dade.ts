@@ -19,6 +19,47 @@ export interface MiamiDadeDetails {
   property_type: string | null;
   /** Full county legal description (used to auto-fill the listing agreement) */
   legal_description: string | null;
+  /**
+   * ESTIMATED annual property tax (USD), derived from the county's most recent
+   * taxable value × an aggregate Miami-Dade millage (~2%). The Property
+   * Appraiser exposes taxable value but not the actual tax bill (that lives in
+   * the Cloudflare-gated Tax Collector). Mirrors the PA site's "estimated
+   * taxes" — always shown to the seller as an estimate to verify and edit.
+   */
+  tax_annual_amount: number | null;
+}
+
+// Aggregate Miami-Dade millage as a fraction of taxable value (~20 mills).
+// The exact rate varies by municipality and year; 2% is the countywide
+// approximation the Property Appraiser uses for its own tax estimate. Any
+// autofilled value is labeled "estimated" and the seller can correct it.
+const MIAMI_DADE_EST_MILLAGE_RATE = 0.02;
+
+// Pull the most-recent-year taxable value from the GetPropertySearchByFolio
+// payload, preferring the county taxable value, then the assessed/total value.
+function latestTaxableValue(json: Record<string, unknown>): number | null {
+  const pickLatest = (
+    arr: Array<Record<string, unknown>> | undefined,
+    keys: string[],
+  ): number | null => {
+    if (!arr || arr.length === 0) return null;
+    const latest = arr
+      .slice()
+      .sort((a, b) => Number(b.Year ?? 0) - Number(a.Year ?? 0))[0];
+    for (const k of keys) {
+      const v = Number(latest?.[k] ?? 0);
+      if (Number.isFinite(v) && v > 0) return v;
+    }
+    return null;
+  };
+  const taxable = (json?.Taxable as Record<string, unknown> | undefined)
+    ?.TaxableInfos as Array<Record<string, unknown>> | undefined;
+  const assessment = (json?.Assessment as Record<string, unknown> | undefined)
+    ?.AssessmentInfos as Array<Record<string, unknown>> | undefined;
+  return (
+    pickLatest(taxable, ["CountyTaxableValue", "SchoolTaxableValue"]) ??
+    pickLatest(assessment, ["AssessedValue", "TotalValue"])
+  );
 }
 
 export interface MiamiDadeLookupResult {
@@ -140,6 +181,13 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
       ? legalRaw.trim().replace(/\s*\|\s*/g, "\n")
       : null;
 
+  // Estimated annual tax from the latest taxable value × aggregate millage.
+  const taxableValue = latestTaxableValue(json);
+  const taxAnnualEstimate =
+    taxableValue != null
+      ? Math.round((taxableValue * MIAMI_DADE_EST_MILLAGE_RATE) / 10) * 10
+      : null;
+
   return {
     bedrooms: beds > 0 && beds < 30 ? beds : null,
     bathrooms: totalBaths > 0 && totalBaths < 30 ? totalBaths : null,
@@ -148,6 +196,7 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
     year_built: year > 1800 && year < 2100 ? year : null,
     property_type: mapDorToType(String(info.DORCode ?? dor)),
     legal_description: legalDescription,
+    tax_annual_amount: taxAnnualEstimate,
   };
 }
 
