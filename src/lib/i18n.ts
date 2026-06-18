@@ -348,6 +348,10 @@ const dictionaries = {
         buyer3Recommended: "Recommended",
         buyer3Tip: "Top tier — maximum agent attention, Zillow/Realtor portal prioritization, fastest sale on average.",
         buyerCommissionSelected: "Selected",
+        buyerCommissionLockedTitle: "Fixed at 3% with Concierge",
+        buyerCommissionLockedBody:
+          "Your Concierge plan offers the buyer's agent a competitive 3% commission — included and locked for this listing, so it's one less decision for you. This rate carries through to your agreement automatically.",
+        buyerCommissionLockedBadge: "Locked",
         buyerCommissionRequired: "Pick a buyer-agent commission before continuing.",
         costEyebrow: "Cost breakdown",
         costToday: "Today (subscription)",
@@ -1486,6 +1490,10 @@ const dictionaries = {
         buyer3Recommended: "Recomendado",
         buyer3Tip: "Top tier — máxima atención de agentes, prioridad en portales Zillow/Realtor, venta más rápida en promedio.",
         buyerCommissionSelected: "Seleccionado",
+        buyerCommissionLockedTitle: "Fijado en 3% con Concierge",
+        buyerCommissionLockedBody:
+          "Tu plan Concierge ofrece al agente del comprador una comisión competitiva del 3% — incluida y bloqueada para este listing, una decisión menos para ti. Esta tasa pasa automáticamente a tu acuerdo.",
+        buyerCommissionLockedBadge: "Bloqueado",
         buyerCommissionRequired: "Elige una comisión del agente comprador antes de continuar.",
         costEyebrow: "Desglose de costos",
         costToday: "Hoy (subscripción)",
