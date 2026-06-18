@@ -242,6 +242,22 @@ export default async function ListingNewPage({
       photos = (photoRows ?? []) as typeof photos;
     }
 
+    // Concierge locks the buyer-agent commission at 3% (the most competitive
+    // cooperating rate). Persist it server-side at step 6 so it's fixed for the
+    // rest of the flow and reflected everywhere that reads the column.
+    if (
+      step === 6 &&
+      draft &&
+      draft.pricing_tier === "concierge" &&
+      Number(draft.buyer_agent_commission ?? 0) !== 3
+    ) {
+      await supabase
+        .from("properties")
+        .update({ buyer_agent_commission: 3 })
+        .eq("id", draftId);
+      draft = { ...draft, buyer_agent_commission: 3 } as Draft;
+    }
+
     if (step === 7 || step === 8) {
       const { data: agRow } = await supabase
         .from("agreements")
@@ -972,7 +988,7 @@ export default async function ListingNewPage({
   async function setBuyerCommission(formData: FormData) {
     "use server";
     const id = String(formData.get("id") ?? "");
-    const pct = Number(formData.get("buyer_agent_commission") ?? "0");
+    let pct = Number(formData.get("buyer_agent_commission") ?? "0");
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
     if (![2, 2.5, 3].includes(pct)) {
       redirect(`/${lang}/listing/new?step=6&id=${id}&error=invalid_buyer_commission`);
@@ -983,6 +999,15 @@ export default async function ListingNewPage({
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    // Concierge fixes the buyer-agent commission at 3% — ignore any other value.
+    const { data: tierRow } = await supabase
+      .from("properties")
+      .select("pricing_tier")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (tierRow?.pricing_tier === "concierge") pct = 3;
 
     await supabase
       .from("properties")
@@ -1006,10 +1031,16 @@ export default async function ListingNewPage({
     const supabase = await createClient();
     const { data: prop } = await supabase
       .from("properties")
-      .select("buyer_agent_commission")
+      .select("buyer_agent_commission, pricing_tier")
       .eq("id", id)
       .maybeSingle();
-    if (!prop?.buyer_agent_commission || prop.buyer_agent_commission === 0) {
+    // Concierge guarantees 3% even if the seller never touched the picker.
+    if (prop?.pricing_tier === "concierge" && prop.buyer_agent_commission !== 3) {
+      await supabase
+        .from("properties")
+        .update({ buyer_agent_commission: 3 })
+        .eq("id", id);
+    } else if (!prop?.buyer_agent_commission || prop.buyer_agent_commission === 0) {
       redirect(`/${lang}/listing/new?step=6&id=${id}&error=buyer_commission_required`);
     }
 
@@ -2280,6 +2311,50 @@ export default async function ListingNewPage({
 
                 {/* Buyer-agent compensation picker (item 16) */}
                 {(() => {
+                  // Concierge fixes the buyer-agent commission at 3% — show a
+                  // locked tile instead of the picker (item 4).
+                  if (draft.pricing_tier === "concierge") {
+                    return (
+                      <div className="border-t border-gold-soft pt-8 flex flex-col gap-5">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                            {copy.step6.buyerCommissionEyebrow}
+                          </p>
+                          <h3 className="font-display text-2xl text-ink leading-tight">
+                            {copy.step6.buyerCommissionLockedTitle}
+                          </h3>
+                          <p className="text-sm text-ink/70 leading-relaxed">
+                            {copy.step6.buyerCommissionLockedBody}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4 border-2 border-gold bg-gold/10 p-5">
+                          <span className="font-display text-3xl text-ink leading-none">
+                            3%
+                          </span>
+                          <span className="text-xs text-ink/60">
+                            {copy.step6.buyer3Subtitle}
+                          </span>
+                          <span className="ml-auto inline-flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] text-gold font-semibold">
+                            <svg
+                              width="11"
+                              height="11"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <rect x="5" y="11" width="14" height="9" rx="1.5" />
+                              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                            </svg>
+                            {copy.step6.buyerCommissionLockedBadge}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
                   const currentBuyerComm = Number(
                     draft.buyer_agent_commission ?? 0,
                   );
