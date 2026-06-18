@@ -18,6 +18,7 @@ import {
   TIER_ORDER,
   TRADITIONAL_COSTS,
 } from "@/lib/pricing-tiers";
+import { InfoTip } from "@/components/info-tip";
 
 interface SavingsCopy {
   priceLabel: string;
@@ -42,6 +43,16 @@ interface SavingsCopy {
   keyInsight: string;
   howToRead: string;
   howToReadBody: string;
+  infoAriaLabel: string;
+  tipListingFee: string;
+  tipSellerCommission: string;
+  tipPhotos: string;
+  tipDocusign: string;
+  tipUpfrontSubtotal: string;
+  tipBuyerCommission: string;
+  tipClosingSubtotal: string;
+  tipTotal: string;
+  tipSavings: string;
 }
 
 interface SavingsSliderProps {
@@ -226,7 +237,10 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
               </td>
             </tr>
             <tr className="border-t border-gold-soft/60">
-              <td className={labelCell}>{copy.lineListingFee}</td>
+              <td className={labelCell}>
+                {copy.lineListingFee}{" "}
+                <InfoTip label={copy.infoAriaLabel} text={copy.tipListingFee} />
+              </td>
               {columns.map((c) => (
                 <td key={c.key} className={moneyCell}>
                   {usd(c.listingFee)}
@@ -234,7 +248,13 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
               ))}
             </tr>
             <tr className="border-t border-gold-soft/60">
-              <td className={labelCell}>{copy.lineSellerCommission}</td>
+              <td className={labelCell}>
+                {copy.lineSellerCommission}{" "}
+                <InfoTip
+                  label={copy.infoAriaLabel}
+                  text={copy.tipSellerCommission}
+                />
+              </td>
               {columns.map((c) => (
                 <td key={c.key} className={moneyCell}>
                   {usd(c.sellerComm)}
@@ -243,7 +263,10 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
               ))}
             </tr>
             <tr className="border-t border-gold-soft/60">
-              <td className={labelCell}>{copy.linePhotos}</td>
+              <td className={labelCell}>
+                {copy.linePhotos}{" "}
+                <InfoTip label={copy.infoAriaLabel} text={copy.tipPhotos} />
+              </td>
               {columns.map((c) => (
                 <td key={c.key} className={moneyCell}>
                   {c.photos === null ? (
@@ -255,7 +278,10 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
               ))}
             </tr>
             <tr className="border-t border-gold-soft/60">
-              <td className={labelCell}>{copy.lineDocusign}</td>
+              <td className={labelCell}>
+                {copy.lineDocusign}{" "}
+                <InfoTip label={copy.infoAriaLabel} text={copy.tipDocusign} />
+              </td>
               {columns.map((c) => (
                 <td key={c.key} className={moneyCell}>
                   {c.docusign === null ? (
@@ -268,7 +294,11 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
             </tr>
             <tr className="border-t border-gold-soft bg-ivory-strong/20">
               <td className="p-3 text-[10px] uppercase tracking-[0.18em] text-ink/70 font-semibold">
-                {copy.lineUpfrontSubtotal}
+                {copy.lineUpfrontSubtotal}{" "}
+                <InfoTip
+                  label={copy.infoAriaLabel}
+                  text={copy.tipUpfrontSubtotal}
+                />
               </td>
               {columns.map((c) => (
                 <td key={c.key} className="p-3 text-right text-ink font-medium">
@@ -285,7 +315,11 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
             </tr>
             <tr className="border-t border-gold-soft/60">
               <td className={labelCell}>
-                {copy.lineBuyerCommission}
+                {copy.lineBuyerCommission}{" "}
+                <InfoTip
+                  label={copy.infoAriaLabel}
+                  text={copy.tipBuyerCommission}
+                />
                 <span className="block text-[10px] text-ink/45 not-italic mt-0.5">
                   {copy.youSelected} {buyerPct}%
                 </span>
@@ -299,7 +333,11 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
             </tr>
             <tr className="border-t border-gold-soft bg-ivory-strong/20">
               <td className="p-3 text-[10px] uppercase tracking-[0.18em] text-ink/70 font-semibold">
-                {copy.lineClosingSubtotal}
+                {copy.lineClosingSubtotal}{" "}
+                <InfoTip
+                  label={copy.infoAriaLabel}
+                  text={copy.tipClosingSubtotal}
+                />
               </td>
               {columns.map((c) => (
                 <td key={c.key} className="p-3 text-right text-ink font-medium">
@@ -311,7 +349,8 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
             {/* TOTAL */}
             <tr className="border-t-2 border-gold-soft bg-ivory-strong/40">
               <td className="p-3 text-[10px] uppercase tracking-[0.18em] text-ink font-semibold">
-                {copy.lineTotal}
+                {copy.lineTotal}{" "}
+                <InfoTip label={copy.infoAriaLabel} text={copy.tipTotal} />
               </td>
               {columns.map((c) => (
                 <td
@@ -325,7 +364,8 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
             {/* YOU SAVE */}
             <tr className="border-t border-gold-soft bg-gold/5">
               <td className="p-3 text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
-                {copy.lineSavings}
+                {copy.lineSavings}{" "}
+                <InfoTip label={copy.infoAriaLabel} text={copy.tipSavings} />
               </td>
               {columns.map((c) => (
                 <td

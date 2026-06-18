@@ -162,6 +162,11 @@ export interface CreateEnvelopeInput {
   textTabs?: Record<string, string>;
   /** Optional checkbox tabs: tabLabel → checked. Template must bind each label. */
   checkboxTabs?: Record<string, boolean>;
+  /**
+   * Text-tab labels the signer must NOT edit (system-set economics like the
+   * listing commission). Rendered read-only/locked on the envelope.
+   */
+  lockedTextTabs?: string[];
   emailSubject?: string;
 }
 
@@ -173,10 +178,12 @@ export interface CreateEnvelopeResult {
 export async function createEnvelopeFromTemplate(
   input: CreateEnvelopeInput,
 ): Promise<CreateEnvelopeResult> {
-  const textTabs = Object.entries(input.textTabs ?? {}).map(([k, v]) => ({
-    tabLabel: k,
-    value: v,
-  }));
+  const lockedSet = new Set(input.lockedTextTabs ?? []);
+  const textTabs = Object.entries(input.textTabs ?? {}).map(([k, v]) =>
+    lockedSet.has(k)
+      ? { tabLabel: k, value: v, locked: "true" }
+      : { tabLabel: k, value: v },
+  );
   // DocuSign checkbox tabs take selected as a stringified boolean.
   const checkboxTabs = Object.entries(input.checkboxTabs ?? {}).map(
     ([k, v]) => ({ tabLabel: k, selected: v ? "true" : "false" }),

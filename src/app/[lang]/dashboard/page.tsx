@@ -382,7 +382,7 @@ export default async function DashboardPage({
               </div>
             </div>
             <Link
-              href={`/${lang}/listing/new`}
+              href={`/${lang}/listing/new?id=${listings[0].id}&step=5`}
               className="inline-flex shrink-0 items-center justify-center bg-gold px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink transition-colors hover:bg-gold/90"
             >
               {copy.aiCta} →

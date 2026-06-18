@@ -41,7 +41,7 @@ const dictionaries = {
           body: "AnaMaria and her FL-licensed team handle contracts, disclosures, and the legal mechanics — you're never alone.",
         },
         {
-          headline: "Full home.com exposure, every major site",
+          headline: "Full exposure in every major site",
           body: "Your listing reaches home.com, Zillow, Realtor.com, Redfin, and Trulia — the same buyer pool as a traditional 6% agent.",
         },
       ],
@@ -1033,6 +1033,16 @@ const dictionaries = {
       howToRead: "How to read this table",
       howToReadBody:
         "Upfront costs are paid when you list; closing costs come out of your sale proceeds. The traditional column is a fixed benchmark — a 6% commission (3% listing + 3% buyer agent) plus a typical $300 photography fee and $40 in document fees — and it doesn't change. On Lixtara you choose the buyer-agent commission you offer (2 / 2.5 / 3%); higher percentages can attract more showings. Every Lixtara plan includes home.com listing, Zillow / Realtor.com syndication, and DocuSign contracts; Essentials photography is DIY with our smartphone guide while Pro and Concierge include a professional photographer. Other closing costs (title, taxes, recording fees) are not shown here.",
+      infoAriaLabel: "What this means",
+      tipListingFee: "The one-time flat fee you pay Lixtara to list your home. A traditional agent charges no flat fee — they take a big commission instead.",
+      tipSellerCommission: "The commission on your sale price that goes to the listing side. Traditional agents charge ~3%; Lixtara charges much less (or nothing on Essentials).",
+      tipPhotos: "Cost of professional listing photos. Included on Pro and Concierge; on Essentials you shoot them yourself with our guide.",
+      tipDocusign: "Cost of preparing and e-signing your contracts. Included free with Lixtara; traditional sellers often pay document fees.",
+      tipUpfrontSubtotal: "Everything you pay at the moment you list — the flat fee plus your listing-side commission and any photo/document costs.",
+      tipBuyerCommission: "What you offer the buyer's agent for bringing a buyer. You choose it (2–3%); it's the same in both columns, so it doesn't change your savings.",
+      tipClosingSubtotal: "Costs paid from your sale proceeds at closing — here, the buyer-agent commission.",
+      tipTotal: "The full cost of selling — upfront costs plus closing costs combined.",
+      tipSavings: "How much more money you keep with this Lixtara plan versus a traditional 6% agent: their total minus yours.",
     },
     savingsCalc: {
       eyebrow: "Calculate your savings",
@@ -1257,7 +1267,7 @@ const dictionaries = {
           body: "AnaMaria y su equipo licenciado en Florida manejan contratos, disclosures, y la mecánica legal — nunca solo.",
         },
         {
-          headline: "Exposición home.com completa, todos los sitios",
+          headline: "Exposición completa en todos los sitios principales",
           body: "Tu listing llega a home.com, Zillow, Realtor.com, Redfin y Trulia — el mismo pool de compradores que un agente tradicional del 6%.",
         },
       ],
@@ -2249,6 +2259,16 @@ const dictionaries = {
       howToRead: "Cómo leer esta tabla",
       howToReadBody:
         "Los costos iniciales se pagan al listar; los de cierre salen del producto de tu venta. La columna tradicional es un comparable fijo — 6% de comisión (3% listing + 3% agente comprador) más ~$300 de fotografía y $40 de documentos — y no cambia. En Lixtara vos elegís la comisión del agente comprador que ofrecés (2 / 2.5 / 3%); porcentajes más altos pueden atraer más visitas. Todos los planes Lixtara incluyen listado en home.com, sindicación a Zillow / Realtor.com y contratos DocuSign; la fotografía de Essentials es DIY con nuestra guía para smartphone, mientras Pro y Concierge incluyen fotógrafo profesional. Otros costos de cierre (título, impuestos, registro) no se muestran aquí.",
+      infoAriaLabel: "Qué significa",
+      tipListingFee: "La tarifa fija única que pagas a Lixtara por publicar tu casa. Un agente tradicional no cobra tarifa fija — en su lugar se lleva una comisión grande.",
+      tipSellerCommission: "La comisión sobre el precio de venta que va al lado del listing. Los agentes tradicionales cobran ~3%; Lixtara cobra mucho menos (o nada en Essentials).",
+      tipPhotos: "Costo de las fotos profesionales del listing. Incluidas en Pro y Concierge; en Essentials las tomas tú con nuestra guía.",
+      tipDocusign: "Costo de preparar y firmar electrónicamente tus contratos. Incluido gratis con Lixtara; los vendedores tradicionales suelen pagar honorarios de documentos.",
+      tipUpfrontSubtotal: "Todo lo que pagas al momento de publicar — la tarifa fija más tu comisión del lado del listing y cualquier costo de fotos/documentos.",
+      tipBuyerCommission: "Lo que le ofreces al agente del comprador por traer un comprador. Tú lo eliges (2–3%); es igual en ambas columnas, así que no cambia tu ahorro.",
+      tipClosingSubtotal: "Costos que se pagan del producto de tu venta al cierre — aquí, la comisión del agente del comprador.",
+      tipTotal: "El costo total de vender — costos iniciales más costos de cierre combinados.",
+      tipSavings: "Cuánto dinero más te quedas con este plan de Lixtara frente a un agente tradicional del 6%: el total de ellos menos el tuyo.",
     },
     savingsCalc: {
       eyebrow: "Calcula tus ahorros",
