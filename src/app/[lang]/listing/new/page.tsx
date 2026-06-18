@@ -31,6 +31,7 @@ import { TourCoaching } from "@/components/tour-coaching";
 import { PhotographyCheckoutButton } from "@/components/photography-checkout-button";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { OccupancySection } from "@/components/occupancy-section";
+import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
@@ -98,6 +99,7 @@ interface Draft {
   show_phone_on_portals: boolean | null;
   folio: string | null;
   buyer_agent_commission: number | null;
+  appliances: string[] | null;
 }
 
 export default async function ListingNewPage({
@@ -155,7 +157,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission",
+        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,appliances",
       )
       .eq("id", draftId)
       .maybeSingle();
@@ -450,6 +452,11 @@ export default async function ListingNewPage({
       ? (occupancyRaw as OccupancyStatus)
       : null;
     const showPhone = formData.get("show_phone_on_portals") === "1";
+    // Appliances included with the sale (multi-select; validated against the
+    // canonical list so only known keys are stored).
+    const appliances = sanitizeAppliances(
+      formData.getAll("appliances").map(String),
+    );
 
     // Lease details — only persisted when a tenant occupies the property;
     // cleared to null otherwise so changing occupancy doesn't leave stale data.
@@ -543,6 +550,7 @@ export default async function ListingNewPage({
         tenant_cooperation: tenantCooperation,
         tenant_notes: tenantNotes,
         show_phone_on_portals: showPhone,
+        appliances,
       })
       .eq("id", id)
       .eq("owner_id", user.id);
@@ -1682,6 +1690,32 @@ export default async function ListingNewPage({
                 </label>
               </fieldset>
 
+              <fieldset className="flex flex-col gap-3 border border-gold-soft p-4">
+                <legend className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 px-2">
+                  {copy.step3.appliancesTitle}
+                </legend>
+                <p className="text-xs text-ink/55 leading-relaxed">
+                  {copy.step3.appliancesBody}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {APPLIANCE_KEYS.map((key) => (
+                    <label
+                      key={key}
+                      className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        name="appliances"
+                        value={key}
+                        defaultChecked={draft?.appliances?.includes(key) ?? false}
+                        className="accent-gold w-4 h-4"
+                      />
+                      <span>{copy.step3.appliances[key]}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer">
                   <input
@@ -2197,6 +2231,22 @@ export default async function ListingNewPage({
                           {draft.cash_only && <span>💵 Cash only</span>}
                           {draft.as_is_sale && <span>📋 As-is</span>}
                         </div>
+                      )}
+                      {draft.appliances && draft.appliances.length > 0 && (
+                        <p className="mt-3 text-xs text-ink/70 leading-relaxed">
+                          <span className="text-ink/50">
+                            {copy.step6.appliancesLabel}:{" "}
+                          </span>
+                          {draft.appliances
+                            .map(
+                              (a) =>
+                                (copy.step3.appliances as Record<string, string>)[
+                                  a
+                                ],
+                            )
+                            .filter(Boolean)
+                            .join(", ")}
+                        </p>
                       )}
                     </div>
                   ) : (
