@@ -16,9 +16,9 @@ export interface PricingTier {
 }
 
 export const PRICING_TIERS: Record<PricingTierId, PricingTier> = {
-  essentials: { id: "essentials", flatFee: 199, commissionPct: 0, termMonths: 24, includesPhotography: false },
-  pro: { id: "pro", flatFee: 495, commissionPct: 0.5, termMonths: 24, includesPhotography: true },
-  concierge: { id: "concierge", flatFee: 995, commissionPct: 1, termMonths: 24, includesPhotography: true },
+  essentials: { id: "essentials", flatFee: 199, commissionPct: 0.5, termMonths: 24, includesPhotography: false },
+  pro: { id: "pro", flatFee: 495, commissionPct: 1, termMonths: 24, includesPhotography: true },
+  concierge: { id: "concierge", flatFee: 995, commissionPct: 1.5, termMonths: 24, includesPhotography: true },
 };
 
 // Baseline costs of the traditional-agent comparison, in USD (flat) or percent.

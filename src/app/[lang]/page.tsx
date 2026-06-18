@@ -41,6 +41,10 @@ export default async function Home({
   const investorCopy = t(lang).investor;
   const faqCopy = t(lang).faq;
 
+  // Investor Club is on hold — hidden from the landing for now while we decide
+  // whether/when to reintroduce it. Copy, component, and admin page are kept.
+  const SHOW_INVESTOR_CLUB = false;
+
   const selectedValue =
     sp.qv === "under" || sp.qv === "mid" || sp.qv === "over" ? sp.qv : null;
   const selectedPhoto =
@@ -379,6 +383,10 @@ export default async function Home({
               pro: prCopy.tiers.pro.name,
               concierge: prCopy.tiers.concierge.name,
             }}
+            infoAriaLabel={savingsCalcCopy.infoAriaLabel}
+            tipTraditional={savingsCalcCopy.tipTraditional}
+            tipLixtara={savingsCalcCopy.tipLixtara}
+            tipYouSave={savingsCalcCopy.tipYouSave}
           />
         </div>
       </section>
@@ -593,6 +601,7 @@ export default async function Home({
         </div>
       </section>
 
+      {SHOW_INVESTOR_CLUB && (
       <section
         id="investor-club"
         className="border-t border-gold-soft scroll-mt-20"
@@ -659,6 +668,7 @@ export default async function Home({
           </div>
         </div>
       </section>
+      )}
 
       <section id="faq" className="border-t border-gold-soft scroll-mt-20">
         <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
