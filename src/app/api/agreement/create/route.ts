@@ -257,6 +257,9 @@ export async function POST(req: Request) {
         signerName,
         clientUserId: propertyId,
         textTabs: tabs,
+        // System-set economics — the signer must not edit these (they reflect
+        // the selected plan exactly). Rendered read-only on the contract.
+        lockedTextTabs: ["commission_pct", "flat_fee", "buyer_agent_commission"],
         // Checkbox tabs (template must bind these labels on the Seller role):
         //  • lockbox_authorized → contract line 71, item E — checked only when
         //    the plan includes a lockbox.
