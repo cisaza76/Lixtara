@@ -2,8 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { isLocale, t } from "@/lib/i18n";
-import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { SITE_URL } from "@/lib/config";
+import { AccountGate } from "@/components/account-gate";
 import { StepShell } from "@/components/step-shell";
 import {
   Field,
@@ -121,12 +123,25 @@ export default async function ListingNewPage({
     session_id?: string;
     signed?: string;
     event?: string;
+    aerror?: string;
+    pending?: string;
   }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
 
-  await requireUser(lang, "/listing/new");
+  // Deferred registration: the listing flow runs on an anonymous Supabase
+  // session (created lazily in saveStep1). We do NOT force sign-in here — the
+  // seller builds their listing freely and only registers at the signing gate
+  // (step 7). Read the user without redirecting.
+  const {
+    data: { user: sessionUser },
+  } = await (await createClient()).auth.getUser();
+  // A real (email-bearing) account is required to sign. Anonymous users — and
+  // users mid email-confirmation (email pending in new_email) — are gated at
+  // step 7. A confirmed email is the signal that registration is complete.
+  const needsAccount = !sessionUser?.email;
+  const pendingEmail = (sessionUser?.new_email as string | undefined) ?? null;
 
   const sp = await searchParams;
   const step = clampStep(Number.parseInt(sp.step ?? "1", 10) || 1);
@@ -334,9 +349,17 @@ export default async function ListingNewPage({
         : (check.lng ?? null);
 
     const supabase = await createClient();
-    const {
+    let {
       data: { user },
     } = await supabase.auth.getUser();
+    // Deferred registration: if the seller has no session yet, start an
+    // anonymous one so they can build the listing without signing up. They
+    // upgrade to a real account at the signing gate (step 7). If anonymous
+    // sign-ins are unavailable, fall back to the sign-in redirect.
+    if (!user) {
+      const { data: anon } = await supabase.auth.signInAnonymously();
+      user = anon.user ?? null;
+    }
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
 
     const addressUpdate = {
@@ -1061,6 +1084,67 @@ export default async function ListingNewPage({
     }
 
     redirect(`/${lang}/listing/new?step=7&id=${id}`);
+  }
+
+  // Signing gate: convert the anonymous seller into a permanent account. The
+  // email goes to new_email (pending) until they confirm via the link; the same
+  // uid is kept, so the whole draft stays attached. We also write the real
+  // name/email into public.users now (service role) so the agreement carries the
+  // correct signer even while the auth email is still confirming.
+  async function registerAccount(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    const firstName = String(formData.get("first_name") ?? "").trim().slice(0, 80);
+    const lastName = String(formData.get("last_name") ?? "").trim().slice(0, 80);
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const password = String(formData.get("password") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    const back = `/${lang}/listing/new?step=7&id=${id}`;
+    if (!firstName || !lastName) redirect(`${back}&aerror=name`);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) redirect(`${back}&aerror=email`);
+    if (password.length < 8) redirect(`${back}&aerror=password`);
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    const { error } = await supabase.auth.updateUser(
+      {
+        email,
+        password,
+        data: { first_name: firstName, last_name: lastName },
+      },
+      {
+        emailRedirectTo: `${SITE_URL}/${lang}/auth/callback?next=${encodeURIComponent(
+          `/${lang}/listing/new?step=7&id=${id}`,
+        )}`,
+      },
+    );
+    if (error) {
+      const code = /registered|already/i.test(error.message)
+        ? "exists"
+        : "failed";
+      redirect(`${back}&aerror=${code}`);
+    }
+
+    // Capture the real signer profile immediately (service role bypasses RLS).
+    const svcUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const svcKey = process.env.SUPABASE_SECRET_KEY;
+    if (svcUrl && svcKey) {
+      const svc = createServiceClient(svcUrl, svcKey, {
+        auth: { persistSession: false },
+      });
+      await svc
+        .from("users")
+        .upsert(
+          { id: user.id, email, first_name: firstName, last_name: lastName },
+          { onConflict: "id" },
+        );
+    }
+
+    redirect(`${back}&pending=1`);
   }
 
   const errorMessage =
@@ -2611,7 +2695,37 @@ export default async function ListingNewPage({
             </p>
           </div>
 
-          {(() => {
+          {needsAccount ? (
+            <AccountGate
+              registerAction={registerAccount}
+              draftId={draftId}
+              pendingEmail={pendingEmail}
+              error={typeof sp.aerror === "string" ? sp.aerror : null}
+              labels={{
+                createEyebrow: copy.step7.gateCreateEyebrow,
+                createTitle: copy.step7.gateCreateTitle,
+                createBody: copy.step7.gateCreateBody,
+                firstNameLabel: copy.step7.gateFirstName,
+                lastNameLabel: copy.step7.gateLastName,
+                emailLabel: copy.step7.gateEmail,
+                passwordLabel: copy.step7.gatePassword,
+                passwordHint: copy.step7.gatePasswordHint,
+                submitLabel: copy.step7.gateSubmit,
+                showPassword: copy.step7.gateShowPassword,
+                hidePassword: copy.step7.gateHidePassword,
+                confirmEyebrow: copy.step7.gateConfirmEyebrow,
+                confirmTitle: copy.step7.gateConfirmTitle,
+                confirmBody: copy.step7.gateConfirmBody,
+                confirmWaiting: copy.step7.gateConfirmWaiting,
+                errName: copy.step7.gateErrName,
+                errEmail: copy.step7.gateErrEmail,
+                errPassword: copy.step7.gateErrPassword,
+                errExists: copy.step7.gateErrExists,
+                errFailed: copy.step7.gateErrFailed,
+              }}
+            />
+          ) : (
+            (() => {
             const agStatus = latestAgreement?.status ?? null;
             const isSigned = agStatus === "signed" || agStatus === "completed";
 
@@ -2700,7 +2814,8 @@ export default async function ListingNewPage({
                 }}
               />
             );
-          })()}
+            })()
+          )}
 
           <Link
             href={`/${lang}/listing/new?step=6&id=${draftId}`}
