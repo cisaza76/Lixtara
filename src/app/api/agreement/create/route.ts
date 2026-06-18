@@ -18,6 +18,8 @@ import {
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
+import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
+import { t } from "@/lib/i18n";
 
 interface Body {
   property_id?: string;
@@ -62,7 +64,7 @@ export async function POST(req: Request) {
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description",
+      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
     )
     .eq("id", propertyId)
     .eq("owner_id", user.id)
@@ -164,6 +166,28 @@ export async function POST(req: Request) {
         tenant_occupied: "Tenant-occupied",
       };
 
+      // Personal property: appliances the seller includes with the sale,
+      // rendered as a human-readable list in the contract's Personal Property
+      // clause. Labels are the canonical English names (the contract is EN).
+      const applianceLabels = t("en").listingForm.step3.appliances as Record<
+        string,
+        string
+      >;
+      const includedAppliances = sanitizeAppliances(
+        (property.appliances ?? []) as string[],
+      );
+      const personalProperty = APPLIANCE_KEYS.filter((k) =>
+        includedAppliances.includes(k),
+      )
+        .map((k) => applianceLabels[k])
+        .join(", ");
+
+      // Lockbox is part of the engagement on Concierge (always) and Pro (when
+      // the home is vacant). Essentials buys it as a $60 add-on — not included.
+      const lockboxIncluded =
+        tierId === "concierge" ||
+        (tierId === "pro" && property.occupancy_status === "vacant");
+
       // EVERY seller-entered + Miami-Dade-sourced field is sent so the contract
       // reaches the seller fully pre-populated — only awaiting signature.
       // DocuSign silently ignores any tabLabel the template doesn't bind, so
@@ -209,6 +233,8 @@ export async function POST(req: Request) {
         monthly_rent: money(property.monthly_rent),
         lease_end_date: property.lease_end_date ?? "",
         tenant_cooperation: property.tenant_cooperation ?? "",
+        // ── Personal property ──
+        personal_property: personalProperty,
         // ── Parties ──
         seller_name: signerName,
         broker_name: BROKERAGE_LICENSED_ENTITY,
@@ -231,6 +257,15 @@ export async function POST(req: Request) {
         signerName,
         clientUserId: propertyId,
         textTabs: tabs,
+        // Checkbox tabs (template must bind these labels on the Seller role):
+        //  • lockbox_authorized → contract line 71, item E — checked only when
+        //    the plan includes a lockbox.
+        //  • buyer_commission_ack → contract line 145, item A — always checked
+        //    (the seller agrees to publish a buyer-agent commission).
+        checkboxTabs: {
+          lockbox_authorized: lockboxIncluded,
+          buyer_commission_ack: true,
+        },
         emailSubject: "Lixtara listing agreement — please sign",
       });
       envelopeId = created.envelopeId;
