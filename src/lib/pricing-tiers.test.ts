@@ -17,9 +17,9 @@ describe("PRICING_TIERS catalog", () => {
   });
 
   it("holds the canonical commission percentages", () => {
-    expect(PRICING_TIERS.essentials.commissionPct).toBe(0);
-    expect(PRICING_TIERS.pro.commissionPct).toBe(0.5);
-    expect(PRICING_TIERS.concierge.commissionPct).toBe(1);
+    expect(PRICING_TIERS.essentials.commissionPct).toBe(0.5);
+    expect(PRICING_TIERS.pro.commissionPct).toBe(1);
+    expect(PRICING_TIERS.concierge.commissionPct).toBe(1.5);
   });
 
   it("uses a 24-month term for every tier", () => {
@@ -62,23 +62,27 @@ describe("getTier", () => {
 });
 
 describe("tierTotalCost", () => {
-  it("is just the flat fee when commission is 0 (essentials)", () => {
-    expect(tierTotalCost("essentials", 500_000)).toBe(199);
+  it("adds the seller-side commission for essentials (0.5%)", () => {
+    expect(tierTotalCost("essentials", 500_000)).toBe(199 + 2_500);
   });
 
-  it("adds the seller-side commission for pro (0.5%)", () => {
-    expect(tierTotalCost("pro", 500_000)).toBe(495 + 2_500);
+  it("adds the seller-side commission for pro (1%)", () => {
+    expect(tierTotalCost("pro", 500_000)).toBe(495 + 5_000);
+  });
+
+  it("adds the seller-side commission for concierge (1.5%)", () => {
+    expect(tierTotalCost("concierge", 500_000)).toBe(995 + 7_500);
   });
 });
 
 describe("tierSavingsVsTraditional", () => {
   it("compares total cost against a 6% traditional commission", () => {
-    // traditional = 30_000; pro total = 495 + 2_500 = 2_995
-    expect(tierSavingsVsTraditional("pro", 500_000)).toBe(30_000 - 2_995);
+    // traditional = 30_000; pro total = 495 + 5_000 = 5_495
+    expect(tierSavingsVsTraditional("pro", 500_000)).toBe(30_000 - 5_495);
   });
 
   it("never goes negative (tiny sale where the flat fee dwarfs 6%)", () => {
-    // 6% of 1_000 = 60, below the 199 essentials flat fee
+    // 6% of 1_000 = 60, below the essentials flat fee + commission
     expect(tierSavingsVsTraditional("essentials", 1_000)).toBe(0);
   });
 });

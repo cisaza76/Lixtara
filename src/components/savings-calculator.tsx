@@ -25,12 +25,54 @@ interface SavingsCalculatorProps {
   youSaveLabel: string;
   ctaLabel: string;
   tierNames: Record<PricingTierId, string>;
+  infoAriaLabel: string;
+  tipTraditional: string;
+  tipLixtara: string;
+  tipYouSave: string;
 }
 
 const LISTING_SIDE_TRADITIONAL_PCT = 3;
 
 function formatUSD(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
+}
+
+// Small ⓘ affordance: plain-language explainer for one figure. Shows on hover
+// (desktop) and on tap/focus (mobile + keyboard) via group-focus-within.
+function InfoTip({
+  label,
+  text,
+  tone = "ink",
+}: {
+  label: string;
+  text: string;
+  tone?: "ink" | "ivory";
+}) {
+  return (
+    <span className="group relative inline-flex align-middle">
+      <button
+        type="button"
+        aria-label={label}
+        className={`inline-flex h-4 w-4 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+          tone === "ivory"
+            ? "text-ivory/55 hover:text-gold"
+            : "text-ink/35 hover:text-gold"
+        }`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 11v5" strokeLinecap="round" />
+          <circle cx="12" cy="7.6" r="0.6" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-56 -translate-x-1/2 rounded border border-gold-soft bg-ink px-3 py-2 text-[11px] font-normal not-italic normal-case leading-snug tracking-normal text-ivory opacity-0 shadow-[0_18px_36px_-18px_rgba(28,28,28,0.6)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+      >
+        {text}
+      </span>
+    </span>
+  );
 }
 
 export function SavingsCalculator({
@@ -49,6 +91,10 @@ export function SavingsCalculator({
   youSaveLabel,
   ctaLabel,
   tierNames,
+  infoAriaLabel,
+  tipTraditional,
+  tipLixtara,
+  tipYouSave,
 }: SavingsCalculatorProps) {
   const [tierId, setTierId] = useState<PricingTierId>("pro");
   const [price, setPrice] = useState<number>(500_000);
@@ -170,8 +216,9 @@ export function SavingsCalculator({
       {/* Side-by-side comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gold-soft border border-gold-soft">
         <div className="bg-ivory p-6 lg:p-8 flex flex-col gap-3">
-          <span className="text-[10px] uppercase tracking-[0.22em] text-ink/55 font-semibold">
+          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-ink/55 font-semibold">
             {traditionalHeader} (6%)
+            <InfoTip label={infoAriaLabel} text={tipTraditional} />
           </span>
           <span className="font-display text-3xl text-ink">
             {formatUSD(traditionalTotal)}
@@ -181,8 +228,9 @@ export function SavingsCalculator({
           </span>
         </div>
         <div className="bg-ivory p-6 lg:p-8 flex flex-col gap-3">
-          <span className="text-[10px] uppercase tracking-[0.22em] text-gold font-semibold">
+          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-gold font-semibold">
             {lixtaraHeader} {tierNames[tierId]}
+            <InfoTip label={infoAriaLabel} text={tipLixtara} />
           </span>
           <span className="font-display text-3xl text-ink">
             {formatUSD(lixTotal)}
@@ -196,8 +244,9 @@ export function SavingsCalculator({
       {/* Savings hero */}
       <div className="bg-ink text-ivory p-6 lg:p-8 flex items-center justify-between gap-6 flex-wrap">
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-[0.22em] text-gold font-semibold">
+          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-gold font-semibold">
             {youSaveLabel}
+            <InfoTip label={infoAriaLabel} text={tipYouSave} tone="ivory" />
           </span>
           <div className="flex items-baseline gap-4">
             <span className="font-display italic text-5xl lg:text-6xl text-gold leading-none">
