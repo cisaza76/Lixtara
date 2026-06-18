@@ -99,6 +99,12 @@ const SENT_LABELS = [
   "monthly_rent",
   "lease_end_date",
   "tenant_cooperation",
+  // personal property (appliances)
+  "personal_property",
+  // checkbox tabs (template must bind on the Seller role):
+  //   lockbox_authorized → line 71-E · buyer_commission_ack → line 145-A
+  "lockbox_authorized",
+  "buyer_commission_ack",
   // parties
   "seller_name",
   "broker_name",

@@ -160,6 +160,8 @@ export interface CreateEnvelopeInput {
   clientUserId: string;
   /** Optional tab/field substitutions for the template. */
   textTabs?: Record<string, string>;
+  /** Optional checkbox tabs: tabLabel → checked. Template must bind each label. */
+  checkboxTabs?: Record<string, boolean>;
   emailSubject?: string;
 }
 
@@ -175,6 +177,14 @@ export async function createEnvelopeFromTemplate(
     tabLabel: k,
     value: v,
   }));
+  // DocuSign checkbox tabs take selected as a stringified boolean.
+  const checkboxTabs = Object.entries(input.checkboxTabs ?? {}).map(
+    ([k, v]) => ({ tabLabel: k, selected: v ? "true" : "false" }),
+  );
+
+  const tabs: Record<string, unknown> = {};
+  if (textTabs.length > 0) tabs.textTabs = textTabs;
+  if (checkboxTabs.length > 0) tabs.checkboxTabs = checkboxTabs;
 
   const body = {
     templateId: input.templateId,
@@ -186,7 +196,7 @@ export async function createEnvelopeFromTemplate(
         name: input.signerName,
         roleName: input.signerRole,
         clientUserId: input.clientUserId,
-        tabs: textTabs.length > 0 ? { textTabs } : undefined,
+        tabs: Object.keys(tabs).length > 0 ? tabs : undefined,
       },
     ],
   };

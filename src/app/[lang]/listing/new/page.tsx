@@ -31,6 +31,7 @@ import { TourCoaching } from "@/components/tour-coaching";
 import { PhotographyCheckoutButton } from "@/components/photography-checkout-button";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { OccupancySection } from "@/components/occupancy-section";
+import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
@@ -98,6 +99,7 @@ interface Draft {
   show_phone_on_portals: boolean | null;
   folio: string | null;
   buyer_agent_commission: number | null;
+  appliances: string[] | null;
 }
 
 export default async function ListingNewPage({
@@ -155,7 +157,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission",
+        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,appliances",
       )
       .eq("id", draftId)
       .maybeSingle();
@@ -190,6 +192,12 @@ export default async function ListingNewPage({
                   updates.property_type = d.property_type;
                 if (d.legal_description != null)
                   updates.legal_description = d.legal_description;
+                // Estimated annual tax — only when the seller hasn't entered one.
+                if (
+                  d.tax_annual_amount != null &&
+                  draft?.tax_annual_amount == null
+                )
+                  updates.tax_annual_amount = d.tax_annual_amount;
               }
             },
           ),
@@ -240,6 +248,22 @@ export default async function ListingNewPage({
         .eq("property_id", draftId)
         .order("display_order", { ascending: true });
       photos = (photoRows ?? []) as typeof photos;
+    }
+
+    // Concierge locks the buyer-agent commission at 3% (the most competitive
+    // cooperating rate). Persist it server-side at step 6 so it's fixed for the
+    // rest of the flow and reflected everywhere that reads the column.
+    if (
+      step === 6 &&
+      draft &&
+      draft.pricing_tier === "concierge" &&
+      Number(draft.buyer_agent_commission ?? 0) !== 3
+    ) {
+      await supabase
+        .from("properties")
+        .update({ buyer_agent_commission: 3 })
+        .eq("id", draftId);
+      draft = { ...draft, buyer_agent_commission: 3 } as Draft;
     }
 
     if (step === 7 || step === 8) {
@@ -434,6 +458,11 @@ export default async function ListingNewPage({
       ? (occupancyRaw as OccupancyStatus)
       : null;
     const showPhone = formData.get("show_phone_on_portals") === "1";
+    // Appliances included with the sale (multi-select; validated against the
+    // canonical list so only known keys are stored).
+    const appliances = sanitizeAppliances(
+      formData.getAll("appliances").map(String),
+    );
 
     // Lease details — only persisted when a tenant occupies the property;
     // cleared to null otherwise so changing occupancy doesn't leave stale data.
@@ -527,6 +556,7 @@ export default async function ListingNewPage({
         tenant_cooperation: tenantCooperation,
         tenant_notes: tenantNotes,
         show_phone_on_portals: showPhone,
+        appliances,
       })
       .eq("id", id)
       .eq("owner_id", user.id);
@@ -645,6 +675,8 @@ export default async function ListingNewPage({
     if (d.property_type != null) update.property_type = d.property_type;
     if (d.legal_description != null)
       update.legal_description = d.legal_description;
+    if (d.tax_annual_amount != null)
+      update.tax_annual_amount = d.tax_annual_amount;
 
     const filledCount = Object.keys(update).length;
     if (filledCount === 0) {
@@ -972,7 +1004,7 @@ export default async function ListingNewPage({
   async function setBuyerCommission(formData: FormData) {
     "use server";
     const id = String(formData.get("id") ?? "");
-    const pct = Number(formData.get("buyer_agent_commission") ?? "0");
+    let pct = Number(formData.get("buyer_agent_commission") ?? "0");
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
     if (![2, 2.5, 3].includes(pct)) {
       redirect(`/${lang}/listing/new?step=6&id=${id}&error=invalid_buyer_commission`);
@@ -983,6 +1015,15 @@ export default async function ListingNewPage({
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    // Concierge fixes the buyer-agent commission at 3% — ignore any other value.
+    const { data: tierRow } = await supabase
+      .from("properties")
+      .select("pricing_tier")
+      .eq("id", id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (tierRow?.pricing_tier === "concierge") pct = 3;
 
     await supabase
       .from("properties")
@@ -1006,10 +1047,16 @@ export default async function ListingNewPage({
     const supabase = await createClient();
     const { data: prop } = await supabase
       .from("properties")
-      .select("buyer_agent_commission")
+      .select("buyer_agent_commission, pricing_tier")
       .eq("id", id)
       .maybeSingle();
-    if (!prop?.buyer_agent_commission || prop.buyer_agent_commission === 0) {
+    // Concierge guarantees 3% even if the seller never touched the picker.
+    if (prop?.pricing_tier === "concierge" && prop.buyer_agent_commission !== 3) {
+      await supabase
+        .from("properties")
+        .update({ buyer_agent_commission: 3 })
+        .eq("id", id);
+    } else if (!prop?.buyer_agent_commission || prop.buyer_agent_commission === 0) {
       redirect(`/${lang}/listing/new?step=6&id=${id}&error=buyer_commission_required`);
     }
 
@@ -1552,6 +1599,7 @@ export default async function ListingNewPage({
                       ? String(draft.tax_annual_amount)
                       : ""
                   }
+                  help={copy.step3.taxEstimateHint}
                 />
               </div>
 
@@ -1649,6 +1697,32 @@ export default async function ListingNewPage({
                   />
                   <span>{copy.step3.asIsLabel}</span>
                 </label>
+              </fieldset>
+
+              <fieldset className="flex flex-col gap-3 border border-gold-soft p-4">
+                <legend className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 px-2">
+                  {copy.step3.appliancesTitle}
+                </legend>
+                <p className="text-xs text-ink/55 leading-relaxed">
+                  {copy.step3.appliancesBody}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {APPLIANCE_KEYS.map((key) => (
+                    <label
+                      key={key}
+                      className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        name="appliances"
+                        value={key}
+                        defaultChecked={draft?.appliances?.includes(key) ?? false}
+                        className="accent-gold w-4 h-4"
+                      />
+                      <span>{copy.step3.appliances[key]}</span>
+                    </label>
+                  ))}
+                </div>
               </fieldset>
 
               <div className="flex flex-col gap-2">
@@ -2167,6 +2241,22 @@ export default async function ListingNewPage({
                           {draft.as_is_sale && <span>📋 As-is</span>}
                         </div>
                       )}
+                      {draft.appliances && draft.appliances.length > 0 && (
+                        <p className="mt-3 text-xs text-ink/70 leading-relaxed">
+                          <span className="text-ink/50">
+                            {copy.step6.appliancesLabel}:{" "}
+                          </span>
+                          {draft.appliances
+                            .map(
+                              (a) =>
+                                (copy.step3.appliances as Record<string, string>)[
+                                  a
+                                ],
+                            )
+                            .filter(Boolean)
+                            .join(", ")}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-ink/55 italic">
@@ -2280,6 +2370,50 @@ export default async function ListingNewPage({
 
                 {/* Buyer-agent compensation picker (item 16) */}
                 {(() => {
+                  // Concierge fixes the buyer-agent commission at 3% — show a
+                  // locked tile instead of the picker (item 4).
+                  if (draft.pricing_tier === "concierge") {
+                    return (
+                      <div className="border-t border-gold-soft pt-8 flex flex-col gap-5">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                            {copy.step6.buyerCommissionEyebrow}
+                          </p>
+                          <h3 className="font-display text-2xl text-ink leading-tight">
+                            {copy.step6.buyerCommissionLockedTitle}
+                          </h3>
+                          <p className="text-sm text-ink/70 leading-relaxed">
+                            {copy.step6.buyerCommissionLockedBody}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4 border-2 border-gold bg-gold/10 p-5">
+                          <span className="font-display text-3xl text-ink leading-none">
+                            3%
+                          </span>
+                          <span className="text-xs text-ink/60">
+                            {copy.step6.buyer3Subtitle}
+                          </span>
+                          <span className="ml-auto inline-flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] text-gold font-semibold">
+                            <svg
+                              width="11"
+                              height="11"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <rect x="5" y="11" width="14" height="9" rx="1.5" />
+                              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                            </svg>
+                            {copy.step6.buyerCommissionLockedBadge}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
                   const currentBuyerComm = Number(
                     draft.buyer_agent_commission ?? 0,
                   );
