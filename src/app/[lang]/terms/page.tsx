@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isLocale } from "@/lib/i18n";
-import { ComingSoon } from "@/components/coming-soon";
+import { isLocale, type Locale } from "@/lib/i18n";
+import { LegalDocument } from "@/components/legal-document";
+import { termsDoc } from "@/lib/legal/terms";
+
+export const metadata: Metadata = {
+  title: "Terms of Service — Lixtara",
+};
 
 export default async function TermsPage({
   params,
@@ -9,5 +15,5 @@ export default async function TermsPage({
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  return <ComingSoon lang={lang} pageKey="terms" />;
+  return <LegalDocument lang={lang as Locale} doc={termsDoc[lang as Locale]} />;
 }
