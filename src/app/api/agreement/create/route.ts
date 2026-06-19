@@ -217,8 +217,8 @@ export async function POST(req: Request) {
         list_price: `$${property.list_price.toLocaleString()}`,
         hoa_fee: money(property.hoa_fee),
         tax_annual: money(property.tax_annual_amount),
-        // cash_only + as_is_sale are sent as CHECKBOX tabs (see checkboxTabs
-        // below) since the template binds them as checkboxes.
+        // cash_only is sent as a CHECKBOX tab (see checkboxTabs below). as_is_sale
+        // is intentionally NOT sent — the contract has no field for it.
         // ── Occupancy / tenancy ──
         // occupancy_status is a CHECKBOX on the contract ("not currently
         // occupied by tenant") — sent via checkboxTabs below.
@@ -259,7 +259,6 @@ export async function POST(req: Request) {
         //    (the seller agrees to publish a buyer-agent commission).
         checkboxTabs: {
           cash_only: property.cash_only === true,
-          as_is_sale: property.as_is_sale === true,
           // Contract clause: "not currently occupied by tenant" — checked when
           // the seller marked the home vacant or owner-occupied (i.e. NOT
           // tenant-occupied). Left unchecked if tenant-occupied or unset.

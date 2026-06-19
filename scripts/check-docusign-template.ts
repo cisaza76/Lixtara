@@ -93,7 +93,6 @@ const SENT_LABELS = [
   "hoa_fee",
   "tax_annual",
   "cash_only",
-  "as_is_sale",
   // occupancy / tenancy
   "occupancy_status",
   "monthly_rent",
