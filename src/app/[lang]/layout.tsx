@@ -6,6 +6,7 @@ import { isLocale, locales, t, type Locale } from "@/lib/i18n";
 import { BROKERAGE_LOCATION, BROKER_LICENSE } from "@/lib/broker";
 import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
+import { CookieNotice } from "@/components/cookie-notice";
 import { MobileMenu } from "@/components/mobile-menu";
 import { Globe, LayoutDashboard, LogOut } from "lucide-react";
 import "../globals.css";
@@ -287,6 +288,18 @@ export default async function RootLayout({
                 >
                   {footerCopy.links.privacy}
                 </Link>
+                <Link
+                  href={`/${lang}/cookies`}
+                  className="text-sm text-ink/70 hover:text-gold transition-colors"
+                >
+                  {footerCopy.links.cookies}
+                </Link>
+                <Link
+                  href={`/${lang}/disclaimers`}
+                  className="text-sm text-ink/70 hover:text-gold transition-colors"
+                >
+                  {footerCopy.links.disclaimers}
+                </Link>
               </div>
             </div>
 
@@ -358,6 +371,12 @@ export default async function RootLayout({
           suggestions={[...louiCopy.suggestions]}
           toolNotice={louiCopy.toolNotice}
           disclaimer={louiCopy.disclaimer}
+        />
+        <CookieNotice
+          lang={lang}
+          message={t(lang).cookieNotice.message}
+          learnMore={t(lang).cookieNotice.learnMore}
+          accept={t(lang).cookieNotice.accept}
         />
       </body>
     </html>

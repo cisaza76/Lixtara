@@ -982,9 +982,23 @@ const dictionaries = {
         contact: "Contact",
         terms: "Terms",
         privacy: "Privacy",
+        cookies: "Cookies",
+        disclaimers: "Disclaimers",
       },
       copyright: "All rights reserved.",
       equalHousing: "Equal Housing Opportunity",
+    },
+    legal: {
+      backHome: "Back to home",
+      lastUpdated: "Last updated",
+      englishControls:
+        "This document is maintained in English. A Spanish translation is provided for convenience; if there is any conflict, the English-language version governs.",
+    },
+    cookieNotice: {
+      message:
+        "We use essential cookies to keep you signed in and to run the listing flow, plus optional ones described in our Cookie Policy.",
+      learnMore: "Cookie Policy",
+      accept: "Got it",
     },
     quiz: {
       eyebrow: "Find your plan",
@@ -2212,9 +2226,23 @@ const dictionaries = {
         contact: "Contacto",
         terms: "Términos",
         privacy: "Privacidad",
+        cookies: "Cookies",
+        disclaimers: "Avisos legales",
       },
       copyright: "Todos los derechos reservados.",
       equalHousing: "Igualdad de oportunidades de vivienda",
+    },
+    legal: {
+      backHome: "Volver al inicio",
+      lastUpdated: "Última actualización",
+      englishControls:
+        "Este documento se mantiene en inglés. La traducción al español se ofrece por conveniencia; en caso de cualquier conflicto, prevalece la versión en inglés.",
+    },
+    cookieNotice: {
+      message:
+        "Usamos cookies esenciales para mantener tu sesión y operar el flujo de listing, además de otras opcionales descritas en nuestra Política de Cookies.",
+      learnMore: "Política de Cookies",
+      accept: "Entendido",
     },
     quiz: {
       eyebrow: "Encuentra tu plan",

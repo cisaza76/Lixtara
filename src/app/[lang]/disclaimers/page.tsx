@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { LegalDocument } from "@/components/legal-document";
-import { privacyDoc } from "@/lib/legal/privacy";
+import { disclaimersDoc } from "@/lib/legal/disclaimers";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Lixtara",
+  title: "Disclaimers — Lixtara",
 };
 
-export default async function PrivacyPage({
+export default async function DisclaimersPage({
   params,
 }: {
   params: Promise<{ lang: string }>;
@@ -16,6 +16,6 @@ export default async function PrivacyPage({
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   return (
-    <LegalDocument lang={lang as Locale} doc={privacyDoc[lang as Locale]} />
+    <LegalDocument lang={lang as Locale} doc={disclaimersDoc[lang as Locale]} />
   );
 }
