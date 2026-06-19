@@ -125,6 +125,8 @@ export default async function ListingNewPage({
     event?: string;
     aerror?: string;
     pending?: string;
+    cerror?: string;
+    verified?: string;
   }>;
 }) {
   const { lang } = await params;
@@ -1145,6 +1147,47 @@ export default async function ListingNewPage({
     }
 
     redirect(`${back}&pending=1`);
+  }
+
+  // #6: confirm the new email with a 6-digit code entered in the SAME tab
+  // (instead of a link that opens a new window). Supabase's email-change
+  // template sends the code; verifyOtp promotes the anonymous user to a
+  // permanent account without leaving the flow.
+  async function verifyEmailCode(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    const token = String(formData.get("code") ?? "").replace(/\s+/g, "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    const back = `/${lang}/listing/new?step=7&id=${id}`;
+    if (!/^\d{6}$/.test(token)) redirect(`${back}&pending=1&cerror=format`);
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const pending = (user?.new_email as string | undefined) ?? user?.email ?? "";
+    if (!user || !pending) redirect(`${back}&aerror=failed`);
+
+    // Confirming a new email on an anonymous user lands the address in
+    // `new_email`, i.e. an email-change confirmation — so "email_change" is the
+    // expected OTP type. Try the other email OTP types as a fallback so the
+    // flow is resilient to Supabase's exact classification of the upgrade.
+    const otpTypes = ["email_change", "email", "signup"] as const;
+    let verified = false;
+    for (const type of otpTypes) {
+      const { error } = await supabase.auth.verifyOtp({
+        email: pending,
+        token,
+        type,
+      });
+      if (!error) {
+        verified = true;
+        break;
+      }
+    }
+    if (!verified) redirect(`${back}&pending=1&cerror=invalid`);
+
+    redirect(`${back}&verified=1`);
   }
 
   const errorMessage =
@@ -2698,9 +2741,11 @@ export default async function ListingNewPage({
           {needsAccount ? (
             <AccountGate
               registerAction={registerAccount}
+              verifyAction={verifyEmailCode}
               draftId={draftId}
               pendingEmail={pendingEmail}
               error={typeof sp.aerror === "string" ? sp.aerror : null}
+              codeError={typeof sp.cerror === "string" ? sp.cerror : null}
               labels={{
                 createEyebrow: copy.step7.gateCreateEyebrow,
                 createTitle: copy.step7.gateCreateTitle,
@@ -2716,12 +2761,16 @@ export default async function ListingNewPage({
                 confirmEyebrow: copy.step7.gateConfirmEyebrow,
                 confirmTitle: copy.step7.gateConfirmTitle,
                 confirmBody: copy.step7.gateConfirmBody,
-                confirmWaiting: copy.step7.gateConfirmWaiting,
+                codeLabel: copy.step7.gateCodeLabel,
+                codeHint: copy.step7.gateCodeHint,
+                codeSubmit: copy.step7.gateCodeSubmit,
                 errName: copy.step7.gateErrName,
                 errEmail: copy.step7.gateErrEmail,
                 errPassword: copy.step7.gateErrPassword,
                 errExists: copy.step7.gateErrExists,
                 errFailed: copy.step7.gateErrFailed,
+                errCodeFormat: copy.step7.gateErrCodeFormat,
+                errCodeInvalid: copy.step7.gateErrCodeInvalid,
               }}
             />
           ) : (
