@@ -160,12 +160,6 @@ export async function POST(req: Request) {
         townhouse: "Townhouse",
         multi_family: "Multi-Family",
       };
-      const OCCUPANCY_LABEL: Record<string, string> = {
-        vacant: "Vacant",
-        owner_occupied: "Owner-occupied",
-        tenant_occupied: "Tenant-occupied",
-      };
-
       // Personal property: appliances the seller includes with the sale,
       // rendered as a human-readable list in the contract's Personal Property
       // clause. Labels are the canonical English names (the contract is EN).
@@ -226,10 +220,8 @@ export async function POST(req: Request) {
         // cash_only + as_is_sale are sent as CHECKBOX tabs (see checkboxTabs
         // below) since the template binds them as checkboxes.
         // ── Occupancy / tenancy ──
-        occupancy_status:
-          OCCUPANCY_LABEL[property.occupancy_status ?? ""] ??
-          property.occupancy_status ??
-          "",
+        // occupancy_status is a CHECKBOX on the contract ("not currently
+        // occupied by tenant") — sent via checkboxTabs below.
         monthly_rent: money(property.monthly_rent),
         lease_end_date: property.lease_end_date ?? "",
         tenant_cooperation: property.tenant_cooperation ?? "",
@@ -268,6 +260,12 @@ export async function POST(req: Request) {
         checkboxTabs: {
           cash_only: property.cash_only === true,
           as_is_sale: property.as_is_sale === true,
+          // Contract clause: "not currently occupied by tenant" — checked when
+          // the seller marked the home vacant or owner-occupied (i.e. NOT
+          // tenant-occupied). Left unchecked if tenant-occupied or unset.
+          occupancy_status:
+            property.occupancy_status === "vacant" ||
+            property.occupancy_status === "owner_occupied",
           lockbox_authorized: lockboxIncluded,
           buyer_commission_ack: true,
         },
