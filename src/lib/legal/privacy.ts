@@ -5,7 +5,7 @@ export const privacyDoc: LegalContent = {
     title: "Privacy Policy",
     intro: [
       "This Privacy Policy explains how Lixtara collects, uses, shares, and protects information about you when you use our website, platform, and related services (the \"Service\"). Lixtara is a Miami, Florida-based real-estate technology platform that connects sellers who list their own homes with buyers who make offers, and supports the e-signing of real-estate agreements.",
-      "Lixtara is operated by [LIXTARA LEGAL ENTITY NAME]. By accessing or using the Service, you acknowledge that you have read and understood this Privacy Policy. If you do not agree with our practices, please do not use the Service.",
+      "Lixtara is operated by Lixtara. By accessing or using the Service, you acknowledge that you have read and understood this Privacy Policy. If you do not agree with our practices, please do not use the Service.",
       "We are a United States-based company, and we process information in the United States. Please read this Policy together with our Terms of Service and our Cookie Policy.",
     ],
     sections: [
@@ -224,8 +224,8 @@ export const privacyDoc: LegalContent = {
           "If you have questions about this Privacy Policy or our privacy practices, or if you wish to exercise your privacy rights, please contact us:",
           "By email for privacy matters: privacy@lixtara.com",
           "By email for general support: support@lixtara.com",
-          "By mail: [LIXTARA LEGAL ENTITY NAME], [MAILING ADDRESS]",
-          "Attention: [DATA PROTECTION CONTACT]",
+          "By mail: Lixtara, Miami, Florida, United States",
+          "Attention: privacy@lixtara.com",
           "To submit a request to access, correct, delete, or otherwise exercise your rights, please email privacy@lixtara.com with details of your request. We may need to verify your identity before processing your request.",
         ],
       },
@@ -235,7 +235,7 @@ export const privacyDoc: LegalContent = {
     title: "Política de Privacidad",
     intro: [
       "Esta Política de Privacidad explica cómo Lixtara recopila, usa, comparte y protege la información sobre usted cuando utiliza nuestro sitio web, plataforma y servicios relacionados (el \"Servicio\"). Lixtara es una plataforma de tecnología inmobiliaria con sede en Miami, Florida, que conecta a vendedores que publican sus propias viviendas con compradores que presentan ofertas, y facilita la firma electrónica de acuerdos inmobiliarios.",
-      "Lixtara es operada por [LIXTARA LEGAL ENTITY NAME]. Al acceder o utilizar el Servicio, usted reconoce que ha leído y comprendido esta Política de Privacidad. Si no está de acuerdo con nuestras prácticas, por favor no utilice el Servicio.",
+      "Lixtara es operada por Lixtara. Al acceder o utilizar el Servicio, usted reconoce que ha leído y comprendido esta Política de Privacidad. Si no está de acuerdo con nuestras prácticas, por favor no utilice el Servicio.",
       "Somos una empresa con sede en los Estados Unidos y procesamos la información en los Estados Unidos. Le pedimos que lea esta Política junto con nuestros Términos de Servicio y nuestra Política de Cookies.",
     ],
     sections: [
@@ -454,8 +454,8 @@ export const privacyDoc: LegalContent = {
           "Si tiene preguntas sobre esta Política de Privacidad o sobre nuestras prácticas de privacidad, o si desea ejercer sus derechos de privacidad, comuníquese con nosotros:",
           "Por correo electrónico para asuntos de privacidad: privacy@lixtara.com",
           "Por correo electrónico para soporte general: support@lixtara.com",
-          "Por correo postal: [LIXTARA LEGAL ENTITY NAME], [MAILING ADDRESS]",
-          "Atención: [DATA PROTECTION CONTACT]",
+          "Por correo postal: Lixtara, Miami, Florida, United States",
+          "Atención: privacy@lixtara.com",
           "Para presentar una solicitud de acceso, corrección, eliminación o de ejercicio de sus derechos, envíe un correo electrónico a privacy@lixtara.com con los detalles de su solicitud. Es posible que necesitemos verificar su identidad antes de procesar su solicitud.",
         ],
       },

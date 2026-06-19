@@ -4,7 +4,7 @@ export const disclaimersDoc: LegalContent = {
   en: {
     title: "Disclaimers",
     intro: [
-      "These Disclaimers explain important limitations on the information, tools, and services that Lixtara (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), operated by [LIXTARA LEGAL ENTITY NAME], makes available through its website, applications, and related services (the \"Services\"). Lixtara is a real-estate platform based in Miami, Florida that combines for-sale-by-owner (FSBO) tools with licensed-broker support.",
+      "These Disclaimers explain important limitations on the information, tools, and services that Lixtara (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), operated by Lixtara, makes available through its website, applications, and related services (the \"Services\"). Lixtara is a real-estate platform based in Miami, Florida that combines for-sale-by-owner (FSBO) tools with licensed-broker support.",
       "Please read these Disclaimers carefully. They are part of, and should be read together with, our Terms of Service. By accessing or using the Services, you acknowledge that you have read and understood the limitations described below. If you do not agree with them, please do not use the Services.",
     ],
     sections: [
@@ -87,8 +87,8 @@ export const disclaimersDoc: LegalContent = {
         heading: "10. Contact Us",
         body: [
           "If you have questions about these Disclaimers, please contact us:",
-          "[LIXTARA LEGAL ENTITY NAME]",
-          "[MAILING ADDRESS]",
+          "Lixtara",
+          "Miami, Florida, United States",
           "Email: legal@lixtara.com",
         ],
       },
@@ -97,7 +97,7 @@ export const disclaimersDoc: LegalContent = {
   es: {
     title: "Avisos Legales",
     intro: [
-      "Estos Avisos Legales explican limitaciones importantes sobre la informacion, las herramientas y los servicios que Lixtara (\"Lixtara\", \"nosotros\" o \"nuestro\"), operada por [LIXTARA LEGAL ENTITY NAME], pone a disposicion a traves de su sitio web, sus aplicaciones y los servicios relacionados (los \"Servicios\"). Lixtara es una plataforma inmobiliaria con sede en Miami, Florida, que combina herramientas de venta por el propietario (FSBO) con el apoyo de un corredor con licencia.",
+      "Estos Avisos Legales explican limitaciones importantes sobre la informacion, las herramientas y los servicios que Lixtara (\"Lixtara\", \"nosotros\" o \"nuestro\"), operada por Lixtara, pone a disposicion a traves de su sitio web, sus aplicaciones y los servicios relacionados (los \"Servicios\"). Lixtara es una plataforma inmobiliaria con sede en Miami, Florida, que combina herramientas de venta por el propietario (FSBO) con el apoyo de un corredor con licencia.",
       "Por favor, lea estos Avisos Legales con atencion. Forman parte de nuestros Terminos del Servicio y deben leerse junto con ellos. Al acceder o utilizar los Servicios, usted reconoce que ha leido y comprendido las limitaciones que se describen a continuacion. Si no esta de acuerdo con ellas, por favor no utilice los Servicios.",
     ],
     sections: [
@@ -180,8 +180,8 @@ export const disclaimersDoc: LegalContent = {
         heading: "10. Contactenos",
         body: [
           "Si tiene preguntas sobre estos Avisos Legales, por favor contactenos:",
-          "[LIXTARA LEGAL ENTITY NAME]",
-          "[MAILING ADDRESS]",
+          "Lixtara",
+          "Miami, Florida, United States",
           "Correo electronico: legal@lixtara.com",
         ],
       },

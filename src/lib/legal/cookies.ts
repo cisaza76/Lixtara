@@ -159,7 +159,7 @@ export const cookiesDoc: LegalContent = {
         bullets: [
           "Email: privacy@lixtara.com",
           "Lixtara, Miami, Florida, USA",
-          "Mailing address: [MAILING ADDRESS]",
+          "Mailing address: Miami, Florida, United States",
         ],
       },
     ],
@@ -322,7 +322,7 @@ export const cookiesDoc: LegalContent = {
         bullets: [
           "Correo electrónico: privacy@lixtara.com",
           "Lixtara, Miami, Florida, EE. UU.",
-          "Dirección postal: [MAILING ADDRESS]",
+          "Dirección postal: Miami, Florida, United States",
         ],
       },
     ],

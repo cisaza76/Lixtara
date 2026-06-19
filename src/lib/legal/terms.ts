@@ -4,7 +4,7 @@ export const termsDoc: LegalContent = {
   en: {
     title: "Terms of Service",
     intro: [
-      "These Terms of Service (the \"Terms\") govern your access to and use of the Lixtara website, applications, and services (collectively, the \"Services\"). Lixtara is an online platform that combines for-sale-by-owner (FSBO) tools with licensed-broker support to help property owners in Florida list, market, and sell their homes. Lixtara is operated by [LIXTARA LEGAL ENTITY NAME] (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), based in Miami, Florida, United States.",
+      "These Terms of Service (the \"Terms\") govern your access to and use of the Lixtara website, applications, and services (collectively, the \"Services\"). Lixtara is an online platform that combines for-sale-by-owner (FSBO) tools with licensed-broker support to help property owners in Florida list, market, and sell their homes. Lixtara is operated by Lixtara (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), based in Miami, Florida, United States.",
       "Please read these Terms carefully. By accessing or using the Services, creating an account, starting a listing, or signing any agreement through the Services, you agree to be bound by these Terms. If you do not agree, do not use the Services. These Terms include important provisions that affect your legal rights, including disclaimers of warranties, a limitation of liability, an indemnification obligation, and provisions regarding dispute resolution and arbitration.",
     ],
     sections: [
@@ -215,9 +215,9 @@ export const termsDoc: LegalContent = {
         heading: "21. Contact Us",
         body: [
           "If you have questions about these Terms or the Services, please contact us:",
-          "Lixtara — [LIXTARA LEGAL ENTITY NAME], Miami, Florida, United States. Mailing address: [MAILING ADDRESS].",
+          "Lixtara — Lixtara, Miami, Florida, United States. Mailing address: Miami, Florida, United States.",
           "Legal: legal@lixtara.com. Support: support@lixtara.com.",
-          "Florida real estate brokerage (license application pending). Brokerage license number: [BROKERAGE LICENSE NO. — once issued]. Principal broker of record: [PRINCIPAL BROKER NAME].",
+          "Florida real estate brokerage (license application pending). Brokerage license number: XXXXXX. Principal broker of record: XXXXXX.",
         ],
       },
     ],
@@ -225,7 +225,7 @@ export const termsDoc: LegalContent = {
   es: {
     title: "Términos del Servicio",
     intro: [
-      "Estos Términos del Servicio (los \"Términos\") rigen su acceso y uso del sitio web, las aplicaciones y los servicios de Lixtara (en conjunto, los \"Servicios\"). Lixtara es una plataforma en línea que combina herramientas de venta por el propietario (FSBO, por sus siglas en inglés) con el apoyo de un corredor de bienes raíces con licencia, para ayudar a los propietarios en Florida a publicar, promocionar y vender sus viviendas. Lixtara es operada por [LIXTARA LEGAL ENTITY NAME] (\"Lixtara\", \"nosotros\" o \"nuestro\"), con sede en Miami, Florida, Estados Unidos.",
+      "Estos Términos del Servicio (los \"Términos\") rigen su acceso y uso del sitio web, las aplicaciones y los servicios de Lixtara (en conjunto, los \"Servicios\"). Lixtara es una plataforma en línea que combina herramientas de venta por el propietario (FSBO, por sus siglas en inglés) con el apoyo de un corredor de bienes raíces con licencia, para ayudar a los propietarios en Florida a publicar, promocionar y vender sus viviendas. Lixtara es operada por Lixtara (\"Lixtara\", \"nosotros\" o \"nuestro\"), con sede en Miami, Florida, Estados Unidos.",
       "Lea estos Términos detenidamente. Al acceder o utilizar los Servicios, crear una cuenta, iniciar una publicación o firmar cualquier acuerdo a través de los Servicios, usted acepta quedar obligado por estos Términos. Si no está de acuerdo, no utilice los Servicios. Estos Términos incluyen disposiciones importantes que afectan sus derechos legales, incluidas exenciones de garantías, una limitación de responsabilidad, una obligación de indemnización y disposiciones sobre resolución de disputas y arbitraje.",
     ],
     sections: [
@@ -436,9 +436,9 @@ export const termsDoc: LegalContent = {
         heading: "21. Contáctenos",
         body: [
           "Si tiene preguntas sobre estos Términos o los Servicios, comuníquese con nosotros:",
-          "Lixtara — [LIXTARA LEGAL ENTITY NAME], Miami, Florida, Estados Unidos. Dirección postal: [MAILING ADDRESS].",
+          "Lixtara — Lixtara, Miami, Florida, Estados Unidos. Dirección postal: Miami, Florida, United States.",
           "Legal: legal@lixtara.com. Soporte: support@lixtara.com.",
-          "Correduría de bienes raíces de Florida (solicitud de licencia en trámite). Número de licencia de correduría: [BROKERAGE LICENSE NO. — once issued]. Corredor principal a cargo: [PRINCIPAL BROKER NAME].",
+          "Correduría de bienes raíces de Florida (solicitud de licencia en trámite). Número de licencia de correduría: XXXXXX. Corredor principal a cargo: XXXXXX.",
         ],
       },
     ],
