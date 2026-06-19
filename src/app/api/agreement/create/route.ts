@@ -223,8 +223,8 @@ export async function POST(req: Request) {
         list_price: `$${property.list_price.toLocaleString()}`,
         hoa_fee: money(property.hoa_fee),
         tax_annual: money(property.tax_annual_amount),
-        cash_only: yn(property.cash_only),
-        as_is_sale: yn(property.as_is_sale),
+        // cash_only + as_is_sale are sent as CHECKBOX tabs (see checkboxTabs
+        // below) since the template binds them as checkboxes.
         // ── Occupancy / tenancy ──
         occupancy_status:
           OCCUPANCY_LABEL[property.occupancy_status ?? ""] ??
@@ -266,6 +266,8 @@ export async function POST(req: Request) {
         //  • buyer_commission_ack → contract line 145, item A — always checked
         //    (the seller agrees to publish a buyer-agent commission).
         checkboxTabs: {
+          cash_only: property.cash_only === true,
+          as_is_sale: property.as_is_sale === true,
           lockbox_authorized: lockboxIncluded,
           buyer_commission_ack: true,
         },
