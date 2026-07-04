@@ -10,6 +10,8 @@ import {
   type Tone,
   type Workstream,
 } from "@/components/seller-listing-card";
+import { MediaStrategyPanel } from "@/components/media-strategy-panel";
+import type { StrategyPayload } from "@/lib/media-intelligence/types";
 
 interface ListingRow {
   id: string;
@@ -133,6 +135,25 @@ export default async function DashboardPage({
     .order("created_at", { ascending: false });
   const listings = (listingRows ?? []) as ListingRow[];
   const ids = listings.map((l) => l.id);
+
+  // Media Intelligence Agent — flag-gated read of the latest completed
+  // strategy per property (Task 16). No-op query when the flag is off.
+  const mediaAgentEnabled = process.env.MEDIA_AGENT_ENABLED === "true";
+  const mediaStrategyByListing = new Map<string, StrategyPayload>();
+  if (mediaAgentEnabled && ids.length > 0) {
+    const { data: mediaJobs } = await supabase
+      .from("media_agent_jobs")
+      .select("property_id, strategy, status, created_at")
+      .in("property_id", ids)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false });
+    for (const j of mediaJobs ?? []) {
+      // keep the newest completed job per property (first seen wins due to desc order)
+      if (j.property_id && j.strategy && !mediaStrategyByListing.has(j.property_id)) {
+        mediaStrategyByListing.set(j.property_id, j.strategy as StrategyPayload);
+      }
+    }
+  }
 
   // Fetch everything else in parallel and group by property_id client-side.
   const [{ data: photoRows }, { data: payRows }, { data: agRows }, { data: tourRows }] =
@@ -539,32 +560,40 @@ export default async function DashboardPage({
                 : undefined;
 
               return (
-                <SellerListingCard
-                  key={l.id}
-                  photo={photo}
-                  address={l.address_street}
-                  cityLine={`${l.address_city}, ${l.address_state} ${l.address_zip}`}
-                  price={l.list_price.toLocaleString()}
-                  statusText={status.text}
-                  statusTone={status.tone as Tone}
-                  tierText={tierText}
-                  offersBadge={
-                    offersCount > 0
-                      ? `${offersCount} ${copy.offersUnit}`
-                      : undefined
-                  }
-                  noPhotosLabel={copy.noPhotos}
-                  workingEyebrow={cc.workingEyebrow}
-                  metricsLabel={cc.metricsLabel}
-                  nextStepLabel={cc.nextStepLabel}
-                  workstreams={workstreams}
-                  metrics={metrics}
-                  nextStep={nextStep}
-                  primaryHref={isDraft ? `${flowHref}&step=6` : publicHref}
-                  primaryLabel={
-                    isDraft ? copy.continueListingButton : copy.viewListingButton
-                  }
-                />
+                <div key={l.id} className="flex flex-col gap-4">
+                  <SellerListingCard
+                    photo={photo}
+                    address={l.address_street}
+                    cityLine={`${l.address_city}, ${l.address_state} ${l.address_zip}`}
+                    price={l.list_price.toLocaleString()}
+                    statusText={status.text}
+                    statusTone={status.tone as Tone}
+                    tierText={tierText}
+                    offersBadge={
+                      offersCount > 0
+                        ? `${offersCount} ${copy.offersUnit}`
+                        : undefined
+                    }
+                    noPhotosLabel={copy.noPhotos}
+                    workingEyebrow={cc.workingEyebrow}
+                    metricsLabel={cc.metricsLabel}
+                    nextStepLabel={cc.nextStepLabel}
+                    workstreams={workstreams}
+                    metrics={metrics}
+                    nextStep={nextStep}
+                    primaryHref={isDraft ? `${flowHref}&step=6` : publicHref}
+                    primaryLabel={
+                      isDraft ? copy.continueListingButton : copy.viewListingButton
+                    }
+                  />
+                  {mediaAgentEnabled && (
+                    <MediaStrategyPanel
+                      propertyId={l.id}
+                      initial={mediaStrategyByListing.get(l.id) ?? null}
+                      copy={t(lang).mediaAgent}
+                    />
+                  )}
+                </div>
               );
             })}
           </div>
