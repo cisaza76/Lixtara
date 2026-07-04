@@ -42,15 +42,25 @@ export async function createJob(
   return data.id;
 }
 
+function throwIfError(error: unknown): void {
+  if (!error) return;
+  const message =
+    typeof error === "object" && error && "message" in error
+      ? (error as { message?: string }).message
+      : "unknown";
+  throw new Error(`media_agent_jobs update failed: ${message}`);
+}
+
 export async function setJobStatus(
   db: JobDbClient,
   jobId: string,
   status: MediaJobStatus,
 ): Promise<void> {
-  await db
+  const { error } = await db
     .from(TABLE)
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", jobId);
+  throwIfError(error);
 }
 
 export async function completeJob(
@@ -59,7 +69,7 @@ export async function completeJob(
   payload: StrategyPayload,
   providers: string,
 ): Promise<void> {
-  await db
+  const { error } = await db
     .from(TABLE)
     .update({
       status: "completed" as MediaJobStatus,
@@ -68,6 +78,7 @@ export async function completeJob(
       updated_at: new Date().toISOString(),
     })
     .eq("id", jobId);
+  throwIfError(error);
 }
 
 export async function failJob(
@@ -75,7 +86,7 @@ export async function failJob(
   jobId: string,
   error: string,
 ): Promise<void> {
-  await db
+  const { error: dbError } = await db
     .from(TABLE)
     .update({
       status: "failed" as MediaJobStatus,
@@ -83,4 +94,5 @@ export async function failJob(
       updated_at: new Date().toISOString(),
     })
     .eq("id", jobId);
+  throwIfError(dbError);
 }

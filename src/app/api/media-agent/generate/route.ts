@@ -10,6 +10,7 @@ import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { runMediaAgent, type AgentDeps } from "@/lib/media-intelligence/agent";
 import { createJob, completeJob, failJob } from "@/lib/media-intelligence/jobs";
 import { setJobStatus } from "@/lib/media-intelligence/jobs";
+import { SelectionEmptyError } from "@/lib/media-intelligence/select";
 import { toAssets } from "@/lib/media-intelligence/ingest";
 import { classifyAssets } from "@/lib/media-intelligence/classify";
 import { scoreAssets } from "@/lib/media-intelligence/quality";
@@ -111,7 +112,14 @@ export async function POST(req: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "pipeline_error";
     console.error(`[media-agent] job=${jobId} failed: ${msg}`);
-    await failJob(svc as never, jobId, msg);
+    try {
+      await failJob(svc as never, jobId, msg);
+    } catch (persistErr) {
+      console.error("[media-agent] failJob also failed", persistErr);
+    }
+    if (e instanceof SelectionEmptyError) {
+      return NextResponse.json({ error: "no_usable_photos" }, { status: 422 });
+    }
     return NextResponse.json({ error: "pipeline_failed", detail: msg, jobId }, { status: 500 });
   }
 }
