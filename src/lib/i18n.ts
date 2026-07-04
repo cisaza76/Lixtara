@@ -6,7 +6,7 @@ export function isLocale(value: string | undefined): value is Locale {
   return value !== undefined && (locales as readonly string[]).includes(value);
 }
 
-const dictionaries = {
+export const dictionaries = {
   en: {
     hero: {
       eyebrow: "Established Florida Brokerage",
@@ -1154,6 +1154,33 @@ const dictionaries = {
       bullet2: "Buyers navigate room-by-room in their browser, even on mobile",
       bullet3: "No expensive Matterport or Insta360 hardware required",
       bullet4: "Reconstruction-based — bounded by the actual video, listing-safe",
+    },
+    mediaAgent: {
+      cta: "Generate marketing package",
+      generating: "Analyzing your photos…",
+      strategyTitle: "Media Strategy",
+      audience: "Target audience",
+      persona: "Buyer persona",
+      emotions: "Emotions",
+      highlight: "Spaces to highlight",
+      hide: "Spaces to de-emphasize",
+      narrative: "Narrative order",
+      style: "Visual style",
+      platforms: "Best platforms",
+      duration: "Suggested duration",
+      outputs: "Recommended outputs",
+      estCost: "Est. cost",
+      roi: "Best ROI combination",
+      shots: "Selected shots",
+      deliverables: "Deliverables",
+      approve: "Approve",
+      regenerate: "Regenerate",
+      variant: "Request a different version",
+      mockBadge: "Preview (not yet rendered)",
+      disclosure:
+        "AI-assisted marketing preview. Any generated media will be clearly disclosed and must faithfully represent the property.",
+      tooFewPhotos: "Add at least 3 photos to generate a marketing package.",
+      failed: "Something went wrong. Please try again.",
     },
     rebate: {
       eyebrow: "Buyer rebate program",
@@ -2398,6 +2425,33 @@ const dictionaries = {
       bullet2: "Compradores recorren cuarto por cuarto desde su navegador, incluso móvil",
       bullet3: "Sin hardware caro tipo Matterport o Insta360",
       bullet4: "Reconstrucción real, acotada al video — compatible con reglas de publicación",
+    },
+    mediaAgent: {
+      cta: "Generar paquete de marketing",
+      generating: "Analizando tus fotos…",
+      strategyTitle: "Estrategia de medios",
+      audience: "Público objetivo",
+      persona: "Perfil del comprador",
+      emotions: "Emociones",
+      highlight: "Espacios a resaltar",
+      hide: "Espacios a restar énfasis",
+      narrative: "Orden narrativo",
+      style: "Estilo visual",
+      platforms: "Mejores plataformas",
+      duration: "Duración sugerida",
+      outputs: "Salidas recomendadas",
+      estCost: "Costo est.",
+      roi: "Mejor combinación de ROI",
+      shots: "Tomas seleccionadas",
+      deliverables: "Entregables",
+      approve: "Aprobar",
+      regenerate: "Regenerar",
+      variant: "Solicitar otra versión",
+      mockBadge: "Vista previa (aún no renderizado)",
+      disclosure:
+        "Vista previa de marketing asistida por IA. Cualquier medio generado se divulgará claramente y debe representar fielmente la propiedad.",
+      tooFewPhotos: "Agrega al menos 3 fotos para generar el paquete de marketing.",
+      failed: "Algo salió mal. Inténtalo de nuevo.",
     },
     rebate: {
       eyebrow: "Programa de rebate para compradores",

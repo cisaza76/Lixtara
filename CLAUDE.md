@@ -88,6 +88,10 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   `KV_REST_API_TOKEN`; a manual Upstash DB uses `UPSTASH_REDIS_REST_URL` /
   `UPSTASH_REDIS_REST_TOKEN`. `ratelimit.ts` reads either. When absent (local dev / CI) the
   limiters fail open; `enforceLimit` logs loudly in prod.
+- `MEDIA_AGENT_ENABLED` — server-only feature flag (`"true"` to enable). Gates the
+  Media Intelligence Agent route (`/api/media-agent/generate`) and its dashboard
+  surface. v1 produces mock deliverables only (no real media generation). Reuses
+  the existing Anthropic access (`@ai-sdk/anthropic`); no new provider keys in v1.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 
