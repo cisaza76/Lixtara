@@ -88,6 +88,26 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   `KV_REST_API_TOKEN`; a manual Upstash DB uses `UPSTASH_REDIS_REST_URL` /
   `UPSTASH_REDIS_REST_TOKEN`. `ratelimit.ts` reads either. When absent (local dev / CI) the
   limiters fail open; `enforceLimit` logs loudly in prod.
+- `SENTRY_DSN` — server-only. Read exclusively by the repo-root `instrumentation.ts`
+  (Next.js instrumentation hook), which initializes `@sentry/nextjs` and registers it
+  with `src/lib/observability/sentry.server.ts#capturePipelineError` ONLY when this is
+  set — unset (every environment as of this writing) is a no-op, never a startup error.
+  Currently wired for the Creative Studio video pipeline only (Task 7 / Gate D1 of
+  `docs/superpowers/plans/2026-07-15-creative-studio-p2-video.md`); no client-side
+  Sentry, source-map upload, or general request-error instrumentation yet.
+- `CREATIVE_STUDIO_VIDEO_ENABLED` — server-only feature flag (`"true"` to enable).
+  Gates `POST /api/creative-studio/video/generate` (fail-closed 404 when unset).
+- `CRON_SECRET` — server-only. Verified (timing-safe) by the durable video-render
+  worker (`/api/creative-studio/video/worker`, a Vercel Cron target) before it claims
+  any job; 401 when unset or wrong.
+- `CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID` / `CREATIVE_STUDIO_SANDBOX_IMAGE` — server-only.
+  The prebuilt Vercel Sandbox base artifact the video worker renders in
+  (`src/lib/video-engine/worker-deps.ts#resolveSandboxBaseArtifactFromEnv`); neither
+  set throws loudly rather than silently falling back to a stock, unprepared runtime.
+  Technical QA (ffprobe) runs INSIDE that same Sandbox, right after the render and
+  before it stops (`SandboxRemotionProvider.render`, `src/lib/video-engine/
+  render-provider.ts`) — no `ffprobe` binary is needed on the worker's own Node
+  runtime.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 

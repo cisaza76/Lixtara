@@ -6,7 +6,7 @@ export function isLocale(value: string | undefined): value is Locale {
   return value !== undefined && (locales as readonly string[]).includes(value);
 }
 
-const dictionaries = {
+export const dictionaries = {
   en: {
     hero: {
       eyebrow: "Established Florida Brokerage",
@@ -1154,6 +1154,35 @@ const dictionaries = {
       bullet2: "Buyers navigate room-by-room in their browser, even on mobile",
       bullet3: "No expensive Matterport or Insta360 hardware required",
       bullet4: "Reconstruction-based — bounded by the actual video, listing-safe",
+    },
+    creativeStudio: {
+      listingVideo: {
+        title: "Listing video",
+        subtitle: "Create a polished video using your listing photos.",
+        createCta: "Create listing video",
+        timeHint: "Usually ready in a few minutes.",
+        disclosure:
+          "Made from your listing photos. The property itself is never digitally altered — and you review the video before using it anywhere.",
+        creatingHeading: "Creating your video",
+        creatingContext: "Preparing your listing video…",
+        creatingNote: "You can leave this page — we'll keep going.",
+        readyHeading: "Your video is ready",
+        madeFromChip: "Made from your listing photos",
+        createdLabel: "Created",
+        download: "Download video",
+        preview: "Preview video",
+        errorHeading: "We couldn't finish your video",
+        errorReassurance: "Your listing and photos are safe. No video was added.",
+        errorDetail: "This sometimes happens — trying again usually works.",
+        tryAgain: "Try again",
+        stillTrouble: "Still having trouble?",
+        contactSupport: "Contact support",
+        sr: {
+          creating: "Creating your video",
+          ready: "Your video is ready",
+          failed: "We couldn't finish your video",
+        },
+      },
     },
     rebate: {
       eyebrow: "Buyer rebate program",
@@ -2398,6 +2427,35 @@ const dictionaries = {
       bullet2: "Compradores recorren cuarto por cuarto desde su navegador, incluso móvil",
       bullet3: "Sin hardware caro tipo Matterport o Insta360",
       bullet4: "Reconstrucción real, acotada al video — compatible con reglas de publicación",
+    },
+    creativeStudio: {
+      listingVideo: {
+        title: "Video de la propiedad",
+        subtitle: "Crea un video pulido con las fotos de tu propiedad.",
+        createCta: "Crear video de la propiedad",
+        timeHint: "Normalmente estará listo en unos minutos.",
+        disclosure:
+          "Hecho con las fotos de tu propiedad. La propiedad nunca se altera digitalmente — y revisas el video antes de usarlo.",
+        creatingHeading: "Creando tu video",
+        creatingContext: "Preparando el video de tu propiedad…",
+        creatingNote: "Puedes salir de esta página — seguiremos trabajando.",
+        readyHeading: "Tu video está listo",
+        madeFromChip: "Hecho con las fotos de tu propiedad",
+        createdLabel: "Creado el",
+        download: "Descargar video",
+        preview: "Ver video",
+        errorHeading: "No pudimos terminar tu video",
+        errorReassurance: "Tu publicación y tus fotos están seguras. No se agregó ningún video.",
+        errorDetail: "A veces pasa — volver a intentarlo suele funcionar.",
+        tryAgain: "Intentar de nuevo",
+        stillTrouble: "¿Sigues con problemas?",
+        contactSupport: "Contactar soporte",
+        sr: {
+          creating: "Creando tu video",
+          ready: "Tu video está listo",
+          failed: "No pudimos terminar tu video",
+        },
+      },
     },
     rebate: {
       eyebrow: "Programa de rebate para compradores",

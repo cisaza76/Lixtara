@@ -10,6 +10,7 @@ import {
   type Tone,
   type Workstream,
 } from "@/components/seller-listing-card";
+import { ListingVideoPanel } from "@/components/listing-video-panel";
 
 interface ListingRow {
   id: string;
@@ -133,6 +134,10 @@ export default async function DashboardPage({
     .order("created_at", { ascending: false });
   const listings = (listingRows ?? []) as ListingRow[];
   const ids = listings.map((l) => l.id);
+
+  // Creative Studio v1 "Listing video" — server-only flag (no NEXT_PUBLIC_ variant);
+  // the panel polls its own status route.
+  const listingVideoEnabled = process.env.CREATIVE_STUDIO_VIDEO_ENABLED === "true";
 
   // Fetch everything else in parallel and group by property_id client-side.
   const [{ data: photoRows }, { data: payRows }, { data: agRows }, { data: tourRows }] =
@@ -539,32 +544,40 @@ export default async function DashboardPage({
                 : undefined;
 
               return (
-                <SellerListingCard
-                  key={l.id}
-                  photo={photo}
-                  address={l.address_street}
-                  cityLine={`${l.address_city}, ${l.address_state} ${l.address_zip}`}
-                  price={l.list_price.toLocaleString()}
-                  statusText={status.text}
-                  statusTone={status.tone as Tone}
-                  tierText={tierText}
-                  offersBadge={
-                    offersCount > 0
-                      ? `${offersCount} ${copy.offersUnit}`
-                      : undefined
-                  }
-                  noPhotosLabel={copy.noPhotos}
-                  workingEyebrow={cc.workingEyebrow}
-                  metricsLabel={cc.metricsLabel}
-                  nextStepLabel={cc.nextStepLabel}
-                  workstreams={workstreams}
-                  metrics={metrics}
-                  nextStep={nextStep}
-                  primaryHref={isDraft ? `${flowHref}&step=6` : publicHref}
-                  primaryLabel={
-                    isDraft ? copy.continueListingButton : copy.viewListingButton
-                  }
-                />
+                <div key={l.id} className="flex flex-col gap-4">
+                  <SellerListingCard
+                    photo={photo}
+                    address={l.address_street}
+                    cityLine={`${l.address_city}, ${l.address_state} ${l.address_zip}`}
+                    price={l.list_price.toLocaleString()}
+                    statusText={status.text}
+                    statusTone={status.tone as Tone}
+                    tierText={tierText}
+                    offersBadge={
+                      offersCount > 0
+                        ? `${offersCount} ${copy.offersUnit}`
+                        : undefined
+                    }
+                    noPhotosLabel={copy.noPhotos}
+                    workingEyebrow={cc.workingEyebrow}
+                    metricsLabel={cc.metricsLabel}
+                    nextStepLabel={cc.nextStepLabel}
+                    workstreams={workstreams}
+                    metrics={metrics}
+                    nextStep={nextStep}
+                    primaryHref={isDraft ? `${flowHref}&step=6` : publicHref}
+                    primaryLabel={
+                      isDraft ? copy.continueListingButton : copy.viewListingButton
+                    }
+                  />
+                  {listingVideoEnabled && (
+                    <ListingVideoPanel
+                      propertyId={l.id}
+                      lang={lang as Locale}
+                      copy={t(lang).creativeStudio.listingVideo}
+                    />
+                  )}
+                </div>
               );
             })}
           </div>
