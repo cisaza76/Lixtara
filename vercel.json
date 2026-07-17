@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/creative-studio/video/worker",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
