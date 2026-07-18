@@ -10,27 +10,38 @@
 
 ---
 
-## Current verdict: **BLOCKED**
+## Current verdict: **BLOCKED — Documentation complete; production artifact not yet baked**
 
 ### Current blocker (the ONLY thing stopping advance right now)
-- **Migration history reconciliation.** Step 1's `db push --dry-run` (2026-07-17) showed a bare push would apply an
-  older, unauthorized second migration from another workstream (`20260703232736_create_media_agent_jobs.sql`, Media
-  Agent) alongside the Creative Studio one. Resolving that cross-workstream collision is out of scope for this launch;
-  it has its own checkpoint: **`2026-07-17-migration-reconciliation-checkpoint.md`**. Step 1 stays BLOCKED until a
-  dry-run shows exclusively authorized migrations in a clean, in-order history.
-  - Step 1 authorization was given by the owner (conditionally) but was **NOT executed** — the pre-flight caught the
-    collision first. No SQL applied, no `migration repair`, production intact.
+- **Sandbox render artifact bake (preflight Step 0).** The artifact **definition is validated** (recipe, versions,
+  reproducibility, compatibility, security, integration, rollback, acceptance criteria) — see
+  **`2026-07-18-creative-studio-sandbox-artifact.md`** + `bake-sandbox-base.mjs`. Two mandatory items must close
+  **before** the first real bake is authorized:
+  1. **Pin ffmpeg** — exact version + immutable URL + SHA-256 set and enforced fail-closed (no "latest").
+  2. **Confirm React 19.2.4 in the bake** — the artifact is aligned to the app's React 19.2.4 (was 18.3.1 in the
+     spike); confirm a real render in the baked artifact.
+  Only then is the actual bake (create Sandbox → `snapshot()` → record `snapshotId` → bump `BASE_ARTIFACT_VERSION` →
+  set env var) authorized. No bake, upload, bucket, secret, flag, cron, or migration has been done.
 
-### Prerequisites for GO (future dependencies — do NOT block Step 1; needed later)
+### Resolved (no longer blockers)
+- **Migration history reconciliation — RESOLVED** via workstream separation (topology ii). F
+  (`feat/media-intelligence-foundation`) and B (`feat/creative-studio`) are **merged to `main`** (`main` = `8d9b641`);
+  A (`feat/media-agent-app`, carries `create_media_agent_jobs`) is deliberately **not** merged. `supabase db push
+  --dry-run` from `main` now shows **exclusively** `20260715171914_creative_studio_video.sql`, in order. See
+  `2026-07-17-migration-reconciliation-checkpoint.md`.
+- **Code integrated to `main`** — Creative Studio v1 is on `main` but **inert** (feature flags unset, migration
+  not applied).
+
+### Prerequisites for GO (owner-gated; sequence after the artifact)
 | Prereq | Owner action | Gates |
 |---|---|---|
-| **Sandbox render artifact** (highest-lead; no beta while pending / dynamic-install-dependent) | Build + pin base image; set `CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID`/`_IMAGE` (Step 3) | any real render (Step 9) → GO |
-| **Code deployed to prod** (branch not merged/deployed; note: neither pending migration is on `main`) | Merge/deploy to prod (or staging) Vercel env | flag-on (Step 8) |
+| **Sandbox render artifact** (current focus) | Close ffmpeg-pin + React-19 confirm → bake → set `CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID`/`_IMAGE` + bump `BASE_ARTIFACT_VERSION` (Step 3) | any real render (Step 9) → GO |
+| **Migration applied** | `supabase db push` (signed off; dry-run from `main` = only the CS migration) | Step 9 |
 | Private `creative-studio` bucket (Step 2) | create it | Step 9 |
 | `CRON_SECRET` / `SENTRY_DSN` (Steps 4–5) | set secrets | worker / capture |
 | `CREATIVE_STUDIO_VIDEO_ENABLED` (Step 8) | set flag, staged | seller-visible |
 
-While BLOCKED, nothing is seller-visible and there is zero production risk (both feature flags unset, no migration applied).
+While BLOCKED, nothing is seller-visible and there is zero production risk (feature flags unset, migration not applied).
 
 ---
 
@@ -39,9 +50,10 @@ While BLOCKED, nothing is seller-visible and there is zero production risk (both
 |---|---|---|
 | — | Migration validated (`migrations:check` ✓) | ✅ agent-verified |
 | — | Rollback SQL captured in repo (`rollback-20260715171914_creative_studio_video.sql`) | ✅ agent-verified |
-| 1 | Apply migration to prod | ⛔ **BLOCKED / NOT EXECUTED** — pre-flight dry-run found an unauthorized 2nd migration; see migration-reconciliation-checkpoint |
+| 0 | **Sandbox artifact definition** (recipe/versions/reproducibility/security/rollback/acceptance) | ✅ **validated** (preflight, 2026-07-17) — bake NOT authorized; see `2026-07-18-creative-studio-sandbox-artifact.md` |
+| 1 | Apply migration to prod | ◻ **unblocked, not executed** — reconciliation resolved (F+B on `main`); dry-run from `main` = only the CS migration; needs owner sign-off + after the artifact |
 | 2 | Private `creative-studio` bucket | ◻ owner action |
-| 3 | Sandbox artifact (B1) | ◻ owner action — **highest dependency** |
+| 3 | Sandbox artifact **bake** (create → snapshot → set env + bump `BASE_ARTIFACT_VERSION`) | ◻ owner action — **highest dependency; blocked on ffmpeg-pin + React-19 confirm** |
 | 4 | `CRON_SECRET` | ◻ owner action |
 | 5 | `SENTRY_DSN` | ◻ owner action |
 | 6 | Analytics (optional to activate) | ◻ decision |
