@@ -25,14 +25,15 @@ export const RENDERER_VERSION = "4.0.489";
 // not a hunt through the codebase (see the task brief's "Rollback" note).
 export const RENDER_PROVIDER = "vercel-sandbox";
 
-// Version tag of the prebuilt Vercel Sandbox base artifact (Node 24, Chromium + its
-// OS libs, ffmpeg/ffprobe, xz, the pinned Remotion packages baked in — see
-// docs/superpowers/spikes/2026-07-15-p2.0-sandbox-render.md §3/§7). NOT YET BUILT as
-// of this module's authoring — Task 5 (Gate B2) only proves the render+QA+persistence
-// logic against `FakeRenderProvider`; baking and versioning the actual snapshot/VCR
-// image is separate follow-up work. `SandboxRemotionProvider` reads this constant (or
-// an injected override) as its default base reference; until a real artifact exists,
-// constructing it without an explicit `baseArtifact` override will fail loudly at
-// render time rather than silently hitting a stock (un-prepared, npm-install-required)
-// runtime. Update this string the moment a real base artifact is baked and versioned.
-export const BASE_ARTIFACT_VERSION = "unbaked-pending-prebuilt-base";
+// Version tag of the prebuilt Vercel Sandbox base artifact (Node 24, Chromium + its OS
+// libs, ffmpeg/ffprobe, xz, the pinned Remotion packages baked in). BAKED + validated
+// 2026-07-19 as the permanent, non-expiring snapshot `snap_8gmMWE8S5NgT5RfM4qfIiMztMfnC`
+// (region iad1) — a **Production Candidate**; all 10 recipe gates passed. See
+// docs/superpowers/runbooks/2026-07-18-creative-studio-sandbox-artifact.md.
+// `SandboxRemotionProvider` reads this constant (or an injected override) as its default
+// base reference and stamps it onto every rendered video's provenance. NOTE: this tag is
+// NOT an activation switch — the snapshotId itself lives ONLY in the
+// CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID env var (still unset), so the provider still fails
+// loudly at render time until that env var is set. Bump this tag together with a new
+// snapshotId whenever a new artifact is baked (keep the pair for rollback).
+export const BASE_ARTIFACT_VERSION = "base-2026-07-19-ffmpeg8.1.2-remotion4.0.489";
