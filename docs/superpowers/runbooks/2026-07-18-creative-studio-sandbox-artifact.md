@@ -20,8 +20,10 @@ needs **baked in once**, so per-job cost is render-only (no npm-install-per-rend
   independent of `BASE_ARTIFACT_VERSION`.
 
 ## Target runtime
-Vercel Sandbox `runtime: "node24"`, **4 vCPU / 8 GB**, `amd64`, region `iad1`. One-time prep in the
-Gate B2 spike measured **~38 s / ~362 MB ingress** (paid once, not per video).
+Vercel Sandbox `runtime: "node24"`, **4 vCPU / 8 GB** (2048 MB per vCPU), `amd64`, region `iad1`
+(**target**; region is not a `Sandbox.create` input in `@vercel/sandbox` 2.6.1 — placement follows
+the project/deployment, so it is not set as a create-time knob). One-time prep in the Gate B2 spike
+measured **~38 s / ~362 MB ingress** (paid once, not per video).
 
 ## Pinned versions
 | Component | Pin | Notes |
@@ -34,7 +36,7 @@ Gate B2 spike measured **~38 s / ~362 MB ingress** (paid once, not per video).
 
 ## Bake recipe (hardened)
 The executable recipe lives alongside this doc; the canonical copy used for the Step-0 preflight is
-`bake-sandbox-base.mjs` (SHA-256 `a6ed5ceb9d237c7b270f8f3a7afff950afd3b20dd4e982811251531fb815827e`).
+`bake-sandbox-base.mjs` (SHA-256 `a532519a5c72d6691598e44ad4cb9a3c8dd08cfbd2599df821c4238fa53a5759`).
 Key properties: pinned deps; Chromium OS libs via `dnf`; `ensureBrowser()`; **ffmpeg pinning is
 fail-closed** — it installs only if `sha256sum -c` passes (`set -e` aborts otherwise), and the
 `bake()` entry refuses to run while `FFMPEG.sha256` is a placeholder. **The ffmpeg version/URL/SHA-256

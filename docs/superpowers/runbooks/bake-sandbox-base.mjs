@@ -105,7 +105,10 @@ const SMOKE_FFPROBE_ASSERT = [
 
 export async function bake() {
   if (FFMPEG.sha256.startsWith("<PIN")) throw new Error("bake refused: FFMPEG.sha256 not pinned");
-  const sandbox = await Sandbox.create({ runtime: "node24", region: "iad1", resources: { vcpus: 4 } });
+  // NOTE: @vercel/sandbox 2.6.1 CreateSandboxParams has NO `region` input — `region` is a
+  // read-only property of the created Sandbox; placement follows the project/deployment, and
+  // passing it here would be silently ignored. Intentionally omitted (do not re-add as a knob).
+  const sandbox = await Sandbox.create({ runtime: "node24", resources: { vcpus: 4 } });
   await sandbox.writeFiles([
     { path: "package.json", content: Buffer.from(BASE_PACKAGE_JSON, "utf8") },
     { path: "ensure-chromium.mjs", content: Buffer.from(ENSURE_CHROMIUM, "utf8") },
