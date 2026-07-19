@@ -28,9 +28,12 @@ const PINNED = {
 // URL: `curl -fsSLo f.tar.xz "$FFMPEG_URL" && sha256sum f.tar.xz`. The bake MUST fail if the
 // downloaded bytes don't match — never install an unverified binary.
 const FFMPEG = {
-  version: "7.0.2",       // <-- PIN the exact version chosen
-  url: "https://<FIXED-IMMUTABLE-URL>/ffmpeg-7.0.2-amd64-static.tar.xz", // <-- PIN a versioned, immutable URL
-  sha256: "<PIN: sha256 of the file at FFMPEG.url — set before any bake; do not leave blank>",
+  // BtbN/FFmpeg-Builds n8.1.2-22-g94138f6973, linux64 GPL variant (extra-version 20260717).
+  // Checksum verified locally 2026-07-18; runtime validation deferred to the first authorized bake.
+  // GPL v3 (LICENSE.txt in the archive) — distribution note remains open (see runbook).
+  version: "8.1.2",
+  url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-17-13-22/ffmpeg-n8.1.2-22-g94138f6973-linux64-gpl-8.1.tar.xz",
+  sha256: "ca1b5eb366743fc44a415e1496dd39a8b3266d99d786bd3eb8cbd837452e306e",
 };
 
 const CHROMIUM_DEPS =
@@ -46,7 +49,8 @@ const FFMPEG_INSTALL = [
   `echo "${FFMPEG.sha256}  ffmpeg.tar.xz" | sha256sum -c -`,
   "tar -xf ffmpeg.tar.xz",
   "DIR=$(tar -tf ffmpeg.tar.xz | head -1 | cut -f1 -d/)",
-  'sudo cp "/tmp/$DIR/ffmpeg" "/tmp/$DIR/ffprobe" /usr/local/bin/',
+  // BtbN linux64 archives nest the binaries under $DIR/bin/ (not the archive root).
+  'sudo cp "/tmp/$DIR/bin/ffmpeg" "/tmp/$DIR/bin/ffprobe" /usr/local/bin/',
   "sudo chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe",
 ].join(" && ");
 
