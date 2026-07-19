@@ -1,8 +1,9 @@
 # Creative Studio — Sandbox Render Artifact (definition + bake recipe + acceptance criteria)
 
 **Status:** **architecture/definition implemented** (Launch Gate preflight Step 0, 2026-07-17).
-**Production values (ffmpeg version/URL/SHA-256) and the real bake are pending owner approval — NOT
-done.** This document is the durable spec for the prebuilt Vercel Sandbox base the video worker
+**The ffmpeg pin (version/URL/SHA-256) is now set — checksum verified locally 2026-07-18; runtime
+validation is deferred to the first authorized bake. The real bake is still pending owner approval —
+NOT done.** This document is the durable spec for the prebuilt Vercel Sandbox base the video worker
 renders in. No production artifact exists yet (`BASE_ARTIFACT_VERSION = "unbaked-pending-prebuilt-base"`).
 Nothing here is evidence that a bake has occurred.
 
@@ -29,17 +30,17 @@ Gate B2 spike measured **~38 s / ~362 MB ingress** (paid once, not per video).
 | remotion / bundler / renderer / fonts | **4.0.489** (exact, no caret) | matches `RENDERER_VERSION` in `src/lib/video-engine/versions.ts` |
 | react / react-dom | **19.2.4** (decision) | **aligned to the app** (`package.json`). Remotion 4.0.489 peer is `react >=16.8.0`; the composition uses no React-18/19-only API — so the spike's `18.3.1` drift is removed, not preserved. **Final validation occurs during the first authorized bake** (a real render with React 19.2.4). |
 | @vercel/sandbox | 2.6.1 | |
-| ffmpeg/ffprobe | **Pinning mechanism implemented** (fail-closed SHA-256, no "latest") | exact **version / URL / SHA-256 are production values pending owner approval** — filled once via an authorized download (see recipe + Open items) |
+| ffmpeg/ffprobe | **8.1.2** — BtbN linux64 **GPL** (`n8.1.2-22-g94138f6973`, extra-version 20260717); fail-closed SHA-256 `ca1b5e…2e306e` | Checksum verified locally 2026-07-18; **runtime validation deferred to the first authorized bake**. `--enable-libx264` present (static evidence: embedded config line + libx264 encoder strings; binary not executed on the arm64 host). GPL distribution note still open. |
 
 ## Bake recipe (hardened)
 The executable recipe lives alongside this doc; the canonical copy used for the Step-0 preflight is
-`bake-sandbox-base.mjs` (SHA-256 `44189f55bf02c08a2796f8f3bae2a3f72d7ee2e2215d5ab7c6cb765f1745f991`).
+`bake-sandbox-base.mjs` (SHA-256 `8cdfa07b553eb7144854904770ffd1f667a933822807b35384b587f4fbd82fb8`).
 Key properties: pinned deps; Chromium OS libs via `dnf`; `ensureBrowser()`; **ffmpeg pinning is
 fail-closed** — it installs only if `sha256sum -c` passes (`set -e` aborts otherwise), and the
-`bake()` entry refuses to run while `FFMPEG.sha256` is a placeholder. **The exact ffmpeg
-version/URL/SHA-256 are not yet pinned** — they are production values to be set once via an
-authorized download. The actual `snapshot()` + recording of `snapshotId` is the owner bake step,
-not part of Step 0.
+`bake()` entry refuses to run while `FFMPEG.sha256` is a placeholder. **The ffmpeg version/URL/SHA-256
+are now pinned** (BtbN `8.1.2` linux64 GPL, checksum verified locally 2026-07-18; the install path
+targets the BtbN `bin/` layout). The actual `snapshot()` + recording of `snapshotId` is the owner
+bake step, not part of Step 0.
 
 ## Reproducibility
 - The **recipe** is byte-stable and hashed (above). The **VM snapshot is NOT byte-reproducible** —
@@ -88,15 +89,19 @@ has happened. **Architecture implemented (☑)** = designed/coded/documented at 
 - [x] **Provenance mechanism in code** — `SandboxRemotionProvider` stamps `baseArtifactVersion` on every render output.
 
 ### B. Operational validation — only after the first authorized bake (NOT done)
-- [ ] **Production checksum recorded** — exact ffmpeg version + immutable URL + real SHA-256 pinned (one authorized download).
+- [x] **Production checksum recorded** — exact ffmpeg version + immutable URL + real SHA-256 pinned (authorized download 2026-07-18). Integrity closed; runtime validation still pending the bake.
 - [ ] **Baked artifact validated (render)** — a real render in the baked artifact, with React 19.2.4, produces an ffprobe-valid h264/1920×1080/30fps MP4 (in-target).
 - [ ] **Reproducibility confirmed on real bakes** — two bakes compared; functional equivalence shown.
 - [ ] **Provenance recorded on a real Asset** — `baseArtifactVersion` present on an actually-produced video Asset.
 
 ## Open items before the bake (owner-gated)
-1. **Pin the ffmpeg SHA-256** — choose the exact ffmpeg version + immutable URL, compute its SHA-256
-   once (`curl -fsSLo f.tar.xz "$URL" && sha256sum f.tar.xz`), and set `FFMPEG.sha256`. (The single
-   download this needs is owner-authorized.)
+1. ~~**Pin the ffmpeg SHA-256**~~ — **DONE 2026-07-18.** Pinned to BtbN `n8.1.2-22-g94138f6973`
+   linux64 GPL (`8.1.2`); local SHA-256 matched the published `ca1b5e…2e306e` exactly (`sha256sum -c`
+   fail-closed OK). Install path fixed for the BtbN `bin/` layout. **Runtime validation (`ffmpeg
+   -version`/`-encoders`) deferred to the first authorized bake** — not run here (arm64 host).
+   **GPL note remains open:** the GPL v3 build reduces some distribution scenarios for internal
+   server-side use but does not substitute a specific legal review before distributing the binary or
+   artifact outside the internal environment.
 2. **Confirm React 19.2.4 in the bake** — a real render in the baked artifact with React 19.2.4
    (matching the app), producing an ffprobe-valid MP4 (D1 evidence supports it; confirm in the bake).
 3. **The bake itself** — create Sandbox → run recipe → `snapshot()` → record `snapshotId` → bump
