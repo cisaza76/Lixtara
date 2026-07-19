@@ -34,13 +34,20 @@ Gate B2 spike measured **~38 s / ~362 MB ingress** (paid once, not per video).
 
 ## Bake recipe (hardened)
 The executable recipe lives alongside this doc; the canonical copy used for the Step-0 preflight is
-`bake-sandbox-base.mjs` (SHA-256 `8cdfa07b553eb7144854904770ffd1f667a933822807b35384b587f4fbd82fb8`).
+`bake-sandbox-base.mjs` (SHA-256 `a6ed5ceb9d237c7b270f8f3a7afff950afd3b20dd4e982811251531fb815827e`).
 Key properties: pinned deps; Chromium OS libs via `dnf`; `ensureBrowser()`; **ffmpeg pinning is
 fail-closed** — it installs only if `sha256sum -c` passes (`set -e` aborts otherwise), and the
 `bake()` entry refuses to run while `FFMPEG.sha256` is a placeholder. **The ffmpeg version/URL/SHA-256
 are now pinned** (BtbN `8.1.2` linux64 GPL, checksum verified locally 2026-07-18; the install path
-targets the BtbN `bin/` layout). The actual `snapshot()` + recording of `snapshotId` is the owner
-bake step, not part of Step 0.
+targets the BtbN `bin/` layout). **`bake()` is now a single self-validating, fail-closed pipeline**
+(v3): after preparing the artifact it runtime-verifies `node`/`ffprobe`/`ffmpeg`, asserts `libx264`
+is among the encoders, runs a real Remotion `codec:"h264"` smoke render (a minimal self-contained
+1920×1080/30fps composition — no Supabase/listing/photos/secrets), and ffprobe-asserts the MP4 is
+`h264 / 1920×1080 / 30fps` — all **before** `snapshot()`. Any failure throws before the snapshot, so
+a bad artifact can never be produced or promoted. `bake()` then calls `snapshot()` (which stops the
+session) and emits the `snapshotId`. **Recording that `snapshotId` into
+`CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID` and bumping `BASE_ARTIFACT_VERSION` remain separate, later
+owner steps — not part of running `bake()`.**
 
 ## Reproducibility
 - The **recipe** is byte-stable and hashed (above). The **VM snapshot is NOT byte-reproducible** —
