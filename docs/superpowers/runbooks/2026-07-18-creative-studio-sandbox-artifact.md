@@ -1,11 +1,13 @@
 # Creative Studio — Sandbox Render Artifact (definition + bake recipe + acceptance criteria)
 
-**Status:** **architecture/definition implemented** (Launch Gate preflight Step 0, 2026-07-17).
-**The ffmpeg pin (version/URL/SHA-256) is now set — checksum verified locally 2026-07-18; runtime
-validation is deferred to the first authorized bake. The real bake is still pending owner approval —
-NOT done.** This document is the durable spec for the prebuilt Vercel Sandbox base the video worker
-renders in. No production artifact exists yet (`BASE_ARTIFACT_VERSION = "unbaked-pending-prebuilt-base"`).
-Nothing here is evidence that a bake has occurred.
+**Status:** **permanent artifact baked + validated — Production Candidate (2026-07-19).** The
+ffmpeg pin is set (checksum verified 2026-07-18). The permanent, non-expiring snapshot
+`snap_8gmMWE8S5NgT5RfM4qfIiMztMfnC` (region `iad1`) was baked 2026-07-19 and passed all 10 recipe
+gates; `BASE_ARTIFACT_VERSION = "base-2026-07-19-ffmpeg8.1.2-remotion4.0.489"`. This document is the
+durable spec for the prebuilt Vercel Sandbox base the video worker renders in. **The artifact is a
+Production Candidate — NOT yet promoted:** it is not wired to any environment
+(`CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID`/`_IMAGE` still unset), and end-to-end integration, a real
+produced Asset, and production activation are still pending.
 
 ## What the artifact is
 A **Vercel Sandbox base** (referenced by `snapshotId`, or an `image`) with everything a render
@@ -67,6 +69,18 @@ not the platform's default ~30-day TTL. (Nothing else about the pipeline changes
 commands, gates, logging, smoke composition, order, `snapshot()` condition, resources and runtime.)
 
 ### Bake history
+- **Permanent bake — 2026-07-19 · Production Candidate.** Recipe SHA-256
+  `7787b1c6d7c6eb6e7e86e6ed67a90d5da573327fbe4ffcb01dc5a5380c204494` (the `snapshotExpiration: 0`
+  version). Produced the permanent snapshot **`snap_8gmMWE8S5NgT5RfM4qfIiMztMfnC`** — region `iad1`,
+  `createdAt` `2026-07-19T17:24:01.048Z`, `sizeBytes` `1 065 730 813`, **`expiresAt` = undefined
+  (NON-EXPIRING, confirmed via `Snapshot.get` and `Snapshot.list`)**. **All 10 gates passed**
+  (npm-install, chromium-os-deps, ensure-chromium, ffmpeg-pinned, verify-node, verify-ffprobe,
+  verify-ffmpeg, verify-libx264, render-smoke, ffprobe-smoke → `codec_name=h264`/`width=1920`/
+  `height=1080`/`r_frame_rate=30/1`), with node `v24.14.1`, ffmpeg/ffprobe `n8.1.2-…-20260717`,
+  runtime `libx264` present, `ffmpeg.tar.xz: OK`, and `RENDER_SMOKE_OK`. Tagged
+  `BASE_ARTIFACT_VERSION = "base-2026-07-19-ffmpeg8.1.2-remotion4.0.489"`. **Status: Production
+  Candidate — recorded here, NOT promoted:** `CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID`/`_IMAGE` remain
+  unset; no deploy, flags, cron, or migration.
 - **First validated bake — 2026-07-19 (validation-only, NOT promoted).** Ran the self-validating
   recipe end-to-end and produced the temporary snapshot **`snap_sLqjP5Eha6U7JnTTKai5LVLvHvtV`**
   (region `iad1`, `sizeBytes` 1 071 233 423). **All 10 gates passed** (npm-install, chromium-os-deps,
@@ -123,11 +137,11 @@ has happened. **Architecture implemented (☑)** = designed/coded/documented at 
 - [x] **Rollback documented** — prior `snapshotId` + `BASE_ARTIFACT_VERSION` retained; env-var revert path.
 - [x] **Provenance mechanism in code** — `SandboxRemotionProvider` stamps `baseArtifactVersion` on every render output.
 
-### B. Operational validation — only after the first authorized bake (NOT done)
+### B. Operational validation — permanent bake done 2026-07-19; remaining items still pending
 - [x] **Production checksum recorded** — exact ffmpeg version + immutable URL + real SHA-256 pinned (authorized download 2026-07-18). Integrity closed; runtime validation still pending the bake.
-- [ ] **Baked artifact validated (render)** — a real render in the baked artifact, with React 19.2.4, produces an ffprobe-valid h264/1920×1080/30fps MP4 (in-target).
-- [ ] **Reproducibility confirmed on real bakes** — two bakes compared; functional equivalence shown.
-- [ ] **Provenance recorded on a real Asset** — `baseArtifactVersion` present on an actually-produced video Asset.
+- [x] **Baked artifact validated (render)** — the permanent bake's Remotion `codec:"h264"` render, run **in the baked artifact** with the baked React 19.2.4, produced an ffprobe-valid **h264/1920×1080/30fps** MP4 (smoke composition; the full `ListingVideo` in-target render is the Gate D1 evidence above). Snapshot `snap_8gmMWE8S5NgT5RfM4qfIiMztMfnC`, 2026-07-19.
+- [ ] **Reproducibility confirmed on real bakes** — two bakes compared; functional equivalence shown. *(Not claimed: two bakes exist and both emitted h264/1920×1080/30fps, but no controlled reproducibility comparison was run.)*
+- [ ] **Provenance recorded on a real Asset** — `baseArtifactVersion` present on an actually-produced video Asset. *(Pending a real produced Asset — not demonstrated by the bake.)*
 
 ## Open items before the bake (owner-gated)
 1. ~~**Pin the ffmpeg SHA-256**~~ — **DONE 2026-07-18.** Pinned to BtbN `n8.1.2-22-g94138f6973`
