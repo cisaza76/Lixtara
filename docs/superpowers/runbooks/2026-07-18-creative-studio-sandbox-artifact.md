@@ -36,7 +36,7 @@ measured **~38 s / ~362 MB ingress** (paid once, not per video).
 
 ## Bake recipe (hardened)
 The executable recipe lives alongside this doc; the canonical copy used for the Step-0 preflight is
-`bake-sandbox-base.mjs` (SHA-256 `5a0eac6112b176c14848fda0012df999546bc1363d768237757644b8cdad96cc`).
+`bake-sandbox-base.mjs` (SHA-256 `7787b1c6d7c6eb6e7e86e6ed67a90d5da573327fbe4ffcb01dc5a5380c204494`).
 Key properties: pinned deps; Chromium OS libs via `dnf`; `ensureBrowser()`; **ffmpeg pinning is
 fail-closed** — it installs only if `sha256sum -c` passes (`set -e` aborts otherwise), and the
 `bake()` entry refuses to run while `FFMPEG.sha256` is a placeholder. **The ffmpeg version/URL/SHA-256
@@ -59,6 +59,23 @@ stdout/stderr — so a bake produces a captured, per-gate audit trail (node/ffmp
 narrow their own output to the relevant evidence, so nothing dumps a full build log, and no env var
 or secret is ever printed. Fail-closed behaviour is unchanged — a non-zero exit still throws before
 any downstream step or `snapshot()`.
+
+**Non-expiring, production-candidate snapshots:** `Sandbox.create` is called with
+`snapshotExpiration: 0` (confirmed in `@vercel/sandbox` 2.6.1: "Use `0` for no expiration"). Snapshots
+produced by this recipe therefore **never expire** and are intended to be **production candidates** —
+not the platform's default ~30-day TTL. (Nothing else about the pipeline changes: same pins, deps,
+commands, gates, logging, smoke composition, order, `snapshot()` condition, resources and runtime.)
+
+### Bake history
+- **First validated bake — 2026-07-19 (validation-only, NOT promoted).** Ran the self-validating
+  recipe end-to-end and produced the temporary snapshot **`snap_sLqjP5Eha6U7JnTTKai5LVLvHvtV`**
+  (region `iad1`, `sizeBytes` 1 071 233 423). **All 10 gates passed** (npm-install, chromium-os-deps,
+  ensure-chromium, ffmpeg-pinned, verify-node, verify-ffprobe, verify-ffmpeg, verify-libx264,
+  render-smoke, ffprobe-smoke → `codec_name=h264`/`width=1920`/`height=1080`/`r_frame_rate=30/1`).
+  This snapshot predates the `snapshotExpiration: 0` change and therefore carries the default
+  **~30-day TTL — it expires 2026-08-18** and **was NOT promoted**. It stands only as evidence that
+  the recipe, pins and gates work, and as an integration fallback until a permanent snapshot exists
+  and is validated. **Do not use `snap_sLqjP5Eha6U7JnTTKai5LVLvHvtV` as a production reference.**
 
 ## Reproducibility
 - The **recipe** is byte-stable and hashed (above). The **VM snapshot is NOT byte-reproducible** —

@@ -108,7 +108,10 @@ export async function bake() {
   // NOTE: @vercel/sandbox 2.6.1 CreateSandboxParams has NO `region` input — `region` is a
   // read-only property of the created Sandbox; placement follows the project/deployment, and
   // passing it here would be silently ignored. Intentionally omitted (do not re-add as a knob).
-  const sandbox = await Sandbox.create({ runtime: "node24", resources: { vcpus: 4 } });
+  // snapshotExpiration: 0 => the resulting snapshot NEVER expires (SDK 2.6.1: "Use 0 for no
+  // expiration"), so the bake produces a PERMANENT, production-candidate artifact rather than
+  // the platform's default ~30-day TTL. See the runbook's retention/history note.
+  const sandbox = await Sandbox.create({ runtime: "node24", resources: { vcpus: 4 }, snapshotExpiration: 0 });
   await sandbox.writeFiles([
     { path: "package.json", content: Buffer.from(BASE_PACKAGE_JSON, "utf8") },
     { path: "ensure-chromium.mjs", content: Buffer.from(ENSURE_CHROMIUM, "utf8") },
