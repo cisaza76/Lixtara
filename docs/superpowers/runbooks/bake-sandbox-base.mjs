@@ -115,11 +115,31 @@ export async function bake() {
     { path: "smoke-entry.jsx", content: Buffer.from(SMOKE_ENTRY, "utf8") },
     { path: "render-smoke.mjs", content: Buffer.from(SMOKE_RENDER, "utf8") },
   ]);
-  const sh = (label, cmd, timeoutMs = 300000) =>
-    sandbox.runCommand("sh", ["-c", cmd], { timeoutMs }).then(async (r) => {
-      if (r.exitCode !== 0) throw new Error(`${label} failed (exit ${r.exitCode}): ${(await r.stderr()).slice(-2000)}`);
-      return r;
-    });
+  // Auditable, fail-closed gate runner: prints a START and a PASS/FAIL line per gate (name +
+  // exit code + duration) followed by the tail-capped stdout/stderr as evidence. Behaviour is
+  // otherwise UNCHANGED — a non-zero exit still throws before returning, so nothing downstream
+  // (and no snapshot) can run after a failure. The gate COMMANDS already narrow their output to
+  // the relevant evidence (head -1 / grep / cat the probe), so this never dumps a full build
+  // log; the cap only bounds the large prep gates (npm/dnf/ffmpeg-install) and keeps the TAIL
+  // (where node/ffmpeg/ffprobe banners, RENDER_SMOKE_OK, and the ffprobe fields land). No env
+  // var or secret is ever printed — only each command's own stdout/stderr.
+  const GATE_LOG_CAP = 4000;
+  const capTail = (s) =>
+    s.length > GATE_LOG_CAP ? `...(truncated to last ${GATE_LOG_CAP} chars)\n${s.slice(-GATE_LOG_CAP)}` : s;
+  const indent = (s) => s.split("\n").map((l) => `    | ${l}`).join("\n");
+  const sh = async (label, cmd, timeoutMs = 300000) => {
+    console.log(`--- GATE START: ${label}`);
+    const startNs = process.hrtime.bigint();
+    const r = await sandbox.runCommand("sh", ["-c", cmd], { timeoutMs });
+    const ms = Number(process.hrtime.bigint() - startNs) / 1e6;
+    const out = (await r.stdout()).trim();
+    const err = (await r.stderr()).trim();
+    console.log(`--- GATE ${r.exitCode === 0 ? "PASS" : "FAIL"}: ${label} (exit=${r.exitCode}, ${ms.toFixed(0)}ms)`);
+    if (out) console.log(`  stdout:\n${indent(capTail(out))}`);
+    if (err) console.log(`  stderr:\n${indent(capTail(err))}`);
+    if (r.exitCode !== 0) throw new Error(`gate ${label} failed (exit ${r.exitCode})`);
+    return r;
+  };
 
   // ---- Prepare the artifact ----
   await sh("npm-install", "npm install --no-audit --no-fund");

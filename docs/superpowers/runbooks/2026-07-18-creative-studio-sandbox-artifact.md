@@ -36,7 +36,7 @@ measured **~38 s / ~362 MB ingress** (paid once, not per video).
 
 ## Bake recipe (hardened)
 The executable recipe lives alongside this doc; the canonical copy used for the Step-0 preflight is
-`bake-sandbox-base.mjs` (SHA-256 `a532519a5c72d6691598e44ad4cb9a3c8dd08cfbd2599df821c4238fa53a5759`).
+`bake-sandbox-base.mjs` (SHA-256 `5a0eac6112b176c14848fda0012df999546bc1363d768237757644b8cdad96cc`).
 Key properties: pinned deps; Chromium OS libs via `dnf`; `ensureBrowser()`; **ffmpeg pinning is
 fail-closed** — it installs only if `sha256sum -c` passes (`set -e` aborts otherwise), and the
 `bake()` entry refuses to run while `FFMPEG.sha256` is a placeholder. **The ffmpeg version/URL/SHA-256
@@ -50,6 +50,15 @@ a bad artifact can never be produced or promoted. `bake()` then calls `snapshot(
 session) and emits the `snapshotId`. **Recording that `snapshotId` into
 `CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID` and bumping `BASE_ARTIFACT_VERSION` remain separate, later
 owner steps — not part of running `bake()`.**
+
+**Auditable gate evidence:** the `sh` gate runner emits, for every gate, a `GATE START` line and a
+`GATE PASS/FAIL` line with the gate name, exit code and duration, followed by the (tail-capped)
+stdout/stderr — so a bake produces a captured, per-gate audit trail (node/ffmpeg/ffprobe banners,
+`libx264` presence, the smoke-render result, and the ffprobe `codec_name`/`width`/`height`/
+`r_frame_rate` fields), not just an inference from "the snapshot exists". The gate commands already
+narrow their own output to the relevant evidence, so nothing dumps a full build log, and no env var
+or secret is ever printed. Fail-closed behaviour is unchanged — a non-zero exit still throws before
+any downstream step or `snapshot()`.
 
 ## Reproducibility
 - The **recipe** is byte-stable and hashed (above). The **VM snapshot is NOT byte-reproducible** —
