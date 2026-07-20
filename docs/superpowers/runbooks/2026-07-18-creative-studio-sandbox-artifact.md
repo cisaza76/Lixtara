@@ -68,6 +68,23 @@ produced by this recipe therefore **never expire** and are intended to be **prod
 not the platform's default ~30-day TTL. (Nothing else about the pipeline changes: same pins, deps,
 commands, gates, logging, smoke composition, order, `snapshot()` condition, resources and runtime.)
 
+### Operator note — `@vercel/sandbox` auto-creates a session snapshot on `stop()`
+Observed with `@vercel/sandbox` 2.6.1 (2026-07-19, during the Preview isolated provider test):
+**creating a Sandbox from a snapshot (`Sandbox.create({ source: { type: "snapshot", snapshotId } })`)
+and then calling `Sandbox.stop()` automatically creates a new session snapshot** of that sandbox's
+filesystem. Properties of that auto-created snapshot:
+- It carries the platform **default ~30-day TTL** (has a finite `expiresAt`) — it does **NOT** inherit
+  the bake's `snapshotExpiration: 0`, so it is not permanent and self-expires.
+- It is a distinct artifact; it does **not** replace or alter the approved permanent snapshot.
+- Example: the isolated tool-check test left `snap_FBlVM4dnCWDRK58AhVHsHSq3clMd` (expires ~2026-08-19).
+
+**Operational recommendation:** do **not** manually delete these auto-created session snapshots except
+in exceptional need — let them self-expire (avoids extra API operations and preserves the "no manual
+cleanup" principle). **The permanent snapshot `snap_8gmMWE8S5NgT5RfM4qfIiMztMfnC` remains the only
+Production Candidate;** session snapshots left behind by tests are never promotion candidates. To avoid
+leaving them at all in future CI/isolated tests, see the backlog issue on ephemeral Sandbox lifecycle
+(`persistent: false` / equivalent).
+
 ### Bake history
 - **Permanent bake — 2026-07-19 · Production Candidate.** Recipe SHA-256
   `7787b1c6d7c6eb6e7e86e6ed67a90d5da573327fbe4ffcb01dc5a5380c204494` (the `snapshotExpiration: 0`
