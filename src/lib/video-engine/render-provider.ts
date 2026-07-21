@@ -142,20 +142,12 @@ export interface SandboxRemotionProviderOptions {
   // change independently of BASE_ARTIFACT_VERSION). Defaults to this repo's
   // src/remotion/ tree.
   entryPointLocalDir?: string;
-  // Local (host) path to the static fonts the composition loads via
-  // `staticFile("fonts/…")` (src/remotion/fonts.ts). These live in the repo's top-level
-  // `public/fonts/` (OUTSIDE src/remotion/), so they are NOT picked up by the
-  // composition-source copy and must be staged explicitly into the bundle's publicDir —
-  // otherwise `loadFont()` 404s in-sandbox and the render fails. Defaults to public/fonts/.
-  fontsLocalDir?: string;
 }
 
 const DEFAULT_ENTRY_POINT_DIR = path.join(process.cwd(), "src", "remotion");
-// The bundle's publicDir inside the sandbox is `remotion/public` (see RENDER_SCRIPT), so
-// `staticFile("fonts/X.woff2")` resolves to `remotion/public/fonts/X.woff2`. We stage the
-// repo's public/fonts/ there. Only fonts are shipped — the rest of public/ (marketing
-// images) is not used by any render composition and is deliberately excluded.
-const DEFAULT_FONTS_LOCAL_DIR = path.join(process.cwd(), "public", "fonts");
+// Fonts are base64-embedded in the composition source (src/remotion/fonts-data.ts) and
+// loaded as data URIs, so nothing font-related needs staging into the bundle's publicDir
+// anymore — that removed the in-sandbox HTTP font fetch (and its delayRender timeout).
 
 // The script that runs INSIDE the sandbox: bundle() -> selectComposition() ->
 // renderMedia({codec:"h264"}), same inputProps to both (per the spike's validated
@@ -249,21 +241,18 @@ async function stageLocalAssets(
 }
 
 // Assembles the full set of files staged into the sandbox for a render (composition
-// source + static fonts + downloaded source photos), plus the `remoteRefs` the caller
-// needs to rewrite inputProps. Exported so the staging layout is unit-testable WITHOUT a
-// real Sandbox — the render itself only adds render.mjs + the manifest on top of this.
+// source + downloaded source photos), plus the `remoteRefs` the caller needs to rewrite
+// inputProps. Exported so the staging layout is unit-testable WITHOUT a real Sandbox —
+// the render itself only adds render.mjs + the manifest on top of this. Fonts are NOT
+// staged: they're base64-embedded in the composition source (fonts-data.ts) and loaded
+// as data URIs, so they ride along in `compositionFiles`.
 export async function collectRenderStagingFiles(opts: {
   entryPointLocalDir: string;
-  fontsLocalDir: string;
   localAssetPaths: string[];
 }): Promise<{ files: { path: string; content: Buffer }[]; remoteRefs: string[] }> {
   const compositionFiles = await collectDirFiles(opts.entryPointLocalDir, "remotion");
-  // Stage public/fonts/ into the bundle's publicDir so `staticFile("fonts/…")` resolves
-  // in-sandbox (fixes the loadFont 404 → RENDER_FAILED). Fonts live OUTSIDE src/remotion/,
-  // so the composition-source copy above never picks them up.
-  const fontFiles = await collectDirFiles(opts.fontsLocalDir, "remotion/public/fonts");
   const { files: assetFiles, remoteRefs } = await stageLocalAssets(opts.localAssetPaths);
-  return { files: [...compositionFiles, ...fontFiles, ...assetFiles], remoteRefs };
+  return { files: [...compositionFiles, ...assetFiles], remoteRefs };
 }
 
 // `inputProps` is caller-shaped (unknown here on purpose — see manifest.ts). Rewrites
@@ -311,12 +300,10 @@ export class SandboxRemotionProvider implements RenderProvider {
       }
       metrics.sandboxStartupMs = Date.now() - startupStart;
 
-      // ---- 2. copy composition source + static fonts + local asset files in ----
+      // ---- 2. copy composition source (fonts are embedded in it) + local assets in ----
       const entryPointLocalDir = this.opts.entryPointLocalDir ?? DEFAULT_ENTRY_POINT_DIR;
-      const fontsLocalDir = this.opts.fontsLocalDir ?? DEFAULT_FONTS_LOCAL_DIR;
       const { files: stagedFiles, remoteRefs } = await collectRenderStagingFiles({
         entryPointLocalDir,
-        fontsLocalDir,
         localAssetPaths: input.localAssetPaths,
       });
       const remoteInputProps = rewriteLocalPathsToRemote(input.inputProps, input.localAssetPaths, remoteRefs);
