@@ -1,30 +1,28 @@
-// Self-contained local fonts for the `ListingVideo` composition. Vendored
+// Self-contained local fonts for the `ListingVideo` composition. The vendored
 // `.woff2` files under `public/fonts/` (SIL Open Font License — see
-// public/fonts/LICENSE.txt), loaded via `@remotion/fonts`' `loadFont()`,
-// which internally wraps the fetch in `delayRender`/`continueRender` so a
-// render waits for the local font before capturing frames.
+// public/fonts/LICENSE.txt) are base64-embedded as data URIs in `fonts-data.ts`
+// (regenerate with `node scripts/embed-fonts.mjs`) and loaded via `@remotion/fonts`'
+// `loadFont()`.
 //
-// Deliberately NOT `@remotion/google-fonts`: that package's `loadFont()`
-// fetches `.woff2` from `fonts.gstatic.com` at render time, which breaks in
-// network-isolated render environments (see Task 5 Vercel Sandbox). Only the
-// weights actually used by `ListingVideo.tsx` are vendored — Playfair
-// Display 500/600 normal + 500 italic, Inter 600.
+// Embedded rather than fetched over HTTP on purpose: `loadFont()` builds a
+// `new FontFace(family, "url('<url>') format('woff2')")` and holds the render in a
+// `delayRender` until the font resolves. A data-URI source resolves with NO network,
+// so a real multi-photo render can't blow the delayRender timeout the way an in-sandbox
+// HTTP font fetch did under load. (Also deliberately NOT `@remotion/google-fonts`,
+// which fetches from `fonts.gstatic.com` and breaks in network-isolated render envs.)
+// `format: "woff2"` is passed explicitly because `getFontFormat()` can't infer it from
+// a data URI. Only the weights ListingVideo.tsx uses are vendored.
 import { loadFont } from "@remotion/fonts";
-import { staticFile } from "remotion";
+import { PLAYFAIR_500, PLAYFAIR_600, PLAYFAIR_500_ITALIC, INTER_600 } from "./fonts-data";
 
 export const SERIF = "Lixtara Playfair Display";
 export const SANS = "Lixtara Inter";
 
 const fontFiles = [
-  { family: SERIF, url: staticFile("fonts/PlayfairDisplay-500.woff2"), weight: "500", style: "normal" as const },
-  { family: SERIF, url: staticFile("fonts/PlayfairDisplay-600.woff2"), weight: "600", style: "normal" as const },
-  {
-    family: SERIF,
-    url: staticFile("fonts/PlayfairDisplay-500Italic.woff2"),
-    weight: "500",
-    style: "italic" as const,
-  },
-  { family: SANS, url: staticFile("fonts/Inter-600.woff2"), weight: "600", style: "normal" as const },
+  { family: SERIF, url: PLAYFAIR_500, weight: "500", style: "normal" as const, format: "woff2" as const },
+  { family: SERIF, url: PLAYFAIR_600, weight: "600", style: "normal" as const, format: "woff2" as const },
+  { family: SERIF, url: PLAYFAIR_500_ITALIC, weight: "500", style: "italic" as const, format: "woff2" as const },
+  { family: SANS, url: INTER_600, weight: "600", style: "normal" as const, format: "woff2" as const },
 ];
 
 // Kicks off all `loadFont()` calls (and their internal `delayRender`
