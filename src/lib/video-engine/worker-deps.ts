@@ -32,7 +32,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Asset, AssetStore } from "@/lib/assets/types";
-import { selectForCapability } from "@/lib/assets/asset-manager";
+import { selectForCapability, wrapPropertyPhoto } from "@/lib/assets/asset-manager";
 import { SupabaseAssetStore } from "@/lib/assets/asset-store.supabase";
 import type { CreativeJob } from "@/lib/creative-jobs/jobs";
 import type { OnStageHook, PipelineDeps, ReconcileResult } from "@/lib/video-engine/pipeline";
@@ -201,6 +201,61 @@ export async function defaultRunQa(
 // `produceVideoAsset` with a fully real deps set.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Source-photo Assets. Sellers only ever create `property_photos` rows; the engine
+// consumes `assets` (kind=photo) via selectForCapability. Nothing wired these two
+// together, so a real listing had ZERO source Assets and the worker threw
+// "no source photo Assets". We wrap them on demand here (the design's lazy §7/§9.2
+// wrapping), just before the engine selects — idempotent via the store's
+// (source_type, source_id) uniqueness. `property_photos` stores only a public URL, so
+// the storage bucket/path each Asset needs is derived from that URL.
+// ---------------------------------------------------------------------------
+
+// `.../storage/v1/object/{public|sign}/<bucket>/<path>[?query]` -> { bucket, path }.
+// Returns null for anything that isn't a Supabase storage object URL (skipped, not fatal).
+export function parseStoragePublicUrl(url: string): { bucket: string; path: string } | null {
+  const m = url.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/([^?]+)/);
+  if (!m) return null;
+  return { bucket: m[1], path: m[2] };
+}
+
+// Wraps each of a listing's property_photos into a kind=photo Asset (idempotent).
+// Exported for unit tests; the DB-backed loader is defaultEnsurePhotoAssets below.
+export async function ensureListingPhotoAssets(
+  assets: AssetStore,
+  photos: { id: string; url: string }[],
+  listingId: string,
+  ownerId: string,
+): Promise<void> {
+  for (const photo of photos) {
+    const ref = parseStoragePublicUrl(photo.url);
+    if (!ref) continue; // unparseable URL — can't stage it as a source Asset, skip
+    await wrapPropertyPhoto(assets, {
+      photo: { id: photo.id, url: photo.url, bucket: ref.bucket, path: ref.path },
+      listingId,
+      ownerId,
+    });
+  }
+}
+
+// Real wiring: load the listing's property_photos and wrap them. Ordered by
+// display_order so the video's photo sequence matches the seller's gallery order.
+export function defaultEnsurePhotoAssets(
+  client: SupabaseClient,
+  assets: AssetStore,
+): (listingId: string, ownerId: string) => Promise<void> {
+  return async (listingId, ownerId) => {
+    const { data, error } = await client
+      .from("property_photos")
+      .select("id, url")
+      .eq("property_id", listingId)
+      .order("display_order", { ascending: true });
+    if (error) throw new Error(`worker-deps: failed to load property_photos for ${listingId}: ${error.message}`);
+    const photos = (data ?? []).filter((r): r is { id: string; url: string } => Boolean(r?.id && r?.url));
+    await ensureListingPhotoAssets(assets, photos, listingId, ownerId);
+  };
+}
+
 const DEFAULT_BRAND_NAME = "Lixtara";
 const DEFAULT_CTA_TEXT = "See more at lixtara.com";
 
@@ -211,6 +266,7 @@ export interface WorkerDepsOptions {
   runQa?: ProduceVideoAssetDeps["runQa"];
   loadListing?: (listingId: string) => Promise<ListingSummary | null>;
   downloadAsset?: DownloadAssetFn;
+  ensurePhotoAssets?: (listingId: string, ownerId: string) => Promise<void>;
   now?: () => number;
   brandName?: string;
   ctaText?: string;
@@ -224,6 +280,9 @@ interface ResolvedWorkerDeps {
   runQa: ProduceVideoAssetDeps["runQa"];
   loadListing: (listingId: string) => Promise<ListingSummary | null>;
   downloadAsset: DownloadAssetFn;
+  // Optional so buildRealProduce's many unit tests (which seed the AssetStore directly)
+  // stay untouched; the real wiring below always supplies defaultEnsurePhotoAssets.
+  ensurePhotoAssets?: (listingId: string, ownerId: string) => Promise<void>;
   now: () => number;
   brandName: string;
   ctaText: string;
@@ -242,6 +301,12 @@ export function buildRealProduce(deps: ResolvedWorkerDeps): PipelineDeps["produc
     const listing = await deps.loadListing(input.listingId);
     if (!listing) {
       throw new Error(`worker-deps: listing not found for produce: ${input.listingId}`);
+    }
+
+    // Sellers create property_photos, never Assets — wrap them into kind=photo source
+    // Assets (idempotent) BEFORE selecting, or selectForCapability finds nothing.
+    if (deps.ensurePhotoAssets) {
+      await deps.ensurePhotoAssets(input.listingId, input.ownerId);
     }
 
     const sourceAssets = await selectForCapability(deps.assets, input.listingId, "video");
@@ -348,6 +413,7 @@ export function buildRealWorkerDeps(
   const runQa = overrides.runQa ?? defaultRunQa;
   const loadListing = overrides.loadListing ?? defaultLoadListing(client);
   const downloadAsset = overrides.downloadAsset ?? defaultDownloadAsset(client as unknown as StorageDbClient);
+  const ensurePhotoAssets = overrides.ensurePhotoAssets ?? defaultEnsurePhotoAssets(client, assets);
   const now = overrides.now ?? (() => Date.now());
   const brandName = overrides.brandName ?? DEFAULT_BRAND_NAME;
   const ctaText = overrides.ctaText ?? DEFAULT_CTA_TEXT;
@@ -360,6 +426,7 @@ export function buildRealWorkerDeps(
     runQa,
     loadListing,
     downloadAsset,
+    ensurePhotoAssets,
     now,
     brandName,
     ctaText,
