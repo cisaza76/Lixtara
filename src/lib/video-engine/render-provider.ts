@@ -185,13 +185,13 @@ async function main() {
   let composition;
   {
     const start = process.hrtime.bigint();
-    composition = await selectComposition({ serveUrl: bundleLocation, id: compositionId, inputProps });
+    composition = await selectComposition({ serveUrl: bundleLocation, id: compositionId, inputProps, delayRenderTimeoutInMilliseconds: 120000 });
     t("selectComposition_ms", Number(process.hrtime.bigint() - start) / 1e6);
   }
 
   {
     const start = process.hrtime.bigint();
-    await renderMedia({ composition, serveUrl: bundleLocation, codec: "h264", outputLocation: outPath, inputProps });
+    await renderMedia({ composition, serveUrl: bundleLocation, codec: "h264", outputLocation: outPath, inputProps, delayRenderTimeoutInMilliseconds: 120000 });
     t("renderMedia_ms", Number(process.hrtime.bigint() - start) / 1e6);
   }
 
