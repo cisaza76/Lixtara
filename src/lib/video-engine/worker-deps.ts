@@ -47,6 +47,8 @@ import { SupabaseVideoStoragePort, type StorageDbClient } from "@/lib/video-engi
 import type { StoragePort } from "@/lib/video-engine/storage-port";
 import { BASE_ARTIFACT_VERSION } from "@/lib/video-engine/versions";
 import { listingVideoInputSchema } from "@/remotion/input";
+import { VIDEO_WIDTH, VIDEO_HEIGHT } from "@/remotion/layout";
+import { downscaleImageToFit } from "@/lib/video-engine/image-downscale";
 
 // ---------------------------------------------------------------------------
 // Sandbox base artifact — from env, never silently defaulted (requirement 8: no
@@ -144,7 +146,14 @@ export type DownloadAssetFn = (asset: Asset, destPath: string) => Promise<void>;
 
 export function defaultDownloadAsset(
   client: StorageDbClient,
-  opts: { ttlSeconds?: number; fetchImpl?: typeof fetch } = {},
+  opts: {
+    ttlSeconds?: number;
+    fetchImpl?: typeof fetch;
+    // When set, source images are downscaled to fit within these dimensions before being
+    // staged — real listing photos are 2–5 MB each and would starve the sandbox's per-image
+    // delayRender past its 28s timeout (RENDER_TIMEOUT). A 1080p render doesn't need more.
+    maxImageDimension?: { width: number; height: number };
+  } = {},
 ): DownloadAssetFn {
   const ttl = opts.ttlSeconds ?? DEFAULT_SOURCE_SIGNED_URL_TTL_SECONDS;
   const fetchImpl = opts.fetchImpl ?? fetch;
@@ -158,9 +167,19 @@ export function defaultDownloadAsset(
     if (!res.ok) {
       throw new Error(`worker-deps: failed to download source asset ${asset.id}: HTTP ${res.status}`);
     }
-    const bytes = Buffer.from(await res.arrayBuffer());
+    let bytes: Buffer = Buffer.from(await res.arrayBuffer());
     if (bytes.length === 0) {
       throw new Error(`worker-deps: downloaded source asset ${asset.id} is empty`);
+    }
+    if (opts.maxImageDimension) {
+      try {
+        bytes = await downscaleImageToFit(bytes, {
+          maxWidth: opts.maxImageDimension.width,
+          maxHeight: opts.maxImageDimension.height,
+        });
+      } catch {
+        // Non-image or sharp failure: stage the original bytes rather than fail the render.
+      }
     }
     await writeFile(destPath, bytes);
   };
@@ -412,7 +431,11 @@ export function buildRealWorkerDeps(
     });
   const runQa = overrides.runQa ?? defaultRunQa;
   const loadListing = overrides.loadListing ?? defaultLoadListing(client);
-  const downloadAsset = overrides.downloadAsset ?? defaultDownloadAsset(client as unknown as StorageDbClient);
+  const downloadAsset =
+    overrides.downloadAsset ??
+    defaultDownloadAsset(client as unknown as StorageDbClient, {
+      maxImageDimension: { width: VIDEO_WIDTH, height: VIDEO_HEIGHT },
+    });
   const ensurePhotoAssets = overrides.ensurePhotoAssets ?? defaultEnsurePhotoAssets(client, assets);
   const now = overrides.now ?? (() => Date.now());
   const brandName = overrides.brandName ?? DEFAULT_BRAND_NAME;
