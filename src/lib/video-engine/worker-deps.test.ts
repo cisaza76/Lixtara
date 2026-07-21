@@ -13,6 +13,8 @@ import {
   defaultRunQa,
   resolveSandboxBaseArtifactFromEnv,
   MissingSandboxBaseArtifactError,
+  parseStoragePublicUrl,
+  ensureListingPhotoAssets,
   type ListingSummary,
 } from "@/lib/video-engine/worker-deps";
 
@@ -407,5 +409,97 @@ describe("resolveSandboxBaseArtifactFromEnv", () => {
     delete process.env.CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID;
     process.env.CREATIVE_STUDIO_SANDBOX_IMAGE = "ghcr.io/example/image:tag";
     expect(resolveSandboxBaseArtifactFromEnv()).toEqual({ image: "ghcr.io/example/image:tag" });
+  });
+});
+
+// ---- Bloqueo 2 fix: wrap seller property_photos into source photo Assets --------------
+
+describe("parseStoragePublicUrl — derives {bucket, path} from a Supabase storage URL", () => {
+  it("parses a public object URL", () => {
+    expect(
+      parseStoragePublicUrl(
+        "https://ref.supabase.co/storage/v1/object/public/property-photos/owner-1/listing-1/pic.jpg",
+      ),
+    ).toEqual({ bucket: "property-photos", path: "owner-1/listing-1/pic.jpg" });
+  });
+
+  it("parses a signed object URL and strips the query string", () => {
+    expect(
+      parseStoragePublicUrl(
+        "https://ref.supabase.co/storage/v1/object/sign/property-photos/a/b.png?token=xyz.abc",
+      ),
+    ).toEqual({ bucket: "property-photos", path: "a/b.png" });
+  });
+
+  it("returns null for a URL that is not a Supabase storage object URL", () => {
+    expect(parseStoragePublicUrl("https://example.com/not-storage/x.jpg")).toBeNull();
+  });
+});
+
+describe("ensureListingPhotoAssets — wraps property_photos into kind=photo Assets (idempotent)", () => {
+  const L = "listing-1";
+  const O = "owner-1";
+  const photos = [
+    { id: "pp-1", url: "https://ref.supabase.co/storage/v1/object/public/property-photos/owner-1/listing-1/a.jpg" },
+    { id: "pp-2", url: "https://ref.supabase.co/storage/v1/object/public/property-photos/owner-1/listing-1/b.jpg" },
+  ];
+
+  it("creates a kind=photo Asset per property_photo with bucket/path parsed from the URL", async () => {
+    const store = fakeAssetStore([]);
+    await ensureListingPhotoAssets(store, photos, L, O);
+
+    const wrapped = store.rows.filter((r) => r.kind === "photo");
+    expect(wrapped).toHaveLength(2);
+    expect(wrapped.map((r) => r.sourceId).sort()).toEqual(["pp-1", "pp-2"]);
+    expect(wrapped.every((r) => r.sourceType === "property_photo")).toBe(true);
+    expect(wrapped.every((r) => r.storageBucket === "property-photos")).toBe(true);
+    expect(wrapped.find((r) => r.sourceId === "pp-1")?.storagePath).toBe("owner-1/listing-1/a.jpg");
+  });
+
+  it("is idempotent — a second run wraps nothing new (findBySource guard)", async () => {
+    const store = fakeAssetStore([]);
+    await ensureListingPhotoAssets(store, photos, L, O);
+    await ensureListingPhotoAssets(store, photos, L, O);
+    expect(store.rows.filter((r) => r.kind === "photo")).toHaveLength(2);
+  });
+
+  it("skips a photo whose URL cannot be parsed rather than throwing", async () => {
+    const store = fakeAssetStore([]);
+    await ensureListingPhotoAssets(
+      store,
+      [{ id: "pp-x", url: "https://example.com/not-storage/x.jpg" }, ...photos],
+      L,
+      O,
+    );
+    expect(store.rows.filter((r) => r.kind === "photo")).toHaveLength(2);
+  });
+});
+
+describe("buildRealProduce — ensures photo Assets exist before selecting (Bloqueo 2 wiring)", () => {
+  it("a listing with property_photos but no Assets yet still renders (ensurePhotoAssets wraps first)", async () => {
+    const store = fakeAssetStore([]); // real seller state: photos exist, Assets don't
+    let ensureCalledBeforeSelect = false;
+    const produce = buildRealProduce({
+      assets: store,
+      storage: createFakeStoragePort(),
+      render: new FakeRenderProvider(),
+      runQa: async () => okQaResult(),
+      loadListing: async () => ({ addressLine: "123 Ocean Dr", priceLabel: "$450,000" }),
+      downloadAsset: async () => {},
+      now: () => Date.now(),
+      brandName: "Lixtara",
+      ctaText: "See more at lixtara.com",
+      tempDirPrefix: "worker-deps-test-",
+      ensurePhotoAssets: async (listingId, ownerId) => {
+        ensureCalledBeforeSelect = store.rows.filter((r) => r.kind === "photo").length === 0;
+        await store.insert(photoAsset("wrapped-1", listingId) as unknown as NewAsset);
+        void ownerId;
+      },
+    });
+
+    await expect(
+      produce({ jobId: "job-1", listingId: "listing-1", ownerId: "owner-1", traceId: null }, { onStage: async () => {} }),
+    ).resolves.toBeTruthy();
+    expect(ensureCalledBeforeSelect).toBe(true);
   });
 });
