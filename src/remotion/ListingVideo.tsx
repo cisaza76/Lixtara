@@ -20,6 +20,7 @@ import {
   SAFE_AREA,
 } from "./layout";
 import { orderedPhotos, perPhotoDurationFrames, type ListingVideoInput } from "./input";
+import { resolvePhotoSrc } from "./resolve";
 
 const IVORY = "#FDFCF8";
 const IVORY_SCRIM = "rgba(253, 252, 248, 0.92)";
@@ -278,7 +279,7 @@ export const ListingVideo: React.FC<ListingVideoInput> = ({ property, priceLabel
 
       {photoList.map((photo, index) => (
         <Sequence key={photo.url + index} from={openingFrames + index * photoFrames} durationInFrames={photoFrames}>
-          <KenBurnsPhoto src={photo.url} index={index} durationInFrames={photoFrames} />
+          <KenBurnsPhoto src={resolvePhotoSrc(photo.url)} index={index} durationInFrames={photoFrames} />
           <LowerThird priceLabel={priceLabel} roomLabel={photo.roomLabel} durationInFrames={photoFrames} />
         </Sequence>
       ))}
