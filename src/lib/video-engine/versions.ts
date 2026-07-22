@@ -26,14 +26,20 @@ export const RENDERER_VERSION = "4.0.489";
 export const RENDER_PROVIDER = "vercel-sandbox";
 
 // Version tag of the prebuilt Vercel Sandbox base artifact (Node 24, Chromium + its OS
-// libs, ffmpeg/ffprobe, xz, the pinned Remotion packages baked in). BAKED + validated
-// 2026-07-19 as the permanent, non-expiring snapshot `snap_8gmMWE8S5NgT5RfM4qfIiMztMfnC`
-// (region iad1) — a **Production Candidate**; all 10 recipe gates passed. See
-// docs/superpowers/runbooks/2026-07-18-creative-studio-sandbox-artifact.md.
+// libs, ffmpeg/ffprobe, xz, the pinned Remotion packages, AND the Lixtara SYSTEM fonts
+// baked in). BAKED + validated 2026-07-22 as the permanent, non-expiring snapshot
+// `snap_pabjEZEF5zsaYlQmX3tsgpyMmT3m` (region iad1); all recipe gates passed incl. the
+// system-font gates. The prior fonts-via-loadFont artifact
+// `snap_8gmMWE8S5NgT5RfM4qfIiMztMfnC` is retained intact for rollback.
 // `SandboxRemotionProvider` reads this constant (or an injected override) as its default
-// base reference and stamps it onto every rendered video's provenance. NOTE: this tag is
-// NOT an activation switch — the snapshotId itself lives ONLY in the
-// CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID env var (still unset), so the provider still fails
-// loudly at render time until that env var is set. Bump this tag together with a new
-// snapshotId whenever a new artifact is baked (keep the pair for rollback).
-export const BASE_ARTIFACT_VERSION = "base-2026-07-19-ffmpeg8.1.2-remotion4.0.489";
+// base reference, asserts it against the snapshot's baked /etc/lixtara-artifact-version via
+// the fail-closed font guard, and stamps it onto every rendered video's provenance. NOTE:
+// this tag is NOT an activation switch — the snapshotId itself lives ONLY in the
+// CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID env var. Bump this tag together with a new snapshotId
+// whenever a new artifact is baked (keep the pair for rollback).
+export const BASE_ARTIFACT_VERSION = "base-2026-07-21-fonts-system-ffmpeg8.1.2-remotion4.0.489";
+
+// Font-delivery strategy the runtime code REQUIRES from the base artifact. "system" = the
+// faces are installed as OS fonts in the snapshot (no runtime loadFont/delayRender). Paired
+// against the snapshot's baked /etc/lixtara-font-strategy by the fail-closed font guard.
+export const FONT_STRATEGY = "system";

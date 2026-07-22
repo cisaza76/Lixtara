@@ -17,6 +17,9 @@
 //
 // Target: Vercel Sandbox runtime "node24" (Amazon Linux 2023, Node v24.14.1), 4 vCPU / 8 GB, amd64.
 import { Sandbox } from "@vercel/sandbox";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const PINNED = {
   "@vercel/sandbox": "2.6.1",
@@ -45,6 +48,120 @@ const FFMPEG = {
 const CHROMIUM_DEPS =
   "sudo dnf install -y mesa-libgbm libX11 libXrandr libdrm libXdamage libXfixes " +
   "libxkbcommon dbus-libs libXcomposite alsa-lib nss dbus pango cups-libs at-spi2-core atk at-spi2-atk";
+
+// ---- Lixtara SYSTEM fonts (F1-N) -------------------------------------------------------
+// The composition loads its fonts at OS level (no runtime loadFont/delayRender — that
+// starved a real 10-photo render's per-tab FontFace load past its 28s timeout). Only the
+// four faces ListingVideo.tsx uses. Source woff2 are vendored in public/fonts/; the bake
+// converts them to TTF with `woff2_decompress` (google/woff2 1.0.2 = AL2023 `woff2-tools`,
+// byte-reproducible — verified in F1-M/F1-N Step 1) and installs them into a fontconfig dir.
+const NEW_ARTIFACT_VERSION = "base-2026-07-21-fonts-system-ffmpeg8.1.2-remotion4.0.489";
+const FONT_STRATEGY = "system";
+const FONT_DIR = "/usr/share/fonts/lixtara";
+// filename -> { ttfSha256 (F1-M/Step1-verified), fcMatch pattern that MUST resolve to it }
+const FONTS = [
+  { woff2: "PlayfairDisplay-500.woff2",       ttf: "PlayfairDisplay-500.ttf",       sha256: "0143eb178b14b5b917f2c6845bdc1fd22f4c2b6e90c2c8c2db01beb2cb1ccea0", match: "Playfair Display:weight=medium" },
+  { woff2: "PlayfairDisplay-600.woff2",       ttf: "PlayfairDisplay-600.ttf",       sha256: "260abf6d34f390cee83aaef74d1047a5a967be67085bf8e27cfe9f44962af284", match: "Playfair Display:weight=semibold" },
+  { woff2: "PlayfairDisplay-500Italic.woff2", ttf: "PlayfairDisplay-500Italic.ttf", sha256: "58c071c10721736c45761a3d05aab33e5d4f5f3acee8fb348b2697aa5ad47f17", match: "Playfair Display:weight=medium:slant=100" },
+  { woff2: "Inter-600.woff2",                 ttf: "Inter-600.ttf",                 sha256: "69f0cc85622514b41e7e4b70d3fb37ec883b97b05369d5c4c353ff89a096e088", match: "Inter:weight=semibold" },
+];
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const FONTS_SRC_DIR = path.join(REPO_ROOT, "public", "fonts");
+
+// Install: convert woff2->ttf, fail-closed hash-verify against the F1-M hashes, install +
+// fc-cache, then write the two self-declared manifests the runtime guard reads.
+const FONT_INSTALL = [
+  "set -e",
+  "sudo dnf install -y fontconfig woff2-tools",
+  "cd fonts",
+  "for f in *.woff2; do woff2_decompress \"$f\"; done",
+  "sha256sum -c ttf.sha256",                       // fail-closed: aborts if any TTF hash differs
+  `sudo mkdir -p ${FONT_DIR}`,
+  `sudo cp *.ttf ${FONT_DIR}/`,
+  `sudo chmod 644 ${FONT_DIR}/*.ttf`,
+  "sudo fc-cache -f",
+  `echo "${NEW_ARTIFACT_VERSION}" | sudo tee /etc/lixtara-artifact-version >/dev/null`,
+  `echo "${FONT_STRATEGY}" | sudo tee /etc/lixtara-font-strategy >/dev/null`,
+  "echo FONT_INSTALL_OK",
+].join(" && ");
+
+// fc-scan + fc-match assert each face resolves to the EXACT installed file (fc-match always
+// returns *something*, so assert the returned path — file presence alone is insufficient).
+const FONT_FC_ASSERT = [
+  "set -e",
+  `fc-scan --format '%{family}|%{style}|%{weight}|%{slant}|%{postscriptname}|%{fontformat}\\n' ${FONT_DIR}/*.ttf`,
+  ...FONTS.map((f) => `test "$(fc-match -f '%{file}' '${f.match}')" = "${FONT_DIR}/${f.ttf}"`),
+  `test "$(cat /etc/lixtara-artifact-version)" = "${NEW_ARTIFACT_VERSION}"`,
+  `test "$(cat /etc/lixtara-font-strategy)" = "${FONT_STRATEGY}"`,
+  "echo FONT_FC_ASSERT_OK",
+].join(" && ");
+
+// Chromium proof (fail-closed): a Remotion still whose composition measures each system
+// face's rendered width against the generic fallback and cancelRender()s if they match
+// (= Chrome fell back). renderStill throws on cancelRender -> gate fails -> no snapshot.
+// Each sample row is `alignSelf: flex-start` so its box shrinks to the TEXT width (a flex
+// column stretches children to the container width by default — that was the harness bug
+// that measured 852px for all rows). A full-width `sentinel` div (no alignSelf) measures the
+// available content width so the harness can prove the rows actually shrank. Two DISTINCT
+// failures: FONT_CHECK_HARNESS_INVALID (the measurement itself is untrustworthy) vs
+// FONT_FALLBACK_DETECTED (a VALID comparison where the custom face is indistinguishable from
+// the fallback). Tolerance is explicit — never float-equality.
+const FONT_CHECK_ENTRY = `import React, { useRef, useState, useEffect } from "react";
+import { registerRoot, Composition, AbsoluteFill, delayRender, continueRender, cancelRender } from "remotion";
+const T = "Lixtara Homes 0123";
+const MIN_FONT_WIDTH_DELTA_PX = 1; // custom vs fallback must differ by at least this
+const Row = React.forwardRef((p, ref) => React.createElement("div", { ref, style: { alignSelf: "flex-start", fontFamily: p.ff, fontWeight: p.fw, fontStyle: p.fs || "normal", fontSize: 40, whiteSpace: "nowrap", color: "#0F172A" } }, T));
+const Check = () => {
+  const [h] = useState(() => delayRender("font-check"));
+  const sentinel = useRef(null), pf = useRef(null), fbSerif = useRef(null), inter = useRef(null), fbSans = useRef(null);
+  useEffect(() => { (async () => {
+    await document.fonts.ready;
+    const w = (r) => r.current.getBoundingClientRect().width;
+    const avail = w(sentinel);
+    const pfW = w(pf), serifW = w(fbSerif), interW = w(inter), sansW = w(fbSans);
+    const s = [pfW, serifW, interW, sansW];
+    // --- harness validity (distinct error; guards against misleading diagnostics) ---
+    const finitePositive = s.every((x) => Number.isFinite(x) && x > 0);
+    const allIdentical = s.every((x) => Math.abs(x - s[0]) < 1e-6);
+    const anyAtContainer = s.some((x) => Math.abs(x - avail) < 1); // didn't shrink to content
+    if (!finitePositive || allIdentical || anyAtContainer) {
+      cancelRender(new Error("FONT_CHECK_HARNESS_INVALID avail=" + avail + " samples=" + JSON.stringify(s)));
+      return;
+    }
+    // --- valid comparison: fallback detection (custom width ~ fallback width) ---
+    const checks = [
+      document.fonts.check('500 40px "Playfair Display"'),
+      document.fonts.check('600 40px "Playfair Display"'),
+      document.fonts.check('italic 500 40px "Playfair Display"'),
+      document.fonts.check('600 40px "Inter"'),
+    ];
+    const pfDistinct = Math.abs(pfW - serifW) >= MIN_FONT_WIDTH_DELTA_PX;
+    const inDistinct = Math.abs(interW - sansW) >= MIN_FONT_WIDTH_DELTA_PX;
+    if (!pfDistinct || !inDistinct || !checks.every(Boolean)) {
+      cancelRender(new Error("FONT_FALLBACK_DETECTED pf=" + pfW + " serif=" + serifW + " inter=" + interW + " sans=" + sansW + " checks=" + JSON.stringify(checks)));
+      return;
+    }
+    continueRender(h);
+  })(); }, []);
+  return React.createElement(AbsoluteFill, { style: { backgroundColor: "#FDFCF8", padding: 24, display: "flex", flexDirection: "column", gap: 6 } },
+    React.createElement("div", { ref: sentinel, style: { height: 0 } }),
+    React.createElement(Row, { ref: pf, ff: '"Playfair Display"', fw: 500 }),
+    React.createElement(Row, { ff: '"Playfair Display"', fw: 600 }),
+    React.createElement(Row, { ff: '"Playfair Display"', fw: 500, fs: "italic" }),
+    React.createElement(Row, { ref: inter, ff: '"Inter"', fw: 600 }),
+    React.createElement(Row, { ref: fbSerif, ff: "serif", fw: 500 }),
+    React.createElement(Row, { ref: fbSans, ff: "sans-serif", fw: 600 }));
+};
+registerRoot(() => React.createElement(Composition, { id: "FontCheck", component: Check, durationInFrames: 1, fps: 1, width: 900, height: 360 }));
+`;
+const FONT_CHECK_RENDER = `import path from "node:path";
+import { bundle } from "@remotion/bundler";
+import { selectComposition, renderStill } from "@remotion/renderer";
+const serveUrl = await bundle({ entryPoint: path.resolve("fontcheck-entry.jsx"), onProgress: () => {} });
+const composition = await selectComposition({ serveUrl, id: "FontCheck" });
+await renderStill({ composition, serveUrl, output: "/tmp/fontcheck.png" });
+console.log("FONT_CHECK_RENDER_OK");
+`;
 
 const FFMPEG_INSTALL = [
   "set -e",
@@ -112,11 +229,22 @@ export async function bake() {
   // expiration"), so the bake produces a PERMANENT, production-candidate artifact rather than
   // the platform's default ~30-day TTL. See the runbook's retention/history note.
   const sandbox = await Sandbox.create({ runtime: "node24", resources: { vcpus: 4 }, snapshotExpiration: 0 });
+  // Font source bytes + a `sha256sum -c` manifest (TTF-name -> F1-M hash) for the fail-closed
+  // in-sandbox hash verify after conversion.
+  const fontFiles = FONTS.map((f) => ({
+    path: `fonts/${f.woff2}`,
+    content: fs.readFileSync(path.join(FONTS_SRC_DIR, f.woff2)),
+  }));
+  const ttfSha256Manifest = FONTS.map((f) => `${f.sha256}  ${f.ttf}`).join("\n") + "\n";
   await sandbox.writeFiles([
     { path: "package.json", content: Buffer.from(BASE_PACKAGE_JSON, "utf8") },
     { path: "ensure-chromium.mjs", content: Buffer.from(ENSURE_CHROMIUM, "utf8") },
     { path: "smoke-entry.jsx", content: Buffer.from(SMOKE_ENTRY, "utf8") },
     { path: "render-smoke.mjs", content: Buffer.from(SMOKE_RENDER, "utf8") },
+    { path: "fontcheck-entry.jsx", content: Buffer.from(FONT_CHECK_ENTRY, "utf8") },
+    { path: "fontcheck-render.mjs", content: Buffer.from(FONT_CHECK_RENDER, "utf8") },
+    { path: "fonts/ttf.sha256", content: Buffer.from(ttfSha256Manifest, "utf8") },
+    ...fontFiles,
   ]);
   // Auditable, fail-closed gate runner: prints a START and a PASS/FAIL line per gate (name +
   // exit code + duration) followed by the tail-capped stdout/stderr as evidence. Behaviour is
@@ -163,6 +291,15 @@ export async function bake() {
   // Assert the rendered MP4 is h264 / 1920x1080 / 30fps via the pinned ffprobe.
   await sh("ffprobe-smoke", SMOKE_FFPROBE_ASSERT);
 
+  // ---- F1-N system-font gates (fail-closed): install, verify hashes, fc resolution +
+  // manifests, and a Chromium width-based proof that the render actually uses the faces. ----
+  await sh("font-install", FONT_INSTALL);        // convert + hash-verify + install + fc-cache + manifests
+  await sh("font-fc-assert", FONT_FC_ASSERT);    // fc-scan + fc-match exact-file + manifest contents
+  await sh("font-check-render", "node fontcheck-render.mjs", 600000); // cancelRender()s on fallback
+  const fontCheckPng = await sandbox.readFileToBuffer({ path: "/tmp/fontcheck.png" });
+  if (!fontCheckPng || fontCheckPng.length === 0) throw new Error("font-check PNG missing");
+  console.log("FONT_CHECK_PNG_BYTES=" + fontCheckPng.length);
+
   // ---- Only now, with ALL evidence green, capture the immutable artifact. snapshot() stops
   // the session as part of the process (no separate stop() needed). The emitted snapshotId is
   // recorded by the owner into CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID + a BASE_ARTIFACT_VERSION
@@ -170,5 +307,6 @@ export async function bake() {
   const snap = await sandbox.snapshot();
   console.log("SNAPSHOT_ID=" + snap.snapshotId);
   console.log("SNAPSHOT_SIZE_BYTES=" + snap.sizeBytes);
-  return snap.snapshotId;
+  console.log("ARTIFACT_VERSION=" + NEW_ARTIFACT_VERSION);
+  return { snapshotId: snap.snapshotId, sizeBytes: snap.sizeBytes, artifactVersion: NEW_ARTIFACT_VERSION, fontCheckPng };
 }

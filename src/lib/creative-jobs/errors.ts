@@ -13,6 +13,7 @@ export const CREATIVE_JOB_ERROR_CODES = [
   "STORAGE_UPLOAD_FAILED",
   "STORAGE_VERIFY_FAILED",
   "ASSET_CREATE_FAILED",
+  "FONT_STRATEGY_MISMATCH",
   "JOB_CANCELLED",
   "JOB_ATTEMPTS_EXHAUSTED",
 ] as const;
@@ -40,6 +41,9 @@ export const ERROR_CLASS: Record<CreativeJobErrorCode, ErrorClass> = {
   STORAGE_UPLOAD_FAILED: "retriable",
   STORAGE_VERIFY_FAILED: "retriable",
   ASSET_CREATE_FAILED: "non_retriable",
+  // A code/artifact font-strategy or version incompatibility — deterministic; a retry with
+  // the same code+snapshot fails identically. Must be fixed (repoint snapshot / revert code).
+  FONT_STRATEGY_MISMATCH: "non_retriable",
   JOB_CANCELLED: "cancelled",
   JOB_ATTEMPTS_EXHAUSTED: "non_retriable",
 };

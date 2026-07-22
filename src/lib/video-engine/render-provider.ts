@@ -14,7 +14,13 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { Sandbox } from "@vercel/sandbox";
 import { buildRenderManifest } from "@/lib/video-engine/manifest";
-import { BASE_ARTIFACT_VERSION, RENDER_PROVIDER } from "@/lib/video-engine/versions";
+import { BASE_ARTIFACT_VERSION, FONT_STRATEGY, RENDER_PROVIDER } from "@/lib/video-engine/versions";
+import {
+  buildFontGuardCommand,
+  evaluateFontGuard,
+  parseFontGuardOutput,
+  FontStrategyMismatchError,
+} from "@/lib/video-engine/font-guard";
 
 export interface RenderInput {
   compositionId: string;
@@ -145,9 +151,9 @@ export interface SandboxRemotionProviderOptions {
 }
 
 const DEFAULT_ENTRY_POINT_DIR = path.join(process.cwd(), "src", "remotion");
-// Fonts are base64-embedded in the composition source (src/remotion/fonts-data.ts) and
-// loaded as data URIs, so nothing font-related needs staging into the bundle's publicDir
-// anymore — that removed the in-sandbox HTTP font fetch (and its delayRender timeout).
+// Fonts are SYSTEM fonts in the base artifact (/usr/share/fonts/lixtara); the composition
+// references them by CSS family name only. Nothing font-related is staged, loaded, or
+// fetched at render time — that removed the per-tab FontFace delayRender timeout.
 
 // The script that runs INSIDE the sandbox: bundle() -> selectComposition() ->
 // renderMedia({codec:"h264"}), same inputProps to both (per the spike's validated
@@ -244,8 +250,7 @@ async function stageLocalAssets(
 // source + downloaded source photos), plus the `remoteRefs` the caller needs to rewrite
 // inputProps. Exported so the staging layout is unit-testable WITHOUT a real Sandbox —
 // the render itself only adds render.mjs + the manifest on top of this. Fonts are NOT
-// staged: they're base64-embedded in the composition source (fonts-data.ts) and loaded
-// as data URIs, so they ride along in `compositionFiles`.
+// staged — they're SYSTEM fonts in the base artifact, referenced by CSS family name.
 export async function collectRenderStagingFiles(opts: {
   entryPointLocalDir: string;
   localAssetPaths: string[];
@@ -300,7 +305,22 @@ export class SandboxRemotionProvider implements RenderProvider {
       }
       metrics.sandboxStartupMs = Date.now() - startupStart;
 
-      // ---- 2. copy composition source (fonts are embedded in it) + local assets in ----
+      // ---- 1b. FAIL-CLOSED font guard: prove code<->snapshot compatibility BEFORE opening
+      // the render. Aborts with FontStrategyMismatchError (job -> FONT_STRATEGY_MISMATCH) if
+      // the snapshot's baked version/strategy or its installed faces don't match what this
+      // code requires — so a mismatched pair can NEVER produce an MP4 with fallback fonts. ----
+      {
+        const probeCmd = await sandbox.runCommand("sh", ["-c", buildFontGuardCommand()], { timeoutMs: 30000 });
+        const probe = parseFontGuardOutput(await probeCmd.stdout());
+        const verdict = evaluateFontGuard({
+          expectedVersion: this.opts.baseArtifactVersion ?? BASE_ARTIFACT_VERSION,
+          expectedStrategy: FONT_STRATEGY,
+          probe,
+        });
+        if (!verdict.ok) throw new FontStrategyMismatchError(verdict.reason);
+      }
+
+      // ---- 2. copy composition source (fonts are system fonts) + local assets in ----
       const entryPointLocalDir = this.opts.entryPointLocalDir ?? DEFAULT_ENTRY_POINT_DIR;
       const { files: stagedFiles, remoteRefs } = await collectRenderStagingFiles({
         entryPointLocalDir,

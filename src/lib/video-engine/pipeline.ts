@@ -20,6 +20,7 @@ import {
   type RenderResult,
 } from "@/lib/video-engine/produce-asset";
 import { SandboxCreateFailedError } from "@/lib/video-engine/render-provider";
+import { FontStrategyMismatchError } from "@/lib/video-engine/font-guard";
 import { RENDER_PROVIDER, TEMPLATE_VERSION } from "@/lib/video-engine/versions";
 import type { Asset } from "@/lib/assets/types";
 
@@ -74,6 +75,7 @@ function classifyThrown(err: unknown, stage: Stage): CreativeJobErrorCode {
   if (err instanceof StorageVerifyFailedError) return "STORAGE_VERIFY_FAILED";
   if (err instanceof AssetPersistFailedError) return "ASSET_CREATE_FAILED";
   if (err instanceof SandboxCreateFailedError) return "SANDBOX_CREATE_FAILED";
+  if (err instanceof FontStrategyMismatchError) return "FONT_STRATEGY_MISMATCH";
 
   const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
   if (message.includes("timeout") || message.includes("timed out")) return "RENDER_TIMEOUT";

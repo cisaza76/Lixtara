@@ -23,9 +23,6 @@ importers:
       '@remotion/bundler':
         specifier: 4.0.489
         version: 4.0.489(@swc/helpers@0.5.15)(postcss@8.5.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@remotion/fonts':
-        specifier: 4.0.489
-        version: 4.0.489(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@remotion/renderer':
         specifier: 4.0.489
         version: 4.0.489(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -1090,9 +1087,6 @@ packages:
     resolution: {integrity: sha512-NijrzGiOEriwW4N7wh/RzeDQyvecjI1Zwj4PoeDihJN9qCVlQSauBOqct6BwQb68XcLKFHFS2AWHH9y91NzNaQ==}
     cpu: [x64]
     os: [win32]
-
-  '@remotion/fonts@4.0.489':
-    resolution: {integrity: sha512-r+KIGSlQBdeaKcpPG1k1FkLArgQlszIgDjzSkrjnHmjsP2llX560bZuF+8BECdNq3HdwgpqCzqNjvxM6yIJ/iA==}
 
   '@remotion/licensing@4.0.489':
     resolution: {integrity: sha512-iEMhp4MRvjlkrXl8ZtrmsikcbXCzSGyk43s/NTLklsFHy+eBDSHO1rmmFrWPNZxw3pXwevdSbXZgyRh78X/3Ow==}
@@ -5816,13 +5810,6 @@ snapshots:
 
   '@remotion/compositor-win32-x64-msvc@4.0.489':
     optional: true
-
-  '@remotion/fonts@4.0.489(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      remotion: 4.0.489(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-    transitivePeerDependencies:
-      - react
-      - react-dom
 
   '@remotion/licensing@4.0.489': {}
 
