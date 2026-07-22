@@ -10,7 +10,9 @@ export const TEMPLATE_ID = "ListingVideo";
 // Bump when the composition's VISUAL output changes in a way that matters for audit
 // (layout, timing, brand). Independent of the input schema below — a template can
 // change its rendering of the same inputProps shape.
-export const TEMPLATE_VERSION = "1";
+// v2 (2026-07-22): photo gallery crossfades now OVERLAP (incoming photo dissolves in over the
+// outgoing one) — removes the ivory flash between photos that v1 produced.
+export const TEMPLATE_VERSION = "2";
 
 // Bump when `listingVideoInputSchema` (src/remotion/input.ts) changes shape.
 export const INPUT_SCHEMA_VERSION = "1";

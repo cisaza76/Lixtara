@@ -278,7 +278,7 @@ describe("produceVideoAsset — happy path", () => {
     expect(result.provenance).toEqual({
       sourceAssetIds: ["photo-1", "photo-2"],
       templateId: "ListingVideo",
-      templateVersion: "1",
+      templateVersion: "2",
       bundleVersion: "bundle-v1",
       inputSchemaVersion: "1",
       rendererVersion: "4.0.489",
@@ -294,7 +294,7 @@ describe("produceVideoAsset — happy path", () => {
 
     expect(assetProvenance.sourceAssetIds).toEqual(["photo-1", "photo-2"]);
     expect(assetProvenance.templateId).toBe("ListingVideo");
-    expect(assetProvenance.templateVersion).toBe("1");
+    expect(assetProvenance.templateVersion).toBe("2");
     expect(assetProvenance.bundleVersion).toBe("bundle-v1");
     expect(assetProvenance.inputSchemaVersion).toBe("1");
     expect(assetProvenance.rendererVersion).toBe("4.0.489");
