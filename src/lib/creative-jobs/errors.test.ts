@@ -45,6 +45,7 @@ describe("classifyError", () => {
       "RENDER_FAILED",
       "TECHNICAL_QA_FAILED",
       "ASSET_CREATE_FAILED",
+      "FONT_STRATEGY_MISMATCH",
       "JOB_ATTEMPTS_EXHAUSTED",
     ];
     for (const code of nonRetriableCodes) {

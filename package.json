@@ -16,7 +16,6 @@
     "@base-ui/react": "^1.4.1",
     "@google/genai": "^2.8.0",
     "@remotion/bundler": "4.0.489",
-    "@remotion/fonts": "4.0.489",
     "@remotion/renderer": "4.0.489",
     "@sentry/nextjs": "^10.66.0",
     "@supabase/ssr": "^0.10.3",
