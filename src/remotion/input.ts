@@ -7,7 +7,7 @@
 // `trace_id` deliberately does NOT live here — correlation IDs belong to the
 // Creative Job layer (src/lib/creative-jobs/), not the composition.
 import { z } from "zod";
-import { DEFAULT_CLOSING_SECONDS, DEFAULT_OPENING_SECONDS, DEFAULT_PHOTO_SECONDS } from "./layout";
+import { CROSSFADE_FRAMES, DEFAULT_CLOSING_SECONDS, DEFAULT_OPENING_SECONDS, DEFAULT_PHOTO_SECONDS } from "./layout";
 
 export const listingVideoInputSchema = z.object({
   property: z.object({
@@ -64,7 +64,16 @@ export interface DurationOptions {
   closingSeconds?: number;
 }
 
-// Opening card + one sequence per photo + closing card, in whole frames.
+// On-screen span of the whole photo gallery, in whole frames. Consecutive photos OVERLAP by
+// CROSSFADE_FRAMES so the incoming photo dissolves IN over the outgoing one (which stays opaque
+// underneath until covered) — a true crossfade with no ivory flash between photos. Each overlap
+// shortens the gallery by CROSSFADE_FRAMES, so N photos span N*perPhoto - (N-1)*CROSSFADE_FRAMES.
+export function photoSectionFrames(photoCount: number, perPhotoFrames: number): number {
+  if (photoCount <= 0) return 0;
+  return photoCount * perPhotoFrames - (photoCount - 1) * CROSSFADE_FRAMES;
+}
+
+// Opening card + the (overlapping) photo gallery + closing card, in whole frames.
 export function totalDurationFrames(photoCount: number, fps: number, opts: DurationOptions = {}): number {
   const photoSeconds = opts.photoSeconds ?? DEFAULT_PHOTO_SECONDS;
   const openingSeconds = opts.openingSeconds ?? DEFAULT_OPENING_SECONDS;
@@ -72,7 +81,7 @@ export function totalDurationFrames(photoCount: number, fps: number, opts: Durat
 
   const openingFrames = Math.round(fps * openingSeconds);
   const closingFrames = Math.round(fps * closingSeconds);
-  const photosFrames = photoCount * perPhotoDurationFrames(photoCount, fps, photoSeconds);
+  const galleryFrames = photoSectionFrames(photoCount, perPhotoDurationFrames(photoCount, fps, photoSeconds));
 
-  return openingFrames + photosFrames + closingFrames;
+  return openingFrames + galleryFrames + closingFrames;
 }

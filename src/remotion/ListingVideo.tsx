@@ -19,7 +19,7 @@ import {
   CROSSFADE_FRAMES,
   SAFE_AREA,
 } from "./layout";
-import { orderedPhotos, perPhotoDurationFrames, type ListingVideoInput } from "./input";
+import { orderedPhotos, perPhotoDurationFrames, photoSectionFrames, type ListingVideoInput } from "./input";
 import { resolvePhotoSrc } from "./resolve";
 
 const IVORY = "#FDFCF8";
@@ -89,10 +89,11 @@ const OpeningCard: React.FC<{ property: ListingVideoInput["property"] }> = ({ pr
   );
 };
 
-const KenBurnsPhoto: React.FC<{ src: string; index: number; durationInFrames: number }> = ({
+const KenBurnsPhoto: React.FC<{ src: string; index: number; durationInFrames: number; isLast: boolean }> = ({
   src,
   index,
   durationInFrames,
+  isLast,
 }) => {
   const frame = useCurrentFrame();
   // Alternate drift direction per slide so a multi-photo gallery doesn't feel
@@ -102,15 +103,25 @@ const KenBurnsPhoto: React.FC<{ src: string; index: number; durationInFrames: nu
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const crossfade = interpolate(
-    frame,
-    [0, CROSSFADE_FRAMES, durationInFrames - CROSSFADE_FRAMES, durationInFrames],
-    [0, 1, 1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: EASE },
-  );
+  // Fade IN only. Because consecutive photo Sequences OVERLAP by CROSSFADE_FRAMES (see the
+  // gallery below) and the outgoing photo stays fully opaque underneath until the incoming one
+  // covers it, the screen is never uncovered — no ivory flash between photos. Only the LAST
+  // photo fades OUT, dissolving into the ivory closing card.
+  const fadeIn = interpolate(frame, [0, CROSSFADE_FRAMES], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE,
+  });
+  const fadeOut = isLast
+    ? interpolate(frame, [durationInFrames - CROSSFADE_FRAMES, durationInFrames], [1, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: EASE,
+      })
+    : 1;
 
   return (
-    <AbsoluteFill style={{ opacity: crossfade, backgroundColor: INK }}>
+    <AbsoluteFill style={{ opacity: fadeIn * fadeOut, backgroundColor: INK }}>
       <AbsoluteFill style={{ transform: `scale(${scale})` }}>
         <Img src={src} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </AbsoluteFill>
@@ -269,7 +280,11 @@ export const ListingVideo: React.FC<ListingVideoInput> = ({ property, priceLabel
   const openingFrames = Math.round(fps * DEFAULT_OPENING_SECONDS);
   const photoFrames = perPhotoDurationFrames(photoList.length, fps, DEFAULT_PHOTO_SECONDS);
   const closingFrames = Math.round(fps * DEFAULT_CLOSING_SECONDS);
-  const photoSectionFrames = photoFrames * photoList.length;
+  // Consecutive photos overlap by CROSSFADE_FRAMES so each dissolves in over the previous
+  // (no ivory flash). `photoStep` is the per-photo advance; the gallery's on-screen span
+  // accounts for the (count-1) overlaps.
+  const photoStep = photoFrames - CROSSFADE_FRAMES;
+  const galleryFrames = photoSectionFrames(photoList.length, photoFrames);
 
   return (
     <AbsoluteFill style={{ backgroundColor: IVORY }}>
@@ -278,17 +293,22 @@ export const ListingVideo: React.FC<ListingVideoInput> = ({ property, priceLabel
       </Sequence>
 
       {photoList.map((photo, index) => (
-        <Sequence key={photo.url + index} from={openingFrames + index * photoFrames} durationInFrames={photoFrames}>
-          <KenBurnsPhoto src={resolvePhotoSrc(photo.url)} index={index} durationInFrames={photoFrames} />
+        <Sequence key={photo.url + index} from={openingFrames + index * photoStep} durationInFrames={photoFrames}>
+          <KenBurnsPhoto
+            src={resolvePhotoSrc(photo.url)}
+            index={index}
+            durationInFrames={photoFrames}
+            isLast={index === photoList.length - 1}
+          />
           <LowerThird priceLabel={priceLabel} roomLabel={photo.roomLabel} durationInFrames={photoFrames} />
         </Sequence>
       ))}
 
-      <Sequence from={openingFrames} durationInFrames={photoSectionFrames}>
+      <Sequence from={openingFrames} durationInFrames={galleryFrames}>
         <SafeAreaBadge badge={badge} />
       </Sequence>
 
-      <Sequence from={openingFrames + photoSectionFrames} durationInFrames={closingFrames}>
+      <Sequence from={openingFrames + galleryFrames} durationInFrames={closingFrames}>
         <ClosingCard brand={brand} cta={cta} />
       </Sequence>
     </AbsoluteFill>
