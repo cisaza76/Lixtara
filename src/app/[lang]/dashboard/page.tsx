@@ -12,6 +12,7 @@ import {
 } from "@/components/seller-listing-card";
 import { MediaStrategyPanel } from "@/components/media-strategy-panel";
 import type { StrategyPayload } from "@/lib/media-intelligence/types";
+import { ListingVideoPanel } from "@/components/listing-video-panel";
 
 interface ListingRow {
   id: string;
@@ -154,6 +155,9 @@ export default async function DashboardPage({
       }
     }
   }
+  // Creative Studio v1 "Listing video" — server-only flag (no NEXT_PUBLIC_ variant);
+  // the panel polls its own status route.
+  const listingVideoEnabled = process.env.CREATIVE_STUDIO_VIDEO_ENABLED === "true";
 
   // Fetch everything else in parallel and group by property_id client-side.
   const [{ data: photoRows }, { data: payRows }, { data: agRows }, { data: tourRows }] =
@@ -591,6 +595,11 @@ export default async function DashboardPage({
                       propertyId={l.id}
                       initial={mediaStrategyByListing.get(l.id) ?? null}
                       copy={t(lang).mediaAgent}
+                  {listingVideoEnabled && (
+                    <ListingVideoPanel
+                      propertyId={l.id}
+                      lang={lang as Locale}
+                      copy={t(lang).creativeStudio.listingVideo}
                     />
                   )}
                 </div>

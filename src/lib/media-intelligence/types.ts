@@ -55,6 +55,39 @@ export interface RecommendedOutput {
   estimatedCostUsd: number; // filled deterministically, NOT by the LLM
 }
 
+export const READINESS_REASON_CODES = [
+  "too_few_photos_for_tour",
+  "listing_not_approved",
+  "no_interior_photos",
+  "few_interior_photos",
+  "low_photo_quality",
+] as const;
+export type ReadinessReasonCode = (typeof READINESS_REASON_CODES)[number];
+
+export const SUGGESTED_ACTION_CODES = [
+  "add_more_photos",
+  "add_interior_photos",
+  "await_listing_approval",
+  "improve_photo_quality",
+] as const;
+export type SuggestedActionCode = (typeof SUGGESTED_ACTION_CODES)[number];
+
+export interface ReadinessReason {
+  code: ReadinessReasonCode;
+  params?: Record<string, number | string>;
+}
+export interface SuggestedAction {
+  code: SuggestedActionCode;
+  params?: Record<string, number | string>;
+}
+export interface CapabilityReadiness {
+  capability: MediaCapability;
+  status: "ready" | "not_ready";
+  recommendation: "recommended" | "not_recommended";
+  reasons: ReadinessReason[];
+  suggestedActions: SuggestedAction[];
+}
+
 export interface MediaStrategy {
   targetAudience: string;
   buyerPersona: string;
@@ -122,5 +155,6 @@ export interface StrategyPayload {
   mediaStrategy: MediaStrategy;
   generationPrompts: GenerationPrompt[];
   deliverables: Deliverable[];
+  readiness: CapabilityReadiness[];
   providersUsed: Partial<Record<MediaCapability, string>>;
 }

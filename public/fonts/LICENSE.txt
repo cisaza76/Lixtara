@@ -1,0 +1,13 @@
+These font files are vendored from Google Fonts (fonts.gstatic.com) for
+self-contained (no-network) Remotion rendering — see src/remotion/fonts.ts.
+
+- Playfair Display (PlayfairDisplay-500.woff2, PlayfairDisplay-600.woff2,
+  PlayfairDisplay-500Italic.woff2) — designed by Claus Eggers Sørensen.
+  https://fonts.google.com/specimen/Playfair+Display
+- Inter (Inter-600.woff2) — designed by Rasmus Andersson.
+  https://fonts.google.com/specimen/Inter
+
+Both typefaces are licensed under the SIL Open Font License, Version 1.1,
+which permits redistribution (including bundling in an application) with
+the font files unmodified. Full license text:
+https://openfontlicense.org/documents/OFL.txt
