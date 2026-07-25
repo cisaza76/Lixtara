@@ -10,6 +10,8 @@ import {
   type Tone,
   type Workstream,
 } from "@/components/seller-listing-card";
+import { MediaStrategyPanel } from "@/components/media-strategy-panel";
+import type { StrategyPayload } from "@/lib/media-intelligence/types";
 import { ListingVideoPanel } from "@/components/listing-video-panel";
 
 interface ListingRow {
@@ -135,6 +137,24 @@ export default async function DashboardPage({
   const listings = (listingRows ?? []) as ListingRow[];
   const ids = listings.map((l) => l.id);
 
+  // Media Intelligence Agent — flag-gated read of the latest completed
+  // strategy per property (Task 16). No-op query when the flag is off.
+  const mediaAgentEnabled = process.env.MEDIA_AGENT_ENABLED === "true";
+  const mediaStrategyByListing = new Map<string, StrategyPayload>();
+  if (mediaAgentEnabled && ids.length > 0) {
+    const { data: mediaJobs } = await supabase
+      .from("media_agent_jobs")
+      .select("property_id, strategy, status, created_at")
+      .in("property_id", ids)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false });
+    for (const j of mediaJobs ?? []) {
+      // keep the newest completed job per property (first seen wins due to desc order)
+      if (j.property_id && j.strategy && !mediaStrategyByListing.has(j.property_id)) {
+        mediaStrategyByListing.set(j.property_id, j.strategy as StrategyPayload);
+      }
+    }
+  }
   // Creative Studio v1 "Listing video" — server-only flag (no NEXT_PUBLIC_ variant);
   // the panel polls its own status route.
   const listingVideoEnabled = process.env.CREATIVE_STUDIO_VIDEO_ENABLED === "true";
@@ -570,6 +590,13 @@ export default async function DashboardPage({
                       isDraft ? copy.continueListingButton : copy.viewListingButton
                     }
                   />
+                  {mediaAgentEnabled && (
+                    <MediaStrategyPanel
+                      propertyId={l.id}
+                      initial={mediaStrategyByListing.get(l.id) ?? null}
+                      copy={t(lang).mediaAgent}
+                    />
+                  )}
                   {listingVideoEnabled && (
                     <ListingVideoPanel
                       propertyId={l.id}
