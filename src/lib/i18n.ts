@@ -10,12 +10,12 @@ export const dictionaries = {
   en: {
     hero: {
       eyebrow: "Established Florida Brokerage",
-      headlineBefore: "Keep up to ",
-      headlineAccent: "6%",
-      headlineAfter: " of your sale price.",
+      headlineBefore: "Your home, ",
+      headlineAccent: "your terms",
+      headlineAfter: ". Sell with confidence and control.",
       subheadline:
-        "Licensed brokerage. Full home.com exposure. You keep more equity.",
-      ctaPrimary: "Get my selling plan",
+        "Smart technology and licensed brokers guide every step — and you keep what the 6% commission would take.",
+      ctaPrimary: "Start selling",
       ctaSecondary: "Browse Florida listings",
       licensedBy: "Licensed by",
       licensePending: "License pending",
@@ -1283,12 +1283,12 @@ export const dictionaries = {
   es: {
     hero: {
       eyebrow: "Brokerage establecido en Florida",
-      headlineBefore: "Quedate con hasta el ",
-      headlineAccent: "6%",
-      headlineAfter: " del precio de venta.",
+      headlineBefore: "Tu casa, ",
+      headlineAccent: "tus reglas",
+      headlineAfter: ". Vende con control y confianza.",
       subheadline:
-        "Brokerage licenciada. Visibilidad home.com completa. Te quedas con más equity.",
-      ctaPrimary: "Obtener mi plan de venta",
+        "Tecnología inteligente y brokers licenciados te guían en cada paso — y conservas lo que la comisión se llevaría.",
+      ctaPrimary: "Empieza a vender",
       ctaSecondary: "Ver listings en Florida",
       licensedBy: "Licenciado por",
       licensePending: "Licencia en trámite",
