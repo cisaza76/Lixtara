@@ -2,7 +2,8 @@
 // work happens inside injected deps (loadAssets/classify/score/strategy) so the
 // whole pipeline is unit-testable. Persistence + final status are handled by the
 // caller (the route) — this returns the completed StrategyPayload or throws.
-import { STRATEGY_SCHEMA_VERSION, type MediaCapability, type StrategyPayload } from "@/lib/media-intelligence/types";
+import { MEDIA_CAPABILITIES, STRATEGY_SCHEMA_VERSION, type MediaCapability, type StrategyPayload } from "@/lib/media-intelligence/types";
+import { evaluateReadiness } from "@/lib/media-intelligence/readiness";
 import type { Asset, Classification, MediaStrategy, QualityScore } from "@/lib/media-intelligence/types";
 import type { MediaJobStatus } from "@/lib/media-intelligence/types";
 import type { ListingFacts } from "@/lib/media-intelligence/strategy";
@@ -25,6 +26,9 @@ export interface RunInput {
   jobId: string;
   propertyId: string;
   ownerId: string;
+  // Resolved by the caller (route) from the listing's mls_status — the agent
+  // itself never touches the DB, so approval state must be injected.
+  listingApproved: boolean;
 }
 
 function log(jobId: string, stage: string, msg: string) {
@@ -68,6 +72,13 @@ export async function runMediaAgent(
     providersUsed[deliverable.capability] = provider.id;
   }
 
+  const readiness = evaluateReadiness(MEDIA_CAPABILITIES, {
+    photoCount: assets.length,
+    scores,
+    classifications,
+    listingApproved: input.listingApproved,
+  });
+
   return {
     schemaVersion: STRATEGY_SCHEMA_VERSION,
     assets,
@@ -77,6 +88,7 @@ export async function runMediaAgent(
     mediaStrategy,
     generationPrompts,
     deliverables,
+    readiness,
     providersUsed,
   };
 }

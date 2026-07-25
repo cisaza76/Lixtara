@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   // Ownership via RLS: the user can only read their own property + its photos.
   const { data: property } = await supabase
     .from("properties")
-    .select("id, list_price, bedrooms, bathrooms, address_city")
+    .select("id, list_price, bedrooms, bathrooms, address_city, mls_status")
     .eq("id", propertyId)
     .maybeSingle();
   if (!property) {
@@ -105,7 +105,15 @@ export async function POST(req: Request) {
   };
 
   try {
-    const payload = await runMediaAgent({ jobId, propertyId, ownerId: user.id }, deps);
+    const payload = await runMediaAgent(
+      {
+        jobId,
+        propertyId,
+        ownerId: user.id,
+        listingApproved: property.mls_status === "active",
+      },
+      deps,
+    );
     const providers = Object.values(payload.providersUsed).join(",") || "mock";
     await completeJob(svc as never, jobId, payload, providers);
     return NextResponse.json({ jobId, status: "completed", strategy: payload });

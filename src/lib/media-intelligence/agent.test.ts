@@ -33,11 +33,17 @@ function deps(overrides: Partial<AgentDeps> = {}): AgentDeps {
 describe("runMediaAgent", () => {
   it("runs the pipeline and returns a completed payload", async () => {
     const d = deps();
-    const payload = await runMediaAgent({ jobId: "j1", propertyId: "p1", ownerId: "o1" }, d);
+    const payload = await runMediaAgent(
+      { jobId: "j1", propertyId: "p1", ownerId: "o1", listingApproved: true },
+      d,
+    );
     expect(payload.schemaVersion).toBe(1);
     expect(payload.selectedShots.length).toBe(3);
     expect(payload.deliverables.length).toBeGreaterThan(0);
     expect(payload.providersUsed.video).toBe("mock");
+    // readiness is evaluated for every capability (required by StrategyPayload)
+    expect(payload.readiness.map((r) => r.capability)).toContain("video");
+    expect(payload.readiness.every((r) => r.status === "ready" || r.status === "not_ready")).toBe(true);
     // status walked pending→analyzing→generating (completed handled by caller)
     expect(d.setStatus).toHaveBeenCalledWith("j1", "analyzing");
     expect(d.setStatus).toHaveBeenCalledWith("j1", "generating");
@@ -45,6 +51,8 @@ describe("runMediaAgent", () => {
 
   it("propagates stage errors (caller marks the job failed)", async () => {
     const d = deps({ classify: vi.fn(async () => { throw new Error("vision down"); }) });
-    await expect(runMediaAgent({ jobId: "j1", propertyId: "p1", ownerId: "o1" }, d)).rejects.toThrow("vision down");
+    await expect(
+      runMediaAgent({ jobId: "j1", propertyId: "p1", ownerId: "o1", listingApproved: true }, d),
+    ).rejects.toThrow("vision down");
   });
 });

@@ -1181,6 +1181,7 @@ export const dictionaries = {
         "AI-assisted marketing preview. Any generated media will be clearly disclosed and must faithfully represent the property.",
       tooFewPhotos: "Add at least 3 photos to generate a marketing package.",
       failed: "Something went wrong. Please try again.",
+    },
     creativeStudio: {
       listingVideo: {
         title: "Listing video",
@@ -2480,6 +2481,7 @@ export const dictionaries = {
         "Vista previa de marketing asistida por IA. Cualquier medio generado se divulgará claramente y debe representar fielmente la propiedad.",
       tooFewPhotos: "Agrega al menos 3 fotos para generar el paquete de marketing.",
       failed: "Algo salió mal. Inténtalo de nuevo.",
+    },
     creativeStudio: {
       listingVideo: {
         title: "Video de la propiedad",

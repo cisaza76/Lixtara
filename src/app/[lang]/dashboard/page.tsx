@@ -595,6 +595,8 @@ export default async function DashboardPage({
                       propertyId={l.id}
                       initial={mediaStrategyByListing.get(l.id) ?? null}
                       copy={t(lang).mediaAgent}
+                    />
+                  )}
                   {listingVideoEnabled && (
                     <ListingVideoPanel
                       propertyId={l.id}
