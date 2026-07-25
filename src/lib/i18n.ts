@@ -14,7 +14,7 @@ export const dictionaries = {
       headlineAccent: "your terms",
       headlineAfter: ". Sell with confidence and control.",
       subheadline:
-        "Smart technology and licensed brokers guide every step — and you keep what the 6% commission would take.",
+        "Smart technology and licensed brokers guide every step — and more of your sale stays with you.",
       ctaPrimary: "Start selling",
       ctaSecondary: "Browse Florida listings",
       licensedBy: "Licensed by",
@@ -1314,7 +1314,7 @@ export const dictionaries = {
       headlineAccent: "tus reglas",
       headlineAfter: ". Vende con control y confianza.",
       subheadline:
-        "Tecnología inteligente y brokers licenciados te guían en cada paso — y conservas lo que la comisión se llevaría.",
+        "Tecnología inteligente y brokers licenciados te guían en cada paso — y más de tu venta se queda contigo.",
       ctaPrimary: "Empieza a vender",
       ctaSecondary: "Ver listings en Florida",
       licensedBy: "Licenciado por",

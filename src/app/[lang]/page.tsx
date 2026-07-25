@@ -154,8 +154,8 @@ export default async function Home({
               />
 
               <Image
-                src="/hero-living.jpg"
-                alt="Bright, elegantly furnished Florida living room"
+                src="/hero-dusk.jpg"
+                alt="Florida home at dusk with warm interior lights, palms, and a still pool"
                 fill
                 priority
                 sizes="(min-width: 1024px) 380px, 80vw"
