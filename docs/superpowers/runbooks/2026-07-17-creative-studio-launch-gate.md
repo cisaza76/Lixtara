@@ -12,6 +12,18 @@
 
 ## Current verdict: **BLOCKED — Documentation complete; production artifact not yet baked**
 
+> **PRECISION UPDATE (2026-07-23).** Three distinct facts — do **not** treat them as equivalent:
+> - **Verified:** Read-only verification confirms that the `assets` (13 rows) and `creative_jobs`
+>   (6 rows) tables exist and contain data.
+> - **NOT verified:** Whether the migration was executed through the official migration history has
+>   not been verified.
+> - **NOT verified:** Migration history reconciliation remains pending.
+>
+> Nothing in this document should be read as "the migration was already applied." What changed is
+> only that the *tables-absent* assumption is contradicted by their live existence; the
+> migration-execution and history-reconciliation questions below remain open. (`creative_job_transitions`
+> was not inspected; no schema action was taken; cause of the discrepancy is not asserted.)
+
 ### Current blocker (the ONLY thing stopping advance right now)
 - **Sandbox render artifact bake (preflight Step 0).** The artifact **definition is validated** (recipe, versions,
   reproducibility, compatibility, security, integration, rollback, acceptance criteria) — see
@@ -29,8 +41,11 @@
   A (`feat/media-agent-app`, carries `create_media_agent_jobs`) is deliberately **not** merged. `supabase db push
   --dry-run` from `main` now shows **exclusively** `20260715171914_creative_studio_video.sql`, in order. See
   `2026-07-17-migration-reconciliation-checkpoint.md`.
-- **Code integrated to `main`** — Creative Studio v1 is on `main` but **inert** (feature flags unset, migration
-  not applied).
+- **Code integrated to `main`** — Creative Studio v1 is on `main` but **inert** (feature flags unset).
+  ⚠️ *Update 2026-07-23: read-only verification confirms the `assets`/`creative_jobs` tables exist and
+  contain data. Whether the migration was executed through the official migration history is NOT
+  verified, and history reconciliation remains pending — do not read this as "applied." See the
+  Precision Update at the top.*
 
 ### Prerequisites for GO (owner-gated; sequence after the artifact)
 | Prereq | Owner action | Gates |
@@ -41,7 +56,7 @@
 | `CRON_SECRET` / `SENTRY_DSN` (Steps 4–5) | set secrets | worker / capture |
 | `CREATIVE_STUDIO_VIDEO_ENABLED` (Step 8) | set flag, staged | seller-visible |
 
-While BLOCKED, nothing is seller-visible and there is zero production risk (feature flags unset, migration not applied).
+While BLOCKED, nothing is seller-visible and there is zero production risk (feature flags unset). *(Update 2026-07-23: read-only verification confirms the `assets`/`creative_jobs` tables exist with data; migration-history execution is NOT verified and reconciliation remains pending — not "applied." Risk statement stands on the unset feature flags. See the Precision Update at the top.)*
 
 ---
 
@@ -51,7 +66,7 @@ While BLOCKED, nothing is seller-visible and there is zero production risk (feat
 | — | Migration validated (`migrations:check` ✓) | ✅ agent-verified |
 | — | Rollback SQL captured in repo (`rollback-20260715171914_creative_studio_video.sql`) | ✅ agent-verified |
 | 0 | **Sandbox artifact definition** (recipe/versions/reproducibility/security/rollback/acceptance) | ✅ **validated** (preflight, 2026-07-17) — bake NOT authorized; see `2026-07-18-creative-studio-sandbox-artifact.md` |
-| 1 | Apply migration to prod | ◻ **unblocked, not executed** — reconciliation resolved (F+B on `main`); dry-run from `main` = only the CS migration; needs owner sign-off + after the artifact |
+| 1 | Apply migration to prod | ⚠️ **tables present, execution unverified** — read-only verification (2026-07-23) confirms `assets` (13 rows) + `creative_jobs` (6 rows) exist with data; whether the migration ran through the official history is NOT verified and reconciliation remains pending. Table-absence is contradicted; "applied" is **not** established. |
 | 2 | Private `creative-studio` bucket | ◻ owner action |
 | 3 | Sandbox artifact **bake** (create → snapshot → set env + bump `BASE_ARTIFACT_VERSION`) | ◻ owner action — **highest dependency; blocked on ffmpeg-pin + React-19 confirm** |
 | 4 | `CRON_SECRET` | ◻ owner action |

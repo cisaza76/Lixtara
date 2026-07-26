@@ -21,6 +21,12 @@ export const INPUT_SCHEMA_VERSION = "1";
 // package.json — all three are pinned in lockstep, no caret).
 export const RENDERER_VERSION = "4.0.489";
 
+// Exact pinned version of @remotion/media (the uploaded_video <Video> body). Pinned in
+// lockstep with the other Remotion packages. The shared composition hard-imports it, so the
+// in-sandbox bundle resolves it for EVERY render; the render provider ensures it is present
+// (one-package `--no-save` install when the base artifact hasn't baked it — D1).
+export const MEDIA_VIDEO_VERSION = "4.0.489";
+
 // Execution provider — WHERE the render ran, distinct from `provider` on the video
 // Asset's AssetProvenance (WHAT produced the pixels, e.g. "remotion"). Kept as its own
 // constant so a future escape hatch (e.g. a Lambda renderer) is a one-line swap here,

@@ -30,6 +30,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { Sandbox } from "@vercel/sandbox";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Asset, AssetStore } from "@/lib/assets/types";
 import { selectForCapability, wrapPropertyPhoto } from "@/lib/assets/asset-manager";
@@ -37,6 +38,7 @@ import { SupabaseAssetStore } from "@/lib/assets/asset-store.supabase";
 import type { CreativeJob } from "@/lib/creative-jobs/jobs";
 import type { OnStageHook, PipelineDeps, ReconcileResult } from "@/lib/video-engine/pipeline";
 import { produceVideoAsset, type ProduceVideoAssetDeps } from "@/lib/video-engine/produce-asset";
+import { defaultResolveVideoSource } from "@/lib/video-engine/resolve-video-source";
 import {
   SandboxRemotionProvider,
   type RenderProvider,
@@ -49,6 +51,16 @@ import { BASE_ARTIFACT_VERSION } from "@/lib/video-engine/versions";
 import { listingVideoInputSchema } from "@/remotion/input";
 import { VIDEO_WIDTH, VIDEO_HEIGHT } from "@/remotion/layout";
 import { downscaleImageToFit } from "@/lib/video-engine/image-downscale";
+// uploaded_video branch — owned by its own module; worker-deps only switch()es + delegates.
+import { produceUploadedVideoStrategy } from "@/lib/video-engine/uploaded-video-pipeline";
+import { decideSourceStrategy } from "@/lib/video-engine/job-routing";
+import type { VideoPreparationSandbox } from "@/lib/video-engine/execute-video-preparation";
+
+export type SourceStrategy = "photo_slideshow" | "uploaded_video";
+
+export function isCreativeStudioVideoEnabled(): boolean {
+  return process.env.CREATIVE_STUDIO_VIDEO_ENABLED === "true";
+}
 
 // ---------------------------------------------------------------------------
 // Sandbox base artifact — from env, never silently defaulted (requirement 8: no
@@ -290,6 +302,19 @@ export interface WorkerDepsOptions {
   brandName?: string;
   ctaText?: string;
   tempDirPrefix?: string;
+  // Step 5 uploaded_video wiring (all optional; defaults preserve photo_slideshow behavior).
+  // `sourceStrategy` is gated by CREATIVE_STUDIO_VIDEO_ENABLED in buildRealWorkerDeps — with
+  // the flag OFF it is forced to "photo_slideshow", so the whole system is byte-identical.
+  sourceStrategy?: SourceStrategy;
+  // F4.2 — when true AND `sourceStrategy` is unset, the strategy is decided per listing from
+  // the existence of a valid Source Asset (buildRealWorkerDeps sets this only when the flag
+  // is ON and no explicit override was given).
+  autoRouteStrategy?: boolean;
+  resolveVideoSource?: (listingId: string, ownerId: string) => Promise<Asset | null>;
+  createPrepSandbox?: () => Promise<VideoPreparationSandbox>;
+  downloadSourceBytes?: (asset: Asset) => Promise<Buffer>;
+  prepTimeoutMs?: number;
+  snapshotId?: string;
 }
 
 interface ResolvedWorkerDeps {
@@ -306,6 +331,17 @@ interface ResolvedWorkerDeps {
   brandName: string;
   ctaText: string;
   tempDirPrefix: string;
+  // Step 5 uploaded_video wiring — all optional so the existing photo-path tests (which
+  // build ResolvedWorkerDeps inline) are untouched; buildRealWorkerDeps always supplies
+  // them, and produceUploadedVideoStrategy (only reached when sourceStrategy==uploaded_video)
+  // requires them.
+  sourceStrategy?: SourceStrategy;
+  autoRouteStrategy?: boolean;
+  resolveVideoSource?: (listingId: string, ownerId: string) => Promise<Asset | null>;
+  createPrepSandbox?: () => Promise<VideoPreparationSandbox>;
+  downloadSourceBytes?: (asset: Asset) => Promise<Buffer>;
+  prepTimeoutMs?: number;
+  snapshotId?: string;
 }
 
 // Builds `PipelineDeps["produce"]` against an EXPLICIT, fully-resolved deps set — every
@@ -320,6 +356,21 @@ export function buildRealProduce(deps: ResolvedWorkerDeps): PipelineDeps["produc
     const listing = await deps.loadListing(input.listingId);
     if (!listing) {
       throw new Error(`worker-deps: listing not found for produce: ${input.listingId}`);
+    }
+
+    // F4.2 — decide the Source Strategy ONCE, per listing (backend-only, never from client
+    // input). An explicit `sourceStrategy` (test-forced, or the flag-OFF photo lock) wins;
+    // otherwise, when auto-routing is active, reuse F3's resolveVideoSource (UNCHANGED) to
+    // pick uploaded_video iff a valid Source Asset exists, else photo_slideshow. Exactly ONE
+    // dispatch into the SAME F3 pipeline — never both strategies, never a double render.
+    const strategy: SourceStrategy =
+      deps.sourceStrategy ??
+      (deps.autoRouteStrategy
+        ? await decideSourceStrategy(deps.resolveVideoSource, input.listingId, input.ownerId)
+        : "photo_slideshow");
+
+    if (strategy === "uploaded_video") {
+      return produceUploadedVideoStrategy(input, hooks, deps, listing);
     }
 
     // Sellers create property_photos, never Assets — wrap them into kind=photo source
@@ -417,6 +468,40 @@ export function buildRealReconcile(assets: AssetStore): PipelineDeps["reconcile"
 // Supabase/Sandbox/ffprobe-backed implementations above.
 // ---------------------------------------------------------------------------
 
+// Default prep-sandbox factory — a real Vercel Sandbox from the base artifact. A real
+// Sandbox structurally satisfies VideoPreparationSandbox (runCommand/writeFiles/
+// readFileToBuffer/stop), the same duck-typing qa.ts/render-provider.ts already rely on.
+function defaultCreatePrepSandbox(timeoutMs: number): () => Promise<VideoPreparationSandbox> {
+  return async () => {
+    const artifact = resolveSandboxBaseArtifactFromEnv();
+    const sandbox =
+      "snapshotId" in artifact
+        ? await Sandbox.create({ source: { type: "snapshot", snapshotId: artifact.snapshotId }, resources: { vcpus: 4 }, timeout: timeoutMs })
+        : await Sandbox.create({ image: artifact.image, resources: { vcpus: 4 }, timeout: timeoutMs });
+    return sandbox as unknown as VideoPreparationSandbox;
+  };
+}
+
+// Default source-bytes download via a short-lived signed URL (never baked into any payload).
+function defaultDownloadSourceBytes(
+  client: StorageDbClient,
+  opts: { ttlSeconds?: number; fetchImpl?: typeof fetch } = {},
+): (asset: Asset) => Promise<Buffer> {
+  const ttl = opts.ttlSeconds ?? DEFAULT_SOURCE_SIGNED_URL_TTL_SECONDS;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  return async (asset) => {
+    const { data, error } = await client.storage.from(asset.storageBucket).createSignedUrl(asset.storagePath, ttl);
+    if (error || !data?.signedUrl) {
+      throw new Error(`worker-deps: failed to sign source video ${asset.id}: ${error?.message ?? "no signed url"}`);
+    }
+    const res = await fetchImpl(data.signedUrl);
+    if (!res.ok) throw new Error(`worker-deps: failed to download source video ${asset.id}: HTTP ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0) throw new Error(`worker-deps: downloaded source video ${asset.id} is empty`);
+    return buf;
+  };
+}
+
 export function buildRealWorkerDeps(
   client: SupabaseClient,
   overrides: WorkerDepsOptions = {},
@@ -442,6 +527,20 @@ export function buildRealWorkerDeps(
   const ctaText = overrides.ctaText ?? DEFAULT_CTA_TEXT;
   const tempDirPrefix = overrides.tempDirPrefix ?? "video-engine-src-";
 
+  // Feature flag + F4.2 auto-routing:
+  //  - flag OFF → FORCED photo_slideshow (byte-identical to today, even if a Source Asset exists);
+  //  - flag ON + explicit override → forced (tests/ops);
+  //  - flag ON + no override → auto-route per listing (decideSourceStrategy, reuses resolveVideoSource).
+  const flagOn = isCreativeStudioVideoEnabled();
+  const sourceStrategy: SourceStrategy | undefined = flagOn ? overrides.sourceStrategy : "photo_slideshow";
+  const autoRouteStrategy = flagOn && overrides.sourceStrategy === undefined;
+  const prepTimeoutMs = overrides.prepTimeoutMs ?? 8 * 60 * 1000;
+  const snapshotId = overrides.snapshotId ?? process.env.CREATIVE_STUDIO_SANDBOX_SNAPSHOT_ID;
+  const resolveVideoSource = overrides.resolveVideoSource ?? defaultResolveVideoSource(assets);
+  const createPrepSandbox = overrides.createPrepSandbox ?? defaultCreatePrepSandbox(prepTimeoutMs);
+  const downloadSourceBytes =
+    overrides.downloadSourceBytes ?? defaultDownloadSourceBytes(client as unknown as StorageDbClient);
+
   const resolved: ResolvedWorkerDeps = {
     assets,
     storage,
@@ -454,6 +553,13 @@ export function buildRealWorkerDeps(
     brandName,
     ctaText,
     tempDirPrefix,
+    sourceStrategy,
+    autoRouteStrategy,
+    resolveVideoSource,
+    createPrepSandbox,
+    downloadSourceBytes,
+    prepTimeoutMs,
+    snapshotId,
   };
 
   return {

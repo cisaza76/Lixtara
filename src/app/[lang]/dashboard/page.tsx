@@ -13,6 +13,7 @@ import {
 import { MediaStrategyPanel } from "@/components/media-strategy-panel";
 import type { StrategyPayload } from "@/lib/media-intelligence/types";
 import { ListingVideoPanel } from "@/components/listing-video-panel";
+import { SourceVideoSection } from "@/components/source-video-section";
 
 interface ListingRow {
   id: string;
@@ -598,11 +599,18 @@ export default async function DashboardPage({
                     />
                   )}
                   {listingVideoEnabled && (
-                    <ListingVideoPanel
-                      propertyId={l.id}
-                      lang={lang as Locale}
-                      copy={t(lang).creativeStudio.listingVideo}
-                    />
+                    <div className="flex flex-col gap-6">
+                      <SourceVideoSection
+                        propertyId={l.id}
+                        lang={lang as Locale}
+                        copy={t(lang).creativeStudio.sourceVideo}
+                      />
+                      <ListingVideoPanel
+                        propertyId={l.id}
+                        lang={lang as Locale}
+                        copy={t(lang).creativeStudio.listingVideo}
+                      />
+                    </div>
                   )}
                 </div>
               );

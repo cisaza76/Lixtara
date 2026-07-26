@@ -61,6 +61,25 @@ export interface ProduceVideoAssetInput {
   sourceAssets: Asset[];
   inputProps: unknown;
   traceId: string | null;
+  // Step 5 pipeline integration (all OPTIONAL; the photo_slideshow path passes none and is
+  // byte-identical to before). This module stays the SINGLE produce core — the strategy
+  // BRANCH lives in the wiring (worker-deps.ts), which for uploaded_video prepares the clip
+  // and then calls THIS function with the prepared file + the fields below.
+  sourceStrategy?: string; // default "photo_slideshow"
+  renderProfile?: string; // default "standard"
+  // QA expected spec override. Photo renders derive it from photo count (unchanged); an
+  // uploaded_video render passes the render-profile's spec (the composition's real output
+  // duration). QA logic (qa.ts parseFfprobe) is UNCHANGED — only what it's compared against.
+  expectedSpec?: ExpectedTechnicalSpec;
+  // Preparation provenance (uploaded_video only) — recorded on the Asset, never recomputed.
+  preparation?: {
+    preparationFingerprint: string;
+    sourceHash: string;
+    ffmpegVersion: string;
+    preparationMs: number;
+    // Stable schema version of the preparation plan (no timestamp/hash).
+    preparationSchemaVersion: string;
+  } | null;
 }
 
 export interface ProduceVideoAssetDeps {
@@ -94,7 +113,22 @@ export interface ProduceVideoAssetDeps {
 // existing `AssetProvenance` contract unchanged while the Asset row's `provenance`
 // column literally carries all 8 `RenderProvenance` fields too — reconstructable
 // straight from the Asset, not only from this function's return value.
-export interface AssetVideoProvenance extends AssetProvenance, RenderProvenance {}
+export interface AssetVideoProvenance extends AssetProvenance, RenderProvenance {
+  // Step 5 additive provenance (defaults for the photo path: photo_slideshow/standard/null).
+  // Lives on the Asset row only (NOT on RenderResult.provenance, whose shape stays frozen).
+  sourceStrategy: string;
+  renderProfile: string;
+  preparationFingerprint: string | null;
+  sourceHash: string | null; // durable source bytes hash (uploaded_video)
+  outputHash: string; // sha256 of the produced render bytes (= Asset.checksum)
+  ffmpegVersion: string | null;
+  preparationMs: number | null;
+  // Stable provenance SCHEMA versions (no timestamps, no hashes): which preparation-plan
+  // schema produced the prepared source (null when there was no preparation), and which
+  // composition input schema the render used.
+  preparationSchemaVersion: string | null;
+  compositionSchemaVersion: string;
+}
 
 export class RenderQaFailedError extends Error {
   constructor(public readonly qa: TechnicalQaResult) {
@@ -229,7 +263,10 @@ export async function produceVideoAsset(
   // there is no host-local ffprobe spawn anywhere in this path.
   await deps.onStage?.("qa");
   const qaStart = deps.now();
-  const technicalQa = await deps.runQa(renderOut.ffprobeJson, renderOut.bytes, expectedSpecFor(input.sourceAssets.length));
+  // Existing QA, unchanged — just fed the right expected spec. Photo renders derive it from
+  // photo count; uploaded_video passes the render-profile's spec (real output duration).
+  const expected = input.expectedSpec ?? expectedSpecFor(input.sourceAssets.length);
+  const technicalQa = await deps.runQa(renderOut.ffprobeJson, renderOut.bytes, expected);
   const qaMs = deps.now() - qaStart;
   if (!technicalQa.ok) {
     throw new RenderQaFailedError(technicalQa);
@@ -290,6 +327,15 @@ export async function produceVideoAsset(
     engine: "video-engine",
     provider: "remotion",
     prompt: null,
+    sourceStrategy: input.sourceStrategy ?? "photo_slideshow",
+    renderProfile: input.renderProfile ?? "standard",
+    preparationFingerprint: input.preparation?.preparationFingerprint ?? null,
+    sourceHash: input.preparation?.sourceHash ?? null,
+    outputHash: checksumSha256,
+    ffmpegVersion: input.preparation?.ffmpegVersion ?? null,
+    preparationMs: input.preparation?.preparationMs ?? null,
+    preparationSchemaVersion: input.preparation?.preparationSchemaVersion ?? null,
+    compositionSchemaVersion: INPUT_SCHEMA_VERSION,
   };
 
   const metrics: RenderMetrics = {
