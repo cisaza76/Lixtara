@@ -1,5 +1,7 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import type { Ratelimit } from "@upstash/ratelimit";
 import { handleInitiateSourceUpload, POST, type InitiateSourceDeps } from "./route";
+import { enforceLimit } from "@/lib/ratelimit";
 import { SOURCE_BUCKET, buildSourceStoragePath } from "@/lib/creative-studio/source-upload";
 
 const OWNER = "11111111-1111-1111-1111-111111111111";
@@ -70,5 +72,33 @@ describe("initiate route", () => {
   it("signed-upload failure → 500", async () => {
     const r = await handleInitiateSourceUpload(req(goodBody), deps({ createSignedUpload: async () => ({ error: "boom" }) }));
     expect(r.status).toBe(500);
+  });
+
+  it("rate-limit PROVIDER outage → route continues to its normal logic, never a 500 (incident 2026-07-26)", async () => {
+    // Route-level regression for the Upstash outage: the production deps wire
+    // checkRateLimit through the REAL enforceLimit. Before the hardening, a dead
+    // Redis host made limiter.limit() throw `TypeError: fetch failed`, the
+    // rejection propagated, and this route (like /api/loui and every other
+    // rate-limited route) returned an empty 500. Now enforceLimit degrades to
+    // fail-open + structured log, and the route completes its normal flow.
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const deadRedisLimiter = {
+      limit: async () => {
+        throw new TypeError("fetch failed", {
+          cause: new Error("getaddrinfo ENOTFOUND stirred-moray-131131.upstash.io"),
+        });
+      },
+    } as unknown as Ratelimit;
+    const r = await handleInitiateSourceUpload(
+      req(goodBody),
+      deps({
+        checkRateLimit: (userId) =>
+          enforceLimit(deadRedisLimiter, `u:${userId}`, { label: "initiate-test", message: "wait" }),
+      }),
+    );
+    expect(r.status).toBe(200); // full normal flow — the limiter outage did not surface
+    const logged = JSON.parse(errSpy.mock.calls[0][0] as string);
+    expect(logged).toMatchObject({ event: "rate_limit_provider_failure", action: "fail_open_bypass" });
+    errSpy.mockRestore();
   });
 });
