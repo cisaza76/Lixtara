@@ -1,16 +1,22 @@
-// Brand-first `ListingVideo` composition — the base template future formats
-// (P2 Task 5+) will build on. Pure function of `inputProps`: no Sandbox, Asset
-// Manager, or Creative Job imports here (those are wired in Task 5).
+// Brand-first `ListingVideo` composition — ONE composition, two Source Strategies
+// (F2/F3 milestone). A pure function of `inputProps`: no Sandbox, Asset Manager, or
+// Creative Job imports here. The shared Lixtara frame (opening card → body → closing card,
+// lower-third, gold hairline, reserved badge, system fonts) is authored ONCE; only the
+// BODY changes with the Source Strategy:
+//   - photo_slideshow → the Ken-Burns photo gallery (unchanged, byte-identical output);
+//   - uploaded_video  → an already-normalized 1920×1080 prepared clip played via
+//                       @remotion/media <Video> (no layout resolved here — F2-D baked it).
+// Adding a source is a new body behind the same frame, never a new composition.
 //
-// Visual language mirrors the Lixtara landing (see brand_identity memory):
-// ivory ground, Playfair Display serif for display type (italic for the
-// wordmark), Inter for secondary/utility text, a single restrained gold
-// accent, sharp corners, hairline gold-soft dividers. Motion stays discreet —
-// slow Ken-Burns drift + soft crossfades, no punches or spins — echoed by a
-// single signature motif: a thin gold rule that draws in under the address
-// on open and under the CTA on close.
+// Visual language mirrors the Lixtara landing (see brand_identity memory): ivory ground,
+// Playfair Display serif for display type (italic for the wordmark), Inter for secondary
+// text, a single restrained gold accent, sharp corners, hairline gold-soft dividers.
+// Motion stays discreet — slow Ken-Burns drift + soft crossfades — echoed by a single
+// signature motif: a thin gold rule that draws in under the address on open and under the
+// CTA on close.
 import React from "react";
 import { AbsoluteFill, Easing, Img, Sequence, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { Video } from "@remotion/media";
 import { SANS, SERIF } from "./fonts";
 import {
   DEFAULT_CLOSING_SECONDS,
@@ -20,7 +26,8 @@ import {
   SAFE_AREA,
 } from "./layout";
 import { orderedPhotos, perPhotoDurationFrames, photoSectionFrames, type ListingVideoInput } from "./input";
-import { resolvePhotoSrc } from "./resolve";
+import { resolvePhotoSrc, resolveStagedSrc } from "./resolve";
+import { compositionSourceOf, type CompositionInput, type PhotoSlideshowInput, type UploadedVideoInput } from "./composition-input";
 
 const IVORY = "#FDFCF8";
 const IVORY_SCRIM = "rgba(253, 252, 248, 0.92)";
@@ -30,8 +37,8 @@ const GOLD_SOFT = "rgba(180, 145, 87, 0.28)";
 
 const EASE = Easing.bezier(0.16, 1, 0.3, 1);
 
-// A short gold rule that draws in (width 0 -> full) — the composition's one
-// signature flourish, used at both bookends (open + close) and nowhere else.
+// A short gold rule that draws in (width 0 -> full) — the composition's one signature
+// flourish, used at both bookends (open + close) and nowhere else.
 const Hairline: React.FC<{ width: number; startFrame?: number; durationInFrames?: number }> = ({
   width,
   startFrame = 0,
@@ -175,9 +182,9 @@ const LowerThird: React.FC<{ priceLabel: string; roomLabel?: string; durationInF
   );
 };
 
-// The badge-reserved rect. Kept clear by every other layer (photo, lower
-// third, opening/closing cards never place content here); renders content
-// only when `badge` is present so P2 (which always passes `null`) is a no-op.
+// The badge-reserved rect. Kept clear by every other layer (photo/video, lower third,
+// opening/closing cards never place content here); renders content only when `badge` is
+// present so a null badge is a no-op.
 const SafeAreaBadge: React.FC<{ badge: ListingVideoInput["badge"] }> = ({ badge }) => {
   const frame = useCurrentFrame();
   const opacity = interpolate(frame, [0, 16], [0, 1], { extrapolateRight: "clamp", easing: EASE });
@@ -274,7 +281,11 @@ const ClosingCard: React.FC<{ brand: ListingVideoInput["brand"]; cta: ListingVid
   );
 };
 
-export const ListingVideo: React.FC<ListingVideoInput> = ({ property, priceLabel, photos, brand, cta, badge }) => {
+// ---------------------------------------------------------------------------
+// Body: photo_slideshow — the original gallery, UNCHANGED (byte-identical output). Extracted
+// verbatim from the pre-F3-A `ListingVideo` so the photo path never regresses.
+// ---------------------------------------------------------------------------
+const PhotoSlideshowBody: React.FC<PhotoSlideshowInput> = ({ property, priceLabel, photos, brand, cta, badge }) => {
   const { fps } = useVideoConfig();
   const photoList = orderedPhotos(photos);
   const openingFrames = Math.round(fps * DEFAULT_OPENING_SECONDS);
@@ -305,7 +316,7 @@ export const ListingVideo: React.FC<ListingVideoInput> = ({ property, priceLabel
       ))}
 
       <Sequence from={openingFrames} durationInFrames={galleryFrames}>
-        <SafeAreaBadge badge={badge} />
+        <SafeAreaBadge badge={badge ?? null} />
       </Sequence>
 
       <Sequence from={openingFrames + galleryFrames} durationInFrames={closingFrames}>
@@ -313,4 +324,47 @@ export const ListingVideo: React.FC<ListingVideoInput> = ({ property, priceLabel
       </Sequence>
     </AbsoluteFill>
   );
+};
+
+// ---------------------------------------------------------------------------
+// Body: uploaded_video — the already-normalized 1920×1080 prepared clip, framed by the
+// SAME opening/closing cards + lower third + reserved badge. NO layout is resolved here:
+// the prepared file is exactly the composition frame (F2-D Strategy C baked aspect /
+// blurred-fill / rotation upstream), so <Video> fills 1:1. Fallback to <OffthreadVideo> is
+// disallowed (the engine decision — @remotion/media on the current glibc-2.34 runtime).
+// ---------------------------------------------------------------------------
+const UploadedVideoBody: React.FC<UploadedVideoInput> = ({ property, priceLabel, videoSrc, durationSeconds, brand, cta, badge }) => {
+  const { fps } = useVideoConfig();
+  const openingFrames = Math.round(fps * DEFAULT_OPENING_SECONDS);
+  const closingFrames = Math.round(fps * DEFAULT_CLOSING_SECONDS);
+  const bodyFrames = Math.round(fps * durationSeconds);
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: IVORY }}>
+      <Sequence from={0} durationInFrames={openingFrames}>
+        <OpeningCard property={property} />
+      </Sequence>
+
+      <Sequence from={openingFrames} durationInFrames={bodyFrames}>
+        <AbsoluteFill style={{ backgroundColor: INK }}>
+          <Video src={resolveStagedSrc(videoSrc)} disallowFallbackToOffthreadVideo style={{ width: "100%", height: "100%" }} />
+        </AbsoluteFill>
+        <LowerThird priceLabel={priceLabel} durationInFrames={bodyFrames} />
+        <SafeAreaBadge badge={badge ?? null} />
+      </Sequence>
+
+      <Sequence from={openingFrames + bodyFrames} durationInFrames={closingFrames}>
+        <ClosingCard brand={brand} cta={cta} />
+      </Sequence>
+    </AbsoluteFill>
+  );
+};
+
+// ONE composition, dispatched by Source Strategy. Render Profile (dimensions/fps/codec) is
+// unchanged and owned by the Composition registration (Root.tsx) — never branched here.
+export const ListingVideo: React.FC<CompositionInput> = (input) => {
+  if (compositionSourceOf(input) === "uploaded_video") {
+    return <UploadedVideoBody {...(input as UploadedVideoInput)} />;
+  }
+  return <PhotoSlideshowBody {...(input as PhotoSlideshowInput)} />;
 };

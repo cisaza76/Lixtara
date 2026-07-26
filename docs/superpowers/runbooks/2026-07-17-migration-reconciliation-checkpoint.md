@@ -8,9 +8,9 @@ checkpoint. **Production is untouched. No SQL was applied. No `migration repair`
 
 ## Status
 - **Launch Gate: BLOCKED**
-- **Step 1 (creative_studio migration): NOT EXECUTED**
-- **Current blocker: migration history reconciliation** (this checkpoint)
-- **Production: intact** (both feature flags unset; neither migration applied)
+- **Step 1 (creative_studio migration):** three distinct facts (2026-07-23) — **Verified:** read-only verification confirms the CS tables `assets` (13 rows) + `creative_jobs` (6 rows) exist and contain data. **NOT verified:** whether the migration was executed through the official migration history. **NOT verified:** migration history reconciliation remains pending. (`creative_job_transitions` not inspected; no schema action taken; cause not asserted.)
+- **Current blocker: migration history reconciliation** (this checkpoint — **still pending**; table existence does not resolve it)
+- **Production:** feature flags unset. ⚠️ *Update 2026-07-23: read-only verification confirms the CS tables exist with data. This contradicts only the "tables absent" reading — it does NOT establish that the migration was applied through the official history; do not read it as "applied."*
 
 ## The finding (facts, read-only verified)
 `supabase db push --dry-run` (2026-07-17, from `docs/media-program-master-plan`) → *"Would push these migrations"*:

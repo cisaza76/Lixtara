@@ -27,6 +27,16 @@ supabase db push        # applies supabase/migrations/20260715171914_creative_st
 ```
 This creates `assets`, `creative_jobs`, `creative_job_transitions` (idempotent; RLS seller-read-only; indexes incl.
 the partial-unique `creative_jobs_idempotency_active`).
+
+> **Note (2026-07-23) — three distinct facts, do not conflate:**
+> - **Verified:** read-only verification confirms that the `assets` (13 rows) and `creative_jobs`
+>   (6 rows) tables exist and contain data.
+> - **NOT verified:** whether the migration was executed through the official migration history.
+> - **NOT verified:** migration history reconciliation remains pending.
+>
+> Table existence does **not** mean the migration was applied. `creative_job_transitions`, the index
+> set, and the CLI migration-history record were not inspected. The migration is idempotent — run the
+> **Verify** block below and reconcile the history before deciding whether/how to `db push`.
 **Verify:**
 ```
 -- via psql or the SQL editor

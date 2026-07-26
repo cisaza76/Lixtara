@@ -14,7 +14,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { Sandbox } from "@vercel/sandbox";
 import { buildRenderManifest } from "@/lib/video-engine/manifest";
-import { BASE_ARTIFACT_VERSION, FONT_STRATEGY, RENDER_PROVIDER } from "@/lib/video-engine/versions";
+import { BASE_ARTIFACT_VERSION, FONT_STRATEGY, MEDIA_VIDEO_VERSION, RENDER_PROVIDER } from "@/lib/video-engine/versions";
 import {
   buildFontGuardCommand,
   evaluateFontGuard,
@@ -318,6 +318,30 @@ export class SandboxRemotionProvider implements RenderProvider {
           probe,
         });
         if (!verdict.ok) throw new FontStrategyMismatchError(verdict.reason);
+      }
+
+      // ---- 1c. Ensure @remotion/media is present (the shared composition hard-imports it
+      // for the uploaded_video body, so the in-sandbox bundle resolves it for EVERY render —
+      // photo renders included). The current base artifact does not bake it yet, so a
+      // one-package `--no-save` install covers it when absent (~1s; D1). A failed install is
+      // a SANDBOX SETUP failure (retryable), NOT a render failure — surfaced as
+      // SandboxCreateFailedError (→ SANDBOX_CREATE_FAILED), never collapsed into RENDER_FAILED. ----
+      {
+        const install = await sandbox.runCommand(
+          "sh",
+          [
+            "-c",
+            `node -e "require.resolve('@remotion/media')" 2>/dev/null || ` +
+              `npm install @remotion/media@${MEDIA_VIDEO_VERSION} --no-save --no-audit --no-fund`,
+          ],
+          { timeoutMs: 120000 },
+        );
+        if (install.exitCode !== 0) {
+          const stderr = await install.stderr();
+          throw new SandboxCreateFailedError(
+            `SandboxRemotionProvider: @remotion/media install failed (exit ${install.exitCode}): ${stderr.slice(-2000)}`,
+          );
+        }
       }
 
       // ---- 2. copy composition source (fonts are system fonts) + local assets in ----

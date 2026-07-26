@@ -13,3 +13,9 @@ const ABSOLUTE_SRC = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i; // scheme: (https:, data:,
 export function resolvePhotoSrc(url: string): string {
   return ABSOLUTE_SRC.test(url) ? url : staticFile(url);
 }
+
+// A staged source ref (photo OR prepared video) resolves the same way: an absolute
+// URL/data/blob passes through; a bundle-relative ref (e.g. "prepared-0.mp4") goes through
+// staticFile(). Same seam as resolvePhotoSrc — named generically because the uploaded_video
+// body stages a prepared clip, not a photo.
+export const resolveStagedSrc = resolvePhotoSrc;

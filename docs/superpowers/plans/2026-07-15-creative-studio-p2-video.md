@@ -809,6 +809,16 @@ sensitive-marker set.
 Gates green; **migration NOT applied, no bucket created, no flag set, no real job, no UI touched**
 (do NOT modify Step 5 or the 3D-tour block). Deliver the C1 report, then **stop**.
 
+> *Update 2026-07-23:* this C1-exit line reflects the state **at the time of writing**. Three
+> distinct facts now hold, and must not be conflated:
+> - **Verified:** read-only verification confirms the `assets`/`creative_jobs` tables exist and
+>   contain data.
+> - **NOT verified:** whether the migration was executed through the official migration history.
+> - **NOT verified:** migration history reconciliation remains pending.
+>
+> The tables' existence contradicts a "tables absent" reading only — it does **not** establish
+> "the migration was applied."
+
 ---
 
 ## Gate C2 — integrated validation (DEFERRED — separate authorization)
