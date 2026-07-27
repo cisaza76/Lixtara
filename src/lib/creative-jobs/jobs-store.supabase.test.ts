@@ -351,7 +351,7 @@ describe("createJob / claimNextQueued wired through SupabaseJobsStore (integrati
     }));
     const store = new SupabaseJobsStore({ from } as never);
 
-    const job = await createJob(store, {
+    const { job, created } = await createJob(store, {
       listingId: "L1",
       ownerId: "O1",
       capability: "video",
@@ -360,6 +360,7 @@ describe("createJob / claimNextQueued wired through SupabaseJobsStore (integrati
     });
 
     expect(job.id).toBe("job1"); // the WINNER's row, returned via re-query
+    expect(created).toBe(false); // lost the 23505 race → did NOT insert → must not consume quota
     expect(insertCallCount).toBe(1); // createJob attempted exactly one insert
     expect(selectCallCount).toBe(2); // fast-path check (empty) + post-conflict re-query (hit)
   });

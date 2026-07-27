@@ -112,10 +112,19 @@ export interface CreateJobInput {
   traceId?: string | null;
 }
 
+// Result of createJob. `created` is TRUE only when this call actually inserted the row; FALSE
+// when it returned a pre-existing active job (fast path or a lost 23505 race). Callers that
+// consume a per-job resource (e.g. the uploaded_video generation quota) MUST consume ONLY when
+// `created` is true, so concurrent same-key requests never double-consume for one logical job.
+export interface CreateJobResult {
+  job: CreativeJob;
+  created: boolean;
+}
+
 // Inserts a new job in state 'queued'. If an ACTIVE job (non-terminal state) with the
-// same idempotencyKey already exists, returns THAT job instead of inserting a duplicate
-// — mirrors the partial unique index `creative_jobs_idempotency_active`.
-export async function createJob(store: JobsStore, input: CreateJobInput): Promise<CreativeJob> {
+// same idempotencyKey already exists, returns THAT job (created:false) instead of inserting a
+// duplicate — mirrors the partial unique index `creative_jobs_idempotency_active`.
+export async function createJob(store: JobsStore, input: CreateJobInput): Promise<CreateJobResult> {
   // Read-first fast path: an optimization only, NOT the correctness guarantee — two
   // concurrent callers with the same idempotencyKey can both pass this check before
   // either has inserted (classic check-then-act race). The catch below is what makes
@@ -124,11 +133,11 @@ export async function createJob(store: JobsStore, input: CreateJobInput): Promis
   // reject the losing insert, and recovers by returning the winner's row instead of
   // propagating the error.
   const existing = await store.findActiveByIdempotencyKey(input.idempotencyKey);
-  if (existing) return existing;
+  if (existing) return { job: existing, created: false };
 
   const nowIso = new Date(input.nowMs ?? Date.now()).toISOString();
   try {
-    return await store.insertJob({
+    const job = await store.insertJob({
       listingId: input.listingId,
       ownerId: input.ownerId,
       capability: input.capability,
@@ -148,12 +157,14 @@ export async function createJob(store: JobsStore, input: CreateJobInput): Promis
       updatedAt: nowIso,
       traceId: input.traceId ?? null,
     });
+    return { job, created: true };
   } catch (err) {
     if (!isUniqueViolation(err)) throw err;
     // Lost the race: another concurrent call won the insert. Re-query (not the stale
     // `existing` from above) and return the winner's row instead of failing the caller.
+    // created:false — WE did not insert, so we must NOT consume the winner's quota.
     const winner = await store.findActiveByIdempotencyKey(input.idempotencyKey);
-    if (winner) return winner;
+    if (winner) return { job: winner, created: false };
     throw err; // no active row found (shouldn't happen) — surface the original error
   }
 }
