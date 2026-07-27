@@ -51,6 +51,7 @@ function probeJson(o: {
   h?: number;
   fps?: string;
   pix?: string | null;
+  range?: string | null;
   dur?: number;
   audio?: boolean;
   acodec?: string;
@@ -64,6 +65,7 @@ function probeJson(o: {
     r_frame_rate: o.fps ?? "30/1",
     pix_fmt: o.pix === undefined ? "yuv420p" : o.pix,
   };
+  if (o.range != null) video.color_range = o.range;
   if (o.rotate != null) video.side_data_list = [{ rotation: -o.rotate }]; // display-matrix = -applyRotation
   const streams: Record<string, unknown>[] = [video];
   if (o.audio !== false) streams.push({ codec_type: "audio", codec_name: o.acodec ?? "aac" });
@@ -260,6 +262,24 @@ describe("9/10. probe + validation", () => {
       expect((e as VideoPreparationExecutionError).code).toBe("VIDEO_PREPARED_SOURCE_INVALID");
       expect((e as VideoPreparationExecutionError).kind).toBe("invalid_prepared_metadata");
     }
+  });
+  it("10b. full-range prepared output (color_range=pc) → invalid_prepared_metadata naming color_range (Gate 5A)", async () => {
+    try {
+      await executeVideoPreparation(baseInput(fakeSandbox({ ffprobeOut: probeJson({ pix: "yuvj420p", range: "pc" }) })));
+      throw new Error("should throw");
+    } catch (e) {
+      const err = e as VideoPreparationExecutionError;
+      expect(err.code).toBe("VIDEO_PREPARED_SOURCE_INVALID");
+      expect(err.kind).toBe("invalid_prepared_metadata");
+      expect(err.message).toContain("color_range");
+      expect(err.message).toContain("pixel_format");
+    }
+  });
+  it("10c. explicit tv tag parses through and passes; absent color_range parses to null and passes", async () => {
+    const tagged = await executeVideoPreparation(baseInput(fakeSandbox({ ffprobeOut: probeJson({ range: "tv" }) })));
+    expect(tagged.preparedMetadata.colorRange).toBe("tv");
+    const untagged = await executeVideoPreparation(baseInput(fakeSandbox({ ffprobeOut: probeJson({}) })));
+    expect(untagged.preparedMetadata.colorRange).toBeNull();
   });
 });
 
