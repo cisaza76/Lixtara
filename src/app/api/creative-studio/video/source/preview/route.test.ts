@@ -2,9 +2,19 @@ import { describe, it, expect, afterEach } from "vitest";
 import { handleSourcePreview, GET, type SourcePreviewDeps } from "./route";
 import type { Asset } from "@/lib/assets/types";
 import type { TemporaryMediaAccess } from "@/lib/creative-studio/source-preview";
+import type { VideoAccessResult } from "@/lib/creative-studio/video-access";
 
 const OWNER = "11111111-1111-1111-1111-111111111111";
 const LISTING = "22222222-2222-2222-2222-222222222222";
+
+const ALLOW: VideoAccessResult = {
+  allowed: true, reason: "allowed", userAllowed: true, listingAllowed: true,
+  remainingGenerations: 1, consentRequired: false, consentSatisfied: true, grantId: "g1", grantGenerationsUsed: 0,
+};
+const deny = (reason: VideoAccessResult["reason"]): VideoAccessResult => ({
+  ...ALLOW, allowed: false, reason, listingAllowed: false, remainingGenerations: 0, consentSatisfied: false,
+  grantId: undefined, grantGenerationsUsed: undefined,
+});
 
 function req(listingId = LISTING): Request {
   return new Request(`http://x/api/creative-studio/video/source/preview?listingId=${listingId}`);
@@ -25,6 +35,7 @@ function deps(over: Partial<SourcePreviewDeps> = {}): SourcePreviewDeps {
     loadProperty: over.loadProperty ?? (async (id) => ({ id, owner_id: OWNER })),
     loadCurrentSource: over.loadCurrentSource ?? (async () => asset()),
     createTemporaryAccess: over.createTemporaryAccess ?? (async () => ACCESS),
+    checkAccess: over.checkAccess ?? (async () => ALLOW),
   };
 }
 
@@ -43,6 +54,19 @@ describe("GET /source/preview (owner-only, ephemeral access)", () => {
   });
   it("not the owner → 403", async () => {
     expect((await handleSourcePreview(req(), deps({ loadProperty: async (id) => ({ id, owner_id: "x" }) }))).status).toBe(403);
+  });
+  it("not allowlisted (no_grant) → 404, no signed URL minted", async () => {
+    let minted = false;
+    const r = await handleSourcePreview(
+      req(),
+      deps({ checkAccess: async () => deny("no_grant"), createTemporaryAccess: async () => { minted = true; return ACCESS; } }),
+    );
+    expect(r.status).toBe(404);
+    expect(minted).toBe(false);
+  });
+  it("out of quota still previews (quota does not gate preview)", async () => {
+    const r = await handleSourcePreview(req(), deps({ checkAccess: async () => deny("quota_exhausted") }));
+    expect(r.status).toBe(200);
   });
   it("no source → exists:false", async () => {
     const r = await handleSourcePreview(req(), deps({ loadCurrentSource: async () => null }));

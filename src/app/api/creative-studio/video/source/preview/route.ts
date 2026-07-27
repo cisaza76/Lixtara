@@ -17,6 +17,7 @@ import {
   type SourcePreviewDto,
   type TemporaryMediaAccess,
 } from "@/lib/creative-studio/source-preview";
+import { checkVideoAccess, videoVisibilityDenial, type CheckVideoAccess } from "@/lib/creative-studio/video-access-guard";
 
 interface PropertyRow {
   id: string;
@@ -29,6 +30,8 @@ export interface SourcePreviewDeps {
   loadCurrentSource(listingId: string, ownerId: string): Promise<Asset | null>;
   // Mints the ephemeral signed URL server-side (never exposes bucket/path/token to the client).
   createTemporaryAccess(bucket: string, path: string): Promise<TemporaryMediaAccess | null>;
+  // Gate 5 visibility: an allowlisted, in-scope seller only (quota does NOT gate previewing).
+  checkAccess: CheckVideoAccess;
 }
 
 function defaultDeps(): SourcePreviewDeps {
@@ -59,6 +62,7 @@ function defaultDeps(): SourcePreviewDeps {
       if (error || !data?.signedUrl) return null;
       return { locator: data.signedUrl, expiresAt: accessExpiresAt(Date.now()) };
     },
+    checkAccess: checkVideoAccess,
   };
 }
 
@@ -81,6 +85,11 @@ export async function handleSourcePreview(req: Request, deps: SourcePreviewDeps)
   if (!property || property.owner_id !== user.id) {
     return json({ error: "listing_not_found_or_not_yours" }, 403);
   }
+
+  // Gate 5 access (after ownership): invisible (404) to a non-allowlisted / out-of-scope seller;
+  // quota does NOT gate previewing existing source (videoVisibilityDenial).
+  const featureDenial = videoVisibilityDenial(await deps.checkAccess({ userId: user.id, listingId }));
+  if (featureDenial) return json(featureDenial.body, featureDenial.status);
 
   const asset = await deps.loadCurrentSource(listingId, user.id);
   if (!asset) return json({ exists: false } satisfies SourcePreviewDto, 200);

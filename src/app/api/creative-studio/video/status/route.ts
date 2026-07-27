@@ -20,6 +20,7 @@ import { SupabaseJobsStore } from "@/lib/creative-jobs/jobs-store.supabase";
 import { SupabaseAssetStore } from "@/lib/assets/asset-store.supabase";
 import type { Asset } from "@/lib/assets/types";
 import { mapJobStateToSeller, deriveVideoMeta, type SellerVideoStatusDto } from "@/lib/creative-studio/seller-video-status";
+import { checkVideoAccess, videoVisibilityDenial, type CheckVideoAccess } from "@/lib/creative-studio/video-access-guard";
 
 export { isCreativeStudioVideoEnabled };
 
@@ -40,6 +41,8 @@ export interface VideoStatusDeps {
   // unavailable (e.g. object not yet visible) — the handler degrades gracefully, never
   // 500s.
   signUrls(asset: Asset): Promise<{ previewUrl: string; downloadUrl: string } | null>;
+  // Gate 5 visibility: an allowlisted, in-scope seller only (quota does NOT gate reading status).
+  checkAccess: CheckVideoAccess;
 }
 
 function defaultDeps(): VideoStatusDeps {
@@ -93,6 +96,7 @@ function defaultDeps(): VideoStatusDeps {
         return null;
       }
     },
+    checkAccess: checkVideoAccess,
   };
 }
 
@@ -117,6 +121,11 @@ export async function handleVideoStatus(req: Request, deps: VideoStatusDeps): Pr
   if (!property || property.owner_id !== user.id) {
     return NextResponse.json({ error: "property_not_found_or_not_yours" }, { status: 403 });
   }
+
+  // Gate 5 access (after ownership): invisible (404) to a non-allowlisted / out-of-scope seller;
+  // quota does NOT gate reading status (videoVisibilityDenial).
+  const denial = videoVisibilityDenial(await deps.checkAccess({ userId: user.id, listingId: propertyId }));
+  if (denial) return NextResponse.json(denial.body, { status: denial.status });
 
   const job = await deps.findLatestByListing(propertyId);
   let state = mapJobStateToSeller(job?.state ?? null);

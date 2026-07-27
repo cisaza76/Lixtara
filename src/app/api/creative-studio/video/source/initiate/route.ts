@@ -15,6 +15,7 @@ import {
   isCreativeStudioVideoEnabled,
   validateInitiate,
 } from "@/lib/creative-studio/source-upload";
+import { checkVideoAccess, videoVisibilityDenial, type CheckVideoAccess } from "@/lib/creative-studio/video-access-guard";
 
 interface Body {
   listingId?: unknown;
@@ -35,6 +36,8 @@ export interface InitiateSourceDeps {
   checkRateLimit(userId: string): Promise<Response | null>;
   createSignedUpload(bucket: string, path: string): Promise<{ signedUrl: string; token: string } | { error: string }>;
   generateAssetId(): string;
+  // Gate 5 visibility: an allowlisted, in-scope seller only (quota does NOT gate uploading source).
+  checkAccess: CheckVideoAccess;
 }
 
 function defaultDeps(): InitiateSourceDeps {
@@ -67,6 +70,7 @@ function defaultDeps(): InitiateSourceDeps {
       return { signedUrl: data.signedUrl, token: data.token };
     },
     generateAssetId: () => crypto.randomUUID(),
+    checkAccess: checkVideoAccess,
   };
 }
 
@@ -94,6 +98,12 @@ export async function handleInitiateSourceUpload(req: Request, deps: InitiateSou
   if (!property || property.owner_id !== user.id) {
     return NextResponse.json({ error: "listing_not_found_or_not_yours" }, { status: 403 });
   }
+
+  // Gate 5 access (after ownership): the feature is invisible (404) to a non-allowlisted or
+  // out-of-scope seller. An out-of-quota seller may still upload/replace source, so quota does
+  // NOT block here (videoVisibilityDenial treats quota_exhausted as visible).
+  const denial = videoVisibilityDenial(await deps.checkAccess({ userId: user.id, listingId }));
+  if (denial) return NextResponse.json(denial.body, { status: denial.status });
 
   // Server owns the id + path — the client cannot choose either.
   const assetId = deps.generateAssetId();

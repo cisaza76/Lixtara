@@ -24,6 +24,20 @@ import { createJob, type JobsStore } from "@/lib/creative-jobs/jobs";
 import { SupabaseJobsStore } from "@/lib/creative-jobs/jobs-store.supabase";
 import { buildIdempotencyKey, hashSourceAssetIds } from "@/lib/video-engine/idempotency";
 import { TEMPLATE_VERSION } from "@/lib/video-engine/versions";
+import type { QuotaConsumeResult } from "@/lib/creative-studio/video-access";
+import {
+  checkVideoAccess,
+  videoAccessDenial,
+  videoAccessStore,
+  activityLogPort,
+  type CheckVideoAccess,
+} from "@/lib/creative-studio/video-access-guard";
+import {
+  auditAccessBlocked,
+  auditGenerationRequested,
+  auditQuotaConsumed,
+  type ActivityLogPort,
+} from "@/lib/creative-studio/video-access-audit";
 
 export function isCreativeStudioVideoEnabled(): boolean {
   return process.env.CREATIVE_STUDIO_VIDEO_ENABLED === "true";
@@ -60,6 +74,14 @@ export interface GenerateVideoDeps {
   jobsStore: JobsStore;
   now(): number;
   checkRateLimit(userId: string): Promise<Response | null>;
+  // Gate 5 access authority: allowlist + per-listing scope + quota (fail-closed). Runs AFTER
+  // ownership, BEFORE any render work is enqueued.
+  checkAccess: CheckVideoAccess;
+  // Atomically consume one generation slot — called ONLY when createJob actually inserted the
+  // job (created===true), so retries of the same logical job never double-consume.
+  consumeQuota(input: { grantId: string; userId: string; expectedUsed: number }): Promise<QuotaConsumeResult>;
+  // Best-effort audit trail (activity_log). Never gates the request.
+  audit: ActivityLogPort;
 }
 
 function defaultDeps(): GenerateVideoDeps {
@@ -109,6 +131,9 @@ function defaultDeps(): GenerateVideoDeps {
         { label: "creative-studio:video:generate", message: "Too many requests. Please wait." },
       );
     },
+    checkAccess: checkVideoAccess,
+    consumeQuota: (input) => videoAccessStore().consumeGeneration(input),
+    audit: activityLogPort(),
   };
 }
 
@@ -141,6 +166,22 @@ export async function handleGenerateVideo(req: Request, deps: GenerateVideoDeps)
   const property = await deps.loadProperty(propertyId);
   if (!property || property.owner_id !== user.id) {
     return NextResponse.json({ error: "property_not_found_or_not_yours" }, { status: 403 });
+  }
+
+  // Gate 5 access authority (validation order: flag → auth → ownership → ACCESS → route logic).
+  // Fail-closed: a non-allowlisted seller, an out-of-scope listing, an exhausted quota, or a
+  // reader error all stop here — before any source resolution or job enqueue. The feature stays
+  // invisible (404) to everyone but allowlisted sellers; only an out-of-quota allowlisted seller
+  // sees a 403 quota_exhausted (videoAccessDenial owns that mapping, shared by all six surfaces).
+  const access = await deps.checkAccess({ userId: user.id, listingId: propertyId });
+  const denial = videoAccessDenial(access);
+  if (denial) {
+    await auditAccessBlocked(deps.audit, {
+      userId: user.id,
+      listingId: propertyId,
+      metadata: { reason: access.reason }, // enum-like only; no PII
+    });
+    return NextResponse.json(denial.body, { status: denial.status });
   }
 
   const photoRows = await deps.loadPhotos(propertyId);
@@ -188,13 +229,37 @@ export async function handleGenerateVideo(req: Request, deps: GenerateVideoDeps)
   // final `completed` transition persists has no way for `buildRealReconcile` to find the
   // already-persisted Asset on recovery (job.assetId is only set at that final transition)
   // — recovery would re-render and duplicate the Asset + Storage object.
-  const { job } = await createJob(deps.jobsStore, {
+  const { job, created } = await createJob(deps.jobsStore, {
     listingId: propertyId,
     ownerId: user.id,
     capability: "video",
     idempotencyKey,
     nowMs: deps.now(),
     traceId: crypto.randomUUID(),
+  });
+
+  // Consume ONE generation slot — but ONLY when THIS call actually created the job (created===true).
+  // A retry / concurrent duplicate of the same logical job returns created===false and must NOT
+  // consume again (that is the whole reason createJob returns `created`). Quota is a safety rail,
+  // not a billing meter: if the CAS misses here (the rare distinct-generation boundary race) we
+  // do NOT fail the already-created job — we record it and proceed (safe direction, spec v2 §0).
+  if (created && access.grantId !== undefined && access.grantGenerationsUsed !== undefined) {
+    const consumed = await deps.consumeQuota({
+      grantId: access.grantId,
+      userId: user.id,
+      expectedUsed: access.grantGenerationsUsed,
+    });
+    await auditQuotaConsumed(deps.audit, {
+      userId: user.id,
+      listingId: propertyId,
+      metadata: { jobId: job.id, grantId: access.grantId, consumed: consumed.consumed },
+    });
+  }
+
+  await auditGenerationRequested(deps.audit, {
+    userId: user.id,
+    listingId: propertyId,
+    metadata: { jobId: job.id, created },
   });
 
   // Only safe fields — no storage path, no provider, no secrets.

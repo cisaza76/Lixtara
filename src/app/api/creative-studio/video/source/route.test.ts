@@ -1,9 +1,19 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { handleReadSource, GET, type SourceReadDeps } from "./route";
 import type { Asset } from "@/lib/assets/types";
+import type { VideoAccessResult } from "@/lib/creative-studio/video-access";
 
 const OWNER = "11111111-1111-1111-1111-111111111111";
 const LISTING = "22222222-2222-2222-2222-222222222222";
+
+const ALLOW: VideoAccessResult = {
+  allowed: true, reason: "allowed", userAllowed: true, listingAllowed: true,
+  remainingGenerations: 1, consentRequired: false, consentSatisfied: true, grantId: "g1", grantGenerationsUsed: 0,
+};
+const deny = (reason: VideoAccessResult["reason"]): VideoAccessResult => ({
+  ...ALLOW, allowed: false, reason, listingAllowed: false, remainingGenerations: 0, consentSatisfied: false,
+  grantId: undefined, grantGenerationsUsed: undefined,
+});
 
 function req(listingId = LISTING): Request {
   return new Request(`http://x/api/creative-studio/video/source?listingId=${listingId}`);
@@ -21,6 +31,7 @@ function deps(over: Partial<SourceReadDeps> = {}): SourceReadDeps {
     getUser: over.getUser ?? (async () => ({ id: OWNER })),
     loadProperty: over.loadProperty ?? (async (id) => ({ id, owner_id: OWNER })),
     loadCurrentSource: over.loadCurrentSource ?? (async () => null),
+    checkAccess: over.checkAccess ?? (async () => ALLOW),
   };
 }
 
@@ -39,6 +50,15 @@ describe("GET /source (read-only)", () => {
   });
   it("not the owner → 403", async () => {
     expect((await handleReadSource(req(), deps({ loadProperty: async (id) => ({ id, owner_id: "x" }) }))).status).toBe(403);
+  });
+  it("not allowlisted (no_grant) → 404 (source status stays invisible)", async () => {
+    const r = await handleReadSource(req(), deps({ checkAccess: async () => deny("no_grant"), loadCurrentSource: async () => sourceAsset() }));
+    expect(r.status).toBe(404);
+    expect(await r.json()).toEqual({ error: "not_found" });
+  });
+  it("out of quota still reads source status (quota does not gate reads)", async () => {
+    const r = await handleReadSource(req(), deps({ checkAccess: async () => deny("quota_exhausted") }));
+    expect(r.status).toBe(200);
   });
   it("listing without a source → exists:false", async () => {
     const r = await handleReadSource(req(), deps());

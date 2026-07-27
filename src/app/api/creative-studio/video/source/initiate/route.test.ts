@@ -3,10 +3,21 @@ import type { Ratelimit } from "@upstash/ratelimit";
 import { handleInitiateSourceUpload, POST, type InitiateSourceDeps } from "./route";
 import { enforceLimit } from "@/lib/ratelimit";
 import { SOURCE_BUCKET, buildSourceStoragePath } from "@/lib/creative-studio/source-upload";
+import type { VideoAccessResult } from "@/lib/creative-studio/video-access";
 
 const OWNER = "11111111-1111-1111-1111-111111111111";
 const LISTING = "22222222-2222-2222-2222-222222222222";
 const ASSET = "33333333-3333-3333-3333-333333333333";
+
+// An allowlisted, in-scope grant. `deny(reason)` builds a fail-closed denial for the gating tests.
+const ALLOW: VideoAccessResult = {
+  allowed: true, reason: "allowed", userAllowed: true, listingAllowed: true,
+  remainingGenerations: 1, consentRequired: false, consentSatisfied: true, grantId: "g1", grantGenerationsUsed: 0,
+};
+const deny = (reason: VideoAccessResult["reason"]): VideoAccessResult => ({
+  ...ALLOW, allowed: false, reason, listingAllowed: false, remainingGenerations: 0, consentSatisfied: false,
+  grantId: undefined, grantGenerationsUsed: undefined,
+});
 
 function req(body: unknown): Request {
   return new Request("http://x/api/creative-studio/video/source/initiate", { method: "POST", body: JSON.stringify(body) });
@@ -18,6 +29,7 @@ function deps(over: Partial<InitiateSourceDeps> = {}): InitiateSourceDeps {
     checkRateLimit: over.checkRateLimit ?? (async () => null),
     createSignedUpload: over.createSignedUpload ?? (async () => ({ signedUrl: "https://signed.example/u", token: "tok-1" })),
     generateAssetId: over.generateAssetId ?? (() => ASSET),
+    checkAccess: over.checkAccess ?? (async () => ALLOW),
   };
 }
 const goodBody = { listingId: LISTING, fileName: "clip.mp4", mimeType: "video/mp4", sizeBytes: 10_000_000 };
@@ -36,6 +48,19 @@ describe("initiate route", () => {
   it("4. not the listing owner → 403", async () => {
     const r = await handleInitiateSourceUpload(req(goodBody), deps({ loadProperty: async (id) => ({ id, owner_id: "someone-else" }) }));
     expect(r.status).toBe(403);
+  });
+  it("4b. not allowlisted (no_grant) → 404 (feature invisible), no signed URL minted", async () => {
+    let signed = false;
+    const r = await handleInitiateSourceUpload(
+      req(goodBody),
+      deps({ checkAccess: async () => deny("no_grant"), createSignedUpload: async () => { signed = true; return { error: "x" }; } }),
+    );
+    expect(r.status).toBe(404);
+    expect(signed).toBe(false);
+  });
+  it("4c. allowlisted but OUT OF QUOTA still initiates (quota does not gate upload)", async () => {
+    const r = await handleInitiateSourceUpload(req(goodBody), deps({ checkAccess: async () => deny("quota_exhausted") }));
+    expect(r.status).toBe(200);
   });
   it("5. invalid mime → 400", async () => {
     const r = await handleInitiateSourceUpload(req({ ...goodBody, mimeType: "video/quicktime" }), deps());

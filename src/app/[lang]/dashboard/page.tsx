@@ -14,6 +14,7 @@ import { MediaStrategyPanel } from "@/components/media-strategy-panel";
 import type { StrategyPayload } from "@/lib/media-intelligence/types";
 import { ListingVideoPanel } from "@/components/listing-video-panel";
 import { SourceVideoSection } from "@/components/source-video-section";
+import { resolveVisibleVideoListings } from "@/lib/creative-studio/video-access-guard";
 
 interface ListingRow {
   id: string;
@@ -157,8 +158,15 @@ export default async function DashboardPage({
     }
   }
   // Creative Studio v1 "Listing video" — server-only flag (no NEXT_PUBLIC_ variant);
-  // the panel polls its own status route.
+  // the panel polls its own status route. The flag is the GLOBAL kill switch; on top of it,
+  // Gate 5 requires a per-listing allowlist grant. We resolve the user's grants ONCE and evaluate
+  // each listing against them (isVideoFeatureVisible → the panel shows even if out of quota; the
+  // routes re-check server-side, so a hidden panel is UX, not the security boundary). Fail-closed:
+  // any reader error leaves the set empty, so no panel renders.
   const listingVideoEnabled = process.env.CREATIVE_STUDIO_VIDEO_ENABLED === "true";
+  const videoVisibleListingIds = listingVideoEnabled
+    ? await resolveVisibleVideoListings(user.id, ids)
+    : new Set<string>();
 
   // Fetch everything else in parallel and group by property_id client-side.
   const [{ data: photoRows }, { data: payRows }, { data: agRows }, { data: tourRows }] =
@@ -598,7 +606,7 @@ export default async function DashboardPage({
                       copy={t(lang).mediaAgent}
                     />
                   )}
-                  {listingVideoEnabled && (
+                  {listingVideoEnabled && videoVisibleListingIds.has(l.id) && (
                     <div className="flex flex-col gap-6">
                       <SourceVideoSection
                         propertyId={l.id}

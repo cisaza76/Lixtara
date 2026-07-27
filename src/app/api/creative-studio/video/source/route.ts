@@ -13,6 +13,7 @@ import { SupabaseAssetStore } from "@/lib/assets/asset-store.supabase";
 import type { Asset } from "@/lib/assets/types";
 import { isCreativeStudioVideoEnabled, isUuid } from "@/lib/creative-studio/source-upload";
 import { toSellerSourceDto, type SellerSourceDto } from "@/lib/creative-studio/seller-source-status";
+import { checkVideoAccess, videoVisibilityDenial, type CheckVideoAccess } from "@/lib/creative-studio/video-access-guard";
 
 interface PropertyRow {
   id: string;
@@ -25,6 +26,8 @@ export interface SourceReadDeps {
   // Newest seller-upload video Asset for (listing, owner), or null — the read-only mirror of
   // resolveVideoSource's selection policy.
   loadCurrentSource(listingId: string, ownerId: string): Promise<Asset | null>;
+  // Gate 5 visibility: an allowlisted, in-scope seller only (quota does NOT gate reading source).
+  checkAccess: CheckVideoAccess;
 }
 
 function defaultDeps(): SourceReadDeps {
@@ -50,6 +53,7 @@ function defaultDeps(): SourceReadDeps {
       if (uploads.length === 0) return null;
       return [...uploads].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     },
+    checkAccess: checkVideoAccess,
   };
 }
 
@@ -64,6 +68,11 @@ export async function handleReadSource(req: Request, deps: SourceReadDeps): Prom
   if (!property || property.owner_id !== user.id) {
     return NextResponse.json({ error: "listing_not_found_or_not_yours" }, { status: 403 });
   }
+
+  // Gate 5 access (after ownership): invisible (404) to a non-allowlisted / out-of-scope seller;
+  // quota does NOT gate reading source status (videoVisibilityDenial).
+  const denial = videoVisibilityDenial(await deps.checkAccess({ userId: user.id, listingId }));
+  if (denial) return NextResponse.json(denial.body, { status: denial.status });
 
   const asset = await deps.loadCurrentSource(listingId, user.id);
   const dto: SellerSourceDto = toSellerSourceDto(asset);

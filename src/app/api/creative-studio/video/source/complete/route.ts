@@ -31,6 +31,7 @@ import {
   VIDEO_SOURCE_UPLOADED_ACTION,
   type AuditPort,
 } from "@/lib/creative-studio/source-audit";
+import { checkVideoAccess, videoVisibilityDenial, type CheckVideoAccess } from "@/lib/creative-studio/video-access-guard";
 
 interface Body {
   listingId?: unknown;
@@ -50,6 +51,8 @@ export interface CompleteSourceDeps {
   statObject(bucket: string, path: string): Promise<StoredObjectMeta>;
   // Idempotent, repairable audit (correction 1): find-or-insert the single durable event.
   auditPort: AuditPort;
+  // Gate 5 visibility: an allowlisted, in-scope seller only (quota does NOT gate finalizing upload).
+  checkAccess: CheckVideoAccess;
 }
 
 function defaultDeps(): CompleteSourceDeps {
@@ -125,6 +128,7 @@ function defaultDeps(): CompleteSourceDeps {
         }
       },
     },
+    checkAccess: checkVideoAccess,
   };
 }
 
@@ -155,6 +159,11 @@ export async function handleCompleteSourceUpload(req: Request, deps: CompleteSou
   if (!property || property.owner_id !== user.id) {
     return NextResponse.json({ error: "listing_not_found_or_not_yours" }, { status: 403 });
   }
+
+  // Gate 5 access (after ownership): invisible (404) to a non-allowlisted / out-of-scope seller;
+  // quota does NOT gate finalizing an already-uploaded object (videoVisibilityDenial).
+  const denial = videoVisibilityDenial(await deps.checkAccess({ userId: user.id, listingId }));
+  if (denial) return NextResponse.json(denial.body, { status: denial.status });
 
   // Path security: the client-supplied path must EXACTLY match the server namespace.
   if (!isExpectedSourcePath(body.storagePath, user.id, listingId, uploadId)) {
