@@ -5,6 +5,13 @@ const FAKE_JWT =
   "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmYWtlLXVzZXIifQ.c2lnbmF0dXJlLWZha2UtZmFrZQ";
 
 describe("redactSensitiveText", () => {
+  it("masks full email addresses (found live in the P1 production smoke)", () => {
+    const s = redactSensitiveText("contact seller-x@example.com or demo@lixtara.test now");
+    expect(s).not.toContain("seller-x@example.com");
+    expect(s).not.toContain("demo@lixtara.test");
+    expect(s).toContain("[REDACTED_EMAIL]");
+  });
+
   it("masks bearer tokens, Supabase keys, PATs, and JWTs", () => {
     const s = redactSensitiveText(
       `Authorization: Bearer abc123XYZ; key sb_secret_LIVEKEY1; pat sbp_deadbeef99; jwt ${FAKE_JWT}`,

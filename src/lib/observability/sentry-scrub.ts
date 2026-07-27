@@ -39,6 +39,8 @@ export function redactSensitiveText(text: string): string {
       .replace(/\bsb(?:p|_secret|_publishable)_[A-Za-z0-9_-]+/g, "[REDACTED_KEY]")
       // JWT triplets
       .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[REDACTED_JWT]")
+      // email addresses (never ship full emails — found live during the P1 production smoke)
+      .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[REDACTED_EMAIL]")
   );
 }
 
