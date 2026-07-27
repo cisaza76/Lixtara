@@ -172,7 +172,8 @@ export async function handleGenerateVideo(req: Request, deps: GenerateVideoDeps)
   // Fail-closed: a non-allowlisted seller, an out-of-scope listing, an exhausted quota, or a
   // reader error all stop here — before any source resolution or job enqueue. The feature stays
   // invisible (404) to everyone but allowlisted sellers; only an out-of-quota allowlisted seller
-  // sees a 403 quota_exhausted (videoAccessDenial owns that mapping, shared by all six surfaces).
+  // sees a 403 quota_exhausted. videoAccessDenial is the GENERATE-surface mapping (quota gates
+  // generation); the read/upload surfaces use videoVisibilityDenial (quota does not hide them).
   const access = await deps.checkAccess({ userId: user.id, listingId: propertyId });
   const denial = videoAccessDenial(access);
   if (denial) {
@@ -241,8 +242,10 @@ export async function handleGenerateVideo(req: Request, deps: GenerateVideoDeps)
   // Consume ONE generation slot — but ONLY when THIS call actually created the job (created===true).
   // A retry / concurrent duplicate of the same logical job returns created===false and must NOT
   // consume again (that is the whole reason createJob returns `created`). Quota is a safety rail,
-  // not a billing meter: if the CAS misses here (the rare distinct-generation boundary race) we
-  // do NOT fail the already-created job — we record it and proceed (safe direction, spec v2 §0).
+  // not a billing meter, and enforced EVENTUALLY, not as a hard atomic cap: if the CAS misses here
+  // (a distinct-key concurrent burst raced the same slot) we do NOT fail the already-created job —
+  // we record consumed:false and proceed (safe direction). A concurrent burst can therefore
+  // over-render by up to (burst − 1), bounded by this route's 5/hour rate limit. See ADR-0010 §7.
   if (created && access.grantId !== undefined && access.grantGenerationsUsed !== undefined) {
     const consumed = await deps.consumeQuota({
       grantId: access.grantId,
