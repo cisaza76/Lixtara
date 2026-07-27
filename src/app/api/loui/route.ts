@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
 import { louiLimiter, clientIp, enforceLimit } from "@/lib/ratelimit";
+import { validateLouiMessages } from "@/lib/loui-request";
 
 const CHAT_MODEL = "claude-sonnet-4-6";
 
@@ -43,9 +44,20 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "invalid_json" }, { status: 400 });
   }
-  const messages = Array.isArray(body.messages)
-    ? (body.messages as UIMessage[]).slice(-MAX_MESSAGES)
-    : [];
+  // Structural validation BEFORE any work (mirrors the 413 gate below): a malformed body must
+  // never reach `convertToModelMessages`/the model — it used to throw there and surface as an
+  // empty 500. Stable, non-sensitive envelope; schema internals are never echoed.
+  const valid = validateLouiMessages(body.messages);
+  if (!valid.ok) {
+    return Response.json(
+      {
+        error: "invalid_request",
+        message: "The request body does not match the expected chat message format.",
+      },
+      { status: 400 },
+    );
+  }
+  const messages = (body.messages as UIMessage[]).slice(-MAX_MESSAGES);
 
   if (totalTextChars(messages) > MAX_TOTAL_CHARS) {
     return Response.json(
