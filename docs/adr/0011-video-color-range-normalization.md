@@ -29,7 +29,7 @@ A real seller upload could hit the same wall.
 
 | Input | probe | old prepare output | new prepare output |
 |---|---|---|---|
-| TV-range | `yuv420p/–` | `yuv420p/–` ✔ | `yuv420p/–` ✔ values untouched |
+| TV-range (tagged `tv`) | `yuv420p/tv` | `yuv420p` ✔ | `yuv420p` ✔ values untouched (no double conversion — verified 12/230 → 12/231) |
 | Full-range (JPEG-derived) | `yuvj420p/pc` | `yuvj420p/pc` ✘ **Gate 5A failure** | `yuv420p/tv` ✔ values remapped (luma 0–255 → ~16–235) |
 | Limited values tagged `pc` | `yuvj420p/pc` | `yuvj420p/pc` ✘ | `yuv420p/–` ✔ converted per its tag |
 | Untagged | `yuv420p/–` | `yuv420p/–` ✔ | `yuv420p/–` ✔ values untouched |
@@ -43,6 +43,11 @@ the unit suites pin this contract against synthetic ffprobe JSON).
    end in a shared tail: `scale=in_range=auto:out_range=tv,format=yuv420p,setsar=1`.
    The dedicated swscale pass **remaps pixel values** to limited range using the stream's
    own range tag (`in_range=auto`); untagged input is limited per H.264 defaults → no-op.
+   **Admitted blind spot (by design):** a source that is untagged yet actually carries
+   full-range values is undetectable by any range-tag inspection — it passes through
+   unconverted and validates. This is the correct trade-off: every spec-compliant player
+   also decodes such a stream as limited, so our output matches how the source already
+   rendered everywhere; "fixing" it would require content-based range guessing.
    We explicitly rejected metadata-only retagging (`-color_range tv` alone): on ffmpeg
    8.1.2 it triggers an *implicit*, version-dependent conversion — measured, undocumented,
    and not a contract.
