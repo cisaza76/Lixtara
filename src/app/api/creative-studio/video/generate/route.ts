@@ -188,7 +188,7 @@ export async function handleGenerateVideo(req: Request, deps: GenerateVideoDeps)
   // final `completed` transition persists has no way for `buildRealReconcile` to find the
   // already-persisted Asset on recovery (job.assetId is only set at that final transition)
   // — recovery would re-render and duplicate the Asset + Storage object.
-  const job = await createJob(deps.jobsStore, {
+  const { job } = await createJob(deps.jobsStore, {
     listingId: propertyId,
     ownerId: user.id,
     capability: "video",

@@ -134,7 +134,7 @@ const baseInput = {
 describe("createJob", () => {
   it("inserts a new job in state 'queued'", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0 });
     expect(job.state).toBe("queued");
     expect(job.attempts).toBe(0);
     expect(store.jobs).toHaveLength(1);
@@ -142,28 +142,28 @@ describe("createJob", () => {
 
   it("duplicate createJob with the same idempotency key returns the same job, no second row", async () => {
     const store = fakeStore();
-    const first = await createJob(store, { ...baseInput, nowMs: 0 });
-    const second = await createJob(store, { ...baseInput, nowMs: 100 });
+    const { job: first } = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job: second } = await createJob(store, { ...baseInput, nowMs: 100 });
     expect(second.id).toBe(first.id);
     expect(store.jobs).toHaveLength(1);
   });
 
   it("allows a new job once the previous one with the same key reached a terminal state", async () => {
     const store = fakeStore();
-    const first = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job: first } = await createJob(store, { ...baseInput, nowMs: 0 });
     await setState(store, first.id, "cancelled", { actor: "seller", nowMs: 10 });
 
-    const second = await createJob(store, { ...baseInput, nowMs: 20 });
+    const { job: second } = await createJob(store, { ...baseInput, nowMs: 20 });
     expect(second.id).not.toBe(first.id);
     expect(store.jobs).toHaveLength(2);
   });
 
   it("stores an optional traceId (default null when omitted)", async () => {
     const store = fakeStore();
-    const withTrace = await createJob(store, { ...baseInput, nowMs: 0, traceId: "trace-abc" });
+    const { job: withTrace } = await createJob(store, { ...baseInput, nowMs: 0, traceId: "trace-abc" });
     expect(withTrace.traceId).toBe("trace-abc");
 
-    const withoutTrace = await createJob(store, {
+    const { job: withoutTrace } = await createJob(store, {
       ...baseInput,
       idempotencyKey: "L1:tmplv1:hash2",
       nowMs: 0,
@@ -188,15 +188,60 @@ describe("createJob", () => {
     ]);
 
     expect(store.jobs).toHaveLength(1);
-    expect(a.id).toBe(b.id);
-    expect(a).toEqual(b);
+    expect(a.job.id).toBe(b.job.id);
+    expect(a.job).toEqual(b.job);
+    // Exactly one call actually inserted the row → exactly one created:true. The loser of
+    // the 23505 race resolves to the winner's row with created:false, so a quota-consuming
+    // caller consumes exactly once for the one logical job.
+    expect([a.created, b.created].filter(Boolean)).toHaveLength(1);
+  });
+
+  it("created flag: normal insert → created:true", async () => {
+    const store = fakeStore();
+    const r = await createJob(store, { ...baseInput, nowMs: 0 });
+    expect(r.created).toBe(true);
+    expect(r.job.state).toBe("queued");
+  });
+
+  it("created flag: fast-path hit on a pre-existing active job → created:false, same row", async () => {
+    const store = fakeStore();
+    const first = await createJob(store, { ...baseInput, nowMs: 0 });
+    expect(first.created).toBe(true);
+    const second = await createJob(store, { ...baseInput, nowMs: 100 });
+    expect(second.created).toBe(false);
+    expect(second.job.id).toBe(first.job.id);
+    expect(store.jobs).toHaveLength(1);
+  });
+
+  it("created flag: a fresh job after the previous key reached a terminal state → created:true again", async () => {
+    const store = fakeStore();
+    const first = await createJob(store, { ...baseInput, nowMs: 0 });
+    await setState(store, first.job.id, "cancelled", { actor: "seller", nowMs: 10 });
+    const second = await createJob(store, { ...baseInput, nowMs: 20 });
+    expect(second.created).toBe(true);
+    expect(second.job.id).not.toBe(first.job.id);
+  });
+
+  it("returned job preserves every field (created wrapper adds nothing lossy)", async () => {
+    const store = fakeStore();
+    const { job, created } = await createJob(store, { ...baseInput, nowMs: 0, traceId: "trace-xyz" });
+    expect(created).toBe(true);
+    expect(job).toMatchObject({
+      listingId: baseInput.listingId,
+      ownerId: baseInput.ownerId,
+      capability: baseInput.capability,
+      state: "queued",
+      idempotencyKey: baseInput.idempotencyKey,
+      attempts: 0,
+      traceId: "trace-xyz",
+    });
   });
 });
 
 describe("setState", () => {
   it("rejects an invalid transition (queued -> completed throws)", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0 });
     await expect(
       setState(store, job.id, "completed", { actor: "system", nowMs: 10 }),
     ).rejects.toThrow();
@@ -261,7 +306,7 @@ describe("setState", () => {
 describe("claimNextQueued — atomic claim", () => {
   it("claims the oldest queued job, sets claimed_at/claimed_by, and logs the transition", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0 });
     const claimed = await claimNextQueued(store, "worker-1", { nowMs: 42 });
 
     expect(claimed).not.toBeNull();
@@ -285,7 +330,7 @@ describe("claimNextQueued — atomic claim", () => {
 
   it("two concurrent claimers racing for the same job — exactly one wins, the other gets null", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0 });
 
     const [a, b] = await Promise.all([
       claimNextQueued(store, "worker-a", { nowMs: 10 }),
@@ -312,7 +357,7 @@ describe("claimNextQueued — atomic claim", () => {
 describe("recoverAbandoned", () => {
   it("re-queues a stale running job when attempts < max_attempts, incrementing attempts", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 3 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 3 });
     await claimNextQueued(store, "w1", { nowMs: 0 }); // heartbeat_at = 0
 
     const recovered = await recoverAbandoned(store, /* now */ 100_000, /* staleMs */ 60_000);
@@ -336,7 +381,7 @@ describe("recoverAbandoned", () => {
     "re-queues a stale '%s' job when attempts < max_attempts, incrementing attempts (supervisory transition, bypasses canTransition)",
     async (staleState) => {
       const store = fakeStore();
-      const job = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 3 });
+      const { job } = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 3 });
       await claimNextQueued(store, "w1", { nowMs: 0 }); // heartbeat_at = 0
       // Force the job into the stale active state under test — `${staleState} -> queued`
       // is NOT a legal edge in LEGAL_TRANSITIONS (mirrors production: only
@@ -364,7 +409,7 @@ describe("recoverAbandoned", () => {
     "fails a stale '%s' job past max_attempts with error_code 'timeout'",
     async (staleState) => {
       const store = fakeStore();
-      const job = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 1 });
+      const { job } = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 1 });
       await claimNextQueued(store, "w1", { nowMs: 0 });
       await store.updateJob(job.id, {
         state: staleState,
@@ -397,7 +442,7 @@ describe("recoverAbandoned", () => {
   // duplicate produce()/Asset call).
   it("a job recovered from a stale 'uploading' state is reclaimable and re-enters 'running' cleanly (no leftover claim/heartbeat state)", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 3 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 3 });
     await claimNextQueued(store, "w1", { nowMs: 0 });
     await store.updateJob(job.id, { state: "uploading", heartbeatAt: new Date(0).toISOString() });
 
@@ -413,7 +458,7 @@ describe("recoverAbandoned", () => {
 
   it("fails a stale job past max_attempts with error_code 'timeout'", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 1 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0, maxAttempts: 1 });
     await claimNextQueued(store, "w1", { nowMs: 0 }); // attempts still 0, heartbeat_at = 0
 
     // First recovery: attempts(0) < maxAttempts(1) -> requeue, attempts becomes 1.
@@ -449,7 +494,7 @@ describe("recoverAbandoned", () => {
 describe("requestCancel", () => {
   it("marks cancellation_requested, and a later claim honors it instead of handing out work", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0 });
 
     const marked = await requestCancel(store, job.id);
     expect(marked.cancellationRequested).toBe(true);
@@ -471,7 +516,7 @@ describe("requestCancel", () => {
 
   it("CONCURRENCY: two claimers racing a still-queued, cancellation-flagged job produce exactly one → cancelled transition", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0 });
     await requestCancel(store, job.id);
 
     const [a, b] = await Promise.all([
@@ -501,7 +546,7 @@ describe("requestCancel", () => {
 describe("appendTransition — append-only", () => {
   it("every call inserts a new row; prior rows are never mutated", async () => {
     const store = fakeStore();
-    const job = await createJob(store, { ...baseInput, nowMs: 0 });
+    const { job } = await createJob(store, { ...baseInput, nowMs: 0 });
 
     const t1: JobTransition = {
       jobId: job.id,
@@ -535,7 +580,7 @@ describe("appendTransition — append-only", () => {
 describe("owner isolation", () => {
   it("listJobsForOwner returns only that owner's jobs", async () => {
     const store = fakeStore();
-    const jobA = await createJob(store, { ...baseInput, ownerId: "ownerA", nowMs: 0 });
+    const { job: jobA } = await createJob(store, { ...baseInput, ownerId: "ownerA", nowMs: 0 });
     await createJob(store, {
       ...baseInput,
       ownerId: "ownerB",
@@ -551,7 +596,7 @@ describe("owner isolation", () => {
   it("listTransitionsForOwner returns only that owner's transitions", async () => {
     const store = fakeStore();
     await createJob(store, { ...baseInput, ownerId: "ownerA", nowMs: 0 });
-    const jobB = await createJob(store, {
+    const { job: jobB } = await createJob(store, {
       ...baseInput,
       ownerId: "ownerB",
       idempotencyKey: "L1:tmplv1:hash2",
