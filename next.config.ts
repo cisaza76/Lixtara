@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -24,4 +25,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// P1 pre-Gate-5: private source maps + release association via the official Sentry build
+// wrapper. FAIL-OPEN: when SENTRY_AUTH_TOKEN/ORG/PROJECT are absent (local dev, forks) the
+// plugin skips the upload with a warning — the build never breaks because of Sentry.
+// `sourcemaps.deleteSourcemapsAfterUpload` keeps the maps PRIVATE: uploaded to Sentry, then
+// removed from the deploy output so they are never publicly served. The auth token is
+// consumed at BUILD time only — it is never read by runtime code and never reaches a bundle.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  telemetry: false,
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+  disableLogger: true,
+});
