@@ -9,6 +9,7 @@ import {
   effectiveDimensions,
   isEffectively169,
   buildTransformations,
+  describeTransformations,
   VideoPreparationError,
   BLUR_SIGMA,
   ENCODE_PARAMS,
@@ -260,7 +261,7 @@ describe("18/19. fingerprint invariants", () => {
     expect(new Set([base, diffDims, diffRot, diffProfile]).size).toBe(4);
   });
   it("fingerprint is schema-versioned + hex", () => {
-    expect(planVideoPreparation(meta(), STANDARD, VIDEO_SOURCE_LIMITS, REFS).preparationFingerprint).toMatch(/^1:[0-9a-f]{64}$/);
+    expect(planVideoPreparation(meta(), STANDARD, VIDEO_SOURCE_LIMITS, REFS).preparationFingerprint).toMatch(/^2:[0-9a-f]{64}$/);
   });
 });
 
@@ -277,6 +278,7 @@ function probe(overrides: Partial<PreparedVideoProbe> = {}): PreparedVideoProbe 
     bytes: 10 * 1024 * 1024,
     rotationDegrees: 0,
     pixelFormat: "yuv420p",
+    colorRange: "tv",
     ...overrides,
   };
 }
@@ -316,5 +318,48 @@ describe("20-24. validatePreparedMetadata", () => {
   });
   it("no-audio prepared output with audioExpected:false passes", () => {
     expect(validatePreparedMetadata(probe({ audioCodec: null }), STANDARD, { audioExpected: false }).ok).toBe(true);
+  });
+});
+
+// --- Gate 5A remediation: full-range sources must be VALUE-normalized to limited/TV ---
+describe("color-range normalization (Gate 5A: yuvj420p/pc source)", () => {
+  it("both filter graphs end in a REAL range-conversion pass, not a metadata retag", () => {
+    const graph169 = graphOf([...planVideoPreparation(meta(), STANDARD, VIDEO_SOURCE_LIMITS, REFS).ffmpegArgs]);
+    const graphBlur = graphOf([...planVideoPreparation(meta({ width: 1080, height: 1920 }), STANDARD, VIDEO_SOURCE_LIMITS, REFS).ffmpegArgs]);
+    for (const g of [graph169, graphBlur]) {
+      expect(g).toContain("scale=in_range=auto:out_range=tv,format=yuv420p");
+      // the conversion pass must come AFTER the geometry/fps stages, right before format
+      expect(g.indexOf("out_range=tv")).toBeGreaterThan(g.indexOf("fps="));
+    }
+  });
+  it("encoder args tag the stream limited (-color_range tv) — coherent with converted values", () => {
+    const args = [...planVideoPreparation(meta(), STANDARD, VIDEO_SOURCE_LIMITS, REFS).ffmpegArgs];
+    const i = args.indexOf("-color_range");
+    expect(i).toBeGreaterThan(-1);
+    expect(args[i + 1]).toBe("tv");
+  });
+  it("records the color_range transformation and expects a tv-range output", () => {
+    const plan = planVideoPreparation(meta(), STANDARD, VIDEO_SOURCE_LIMITS, REFS);
+    expect(plan.transformations).toContainEqual({ kind: "color_range", to: "tv" });
+    expect(describeTransformations(plan.transformations)).toContain("color range → tv (limited)");
+    expect(plan.expectedOutput.colorRange).toBe("tv");
+  });
+  it("validator: colorRange 'tv' passes; null (no VUI signal = limited per H.264) passes", () => {
+    expect(validatePreparedMetadata(probe({ colorRange: "tv" }), STANDARD, { audioExpected: true }).ok).toBe(true);
+    expect(validatePreparedMetadata(probe({ colorRange: null }), STANDARD, { audioExpected: true }).ok).toBe(true);
+  });
+  it("validator: colorRange 'pc' is rejected (fail-closed)", () => {
+    const r = validatePreparedMetadata(probe({ colorRange: "pc" }), STANDARD);
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe("VIDEO_PREPARED_SOURCE_INVALID");
+    expect(r.violations.map((v) => v.check)).toContain("color_range");
+  });
+  it("validator: unknown range values are rejected, never assumed limited", () => {
+    expect(validatePreparedMetadata(probe({ colorRange: "unknown" }), STANDARD).violations.map((v) => v.check)).toContain("color_range");
+  });
+  it("validator: a yuvj420p prepared output is rejected on BOTH pixel_format and color_range", () => {
+    const checks = validatePreparedMetadata(probe({ pixelFormat: "yuvj420p", colorRange: "pc" }), STANDARD).violations.map((v) => v.check);
+    expect(checks).toContain("pixel_format");
+    expect(checks).toContain("color_range");
   });
 });

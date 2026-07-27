@@ -6,6 +6,8 @@
 
 export const CREATIVE_JOB_ERROR_CODES = [
   "ASSET_DOWNLOAD_FAILED",
+  "VIDEO_PREPARATION_FAILED",
+  "VIDEO_PREPARED_SOURCE_INVALID",
   "SANDBOX_CREATE_FAILED",
   "RENDER_FAILED",
   "RENDER_TIMEOUT",
@@ -34,6 +36,12 @@ export type ErrorClass = "retriable" | "non_retriable" | "cancelled";
 // - cancelled: not a failure at all — the seller/system explicitly stopped the job.
 export const ERROR_CLASS: Record<CreativeJobErrorCode, ErrorClass> = {
   ASSET_DOWNLOAD_FAILED: "retriable",
+  // FFmpeg normalization on the SAME source is deterministic — a retry re-runs the same
+  // command on the same bytes and fails identically (mirrors the video-engine catalog,
+  // which marks both preparation codes retryable:false). The rare transient sub-case
+  // (ffmpeg_timeout) is not worth burning sandbox attempts on a poisoned input.
+  VIDEO_PREPARATION_FAILED: "non_retriable",
+  VIDEO_PREPARED_SOURCE_INVALID: "non_retriable",
   SANDBOX_CREATE_FAILED: "retriable",
   RENDER_FAILED: "non_retriable",
   RENDER_TIMEOUT: "retriable",

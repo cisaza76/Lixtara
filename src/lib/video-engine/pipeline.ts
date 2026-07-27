@@ -21,6 +21,7 @@ import {
 } from "@/lib/video-engine/produce-asset";
 import { SandboxCreateFailedError } from "@/lib/video-engine/render-provider";
 import { FontStrategyMismatchError } from "@/lib/video-engine/font-guard";
+import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
 import { RENDER_PROVIDER, TEMPLATE_VERSION } from "@/lib/video-engine/versions";
 import type { Asset } from "@/lib/assets/types";
 
@@ -71,6 +72,12 @@ type Stage = "download" | "rendering" | "qa" | "uploading";
 function classifyThrown(err: unknown, stage: Stage): CreativeJobErrorCode {
   if (err instanceof RenderQaFailedError) return "TECHNICAL_QA_FAILED";
   if (err instanceof AssetDownloadFailedError) return "ASSET_DOWNLOAD_FAILED";
+  // Preparation is distinct from download: by the time these throw, the source asset was
+  // already fetched. Gate 5A's pixel_format failure surfaced as ASSET_DOWNLOAD_FAILED via
+  // the stage default below — misleading enough to hide the real cause from the operator.
+  if (err instanceof VideoPreparationExecutionError) {
+    return err.code === "VIDEO_PREPARED_SOURCE_INVALID" ? "VIDEO_PREPARED_SOURCE_INVALID" : "VIDEO_PREPARATION_FAILED";
+  }
   if (err instanceof StorageUploadFailedError) return "STORAGE_UPLOAD_FAILED";
   if (err instanceof StorageVerifyFailedError) return "STORAGE_VERIFY_FAILED";
   if (err instanceof AssetPersistFailedError) return "ASSET_CREATE_FAILED";

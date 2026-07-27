@@ -26,9 +26,14 @@ import type { VideoErrorCode } from "@/lib/video-engine/video-errors";
 export type VideoSourceLimits = typeof VIDEO_SOURCE_LIMITS;
 
 // Additive superset of the frozen SourceVideoMetadata: the prepared file's probe also
-// carries the pixel format (needed to assert yuv420p). Frozen type unchanged.
+// carries the pixel format (needed to assert yuv420p) and the color range (needed to
+// assert limited/TV range — a full-range H.264 stream probes as yuvj420p/pc). Frozen
+// type unchanged.
 export interface PreparedVideoProbe extends SourceVideoMetadata {
   pixelFormat: string | null;
+  // ffprobe `color_range`: "tv" | "pc" | null when the stream carries no VUI range
+  // signal. H.264 semantics: an unspecified range IS limited range, so null is accepted.
+  colorRange: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +43,7 @@ export interface PreparedVideoProbe extends SourceVideoMetadata {
 // visible double-compression loss — deliberately not `veryfast`. A speed pass, if ever
 // needed, is a documented change here, not scattered flags.
 // ---------------------------------------------------------------------------
-export const PREPARATION_PLAN_SCHEMA_VERSION = "1";
+export const PREPARATION_PLAN_SCHEMA_VERSION = "2";
 
 export const ENCODE_PARAMS = {
   videoCodec: "libx264",
@@ -50,6 +55,17 @@ export const ENCODE_PARAMS = {
 } as const;
 
 export const BLUR_SIGMA = 30; // F2-D Strategy C blurred-fill background sigma
+
+// Shared tail of BOTH filter graphs: real color-range normalization (a dedicated swscale
+// pass — value conversion, not metadata retagging), then pixel format, then SAR. Gate 5A
+// (job 9467cc1f, 2026-07-27) proved a full-range source (yuvj420p/pc, e.g. JPEG-derived or
+// a phone recording in full range) survives `format=yuv420p` alone: swscale treats j420p
+// as the same layout, the encoder re-signals full range in the VUI, and the prepared file
+// probes as yuvj420p — failing the strict validator. `in_range=auto` reads the stream's
+// own range tag (untagged input is limited per H.264 defaults → no-op), `out_range=tv`
+// remaps values to limited range where needed. Version-robust: explicit filter semantics,
+// never ffmpeg's implicit range negotiation.
+const RANGE_NORMALIZATION_TAIL = `scale=in_range=auto:out_range=tv,format=${ENCODE_PARAMS.pixelFormat},setsar=1`;
 
 // Operational placeholders — kept OUT of the fingerprint. `buildNormalizeFfmpegArgs`
 // returns a ref-FREE recipe (these placeholders in the -i / output positions);
@@ -80,6 +96,7 @@ export type VideoTransformation =
   | { kind: "blurred_fill"; sourceAspect: string; sigma: number; targetWidth: number; targetHeight: number }
   | { kind: "fps"; from: number; to: number }
   | { kind: "pixel_format"; to: "yuv420p" }
+  | { kind: "color_range"; to: "tv" }
   | { kind: "audio_transcode"; to: "aac" }
   | { kind: "drop_audio" };
 
@@ -92,6 +109,7 @@ export interface PreparationPlan {
     width: number;
     height: number;
     fps: number;
+    colorRange: "tv";
     videoCodec: "h264";
     audioCodec: "aac" | null;
     pixelFormat: "yuv420p";
@@ -156,7 +174,7 @@ function build169Graph(rot: string[], profile: RenderProfileSpec): string {
   // rounding gap is filled deterministically, then normalize fps + pixel format + SAR.
   return (
     `[0:v]${pre}scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease:force_divisible_by=2,` +
-    `pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2,fps=${profile.fps},format=${ENCODE_PARAMS.pixelFormat},setsar=1[v]`
+    `pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2,fps=${profile.fps},${RANGE_NORMALIZATION_TAIL}[v]`
   );
 }
 
@@ -169,7 +187,7 @@ function buildBlurredFillGraph(rot: string[], profile: RenderProfileSpec): strin
     `[bg]scale=${profile.width}:${profile.height}:force_original_aspect_ratio=increase,` +
       `crop=${profile.width}:${profile.height},gblur=sigma=${BLUR_SIGMA}[bgb]`,
     `[fg]scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease:force_divisible_by=2[fgs]`,
-    `[bgb][fgs]overlay=(W-w)/2:(H-h)/2,fps=${profile.fps},format=${ENCODE_PARAMS.pixelFormat},setsar=1[v]`,
+    `[bgb][fgs]overlay=(W-w)/2:(H-h)/2,fps=${profile.fps},${RANGE_NORMALIZATION_TAIL}[v]`,
   ].join(";");
 }
 
@@ -207,6 +225,11 @@ export function buildNormalizeFfmpegArgs(
     ENCODE_PARAMS.crf,
     "-pix_fmt",
     ENCODE_PARAMS.pixelFormat,
+    // Coherent range METADATA on the encoded stream. The VALUE conversion is the graph's
+    // RANGE_NORMALIZATION_TAIL — this flag alone never suffices (metadata-only retag was
+    // measured to leave ill-defined pixel values; see the Gate 5A remediation evidence).
+    "-color_range",
+    "tv",
     ...(hasAudio ? ["-c:a", ENCODE_PARAMS.audioCodec, "-b:a", ENCODE_PARAMS.audioBitrate] : []),
     "-movflags",
     "+faststart",
@@ -250,6 +273,7 @@ export function buildTransformations(
     t.push({ kind: "fps", from: inFps, to: profile.fps });
   }
   t.push({ kind: "pixel_format", to: "yuv420p" });
+  t.push({ kind: "color_range", to: "tv" });
   t.push(metadata.audioCodec !== null ? { kind: "audio_transcode", to: "aac" } : { kind: "drop_audio" });
   return t;
 }
@@ -272,6 +296,8 @@ export function describeTransformations(ts: readonly VideoTransformation[]): str
         return `fps ${t.from} → ${t.to}`;
       case "pixel_format":
         return `pixel format → ${t.to}`;
+      case "color_range":
+        return `color range → ${t.to} (limited)`;
       case "audio_transcode":
         return `audio → ${t.to}`;
       case "drop_audio":
@@ -309,6 +335,7 @@ export function planVideoPreparation(
     width: profile.width,
     height: profile.height,
     fps: profile.fps,
+    colorRange: "tv",
     videoCodec: "h264",
     audioCodec: hasAudio ? "aac" : null,
     pixelFormat: "yuv420p",
@@ -359,6 +386,14 @@ export function validatePreparedMetadata(
   }
   if (prepared.pixelFormat !== "yuv420p") {
     violations.push({ check: "pixel_format", message: `expected yuv420p, got ${prepared.pixelFormat}` });
+  }
+  // Range policy (fail-closed): "tv" is the normalized target; null (no VUI range signal)
+  // is accepted because H.264 defines unspecified as limited range AND x264 only writes
+  // the VUI colour block when the input carried colour metadata — both cases decode
+  // identically. Anything else — "pc" above all — is a normalization failure, never
+  // acceptable in a prepared file.
+  if (prepared.colorRange !== "tv" && prepared.colorRange !== null) {
+    violations.push({ check: "color_range", message: `expected tv or unspecified (limited), got ${prepared.colorRange}` });
   }
   if (prepared.rotationDegrees !== 0) {
     violations.push({ check: "residual_rotation", message: `prepared output has residual rotation ${prepared.rotationDegrees}° (must be 0)` });

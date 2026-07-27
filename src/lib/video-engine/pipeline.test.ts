@@ -11,6 +11,7 @@ import {
   type RenderResult,
 } from "@/lib/video-engine/produce-asset";
 import { SandboxCreateFailedError } from "@/lib/video-engine/render-provider";
+import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
 import { processJob, type PipelineDeps, type ReconcileResult } from "@/lib/video-engine/pipeline";
 
 // ---- fake JobsStore (same DB-mimicking semantics as jobs.test.ts's fake) -----------
@@ -285,6 +286,30 @@ describe("processJob — failure classification (no partial/completed Asset)", (
     expect(result.assetId).toBeNull();
     expect(captureCalls).toHaveLength(1);
     expect((captureCalls[0][1] as { errorCode: string }).errorCode).toBe("ASSET_DOWNLOAD_FAILED");
+  });
+
+  it("preparation VALIDATION failure -> VIDEO_PREPARED_SOURCE_INVALID (not ASSET_DOWNLOAD_FAILED)", async () => {
+    // Gate 5A regression: this exact error (a full-range source whose prepared output
+    // failed the pixel_format check) was reported as ASSET_DOWNLOAD_FAILED via the
+    // "download" stage default — the source had downloaded fine.
+    const { result, captureCalls } = await runFailing(async () => {
+      throw new VideoPreparationExecutionError(
+        "VIDEO_PREPARED_SOURCE_INVALID",
+        "invalid_prepared_metadata",
+        "prepared output failed validation: pixel_format",
+      );
+    });
+    expect(result.state).toBe("failed");
+    expect(result.errorCode).toBe("VIDEO_PREPARED_SOURCE_INVALID");
+    expect((captureCalls[0][1] as { errorCode: string }).errorCode).toBe("VIDEO_PREPARED_SOURCE_INVALID");
+  });
+
+  it("preparation EXECUTION failure -> VIDEO_PREPARATION_FAILED", async () => {
+    const { result } = await runFailing(async () => {
+      throw new VideoPreparationExecutionError("VIDEO_PREPARATION_FAILED", "ffmpeg_exec_failed", "ffmpeg execution error");
+    });
+    expect(result.state).toBe("failed");
+    expect(result.errorCode).toBe("VIDEO_PREPARATION_FAILED");
   });
 
   it("a generic render failure (untyped) -> RENDER_FAILED", async () => {

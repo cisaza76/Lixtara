@@ -235,6 +235,7 @@ export function parseFfprobeToPreparedProbe(jsonStr: string, fileBytes: number):
     bytes: fileBytes,
     rotationDegrees: parseRotationDegrees(video),
     pixelFormat: typeof video.pix_fmt === "string" ? video.pix_fmt : null,
+    colorRange: typeof video.color_range === "string" ? video.color_range : null,
   };
 }
 

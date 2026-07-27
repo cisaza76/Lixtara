@@ -212,7 +212,7 @@ describe("Step 5 — uploaded_video pipeline branch", () => {
     const prov = result.outputAsset.provenance as unknown as Record<string, unknown>;
     expect(prov.sourceStrategy).toBe("uploaded_video");
     expect(prov.renderProfile).toBe("standard");
-    expect(prov.preparationFingerprint).toMatch(/^1:[0-9a-f]{64}$/);
+    expect(prov.preparationFingerprint).toMatch(/^2:[0-9a-f]{64}$/);
     expect(prov.sourceHash).toEqual(expect.any(String));
     expect(prov.ffmpegVersion).toContain("8.1.2-fake");
     expect(prov.preparationMs).toEqual(expect.any(Number));
