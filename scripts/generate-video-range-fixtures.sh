@@ -11,9 +11,13 @@ set -euo pipefail
 OUT="${1:?usage: generate-video-range-fixtures.sh <output-dir>}"
 mkdir -p "$OUT"
 
-# 1. TV-range H.264 (camera-like): limited-range values.
+# 1. TV-range H.264 (camera-like): natively limited values, EXPLICITLY tagged tv. The full
+#    colour triplet is required — x264 only writes the VUI range flag alongside colour
+#    metadata, so `-color_range tv` alone yields an UNTAGGED stream (adversarial-review
+#    finding F1; verified on ffmpeg 8.1.2). testsrc2's yuv420p output is already limited —
+#    no range conversion here, or the values would be double-compressed.
 ffmpeg -y -loglevel error -f lavfi -i "testsrc2=size=1280x720:rate=24:duration=4" \
-  -vf "scale=in_range=full:out_range=tv,format=yuv420p" -color_range tv \
+  -vf "format=yuv420p" -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709 \
   -c:v libx264 -pix_fmt yuv420p -an "$OUT/in-tv.mp4"
 
 # 2. Full-range source (probes yuvj420p/pc) — the Gate 5A failure class. A JPEG-derived
