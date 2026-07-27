@@ -65,10 +65,24 @@ authority consulted by every surface. Key properties:
    - **Exactly-once consumption:** `createJob` returns `{ job, created }`; the generate route
      consumes ONLY when `created === true` (an actual insert). Retries and concurrent duplicates
      of the same logical job return `created === false` and never double-consume.
-   - **Benign residual (safe direction):** if the consume CAS misses AFTER the job was created
-     (the rare distinct-generation boundary race), the already-created job still proceeds — we
-     record it and do not fail the seller. At most ≤1 extra render, never an over-count that would
-     wrongly block a legitimate seller.
+   - **Bounded residual (safe direction).** The quota pre-check (access) and the consume are two
+     steps, not one transaction, so the ceiling is enforced *eventually*, not atomically across
+     concurrent DISTINCT-key generates:
+     - **Sequential** requests are tight: the second generate reads the incremented
+       `generations_used` and is denied `quota_exhausted`.
+     - **A single request that crashes** between `createJob` and consume leaks exactly **1** extra
+       render (job created, slot not consumed).
+     - **A concurrent burst** of N generates with DISTINCT idempotency keys (i.e. different photo
+       sets) can each pass the pre-check at the same `generations_used`, each create a job, and
+       each proceed — but only ONE CAS lands. So actual renders can exceed `max_generations` by up
+       to **N − 1**, where N is capped by the per-user generate rate limit (**5 / hour**). The DB
+       `generations_used` correspondingly under-counts actual renders by the same amount.
+
+     This is acceptable by design: quota is a safety rail, not a billing meter, and the error is in
+     the permissive direction (never wrongly blocks a legitimate seller, never over-counts to
+     falsely deny). It is NOT a hard cap. Tightening it to a true atomic cap would require
+     reserving the slot before `createJob` (a reservation model), which the frozen spec v2 rejected
+     to preserve the pure-TS, exactly-once-per-job `created` design — out of scope here.
 
 8. **Audit + consent.** `activity_log` (no new audit table) records append-only telemetry
    (`video_generation_requested` / `video_access_blocked` / `video_quota_consumed`) with
@@ -104,5 +118,7 @@ ahead of a wider one.
   new surface only has to call `checkAccess` + the right denial mapper.
 - The pure decision logic is unit-tested without Supabase (DI reader); the service-role adapter,
   guard mapping, audit, and each route's gating are covered (test count 821 → 893).
-- Residual accepted: quota may under-count by ≤1 in a rare boundary race (safe direction). Precise
-  billing is explicitly NOT a goal here.
+- Residual accepted: quota is enforced eventually, not as a hard atomic cap. A concurrent burst of
+  distinct-key generates can over-render by up to (burst size − 1), bounded by the 5/hour per-user
+  generate rate limit; the DB count under-counts by the same amount (see §7). Permissive direction;
+  precise billing/capping is explicitly NOT a goal here.
