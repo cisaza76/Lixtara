@@ -55,6 +55,14 @@ export function registerPipelineSentryClient(client: SentryLikeClient | null): v
   registeredClient = client;
 }
 
+// The client registered by production instrumentation, or null everywhere it isn't configured
+// (every environment as of this writing). Callers outside the pipeline path (e.g. the
+// video-access guard) use this to attach a content-free capture; they MUST forward a generic
+// error, never a caught one, since this bypasses buildGenericError's scrubbing.
+export function getRegisteredSentryClient(): SentryLikeClient | null {
+  return registeredClient;
+}
+
 function resolveClient(injected: SentryLikeClient | null | undefined): SentryLikeClient | null {
   // Explicit `null`/client passed in wins outright (tests rely on this to force the
   // "absent" path even if a global happens to be registered). `undefined` means "use

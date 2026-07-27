@@ -33,6 +33,7 @@ export interface VideoAccessResult {
   consentRequired: boolean; // structural flag for 5B; false for 5A internal-consent path
   consentSatisfied: boolean;
   grantId?: string; // the row to consume quota against, present only when allowed
+  grantGenerationsUsed?: number; // the CAS anchor the consume UPDATE compares against; only when allowed
 }
 
 // One active grant row, as returned by the reader. `listingId === null` means "all the user's
@@ -137,9 +138,13 @@ export async function requireVideoFeatureAccess(
   let grants: VideoAccessGrant[];
   try {
     grants = await deps.reader.listActiveGrants(input.userId);
-  } catch (err) {
-    // Fail closed and record a content-free signal (no userId/listingId values, no error text).
-    deps.sentry?.captureException(err, { tags: { surface: "video_access", outcome: "reader_error" } });
+  } catch {
+    // Fail closed and record a content-free signal. We forward a GENERIC error, never the caught
+    // one — its message could carry a DB connection string or query text (same doctrine as
+    // capturePipelineError, which never echoes error-derived text). Only the PII-free tags travel.
+    deps.sentry?.captureException(new Error("video_access reader_error"), {
+      tags: { surface: "video_access", outcome: "reader_error" },
+    });
     return deny("reader_error");
   }
 
@@ -170,5 +175,6 @@ export async function requireVideoFeatureAccess(
     consentRequired: false,
     consentSatisfied: true,
     grantId: grant.id,
+    grantGenerationsUsed: grant.generationsUsed,
   };
 }
