@@ -55,6 +55,27 @@ export interface AccessReader {
   listActiveGrants(userId: string): Promise<VideoAccessGrant[]>;
 }
 
+// Result of attempting to consume ONE generation from a grant. `consumed` is true only when the
+// guarded conditional UPDATE flipped exactly one row (quota was available, grant still
+// enabled/not-revoked, and no concurrent consumer moved it first). false means the slot was NOT
+// taken — exhausted, revoked, disabled, or a lost compare-and-swap race.
+export interface QuotaConsumeResult {
+  consumed: boolean;
+  remainingGenerations: number | null; // remaining AFTER this consume; null when not consumed
+}
+
+export interface QuotaConsumer {
+  // Atomically consume one generation against `grantId`. `expectedUsed` is the generations_used
+  // value the caller read from the grant (compare-and-swap guard), so two concurrent consumers
+  // can never both take the same slot. MUST be called at most once per logical job (see
+  // createJob's `created` flag) — quota is a safety rail, not a billing meter (spec v2 §0).
+  consumeGeneration(input: {
+    grantId: string;
+    userId: string;
+    expectedUsed: number;
+  }): Promise<QuotaConsumeResult>;
+}
+
 export interface VideoAccessDeps {
   reader: AccessReader;
   now: () => number; // injectable clock (ms) for window checks
