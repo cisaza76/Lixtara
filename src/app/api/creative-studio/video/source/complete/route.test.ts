@@ -4,11 +4,21 @@ import { buildSourceStoragePath, type StoredObjectMeta } from "@/lib/creative-st
 import type { VideoSourceAuditEntry } from "@/lib/creative-studio/source-audit";
 import type { Asset, AssetStore, NewAsset } from "@/lib/assets/types";
 import { UniqueViolationError } from "@/lib/assets/asset-store.supabase";
+import type { VideoAccessResult } from "@/lib/creative-studio/video-access";
 
 const OWNER = "11111111-1111-1111-1111-111111111111";
 const LISTING = "22222222-2222-2222-2222-222222222222";
 const ASSET = "33333333-3333-3333-3333-333333333333";
 const goodPath = buildSourceStoragePath(OWNER, LISTING, ASSET);
+
+const ALLOW: VideoAccessResult = {
+  allowed: true, reason: "allowed", userAllowed: true, listingAllowed: true,
+  remainingGenerations: 1, consentRequired: false, consentSatisfied: true, grantId: "g1", grantGenerationsUsed: 0,
+};
+const deny = (reason: VideoAccessResult["reason"]): VideoAccessResult => ({
+  ...ALLOW, allowed: false, reason, listingAllowed: false, remainingGenerations: 0, consentSatisfied: false,
+  grantId: undefined, grantGenerationsUsed: undefined,
+});
 
 function req(body: unknown): Request {
   return new Request("http://x/api/creative-studio/video/source/complete", { method: "POST", body: JSON.stringify(body) });
@@ -81,6 +91,7 @@ function mkDeps(over: {
   assets?: AssetStore;
   statObject?: CompleteSourceDeps["statObject"];
   audit?: ReturnType<typeof auditStore>;
+  checkAccess?: CompleteSourceDeps["checkAccess"];
 } = {}) {
   const assets = over.assets ?? store();
   const audit = over.audit ?? auditStore();
@@ -91,6 +102,7 @@ function mkDeps(over: {
     assets,
     statObject: over.statObject ?? (async () => OBJ_OK),
     auditPort: audit.port,
+    checkAccess: over.checkAccess ?? (async () => ALLOW),
   };
   return { deps, assets: assets as AssetStore & { rows: Asset[]; inserts: number }, audit };
 }
@@ -115,6 +127,14 @@ describe("complete route — auth / ownership / path / object", () => {
   });
   it("not the owner → 403", async () => {
     expect((await handleCompleteSourceUpload(req(body), mkDeps({ loadProperty: async (id) => ({ id, owner_id: "x" }) }).deps)).status).toBe(403);
+  });
+  it("not allowlisted (no_grant) → 404, no asset registered", async () => {
+    const d = mkDeps({ checkAccess: async () => deny("no_grant") });
+    expect((await handleCompleteSourceUpload(req(body), d.deps)).status).toBe(404);
+    expect(d.assets.inserts).toBe(0);
+  });
+  it("allowlisted but out of quota still completes (quota does not gate finalize)", async () => {
+    expect((await handleCompleteSourceUpload(req(body), mkDeps({ checkAccess: async () => deny("quota_exhausted") }).deps)).status).toBe(200);
   });
   it("path security: other-owner path + traversal → 403", async () => {
     const otherOwnerPath = buildSourceStoragePath("99999999-9999-9999-9999-999999999999", LISTING, ASSET);

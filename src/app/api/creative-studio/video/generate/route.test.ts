@@ -11,6 +11,13 @@ import type { JobTransition } from "@/lib/creative-jobs/states";
 import type { Classification } from "@/lib/media-intelligence/types";
 import { buildIdempotencyKey, hashSourceAssetIds } from "@/lib/video-engine/idempotency";
 import { TEMPLATE_VERSION } from "@/lib/video-engine/versions";
+import type { VideoAccessResult } from "@/lib/creative-studio/video-access";
+import type { ActivityLogPort } from "@/lib/creative-studio/video-access-audit";
+import {
+  VIDEO_ACCESS_BLOCKED_ACTION,
+  VIDEO_QUOTA_CONSUMED_ACTION,
+  VIDEO_GENERATION_REQUESTED_ACTION,
+} from "@/lib/creative-studio/video-access-audit";
 
 const ACTIVE_STATES = new Set(["queued", "running", "rendering", "uploading", "qa"]);
 
@@ -113,6 +120,36 @@ const READY_CLASSIFICATIONS: Classification[] = [
   { photoId: "photo-3", roomType: "habitacion", tags: [], confidence: 0.9 },
 ];
 
+// An allowlisted, in-scope, in-quota access result (grant g1 with 1 of 3 used → 2 remaining).
+function allowedAccess(over: Partial<VideoAccessResult> = {}): VideoAccessResult {
+  return {
+    allowed: true,
+    reason: "allowed",
+    userAllowed: true,
+    listingAllowed: true,
+    remainingGenerations: 2,
+    consentRequired: false,
+    consentSatisfied: true,
+    grantId: "g1",
+    grantGenerationsUsed: 1,
+    ...over,
+  };
+}
+
+// Records audit calls without touching a DB; every method is best-effort (returns true).
+function fakeAudit(): ActivityLogPort & { inserts: Array<{ action_type: string; metadata: Record<string, unknown> }> } {
+  const inserts: Array<{ action_type: string; metadata: Record<string, unknown> }> = [];
+  return {
+    inserts,
+    async insert(row) {
+      inserts.push({ action_type: row.action_type, metadata: row.metadata });
+    },
+    async exists() {
+      return false;
+    },
+  };
+}
+
 function makeDeps(over: Partial<GenerateVideoDeps> = {}): GenerateVideoDeps {
   return {
     getUser: async () => ({ id: OWNER_ID }),
@@ -126,6 +163,9 @@ function makeDeps(over: Partial<GenerateVideoDeps> = {}): GenerateVideoDeps {
     jobsStore: fakeJobsStore(),
     now: () => FIXED_NOW,
     checkRateLimit: async () => null,
+    checkAccess: async () => allowedAccess(),
+    consumeQuota: async () => ({ consumed: true, remainingGenerations: 1 }),
+    audit: fakeAudit(),
     ...over,
   };
 }
@@ -300,5 +340,128 @@ describe("handleGenerateVideo", () => {
     });
     const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
     expect(res.status).toBe(429);
+  });
+});
+
+describe("handleGenerateVideo — Gate 5 access + quota", () => {
+  const denied = (reason: VideoAccessResult["reason"], over: Partial<VideoAccessResult> = {}): VideoAccessResult => ({
+    allowed: false,
+    reason,
+    userAllowed: reason !== "no_grant" && reason !== "reader_error",
+    listingAllowed: false,
+    remainingGenerations: 0,
+    consentRequired: false,
+    consentSatisfied: false,
+    ...over,
+  });
+
+  it("non-allowlisted user (no_grant) → 404, NO job created, NO quota consumed, audit records blocked", async () => {
+    const store = fakeJobsStore();
+    const audit = fakeAudit();
+    let consumeCalls = 0;
+    const deps = makeDeps({
+      jobsStore: store,
+      audit,
+      checkAccess: async () => denied("no_grant"),
+      consumeQuota: async () => {
+        consumeCalls++;
+        return { consumed: false, remainingGenerations: null };
+      },
+    });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    expect(store.jobs).toHaveLength(0);
+    expect(consumeCalls).toBe(0);
+    expect(audit.inserts.map((i) => i.action_type)).toEqual([VIDEO_ACCESS_BLOCKED_ACTION]);
+    expect(audit.inserts[0]!.metadata).toMatchObject({ reason: "no_grant" });
+  });
+
+  it("listing out of scope → 404 (feature stays invisible)", async () => {
+    const deps = makeDeps({ checkAccess: async () => denied("listing_out_of_scope", { userAllowed: true }) });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(404);
+  });
+
+  it("reader error fails closed → 404, no job", async () => {
+    const store = fakeJobsStore();
+    const deps = makeDeps({ jobsStore: store, checkAccess: async () => denied("reader_error") });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(404);
+    expect(store.jobs).toHaveLength(0);
+  });
+
+  it("quota exhausted → 403 quota_exhausted (distinguishable), NO job created", async () => {
+    const store = fakeJobsStore();
+    const deps = makeDeps({
+      jobsStore: store,
+      checkAccess: async () => denied("quota_exhausted", { userAllowed: true, listingAllowed: true, grantId: "g1" }),
+    });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "quota_exhausted" });
+    expect(store.jobs).toHaveLength(0);
+  });
+
+  it("ownership 403 wins BEFORE the access check runs (validation order)", async () => {
+    let accessCalled = false;
+    const deps = makeDeps({
+      loadProperty: async () => ({ id: PROPERTY_ID, owner_id: "someone-else", mls_status: "active" }),
+      checkAccess: async () => {
+        accessCalled = true;
+        return allowedAccess();
+      },
+    });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(403);
+    expect(accessCalled).toBe(false);
+  });
+
+  it("on success: consumes ONE slot with the grant's CAS anchor, and audits requested + consumed", async () => {
+    const store = fakeJobsStore();
+    const audit = fakeAudit();
+    const consumeArgs: Array<{ grantId: string; userId: string; expectedUsed: number }> = [];
+    const deps = makeDeps({
+      jobsStore: store,
+      audit,
+      checkAccess: async () => allowedAccess({ grantId: "g1", grantGenerationsUsed: 1 }),
+      consumeQuota: async (input) => {
+        consumeArgs.push(input);
+        return { consumed: true, remainingGenerations: 1 };
+      },
+    });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(202);
+    expect(consumeArgs).toEqual([{ grantId: "g1", userId: OWNER_ID, expectedUsed: 1 }]);
+    const actions = audit.inserts.map((i) => i.action_type);
+    expect(actions).toContain(VIDEO_QUOTA_CONSUMED_ACTION);
+    expect(actions).toContain(VIDEO_GENERATION_REQUESTED_ACTION);
+  });
+
+  it("a duplicate request (created:false) does NOT consume a second slot", async () => {
+    const store = fakeJobsStore();
+    let consumeCalls = 0;
+    const deps = makeDeps({
+      jobsStore: store,
+      consumeQuota: async () => {
+        consumeCalls++;
+        return { consumed: true, remainingGenerations: 1 };
+      },
+    });
+    await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps); // created:true → consumes
+    await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps); // created:false → must NOT consume
+    expect(store.jobs).toHaveLength(1);
+    expect(consumeCalls).toBe(1);
+  });
+
+  it("a missed CAS at consume time (boundary race) still returns 202 — quota is a safety rail, not a gate", async () => {
+    const store = fakeJobsStore();
+    const deps = makeDeps({
+      jobsStore: store,
+      consumeQuota: async () => ({ consumed: false, remainingGenerations: null }),
+    });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(202); // the already-created job proceeds; safe direction
+    expect(store.jobs).toHaveLength(1);
   });
 });

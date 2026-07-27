@@ -2,9 +2,19 @@ import { describe, it, expect } from "vitest";
 import { handleVideoStatus, type VideoStatusDeps } from "@/app/api/creative-studio/video/status/route";
 import type { CreativeJob } from "@/lib/creative-jobs/jobs";
 import type { Asset } from "@/lib/assets/types";
+import type { VideoAccessResult } from "@/lib/creative-studio/video-access";
 
 const PROPERTY_ID = "prop-1";
 const OWNER_ID = "user-1";
+
+const ALLOW: VideoAccessResult = {
+  allowed: true, reason: "allowed", userAllowed: true, listingAllowed: true,
+  remainingGenerations: 1, consentRequired: false, consentSatisfied: true, grantId: "g1", grantGenerationsUsed: 0,
+};
+const deny = (reason: VideoAccessResult["reason"]): VideoAccessResult => ({
+  ...ALLOW, allowed: false, reason, listingAllowed: false, remainingGenerations: 0, consentSatisfied: false,
+  grantId: undefined, grantGenerationsUsed: undefined,
+});
 
 function makeJob(over: Partial<CreativeJob> = {}): CreativeJob {
   return {
@@ -71,6 +81,7 @@ function makeDeps(over: Partial<VideoStatusDeps> = {}): VideoStatusDeps {
     findLatestByListing: async () => null,
     getAsset: async () => null,
     signUrls: async () => null,
+    checkAccess: async () => ALLOW,
     ...over,
   };
 }
@@ -112,6 +123,19 @@ describe("handleVideoStatus", () => {
     const res = await handleVideoStatus(req(PROPERTY_ID), deps);
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({ error: "property_not_found_or_not_yours" });
+  });
+
+  it("returns 404 when the user is not allowlisted (feature invisible)", async () => {
+    const deps = makeDeps({ checkAccess: async () => deny("no_grant") });
+    const res = await handleVideoStatus(req(PROPERTY_ID), deps);
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: "not_found" });
+  });
+
+  it("out of quota still returns status (quota does not gate reads)", async () => {
+    const deps = makeDeps({ checkAccess: async () => deny("quota_exhausted") });
+    const res = await handleVideoStatus(req(PROPERTY_ID), deps);
+    expect(res.status).toBe(200);
   });
 
   it("returns idle when there is no job yet", async () => {
