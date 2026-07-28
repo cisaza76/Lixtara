@@ -13,6 +13,7 @@ import {
 } from "@/lib/video-engine/produce-asset";
 import { RenderTimeoutError, SandboxCreateFailedError } from "@/lib/video-engine/render-provider";
 import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
+import { VideoPreparationError } from "@/lib/video-engine/prepare-video";
 import { processJob, type PipelineDeps, type ReconcileResult } from "@/lib/video-engine/pipeline";
 
 // ---- fake JobsStore (same DB-mimicking semantics as jobs.test.ts's fake) -----------
@@ -786,5 +787,34 @@ describe("#112 — stage default for 'preparing'", () => {
     const evidence = (store.transitions.find((t) => t.to === "failed")!.metadata as Record<string, unknown>)
       .evidence as { classification: { category: string; stage: string } };
     expect(evidence.classification).toMatchObject({ category: "PREPARATION", stage: "preparing" });
+  });
+});
+
+describe("UX 5C — granular seller-actionable codes reach the job row", () => {
+  it("a plan-time VideoPreparationError carries ITS OWN code (e.g. VIDEO_DURATION_EXCEEDED)", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("preparing");
+        throw new VideoPreparationError("VIDEO_DURATION_EXCEEDED", "source is 200s; max is 120s");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.errorCode).toBe("VIDEO_DURATION_EXCEEDED");
+    const evidence = (store.transitions.find((t) => t.to === "failed")!.metadata as Record<string, unknown>)
+      .evidence as { classification: { category: string } };
+    expect(evidence.classification.category).toBe("INPUT");
+  });
+
+  it("a plan-time code NOT in the shared catalog falls back to VIDEO_PREPARATION_FAILED", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("preparing");
+        throw new VideoPreparationError("VIDEO_SOURCE_UNAUTHORIZED", "not yours");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.errorCode).toBe("VIDEO_PREPARATION_FAILED");
   });
 });

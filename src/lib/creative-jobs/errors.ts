@@ -6,6 +6,16 @@
 
 export const CREATIVE_JOB_ERROR_CODES = [
   "VIDEO_SOURCE_MISSING",
+  // Seller-actionable source conditions (reconciled from the video-engine contract
+  // catalog per the approved UX decision 2026-07-28 — sellerFacing is the source of
+  // truth for the visible failure treatment; see seller-failure-kind.ts):
+  "VIDEO_CORRUPT",
+  "VIDEO_CONTAINER_UNSUPPORTED",
+  "VIDEO_CODEC_UNSUPPORTED",
+  "VIDEO_STREAM_MISSING",
+  "VIDEO_DURATION_EXCEEDED",
+  "VIDEO_FILE_TOO_LARGE",
+  "VIDEO_RESOLUTION_EXCEEDED",
   "ASSET_DOWNLOAD_FAILED",
   "VIDEO_PREPARATION_FAILED",
   "VIDEO_PREPARED_SOURCE_INVALID",
@@ -39,6 +49,14 @@ export const ERROR_CLASS: Record<CreativeJobErrorCode, ErrorClass> = {
   // #112 — a listing with no usable source (photo Assets / uploaded video) fails
   // identically on retry; mirrors the video-engine catalog's user_input/retryable:false.
   VIDEO_SOURCE_MISSING: "non_retriable",
+  // Deterministic on the same source: the identical file fails identically on retry.
+  VIDEO_CORRUPT: "non_retriable",
+  VIDEO_CONTAINER_UNSUPPORTED: "non_retriable",
+  VIDEO_CODEC_UNSUPPORTED: "non_retriable",
+  VIDEO_STREAM_MISSING: "non_retriable",
+  VIDEO_DURATION_EXCEEDED: "non_retriable",
+  VIDEO_FILE_TOO_LARGE: "non_retriable",
+  VIDEO_RESOLUTION_EXCEEDED: "non_retriable",
   ASSET_DOWNLOAD_FAILED: "retriable",
   // FFmpeg normalization on the SAME source is deterministic — a retry re-runs the same
   // command on the same bytes and fails identically (mirrors the video-engine catalog,

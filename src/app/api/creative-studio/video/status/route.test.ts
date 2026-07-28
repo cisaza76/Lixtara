@@ -152,11 +152,15 @@ describe("handleVideoStatus", () => {
     await expect(res.json()).resolves.toEqual({ state: "creating", video: null });
   });
 
-  it("returns failed when the job failed", async () => {
+  it("returns failed when the job failed (UX 5C: plus the seller-facing failure object)", async () => {
     const deps = makeDeps({ findLatestByListing: async () => makeJob({ state: "failed" }) });
     const res = await handleVideoStatus(req(PROPERTY_ID), deps);
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ state: "failed", video: null });
+    const body = await res.json();
+    expect(body.state).toBe("failed");
+    expect(body.video).toBeNull();
+    // widened contract (approved 2026-07-28): a closed, non-technical failure object
+    expect(["source_action_required", "technical_retryable", "technical_support"]).toContain(body.failure.kind);
   });
 
   it("returns completed with signed urls + meta on a completed job with a servable asset", async () => {
@@ -169,6 +173,7 @@ describe("handleVideoStatus", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       state: "completed",
+      madeFrom: "photos",
       video: {
         previewUrl: "https://signed/preview",
         downloadUrl: "https://signed/dl",

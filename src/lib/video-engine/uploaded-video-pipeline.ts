@@ -19,6 +19,7 @@ import type { StoragePort } from "@/lib/video-engine/storage-port";
 import { getRenderProfile } from "@/lib/video-engine/render-profiles";
 import { VIDEO_SOURCE_LIMITS } from "@/lib/video-engine/video-source-limits";
 import {
+  VideoPreparationError,
   planVideoPreparation,
   PREPARATION_PLAN_SCHEMA_VERSION,
   SOURCE_PLACEHOLDER,
@@ -116,8 +117,12 @@ export async function produceUploadedVideoStrategy(
       if (probe.exitCode !== 0) {
         // #112 — carry the probe's stderr TAIL (the fatal line, e.g. "moov atom not
         // found") so the evidence pack and error_message tell the operator WHY.
+        // UX 5C — an UNREADABLE source is the seller's file being corrupt/truncated:
+        // typed VIDEO_CORRUPT (sellerFacing) so the panel asks for a replacement
+        // instead of inviting a blind retry of the same bytes.
         const probeStderr = await probe.stderr().catch(() => "");
-        throw new Error(
+        throw new VideoPreparationError(
+          "VIDEO_CORRUPT",
           `uploaded-video-pipeline: source ffprobe failed (exit ${probe.exitCode}): ${probeStderr.slice(-1500)}`,
         );
       }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapJobStateToSeller, deriveVideoMeta } from "@/lib/creative-studio/seller-video-status";
+import { mapJobStateToSeller, deriveVideoMeta, deriveSellerFailure, isEquivalentFailure, madeFromStrategy } from "@/lib/creative-studio/seller-video-status";
 import type { CreativeJobState } from "@/lib/creative-jobs/states";
 import type { Asset } from "@/lib/assets/types";
 
@@ -145,5 +145,87 @@ describe("deriveVideoMeta", () => {
 
     const meta = deriveVideoMeta(asset);
     expect(meta.createdAt).toBe("2020-01-01T00:00:00.000Z");
+  });
+});
+
+// ---- UX 5C — seller-facing failure derivation --------------------------------------
+
+describe("deriveSellerFailure — approved CTA matrix", () => {
+  const base = { errorCode: "RENDER_TIMEOUT", traceId: "trace-x", remainingGenerations: 2, isRepeatEquivalentFailure: false };
+
+  it("technical_retryable with capacity: retry allowed, support secondary", () => {
+    const f = deriveSellerFailure(base);
+    expect(f.kind).toBe("technical_retryable");
+    expect(f.canRetry).toBe(true);
+    expect(f.supportPrimary).toBe(false);
+    expect(f.reference).toMatch(/^[A-F0-9]{8}$/);
+  });
+
+  it("source_action_required: NO retry (replace is the action), support secondary", () => {
+    const f = deriveSellerFailure({ ...base, errorCode: "VIDEO_CORRUPT" });
+    expect(f.kind).toBe("source_action_required");
+    expect(f.canRetry).toBe(false);
+    expect(f.supportPrimary).toBe(false);
+  });
+
+  it("technical_support: no retry, support primary", () => {
+    const f = deriveSellerFailure({ ...base, errorCode: "RENDER_FAILED" });
+    expect(f.kind).toBe("technical_support");
+    expect(f.canRetry).toBe(false);
+    expect(f.supportPrimary).toBe(true);
+  });
+
+  it("repeat equivalent failure: support becomes primary; retry stays available only while retryable + capacity", () => {
+    const f = deriveSellerFailure({ ...base, isRepeatEquivalentFailure: true });
+    expect(f.supportPrimary).toBe(true);
+    expect(f.canRetry).toBe(true);
+  });
+
+  it("exhausted capacity: retry disappears, support primary — never a dead CTA", () => {
+    const f = deriveSellerFailure({ ...base, remainingGenerations: 0 });
+    expect(f.canRetry).toBe(false);
+    expect(f.supportPrimary).toBe(true);
+  });
+
+  it("no traceId → reference null (still functional)", () => {
+    expect(deriveSellerFailure({ ...base, traceId: null }).reference).toBeNull();
+  });
+});
+
+describe("isEquivalentFailure — approved repetition rule", () => {
+  const a = { errorCode: "RENDER_TIMEOUT", strategy: "uploaded_video", sourceAssetId: "s1" };
+
+  it("same strategy + same source + same code → equivalent", () => {
+    expect(isEquivalentFailure(a, { ...a })).toBe(true);
+  });
+
+  it("same strategy + same source + different code but SAME kind → equivalent", () => {
+    expect(isEquivalentFailure(a, { ...a, errorCode: "SANDBOX_CREATE_FAILED" })).toBe(true);
+  });
+
+  it("different source asset → NOT equivalent (seller replaced the file)", () => {
+    expect(isEquivalentFailure(a, { ...a, sourceAssetId: "s2" })).toBe(false);
+  });
+
+  it("different strategy → NOT equivalent", () => {
+    expect(isEquivalentFailure(a, { ...a, strategy: "photo_slideshow" })).toBe(false);
+  });
+
+  it("different code AND different kind → NOT equivalent", () => {
+    expect(isEquivalentFailure(a, { ...a, errorCode: "VIDEO_CORRUPT" })).toBe(false);
+  });
+
+  it("photo path (no source asset on either side) compares strategy + code/kind only", () => {
+    const p = { errorCode: "RENDER_FAILED", strategy: "photo_slideshow", sourceAssetId: null };
+    expect(isEquivalentFailure(p, { ...p })).toBe(true);
+  });
+});
+
+describe("madeFromStrategy — chip source", () => {
+  it("maps provenance strategies to the two approved chips", () => {
+    expect(madeFromStrategy("photo_slideshow")).toBe("photos");
+    expect(madeFromStrategy("uploaded_video")).toBe("uploaded_video");
+    expect(madeFromStrategy(null)).toBe("photos"); // legacy assets predate the field
+    expect(madeFromStrategy("unknown-future")).toBe("photos");
   });
 });

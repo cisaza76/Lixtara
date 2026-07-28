@@ -12,6 +12,7 @@ import { produceUploadedVideoStrategy } from "@/lib/video-engine/uploaded-video-
 import { VideoSourceMissingError } from "@/lib/video-engine/produce-asset";
 import { FailureEvidenceCollector } from "@/lib/video-engine/failure-evidence";
 import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
+import { VideoPreparationError } from "@/lib/video-engine/prepare-video";
 import type { SandboxCommandResult, VideoPreparationSandbox } from "@/lib/video-engine/execute-video-preparation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -402,6 +403,24 @@ describe("#112 — source ffprobe failure carries the probe's stderr (the fatal 
     const { resolved } = uploadedResolved({ prep });
     const err = await produceUploadedVideoStrategy(INPUT, HOOKS, resolved, { addressLine: "x", priceLabel: "$1" }).catch((e) => e);
     expect(String(err.message)).toContain("source ffprobe failed (exit 1)");
+    expect(String(err.message)).toContain("moov atom not found");
+  });
+});
+
+describe("UX 5C — an unreadable source classifies as VIDEO_CORRUPT (seller-actionable)", () => {
+  it("source ffprobe failure throws typed VideoPreparationError with VIDEO_CORRUPT", async () => {
+    const prep = fakePrep();
+    const orig = prep.runCommand.bind(prep);
+    prep.runCommand = async (c, a, o) => {
+      if (c === "ffprobe" && [...a].some((x) => String(x).includes("source"))) {
+        return { exitCode: 1, stdout: async () => "", stderr: async () => "moov atom not found" };
+      }
+      return orig(c, a, o);
+    };
+    const { resolved } = uploadedResolved({ prep });
+    const err = await produceUploadedVideoStrategy(INPUT, HOOKS, resolved, { addressLine: "x", priceLabel: "$1" }).catch((e) => e);
+    expect(err).toBeInstanceOf(VideoPreparationError);
+    expect((err as VideoPreparationError).code).toBe("VIDEO_CORRUPT");
     expect(String(err.message)).toContain("moov atom not found");
   });
 });

@@ -8,7 +8,7 @@
 //
 // CODE ONLY as of this commit (Gate C1): no real Sandbox, no real DB, no UI. Every dep
 // is injected and every test in pipeline.test.ts uses fakes.
-import type { CreativeJobErrorCode } from "@/lib/creative-jobs/errors";
+import { CREATIVE_JOB_ERROR_CODES, type CreativeJobErrorCode } from "@/lib/creative-jobs/errors";
 import { setState, type CreativeJob, type JobsStore } from "@/lib/creative-jobs/jobs";
 import { capturePipelineError, type PipelineErrorContext } from "@/lib/observability/sentry.server";
 import { failureTaxonomyFor } from "@/lib/creative-jobs/failure-taxonomy";
@@ -27,6 +27,7 @@ import { logVideoEvent } from "@/lib/video-engine/observability-log";
 import { sanitizeErrorMessage, sanitizedCauseChain, sanitizeStderrTail } from "@/lib/video-engine/sanitize-error";
 import { FontStrategyMismatchError } from "@/lib/video-engine/font-guard";
 import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
+import { VideoPreparationError } from "@/lib/video-engine/prepare-video";
 import { RENDER_PROVIDER, TEMPLATE_VERSION } from "@/lib/video-engine/versions";
 import type { Asset } from "@/lib/assets/types";
 
@@ -96,6 +97,16 @@ function classifyThrown(err: unknown, stage: Stage): CreativeJobErrorCode {
   // the stage default below — misleading enough to hide the real cause from the operator.
   if (err instanceof VideoPreparationExecutionError) {
     return err.code === "VIDEO_PREPARED_SOURCE_INVALID" ? "VIDEO_PREPARED_SOURCE_INVALID" : "VIDEO_PREPARATION_FAILED";
+  }
+  // UX 5C — plan-time preparation errors (limits/probe: duration, resolution, codec,
+  // corrupt…) carry granular user_input codes now reconciled into the shared catalog;
+  // persist them verbatim so the seller-facing kind derivation (sellerFacing flag) can
+  // distinguish "fix your file" from technical failures. Codes not in the shared
+  // catalog fall back to the generic preparation code.
+  if (err instanceof VideoPreparationError) {
+    return (CREATIVE_JOB_ERROR_CODES as readonly string[]).includes(err.code)
+      ? (err.code as CreativeJobErrorCode)
+      : "VIDEO_PREPARATION_FAILED";
   }
   if (err instanceof StorageUploadFailedError) return "STORAGE_UPLOAD_FAILED";
   if (err instanceof StorageVerifyFailedError) return "STORAGE_VERIFY_FAILED";

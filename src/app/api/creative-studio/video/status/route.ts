@@ -19,7 +19,7 @@ import type { CreativeJob } from "@/lib/creative-jobs/jobs";
 import { SupabaseJobsStore } from "@/lib/creative-jobs/jobs-store.supabase";
 import { SupabaseAssetStore } from "@/lib/assets/asset-store.supabase";
 import type { Asset } from "@/lib/assets/types";
-import { mapJobStateToSeller, deriveVideoMeta, type SellerVideoStatusDto } from "@/lib/creative-studio/seller-video-status";
+import { deriveSellerFailure, deriveVideoMeta, isEquivalentFailure, madeFromStrategy, mapJobStateToSeller, type SellerVideoStatusDto } from "@/lib/creative-studio/seller-video-status";
 import { checkVideoAccess, videoVisibilityDenial, type CheckVideoAccess } from "@/lib/creative-studio/video-access-guard";
 
 export { isCreativeStudioVideoEnabled };
@@ -43,6 +43,12 @@ export interface VideoStatusDeps {
   signUrls(asset: Asset): Promise<{ previewUrl: string; downloadUrl: string } | null>;
   // Gate 5 visibility: an allowlisted, in-scope seller only (quota does NOT gate reading status).
   checkAccess: CheckVideoAccess;
+  // UX 5C — the latest terminal jobs for the listing (newest first), with the failure
+  // identity facts needed by the approved repetition rule. Strategy/sourceAssetId come
+  // from the #112 evidence pack when present; nulls degrade the comparison gracefully.
+  listRecentTerminalJobs?(listingId: string): Promise<
+    Array<{ state: string; errorCode: string | null; strategy: string | null; sourceAssetId: string | null }>
+  >;
 }
 
 function defaultDeps(): VideoStatusDeps {
@@ -97,6 +103,46 @@ function defaultDeps(): VideoStatusDeps {
       }
     },
     checkAccess: checkVideoAccess,
+    async listRecentTerminalJobs(listingId) {
+      // Two most recent jobs + (for failed ones) the #112 evidence facts from their
+      // failed transition. Any error degrades to [] — the repetition rule then simply
+      // does not fire (first-failure treatment), never a 500.
+      try {
+        const service = createService();
+        const { data: jobs } = await service
+          .from("creative_jobs")
+          .select("id, state, error_code")
+          .eq("listing_id", listingId)
+          .eq("capability", "video")
+          .order("created_at", { ascending: false })
+          .limit(2);
+        if (!jobs?.length) return [];
+        const failedIds = jobs.filter((j) => j.state === "failed").map((j) => j.id);
+        const evidenceByJob = new Map<string, { strategy: string | null; sourceAssetId: string | null }>();
+        if (failedIds.length) {
+          const { data: transitions } = await service
+            .from("creative_job_transitions")
+            .select("job_id, metadata")
+            .in("job_id", failedIds)
+            .eq("to_state", "failed");
+          for (const t of transitions ?? []) {
+            const ev = (t.metadata as { evidence?: { strategy?: string; sourceAssetId?: string } } | null)?.evidence;
+            evidenceByJob.set(t.job_id as string, {
+              strategy: ev?.strategy ?? null,
+              sourceAssetId: ev?.sourceAssetId ?? null,
+            });
+          }
+        }
+        return jobs.map((j) => ({
+          state: j.state as string,
+          errorCode: (j.error_code as string | null) ?? null,
+          strategy: evidenceByJob.get(j.id)?.strategy ?? null,
+          sourceAssetId: evidenceByJob.get(j.id)?.sourceAssetId ?? null,
+        }));
+      } catch {
+        return [];
+      }
+    },
   };
 }
 
@@ -124,12 +170,15 @@ export async function handleVideoStatus(req: Request, deps: VideoStatusDeps): Pr
 
   // Gate 5 access (after ownership): invisible (404) to a non-allowlisted / out-of-scope seller;
   // quota does NOT gate reading status (videoVisibilityDenial).
-  const denial = videoVisibilityDenial(await deps.checkAccess({ userId: user.id, listingId: propertyId }));
+  const access = await deps.checkAccess({ userId: user.id, listingId: propertyId });
+  const denial = videoVisibilityDenial(access);
   if (denial) return NextResponse.json(denial.body, { status: denial.status });
 
   const job = await deps.findLatestByListing(propertyId);
   let state = mapJobStateToSeller(job?.state ?? null);
   let video: SellerVideoStatusDto["video"] = null;
+  let madeFrom: SellerVideoStatusDto["madeFrom"];
+  let failure: SellerVideoStatusDto["failure"];
 
   if (state === "completed" && job?.assetId) {
     const asset = await deps.getAsset(job.assetId);
@@ -140,6 +189,9 @@ export async function handleVideoStatus(req: Request, deps: VideoStatusDeps): Pr
         downloadUrl: signed.downloadUrl,
         meta: deriveVideoMeta(asset),
       };
+      madeFrom = madeFromStrategy(
+        (asset.provenance as { sourceStrategy?: string } | null)?.sourceStrategy ?? null,
+      );
     } else {
       // A completed job whose asset is missing or can't yet be signed reads as still
       // finishing, never broken — never a 500, never a "completed" state with no video.
@@ -148,7 +200,31 @@ export async function handleVideoStatus(req: Request, deps: VideoStatusDeps): Pr
     }
   }
 
-  const dto: SellerVideoStatusDto = { state, video };
+  if (state === "failed" && job) {
+    // UX 5C — approved repetition rule: only the two MOST RECENT jobs, both failed and
+    // equivalent (same strategy + same source asset + same kind-or-code), count. All
+    // derivation never throws; a lookup failure degrades to "first failure" treatment.
+    let isRepeat = false;
+    try {
+      const recent = (await deps.listRecentTerminalJobs?.(propertyId)) ?? [];
+      if (recent.length >= 2 && recent[0].state === "failed" && recent[1].state === "failed") {
+        isRepeat = isEquivalentFailure(
+          { errorCode: recent[0].errorCode, strategy: recent[0].strategy, sourceAssetId: recent[0].sourceAssetId },
+          { errorCode: recent[1].errorCode, strategy: recent[1].strategy, sourceAssetId: recent[1].sourceAssetId },
+        );
+      }
+    } catch {
+      isRepeat = false;
+    }
+    failure = deriveSellerFailure({
+      errorCode: job.errorCode ?? null,
+      traceId: job.traceId ?? null,
+      remainingGenerations: access.remainingGenerations,
+      isRepeatEquivalentFailure: isRepeat,
+    });
+  }
+
+  const dto: SellerVideoStatusDto = { state, video, ...(madeFrom ? { madeFrom } : {}), ...(failure ? { failure } : {}) };
   return NextResponse.json(dto, { status: 200 });
 }
 
