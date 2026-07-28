@@ -818,3 +818,67 @@ describe("UX 5C — granular seller-actionable codes reach the job row", () => {
     expect(result.errorCode).toBe("VIDEO_PREPARATION_FAILED");
   });
 });
+
+// ---- UX 5C — terminal notification hook ---------------------------------------------
+
+describe("processJob — UX 5C terminal notification hook", () => {
+  it("fires notifyTerminal exactly once on completed, AFTER the transition is persisted", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const events: Array<Record<string, unknown>> = [];
+    const { deps } = buildDeps(store, {
+      notifyTerminal: async (e) => {
+        events.push({ ...e, transitionsSoFar: store.transitions.map((t) => t.to).join(",") });
+      },
+    });
+    await processJob(runningJob(), deps);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ jobId: "job-1", outcome: "completed", errorCode: null, reconciled: false });
+    expect(String(events[0].transitionsSoFar)).toContain("completed"); // persisted first
+  });
+
+  it("fires notifyTerminal once on failed, with the errorCode", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const events: Array<Record<string, unknown>> = [];
+    const { deps } = buildDeps(store, {
+      produce: async () => {
+        throw new VideoSourceMissingError("no source");
+      },
+      notifyTerminal: async (e) => void events.push(e),
+    });
+    await processJob(runningJob(), deps);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "failed", errorCode: "VIDEO_SOURCE_MISSING" });
+  });
+
+  it("fires on a reconciled fast-forward completion with reconciled:true", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const events: Array<Record<string, unknown>> = [];
+    const { deps } = buildDeps(store, {
+      reconcile: async () => ({ alreadyDone: true, asset: fakeAsset() }),
+      notifyTerminal: async (e) => void events.push(e),
+    });
+    await processJob(runningJob(), deps);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "completed", reconciled: true });
+  });
+
+  it("does NOT fire on cancellation", async () => {
+    const store = fakeJobsStore([runningJob({ cancellationRequested: true })]);
+    const events: unknown[] = [];
+    const { deps } = buildDeps(store, { notifyTerminal: async (e) => void events.push(e) });
+    await processJob(runningJob({ cancellationRequested: true }), deps);
+    expect(events).toHaveLength(0);
+  });
+
+  it("a THROWING notifier never changes the job result (non-regression doctrine)", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      notifyTerminal: async () => {
+        throw new Error("email provider down");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.state).toBe("completed");
+    expect(store.transitions.map((t) => t.to)).toEqual(["rendering", "qa", "uploading", "completed"]);
+  });
+});

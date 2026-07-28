@@ -37,6 +37,9 @@ import { processJob, type PipelineDeps } from "@/lib/video-engine/pipeline";
 import { logVideoEvent } from "@/lib/video-engine/observability-log";
 import { sanitizeErrorMessage } from "@/lib/video-engine/sanitize-error";
 import { buildRealWorkerDeps } from "@/lib/video-engine/worker-deps";
+import { buildVideoTerminalEmail } from "@/lib/creative-studio/video-notifications";
+import { referenceCodeFromTraceId, sellerFailureKindFor } from "@/lib/creative-studio/seller-failure-kind";
+import { sendListingVideoTerminal } from "@/lib/email";
 
 // Constant-time compare of the SECRET VALUE only. The length pre-check is the
 // standard, widely-used deviation for this pattern (Node's own `timingSafeEqual`
@@ -195,6 +198,38 @@ function defaultRunDeps(): RunDeps {
     // short-lived signed URLs, renders through SandboxRemotionProvider, runs ffprobe
     // QA, and persists through the real Supabase Storage/Asset adapters.
     produce,
+    // UX 5C — terminal emails (approved 2026-07-28). Runs AFTER the terminal transition
+    // is persisted (pipeline.ts#safeNotify), never on cancellation, and every step in
+    // here degrades silently: a notification problem must never touch the job result.
+    // Provider-side idempotency key = at-most-once per (job, outcome), so retries and
+    // reconciliation cannot double-send (no migrations needed for dedup).
+    async notifyTerminal(event) {
+      try {
+        const [{ data: owner }, { data: property }] = await Promise.all([
+          client.auth.admin.getUserById(event.ownerId),
+          client.from("properties").select("address_street").eq("id", event.listingId).maybeSingle(),
+        ]);
+        const to = owner?.user?.email;
+        if (!to) return;
+        const addressLine = (property?.address_street as string | undefined) ?? "your listing";
+        const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
+        const kind = event.outcome === "failed" ? sellerFailureKindFor(event.errorCode) : undefined;
+        const built = buildVideoTerminalEmail({
+          outcome: event.outcome,
+          kind,
+          reference: event.outcome === "failed" ? referenceCodeFromTraceId(event.traceId) : null,
+          addressLine,
+          dashboardUrl: `${site}/en/dashboard`,
+        });
+        await sendListingVideoTerminal({
+          to,
+          ...built,
+          idempotencyKey: `video-terminal-${event.jobId}-${event.outcome}`,
+        });
+      } catch {
+        // never-throw: the job's result is already persisted and must stay untouched
+      }
+    },
   };
 
   return {

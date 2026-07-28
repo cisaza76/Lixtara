@@ -72,6 +72,18 @@ export interface PipelineDeps {
   heartbeat: (jobId: string) => Promise<void>;
   reconcile: (job: CreativeJob) => Promise<ReconcileResult>;
   capture: typeof capturePipelineError;
+  // UX 5C — optional terminal notifier (emails). Fired AFTER the terminal transition is
+  // persisted, never on cancellation, and ALWAYS fire-and-forget: a throwing notifier
+  // can never change the job's result (same doctrine as the #112 collectors/loggers).
+  notifyTerminal?: (event: {
+    jobId: string;
+    listingId: string;
+    ownerId: string;
+    traceId: string | null;
+    outcome: "completed" | "failed";
+    errorCode: string | null;
+    reconciled: boolean;
+  }) => Promise<void>;
 }
 
 // Internal only — never reaches a caller. Thrown from inside the `onStage` hook to
@@ -139,6 +151,28 @@ function classifyThrown(err: unknown, stage: Stage): CreativeJobErrorCode {
 // truncation preserves the TAIL — where ffmpeg/render stderr keeps its fatal line —
 // instead of discarding it.
 
+async function safeNotify(
+  deps: PipelineDeps,
+  job: CreativeJob,
+  outcome: "completed" | "failed",
+  errorCode: string | null,
+  reconciled: boolean,
+): Promise<void> {
+  try {
+    await deps.notifyTerminal?.({
+      jobId: job.id,
+      listingId: job.listingId,
+      ownerId: job.ownerId,
+      traceId: job.traceId ?? null,
+      outcome,
+      errorCode,
+      reconciled,
+    });
+  } catch {
+    // never let a notification failure touch the job result
+  }
+}
+
 async function fastForwardToCompleted(
   deps: PipelineDeps,
   job: CreativeJob,
@@ -186,7 +220,9 @@ export async function processJob(job: CreativeJob, deps: PipelineDeps): Promise<
   const reconciled = await deps.reconcile(job);
   const attempt = job.attempts + 1;
   if (reconciled.alreadyDone) {
-    return fastForwardToCompleted(deps, job, attempt, reconciled.asset ?? null);
+    const done = await fastForwardToCompleted(deps, job, attempt, reconciled.asset ?? null);
+    await safeNotify(deps, job, "completed", null, true);
+    return done;
   }
 
   // Cancel "before Sandbox creation" — the job is still 'running' here, which has a
@@ -312,6 +348,7 @@ export async function processJob(job: CreativeJob, deps: PipelineDeps): Promise<
     // — defense-in-depth in case a future caller passes something richer here.
     deps.capture(new Error(`Creative job failed: ${errorCode}`), ctx);
 
+    await safeNotify(deps, job, "failed", errorCode, false);
     return failed;
   }
 
@@ -326,7 +363,7 @@ export async function processJob(job: CreativeJob, deps: PipelineDeps): Promise<
   // transition log stays the source of truth (see getJobTimeline,
   // src/lib/creative-jobs/timeline.ts, for the admin-only read of this data) — no
   // separate metrics store.
-  return setState(deps.jobs, job.id, "completed", {
+  const completed = await setState(deps.jobs, job.id, "completed", {
     actor: "worker",
     nowMs: deps.now(),
     attempt,
@@ -336,4 +373,6 @@ export async function processJob(job: CreativeJob, deps: PipelineDeps): Promise<
     cost: { amountUsd: result.metrics.estimatedCostUsd, provider: result.provenance.renderProvider },
     metadata: { metrics: result.metrics },
   });
+  await safeNotify(deps, job, "completed", null, false);
+  return completed;
 }
