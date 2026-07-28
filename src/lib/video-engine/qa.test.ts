@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { contentTypeFromQa, parseFfprobe, runFfprobe, type ExpectedTechnicalSpec } from "@/lib/video-engine/qa";
+import { contentTypeFromQa, FINAL_OUTPUT_COLOR_CONTRACT, parseFfprobe, runFfprobe, type ExpectedTechnicalSpec } from "@/lib/video-engine/qa";
 
 // A captured ffprobe payload shape (ffprobe -print_format json -show_format
 // -show_streams), matching what the P2.0 spike actually observed for a
 // 1920x1080/30fps/h264 render (docs/superpowers/spikes/2026-07-15-p2.0-sandbox-render.md).
+// Color fields default to the Issue #111 final-output contract (yuv420p/tv/bt709);
+// pass `null` to OMIT a field, simulating a stream with no VUI color metadata.
 function ffprobeFixture(overrides: {
   codec_name?: string;
   width?: number;
@@ -12,18 +14,34 @@ function ffprobeFixture(overrides: {
   r_frame_rate?: string;
   duration?: string;
   format_name?: string;
+  pix_fmt?: string | null;
+  color_range?: string | null;
+  color_space?: string | null;
+  color_primaries?: string | null;
+  color_transfer?: string | null;
 } = {}) {
+  const stream: Record<string, unknown> = {
+    codec_type: "video",
+    codec_name: overrides.codec_name ?? "h264",
+    width: overrides.width ?? 1920,
+    height: overrides.height ?? 1080,
+    r_frame_rate: overrides.r_frame_rate ?? "30/1",
+    duration: overrides.duration ?? "13.056000",
+  };
+  const colorDefaults: Record<string, string> = {
+    pix_fmt: "yuv420p",
+    color_range: "tv",
+    color_space: "bt709",
+    color_primaries: "bt709",
+    color_transfer: "bt709",
+  };
+  for (const key of Object.keys(colorDefaults) as (keyof typeof colorDefaults)[]) {
+    const override = overrides[key as keyof typeof overrides] as string | null | undefined;
+    if (override === null) continue; // omit the field entirely
+    stream[key] = override ?? colorDefaults[key];
+  }
   return {
-    streams: [
-      {
-        codec_type: "video",
-        codec_name: overrides.codec_name ?? "h264",
-        width: overrides.width ?? 1920,
-        height: overrides.height ?? 1080,
-        r_frame_rate: overrides.r_frame_rate ?? "30/1",
-        duration: overrides.duration ?? "13.056000",
-      },
-    ],
+    streams: [stream],
     format: {
       format_name: overrides.format_name ?? "mov,mp4,m4a,3gp,3g2,mj2",
       duration: overrides.duration ?? "13.056000",
@@ -40,6 +58,7 @@ const EXPECTED: ExpectedTechnicalSpec = {
   fps: 30,
   durationSec: 13.056,
   toleranceSec: 1,
+  color: FINAL_OUTPUT_COLOR_CONTRACT,
 };
 
 const BYTES = Buffer.from("some rendered mp4 bytes for the test", "utf8");
@@ -61,6 +80,11 @@ describe("parseFfprobe", () => {
       duration: true,
       bytesPositive: true,
       decodable: true,
+      pixFmt: true,
+      colorRange: true,
+      colorSpace: true,
+      colorPrimaries: true,
+      colorTransfer: true,
     });
   });
 
@@ -119,6 +143,74 @@ describe("parseFfprobe", () => {
     const result = parseFfprobe({ streams: [], format: { format_name: "mov,mp4" } }, EXPECTED, BYTES);
     expect(result.ok).toBe(false);
     expect(result.checks.decodable).toBe(false);
+  });
+});
+
+// Mirrors prepare-video.test.ts's "color-range normalization" suite, applied to the FINAL
+// Remotion output (Issue #111): the encode contract is yuv420p + tv + bt709 across
+// colorspace/primaries/transfer, asserted fail-closed from real ffprobe fields.
+describe("final-output color contract (Issue #111: yuv420p/tv/bt709)", () => {
+  it("passes when the output carries the full yuv420p/tv/bt709 contract", () => {
+    const result = parseFfprobe(ffprobeFixture(), EXPECTED, BYTES);
+    expect(result.ok).toBe(true);
+    expect(result.checks.pixFmt).toBe(true);
+    expect(result.checks.colorRange).toBe(true);
+    expect(result.checks.colorSpace).toBe(true);
+    expect(result.checks.colorPrimaries).toBe(true);
+    expect(result.checks.colorTransfer).toBe(true);
+  });
+
+  it("reports the detected color values for diagnostics", () => {
+    const result = parseFfprobe(ffprobeFixture(), EXPECTED, BYTES);
+    expect(result.pixFmt).toBe("yuv420p");
+    expect(result.colorRange).toBe("tv");
+    expect(result.colorSpace).toBe("bt709");
+    expect(result.colorPrimaries).toBe("bt709");
+    expect(result.colorTransfer).toBe("bt709");
+  });
+
+  it("fails the pre-fix Gate 5A output shape — yuvj420p/pc with no bt709 tags", () => {
+    const result = parseFfprobe(
+      ffprobeFixture({ pix_fmt: "yuvj420p", color_range: "pc", color_space: null, color_primaries: null, color_transfer: null }),
+      EXPECTED,
+      BYTES,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.checks.pixFmt).toBe(false);
+    expect(result.checks.colorRange).toBe(false);
+    expect(result.checks.colorSpace).toBe(false);
+    expect(result.checks.colorPrimaries).toBe(false);
+    expect(result.checks.colorTransfer).toBe(false);
+  });
+
+  it("fails closed when the stream carries NO color metadata at all", () => {
+    const result = parseFfprobe(
+      ffprobeFixture({ pix_fmt: null, color_range: null, color_space: null, color_primaries: null, color_transfer: null }),
+      EXPECTED,
+      BYTES,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.checks.pixFmt).toBe(false);
+    expect(result.checks.colorRange).toBe(false);
+    expect(result.checks.colorSpace).toBe(false);
+  });
+
+  it("fails ONLY the mismatched check — wrong colorspace, everything else intact", () => {
+    const result = parseFfprobe(ffprobeFixture({ color_space: "bt601" }), EXPECTED, BYTES);
+    expect(result.ok).toBe(false);
+    expect(result.checks.colorSpace).toBe(false);
+    expect(result.checks.pixFmt).toBe(true);
+    expect(result.checks.colorRange).toBe(true);
+    expect(result.checks.colorPrimaries).toBe(true);
+    expect(result.checks.colorTransfer).toBe(true);
+    expect(result.checks.codec).toBe(true);
+  });
+
+  it("fails a full-range pc tag even when the pixel format is the tolerated yuv420p", () => {
+    const result = parseFfprobe(ffprobeFixture({ color_range: "pc" }), EXPECTED, BYTES);
+    expect(result.ok).toBe(false);
+    expect(result.checks.colorRange).toBe(false);
+    expect(result.checks.pixFmt).toBe(true);
   });
 });
 

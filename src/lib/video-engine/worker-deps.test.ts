@@ -6,7 +6,7 @@ import type { Asset, AssetStore, NewAsset } from "@/lib/assets/types";
 import type { CreativeJob } from "@/lib/creative-jobs/jobs";
 import { FakeRenderProvider, type RenderInput } from "@/lib/video-engine/render-provider";
 import { createFakeStoragePort } from "@/lib/video-engine/storage-port";
-import type { ExpectedTechnicalSpec, TechnicalQaResult } from "@/lib/video-engine/qa";
+import { FINAL_OUTPUT_COLOR_CONTRACT, type ExpectedTechnicalSpec, type TechnicalQaResult } from "@/lib/video-engine/qa";
 import {
   buildRealProduce,
   buildRealReconcile,
@@ -110,6 +110,11 @@ function okQaResult(): TechnicalQaResult {
     height: 1080,
     fps: "30/1",
     durationSec: 6.5,
+    pixFmt: "yuv420p",
+    colorRange: "tv",
+    colorSpace: "bt709",
+    colorPrimaries: "bt709",
+    colorTransfer: "bt709",
     bytes: 37,
     checksumSha256: "fake-checksum",
     checks: {
@@ -160,6 +165,7 @@ const REAL_QA_EXPECTED: ExpectedTechnicalSpec = {
   fps: 30,
   durationSec: 13.5,
   toleranceSec: 2,
+  color: FINAL_OUTPUT_COLOR_CONTRACT,
 };
 
 function ffprobeJsonFixture(overrides: { codec_name?: string } = {}): string {
@@ -172,6 +178,11 @@ function ffprobeJsonFixture(overrides: { codec_name?: string } = {}): string {
         height: 1080,
         r_frame_rate: "30/1",
         duration: "13.500000",
+        pix_fmt: "yuv420p",
+        color_range: "tv",
+        color_space: "bt709",
+        color_primaries: "bt709",
+        color_transfer: "bt709",
       },
     ],
     format: { format_name: "mov,mp4,m4a,3gp,3g2,mj2", duration: "13.500000" },

@@ -11,7 +11,7 @@
 import { createHash } from "node:crypto";
 import { createAsset } from "@/lib/assets/asset-manager";
 import type { Asset, AssetProvenance, AssetStore } from "@/lib/assets/types";
-import { contentTypeFromQa, type ExpectedTechnicalSpec, type TechnicalQaResult } from "@/lib/video-engine/qa";
+import { contentTypeFromQa, FINAL_OUTPUT_COLOR_CONTRACT, type ExpectedTechnicalSpec, type TechnicalQaResult } from "@/lib/video-engine/qa";
 import type { RenderProvider } from "@/lib/video-engine/render-provider";
 import type { StoragePort } from "@/lib/video-engine/storage-port";
 import {
@@ -196,6 +196,7 @@ function expectedSpecFor(photoCount: number): ExpectedTechnicalSpec {
     fps: FPS,
     durationSec: frames / FPS,
     toleranceSec: DURATION_TOLERANCE_SEC,
+    color: FINAL_OUTPUT_COLOR_CONTRACT,
   };
 }
 

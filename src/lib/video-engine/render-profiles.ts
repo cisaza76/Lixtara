@@ -9,6 +9,7 @@
 // behavior change.
 import type { CompositionInput } from "@/lib/video-engine/composition-input";
 import type { ExpectedVideoQaSpec } from "@/lib/video-engine/qa-contract";
+import { FINAL_OUTPUT_COLOR_CONTRACT } from "@/lib/video-engine/qa";
 import { VIDEO_OUTPUT_SPEC } from "@/lib/video-engine/video-source-limits";
 
 export const RENDER_PROFILES = ["standard"] as const;
@@ -56,6 +57,7 @@ const STANDARD: RenderProfileSpec = {
       fps: VIDEO_OUTPUT_SPEC.fps,
       durationSec: totalOutputDurationSeconds,
       toleranceSec: this.durationToleranceSec,
+      color: FINAL_OUTPUT_COLOR_CONTRACT,
       audioExpected,
       ...(audioExpected ? { audioCodec: VIDEO_OUTPUT_SPEC.audioCodec } : {}),
       aspect: { width: 16, height: 9 },

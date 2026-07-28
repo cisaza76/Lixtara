@@ -100,6 +100,11 @@ function ffprobeJsonFixture(overrides: { codec_name?: string; duration?: string 
         height: 1080,
         r_frame_rate: "30/1",
         duration: overrides.duration ?? "13.500000",
+        pix_fmt: "yuv420p",
+        color_range: "tv",
+        color_space: "bt709",
+        color_primaries: "bt709",
+        color_transfer: "bt709",
       },
     ],
     format: {
@@ -118,6 +123,11 @@ function okQaResult(overrides: Partial<TechnicalQaResult> = {}): TechnicalQaResu
     height: 1080,
     fps: "30/1",
     durationSec: 6.5,
+    pixFmt: "yuv420p",
+    colorRange: "tv",
+    colorSpace: "bt709",
+    colorPrimaries: "bt709",
+    colorTransfer: "bt709",
     bytes: 14,
     checksumSha256: "irrelevant-fake-checksum-from-qa",
     checks: {
@@ -129,6 +139,11 @@ function okQaResult(overrides: Partial<TechnicalQaResult> = {}): TechnicalQaResu
       duration: true,
       bytesPositive: true,
       decodable: true,
+      pixFmt: true,
+      colorRange: true,
+      colorSpace: true,
+      colorPrimaries: true,
+      colorTransfer: true,
     },
     ...overrides,
   };
@@ -414,6 +429,11 @@ describe("produceVideoAsset — QA parses the provider-supplied ffprobeJson (no 
       duration: true,
       bytesPositive: true,
       decodable: true,
+      pixFmt: true,
+      colorRange: true,
+      colorSpace: true,
+      colorPrimaries: true,
+      colorTransfer: true,
     });
     expect(order).toEqual(["render", "qa", "upload", "readVerify", "createAsset"]);
     expect(storage.uploaded).toHaveLength(1);
