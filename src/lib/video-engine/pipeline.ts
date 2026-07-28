@@ -111,6 +111,8 @@ function classifyThrown(err: unknown, stage: Stage): CreativeJobErrorCode {
   switch (stage) {
     case "download":
       return "ASSET_DOWNLOAD_FAILED";
+    case "preparing":
+      return "VIDEO_PREPARATION_FAILED";
     case "qa":
       return "TECHNICAL_QA_FAILED";
     case "uploading":

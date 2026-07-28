@@ -90,7 +90,7 @@ export async function produceUploadedVideoStrategy(
     // #112 — announce the observability-only 'preparing' stage BEFORE any prep work, so
     // a failure anywhere in this block carries the true stage (not 'download').
     await hooks.onStage("preparing");
-    hooks.evidence?.record({ preparation: { executed: true, snapshotId: deps.snapshotId } });
+    hooks.evidence?.record({ preparation: { snapshotId: deps.snapshotId } });
     const prep = await createPrepSandbox();
     hooks.evidence?.record({ preparation: { sandboxId: (prep as { name?: string }).name } });
     const workspaceDir = `video-jobs/${input.jobId}`;
@@ -125,6 +125,7 @@ export async function produceUploadedVideoStrategy(
         normalizedRef: OUTPUT_PLACEHOLDER,
       });
 
+      hooks.evidence?.record({ preparation: { executed: true } }); // ffmpeg is about to run
       const exec = await executeVideoPreparation({
         sandbox: prep,
         plan,

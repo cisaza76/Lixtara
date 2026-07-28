@@ -771,3 +771,20 @@ describe("processJob — #112 non-regression: observability never changes outcom
     }
   });
 });
+
+describe("#112 — stage default for 'preparing'", () => {
+  it("an UNTYPED error during the preparing stage classifies as VIDEO_PREPARATION_FAILED (never RENDER_FAILED)", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("preparing");
+        throw new Error("uploaded-video-pipeline: source ffprobe failed (exit 1)");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.errorCode).toBe("VIDEO_PREPARATION_FAILED");
+    const evidence = (store.transitions.find((t) => t.to === "failed")!.metadata as Record<string, unknown>)
+      .evidence as { classification: { category: string; stage: string } };
+    expect(evidence.classification).toMatchObject({ category: "PREPARATION", stage: "preparing" });
+  });
+});
