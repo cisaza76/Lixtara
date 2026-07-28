@@ -212,3 +212,45 @@ the validation AND consume grant quota).
    required, remember to restore.
 
 Related: gap D-P0-2 (no cron on Preview) in the F1R release-hardening plan.
+
+---
+
+## Appendix (2026-07-28) — Failure evidence pack: reference queries (Issue #112)
+
+Since PR #115, every transition to `failed` persists a complete evidence pack in
+`creative_job_transitions.metadata.evidence` (stage, per-stage durations, strategy,
+source asset, sandbox identity, stderr tail, QA detected values, deterministic
+classification). The DB alone reconstructs a failure — no Vercel/sandbox/Sentry logs.
+
+```sql
+-- Failures by category (zero message inspection)
+select metadata->'evidence'->'classification'->>'category' as category, count(*)
+from creative_job_transitions
+where to_state = 'failed' and metadata ? 'evidence'
+group by 1 order by 2 desc;
+
+-- Latest PREPARATION failures, with the facts an operator needs first
+select t.job_id, t.at, t.error_code,
+       t.metadata->'evidence'->>'sourceAssetId'                       as source_asset,
+       t.metadata->'evidence'->'preparation'->>'sandboxId'            as prep_sandbox,
+       t.metadata->'evidence'->'stageDurationsMs'                     as stage_ms,
+       left(t.metadata->'evidence'->>'stderrTail', 200)               as stderr_tail
+from creative_job_transitions t
+where t.to_state = 'failed'
+  and t.metadata->'evidence'->'classification'->>'category' = 'PREPARATION'
+order by t.at desc limit 10;
+
+-- Latest QA failures with the DETECTED encode values (not just boolean checks)
+select t.job_id, t.at,
+       t.metadata->'evidence'->'qaDetected'->>'pixFmt'      as pix_fmt,
+       t.metadata->'evidence'->'qaDetected'->>'colorRange'  as color_range,
+       t.metadata->'evidence'->'qaDetected'->'checks'       as failed_checks
+from creative_job_transitions t
+where t.to_state = 'failed'
+  and t.metadata->'evidence'->'classification'->>'category' = 'QA'
+order by t.at desc limit 10;
+```
+
+Evolution rule: every new `CreativeJobErrorCode` gets a deliberate entry in
+`src/lib/creative-jobs/failure-taxonomy.ts` before it ships (compiler-enforced);
+`INTERNAL` is reserved for legacy strings and genuine pipeline bugs.

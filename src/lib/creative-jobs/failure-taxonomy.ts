@@ -12,6 +12,13 @@
 //    lowercase "timeout" written by recoverAbandoned) classify as INTERNAL.
 //  - No message sniffing here or anywhere — codes are assigned by typed `instanceof`
 //    checks in pipeline.ts's classifyThrown.
+//
+// EVOLUTION RULE (owner sign-off, PR #115): every NEW CreativeJobErrorCode MUST get a
+// deliberate taxonomy entry here BEFORE it ships — never rely on the INTERNAL fallback
+// for a known code. The `Record<CreativeJobErrorCode, …>` type makes the compiler
+// enforce this (adding a code to errors.ts without an entry here fails `tsc`), and
+// failure-taxonomy.test.ts pins it; INTERNAL exists ONLY for legacy strings already in
+// the DB and for genuine pipeline bugs.
 import type { CreativeJobErrorCode } from "@/lib/creative-jobs/errors";
 
 export const FAILURE_CATEGORIES = [
