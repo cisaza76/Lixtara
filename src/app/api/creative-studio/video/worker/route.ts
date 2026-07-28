@@ -34,6 +34,8 @@ import { SupabaseJobsStore } from "@/lib/creative-jobs/jobs-store.supabase";
 import { capturePipelineError } from "@/lib/observability/sentry.server";
 import { creativeVideoConfig } from "@/lib/video-engine/config";
 import { processJob, type PipelineDeps } from "@/lib/video-engine/pipeline";
+import { logVideoEvent } from "@/lib/video-engine/observability-log";
+import { sanitizeErrorMessage } from "@/lib/video-engine/sanitize-error";
 import { buildRealWorkerDeps } from "@/lib/video-engine/worker-deps";
 
 // Constant-time compare of the SECRET VALUE only. The length pre-check is the
@@ -132,11 +134,18 @@ export async function runWorker(deps: RunDeps): Promise<RunSummary> {
       .then(() => {
         processed++;
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         // processJob already turns a job-level failure into a persisted 'failed'
         // CreativeJob row — a rejection reaching here means the pipeline itself threw
         // (a bug), which must never crash the whole cron run or leak a stack trace into
-        // this route's response.
+        // this route's response. #112: no longer SILENT — one structured line so a
+        // pipeline bug is visible in function logs (INTERNAL category by definition).
+        logVideoEvent("video_worker_internal_error", {
+          jobId: job.id,
+          traceId: job.traceId ?? null,
+          workerId: deps.workerId,
+          message: sanitizeErrorMessage(err),
+        });
       })
       .finally(() => {
         const idx = inFlight.indexOf(p);
@@ -146,6 +155,16 @@ export async function runWorker(deps: RunDeps): Promise<RunSummary> {
   }
 
   await Promise.allSettled(inFlight); // don't respond until every claimed job has settled
+
+  // #112 — one structured summary line per invocation: previously a cron run left no
+  // record it ever happened (the counters lived only in the HTTP response body).
+  logVideoEvent("video_worker_run", {
+    workerId: deps.workerId,
+    claimed: claimedCount,
+    processed,
+    recovered: recovered.length,
+    durationMs: deps.now() - startMs,
+  });
 
   return { claimed: claimedCount, processed, recovered: recovered.length };
 }

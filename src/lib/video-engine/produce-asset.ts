@@ -90,6 +90,9 @@ export interface ProduceVideoAssetDeps {
   // through unchanged so the real implementation's checksum/bytesPositive checks
   // (qa.ts's `parseFfprobe`) still verify the real bytes, never ffprobe's own claims.
   runQa: (ffprobeJson: string, bytes: Buffer, expected: ExpectedTechnicalSpec) => Promise<TechnicalQaResult>;
+  // #112 — optional failure-evidence collector; when present, the render's sandbox
+  // identity is recorded so a failure at ANY later stage still knows which sandbox ran.
+  evidence?: import("@/lib/video-engine/failure-evidence").FailureEvidenceCollector;
   storage: StoragePort;
   assets: AssetStore;
   downloadAssets: (assets: Asset[]) => Promise<string[]>;
@@ -174,6 +177,21 @@ export class StorageVerifyFailedError extends Error {
   }
 }
 
+// #112 — a listing with no usable render inputs (no storage-hosted photo Assets for the
+// photo path, no uploaded source video for the uploaded_video path). Previously these
+// threw plain Errors and fell through to the misleading, RETRIABLE stage default
+// ASSET_DOWNLOAD_FAILED — burning attempts on a deterministic condition. Classified by
+// pipeline.ts as VIDEO_SOURCE_MISSING (non_retriable, category INPUT).
+export class VideoSourceMissingError extends Error {
+  constructor(
+    message: string,
+    public readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = "VideoSourceMissingError";
+  }
+}
+
 export class AssetPersistFailedError extends Error {
   constructor(
     message: string,
@@ -254,6 +272,7 @@ export async function produceVideoAsset(
     localAssetPaths,
     inputProps: input.inputProps,
     traceId: input.traceId,
+    onSandboxIdentity: (identity) => deps.evidence?.record({ render: { ...identity } }),
   });
 
   // 3. QA BEFORE any Asset row exists (requirements 5 + 6). A failed QA never yields a

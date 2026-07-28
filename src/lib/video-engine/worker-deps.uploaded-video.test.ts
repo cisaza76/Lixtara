@@ -8,6 +8,10 @@ import { createFakeStoragePort, type FakeStoragePort } from "@/lib/video-engine/
 import { FakeRenderProvider } from "@/lib/video-engine/render-provider";
 import { TEMPLATE_ID } from "@/lib/video-engine/versions";
 import { buildRealProduce, buildRealWorkerDeps, defaultRunQa } from "@/lib/video-engine/worker-deps";
+import { produceUploadedVideoStrategy } from "@/lib/video-engine/uploaded-video-pipeline";
+import { VideoSourceMissingError } from "@/lib/video-engine/produce-asset";
+import { FailureEvidenceCollector } from "@/lib/video-engine/failure-evidence";
+import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
 import type { SandboxCommandResult, VideoPreparationSandbox } from "@/lib/video-engine/execute-video-preparation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -320,5 +324,84 @@ describe("Step 5 — feature flag gating (buildRealWorkerDeps)", () => {
     const { produce } = buildRealWorkerDeps(client, { ...overrides, sourceStrategy: "uploaded_video" });
     await produce(INPUT, HOOKS);
     expect(ffmpegRenders(prep).length).toBe(1); // uploaded_video path taken
+  });
+});
+
+// ---- Issue #112 — evidence + typed source-missing + preparing stage -----------------
+
+describe("#112 — uploaded_video observability wiring", () => {
+  it("throws typed VideoSourceMissingError when the listing has no uploaded source", async () => {
+    const { resolved } = uploadedResolved({ resolveVideoSource: async () => null });
+    await expect(
+      produceUploadedVideoStrategy(INPUT, HOOKS, resolved, { addressLine: "x", priceLabel: "$1" }),
+    ).rejects.toBeInstanceOf(VideoSourceMissingError);
+  });
+
+  it("announces onStage('preparing') BEFORE any prep-sandbox work", async () => {
+    const { resolved, prep } = uploadedResolved();
+    const stages: string[] = [];
+    let firstPrepCallSeenAtStageCount = -1;
+    const origRun = prep.runCommand.bind(prep);
+    prep.runCommand = async (c, a, o) => {
+      if (firstPrepCallSeenAtStageCount === -1) firstPrepCallSeenAtStageCount = stages.length;
+      return origRun(c, a, o);
+    };
+    await produceUploadedVideoStrategy(
+      INPUT,
+      { onStage: async (s) => void stages.push(s) },
+      resolved,
+      { addressLine: "x", priceLabel: "$1" },
+    );
+    expect(stages[0]).toBe("preparing");
+    expect(firstPrepCallSeenAtStageCount).toBeGreaterThanOrEqual(1); // preparing announced first
+  });
+
+  it("records sourceAssetId + preparation facts into hooks.evidence", async () => {
+    const { resolved } = uploadedResolved();
+    const evidence = new FailureEvidenceCollector(now);
+    await produceUploadedVideoStrategy(
+      INPUT,
+      { onStage: async () => {}, evidence },
+      { ...resolved, snapshotId: "snap_evidence" },
+      { addressLine: "x", priceLabel: "$1" },
+    );
+    const s = evidence.snapshot();
+    expect(s.sourceAssetId).toBe("src-video-1");
+    expect(s.preparation).toMatchObject({ executed: true, snapshotId: "snap_evidence" });
+    expect(typeof s.preparation?.fingerprint).toBe("string");
+  });
+
+  it("a prep ffmpeg failure leaves executed:true + kind + exitCode extractable via the typed error", async () => {
+    const { resolved } = uploadedResolved({ prep: fakePrep({ ffmpegExit: 187 }) });
+    const evidence = new FailureEvidenceCollector(now);
+    let thrown: unknown;
+    try {
+      await produceUploadedVideoStrategy(INPUT, { onStage: async () => {}, evidence }, resolved, {
+        addressLine: "x",
+        priceLabel: "$1",
+      });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(VideoPreparationExecutionError);
+    expect((thrown as VideoPreparationExecutionError).detail?.exitCode).toBe(187);
+    expect(evidence.snapshot().preparation?.executed).toBe(true);
+  });
+});
+
+describe("#112 — source ffprobe failure carries the probe's stderr (the fatal line)", () => {
+  it("includes ffprobe stderr tail in the thrown message", async () => {
+    const prep = fakePrep();
+    const orig = prep.runCommand.bind(prep);
+    prep.runCommand = async (c, a, o) => {
+      if (c === "ffprobe" && [...a].some((x) => String(x).includes("source"))) {
+        return { exitCode: 1, stdout: async () => "", stderr: async () => "moov atom not found\nInvalid data found when processing input" };
+      }
+      return orig(c, a, o);
+    };
+    const { resolved } = uploadedResolved({ prep });
+    const err = await produceUploadedVideoStrategy(INPUT, HOOKS, resolved, { addressLine: "x", priceLabel: "$1" }).catch((e) => e);
+    expect(String(err.message)).toContain("source ffprobe failed (exit 1)");
+    expect(String(err.message)).toContain("moov atom not found");
   });
 });

@@ -36,8 +36,8 @@ import type { Asset, AssetStore } from "@/lib/assets/types";
 import { selectForCapability, wrapPropertyPhoto } from "@/lib/assets/asset-manager";
 import { SupabaseAssetStore } from "@/lib/assets/asset-store.supabase";
 import type { CreativeJob } from "@/lib/creative-jobs/jobs";
-import type { OnStageHook, PipelineDeps, ReconcileResult } from "@/lib/video-engine/pipeline";
-import { produceVideoAsset, type ProduceVideoAssetDeps } from "@/lib/video-engine/produce-asset";
+import type { OnStageHook, PipelineDeps, ProduceHooks, ReconcileResult } from "@/lib/video-engine/pipeline";
+import { produceVideoAsset, VideoSourceMissingError, type ProduceVideoAssetDeps } from "@/lib/video-engine/produce-asset";
 import { defaultResolveVideoSource } from "@/lib/video-engine/resolve-video-source";
 import {
   SandboxRemotionProvider,
@@ -351,7 +351,7 @@ interface ResolvedWorkerDeps {
 export function buildRealProduce(deps: ResolvedWorkerDeps): PipelineDeps["produce"] {
   return async (
     input: { jobId: string; listingId: string; ownerId: string; traceId: string | null },
-    hooks: { onStage: OnStageHook },
+    hooks: ProduceHooks,
   ) => {
     const listing = await deps.loadListing(input.listingId);
     if (!listing) {
@@ -368,6 +368,7 @@ export function buildRealProduce(deps: ResolvedWorkerDeps): PipelineDeps["produc
       (deps.autoRouteStrategy
         ? await decideSourceStrategy(deps.resolveVideoSource, input.listingId, input.ownerId)
         : "photo_slideshow");
+    hooks.evidence?.record({ strategy }); // #112 — flow fact for the failure evidence pack
 
     if (strategy === "uploaded_video") {
       return produceUploadedVideoStrategy(input, hooks, deps, listing);
@@ -381,7 +382,9 @@ export function buildRealProduce(deps: ResolvedWorkerDeps): PipelineDeps["produc
 
     const sourceAssets = await selectForCapability(deps.assets, input.listingId, "video");
     if (sourceAssets.length === 0) {
-      throw new Error(`worker-deps: no source photo Assets for listing ${input.listingId}`);
+      // #112 — typed: a listing with no renderable inputs is an INPUT condition
+      // (VIDEO_SOURCE_MISSING, non_retriable), not a retriable download failure.
+      throw new VideoSourceMissingError(`worker-deps: no source photo Assets for listing ${input.listingId}`);
     }
 
     const tempDir = await mkdtemp(path.join(tmpdir(), deps.tempDirPrefix));
@@ -423,6 +426,7 @@ export function buildRealProduce(deps: ResolvedWorkerDeps): PipelineDeps["produc
           downloadAssets,
           now: deps.now,
           onStage: hooks.onStage,
+          evidence: hooks.evidence,
         },
       );
     } finally {

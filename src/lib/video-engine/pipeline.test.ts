@@ -8,9 +8,10 @@ import {
   RenderQaFailedError,
   StorageUploadFailedError,
   StorageVerifyFailedError,
+  VideoSourceMissingError,
   type RenderResult,
 } from "@/lib/video-engine/produce-asset";
-import { SandboxCreateFailedError } from "@/lib/video-engine/render-provider";
+import { RenderTimeoutError, SandboxCreateFailedError } from "@/lib/video-engine/render-provider";
 import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
 import { processJob, type PipelineDeps, type ReconcileResult } from "@/lib/video-engine/pipeline";
 
@@ -334,10 +335,10 @@ describe("processJob — failure classification (no partial/completed Asset)", (
     expect(result.errorCode).toBe("SANDBOX_CREATE_FAILED");
   });
 
-  it("a render timeout (message-based) -> RENDER_TIMEOUT", async () => {
+  it("a render timeout (typed RenderTimeoutError — #112 replaced the message sniff) -> RENDER_TIMEOUT", async () => {
     const { result } = await runFailing(async (_input, hooks) => {
       await hooks.onStage("rendering");
-      throw new Error("render timed out after 300000ms");
+      throw new RenderTimeoutError("render timed out after 300000ms");
     });
     expect(result.errorCode).toBe("RENDER_TIMEOUT");
   });
@@ -561,5 +562,229 @@ describe("processJob — sanitized failure detail", () => {
     expect(forwardedErr.message).not.toContain("Ocean Dr");
     expect(forwardedErr.message).not.toContain("Miami Beach");
     expect((forwardedErr as Error & { cause?: unknown }).cause).toBeUndefined();
+  });
+});
+
+// ---- Issue #112 — failure evidence pack + deterministic classification ---------------
+
+describe("processJob — #112 evidence pack on the failed transition", () => {
+  function failedTransitionOf(store: ReturnType<typeof fakeJobsStore>) {
+    const t = store.transitions.find((row) => row.to === "failed");
+    expect(t, "expected a failed transition").toBeDefined();
+    return t as StoredTransition & { metadata: Record<string, unknown> };
+  }
+
+  it("persists classification (errorCode + category + stage) queryable from metadata.evidence", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("rendering");
+        await hooks.onStage("qa");
+        throw new RenderQaFailedError(okRenderResult().technicalQa);
+      },
+    });
+    await processJob(runningJob(), deps);
+    const failed = failedTransitionOf(store);
+    const evidence = failed.metadata.evidence as Record<string, unknown>;
+    expect(evidence).toBeDefined();
+    expect(evidence.classification).toEqual({ errorCode: "TECHNICAL_QA_FAILED", category: "QA", stage: "qa" });
+  });
+
+  it("QA failure persists the DETECTED values, not just boolean checks", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const qa = {
+      ...okRenderResult().technicalQa,
+      ok: false,
+      pixFmt: "yuvj420p",
+      colorRange: "pc",
+      checks: { colorRange: false, pixFmt: false },
+    };
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("rendering");
+        await hooks.onStage("qa");
+        throw new RenderQaFailedError(qa);
+      },
+    });
+    await processJob(runningJob(), deps);
+    const evidence = failedTransitionOf(store).metadata.evidence as { qaDetected: Record<string, unknown> };
+    expect(evidence.qaDetected.pixFmt).toBe("yuvj420p");
+    expect(evidence.qaDetected.colorRange).toBe("pc");
+    expect(evidence.qaDetected.checks).toEqual({ colorRange: false, pixFmt: false });
+  });
+
+  it("persists the sanitized cause chain and a tail-preserving stderr excerpt", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const err = new Error(`render failed (exit 1): ${"z".repeat(3000)}\nTHE_FATAL_LINE https://leak.example/x`);
+    (err as Error & { cause?: unknown }).cause = new Error("underlying: ENOMEM");
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("rendering");
+        throw err;
+      },
+    });
+    await processJob(runningJob(), deps);
+    const evidence = failedTransitionOf(store).metadata.evidence as { stderrTail: string; causeChain: string[] };
+    expect(evidence.stderrTail).toContain("THE_FATAL_LINE");
+    expect(evidence.stderrTail).not.toContain("leak.example");
+    expect(evidence.causeChain).toEqual(["underlying: ENOMEM"]);
+  });
+
+  it("collects flow facts recorded by produce via hooks.evidence (strategy, source, stage durations)", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        hooks.evidence!.record({ strategy: "uploaded_video", sourceAssetId: "src-9" });
+        await hooks.onStage("rendering");
+        throw new Error("boom");
+      },
+    });
+    await processJob(runningJob(), deps);
+    const evidence = failedTransitionOf(store).metadata.evidence as Record<string, unknown>;
+    expect(evidence.strategy).toBe("uploaded_video");
+    expect(evidence.sourceAssetId).toBe("src-9");
+    expect(typeof evidence.stageDurationsMs).toBe("object");
+  });
+});
+
+describe("processJob — #112 'preparing' as an observability attribute (NOT a job state)", () => {
+  it("onStage('preparing') sets the Sentry stage + evidence stage but writes NO transition", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps, captureCalls, heartbeatCalls } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("preparing");
+        throw new VideoPreparationExecutionError("VIDEO_PREPARED_SOURCE_INVALID", "invalid_prepared_metadata", "prepared output failed validation: pixel_format");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.state).toBe("failed");
+    // no 'preparing' transition — the state machine is untouched
+    expect(store.transitions.map((t) => t.to)).toEqual(["failed"]);
+    // but the true stage reaches Sentry context and the evidence pack
+    expect((captureCalls[0][1] as { stage: string }).stage).toBe("preparing");
+    const evidence = (store.transitions[0].metadata as Record<string, unknown>).evidence as {
+      stage: string;
+      classification: { category: string };
+    };
+    expect(evidence.stage).toBe("preparing");
+    expect(evidence.classification.category).toBe("PREPARATION");
+    // heartbeat still fired for the preparing checkpoint
+    expect(heartbeatCalls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("processJob — #112 deterministic classification (no message sniffing)", () => {
+  it("VideoSourceMissingError → VIDEO_SOURCE_MISSING / INPUT", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async () => {
+        throw new VideoSourceMissingError("no source photo Assets for listing listing-1");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.errorCode).toBe("VIDEO_SOURCE_MISSING");
+    const evidence = (store.transitions.find((t) => t.to === "failed")!.metadata as Record<string, unknown>)
+      .evidence as { classification: { category: string } };
+    expect(evidence.classification.category).toBe("INPUT");
+  });
+
+  it("typed RenderTimeoutError → RENDER_TIMEOUT", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("rendering");
+        throw new RenderTimeoutError("render exceeded 300000ms (exit 137)");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.errorCode).toBe("RENDER_TIMEOUT");
+  });
+
+  it("an untyped error merely CONTAINING 'timeout' is NOT sniffed into RENDER_TIMEOUT anymore", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("rendering");
+        throw new Error("delayRender timeout mentioned in a stack that is NOT a real sandbox timeout");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.errorCode).toBe("RENDER_FAILED");
+  });
+});
+
+describe("processJob — #112 non-regression: observability never changes outcomes", () => {
+  it("a produce that records junk evidence still completes successfully", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const { deps, captureCalls } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        hooks.evidence!.record(null as never);
+        hooks.evidence!.record({ qaDetected: circular });
+        await hooks.onStage("rendering");
+        await hooks.onStage("qa");
+        await hooks.onStage("uploading");
+        return okRenderResult();
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.state).toBe("completed");
+    expect(captureCalls).toHaveLength(0);
+  });
+
+  it("unserializable evidence on a failure degrades the pack, never the failure handling", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        hooks.evidence!.record({ qaDetected: circular });
+        throw new Error("real failure");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.state).toBe("failed");
+    expect(result.errorCode).toBe("ASSET_DOWNLOAD_FAILED"); // stage default, unchanged
+    expect(store.transitions.find((t) => t.to === "failed")).toBeDefined();
+  });
+
+  it("emits one structured video_job_failed JSON line per failure", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const store = fakeJobsStore([runningJob()]);
+      const { deps } = buildDeps(store, {
+        produce: async () => {
+          throw new VideoSourceMissingError("no source");
+        },
+      });
+      await processJob(runningJob(), deps);
+      const lines = spy.mock.calls.map((c) => String(c[0])).filter((l) => l.includes("video_job_failed"));
+      expect(lines).toHaveLength(1);
+      const parsed = JSON.parse(lines[0]);
+      expect(parsed.jobId).toBe("job-1");
+      expect(parsed.traceId).toBe("trace-1");
+      expect(parsed.errorCode).toBe("VIDEO_SOURCE_MISSING");
+      expect(parsed.category).toBe("INPUT");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("#112 — stage default for 'preparing'", () => {
+  it("an UNTYPED error during the preparing stage classifies as VIDEO_PREPARATION_FAILED (never RENDER_FAILED)", async () => {
+    const store = fakeJobsStore([runningJob()]);
+    const { deps } = buildDeps(store, {
+      produce: async (_input, hooks) => {
+        await hooks.onStage("preparing");
+        throw new Error("uploaded-video-pipeline: source ffprobe failed (exit 1)");
+      },
+    });
+    const result = await processJob(runningJob(), deps);
+    expect(result.errorCode).toBe("VIDEO_PREPARATION_FAILED");
+    const evidence = (store.transitions.find((t) => t.to === "failed")!.metadata as Record<string, unknown>)
+      .evidence as { classification: { category: string; stage: string } };
+    expect(evidence.classification).toMatchObject({ category: "PREPARATION", stage: "preparing" });
   });
 });
