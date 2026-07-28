@@ -182,3 +182,33 @@ If any is false → **No-Go**: unset the flag, fix, re-run from the failing step
 | unset `CRON_SECRET` | worker stops claiming/processing (pipeline OFF) | renders misbehave / cost spike |
 | unset Sandbox artifact var | worker fails closed on next claim | bad artifact |
 In-flight jobs are always recovered or failed by the sweep — no manual cleanup needed for a clean rollback.
+
+---
+
+## Appendix (2026-07-28) — Preview validations share the prod DB: the production-cron race
+
+**Finding (PR #113 Preview validation):** Vercel Cron runs the video worker **in
+Production only**, but Preview deployments and Production share the single prod database.
+Any `queued` video job — including one created from a Preview deployment for validation —
+can be claimed by the **Production** worker (running merged `main` code) within seconds
+to minutes of the next cron tick (`*/5`). During PR #113's validation, the first job was
+claimed by prod in ~17s and processed with pre-fix code (it happened to fail pre-render,
+so no wrong asset was produced — but a successful prod claim would silently invalidate
+the validation AND consume grant quota).
+
+**Protocol for any Preview validation run (applies to Gate 5C-era operations):**
+1. Chain job creation and the Preview worker invocation in one step —
+   `POST …/video/generate` immediately followed by
+   `curl -H "Authorization: Bearer $CRON_SECRET" <preview>/api/creative-studio/video/worker`.
+   The claim is atomic; the first claimer wins.
+2. After completion, **verify which code processed the job** — do not trust `claimed_by`
+   (both environments produce `cron-<region>-<n>` names). Ground truth: probe the output
+   (post-#113 code emits `yuv420p/tv/bt709`; pre-fix emits `yuvj420p/pc`) and/or compare
+   provenance versions (`bundleVersion`, `preparationSchemaVersion`).
+3. Budget grant quota for a spoiled run (a prod-claimed job still consumes its
+   generation) — use `max_generations` ≥ 2 per validation listing.
+4. Alternative when zero interference is required: temporarily unset Production
+   `CRON_SECRET` (kill-switch above) for the duration of the run — owner sign-off
+   required, remember to restore.
+
+Related: gap D-P0-2 (no cron on Preview) in the F1R release-hardening plan.
