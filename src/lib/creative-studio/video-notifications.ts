@@ -2,6 +2,10 @@
 // One bilingual message (EN + ES) per terminal outcome, reassuring tone, and the
 // strict no-leak contract: no error codes, categories, stderr, internal identifiers,
 // or quota vocabulary. The support reference appears ONLY in failure variants.
+//
+// PILOT-COHORT DECISION (owner sign-off, PR #116): the bilingual single message is a
+// TEMPORARY decision for the Gate 5C pilot, not the definitive contract — before wide
+// opening, these emails should follow the seller's locale (tracked as post-pilot debt).
 import type { SellerFailureKind } from "@/lib/creative-studio/seller-failure-kind";
 
 export interface VideoTerminalEmailInput {
