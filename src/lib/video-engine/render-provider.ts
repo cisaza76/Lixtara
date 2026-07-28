@@ -92,6 +92,12 @@ export const FAKE_FFPROBE_JSON = JSON.stringify({
       height: 1080,
       r_frame_rate: "30/1",
       duration: "13.500000",
+      // Issue #111 contract values — what a real post-fix render probes as.
+      pix_fmt: "yuv420p",
+      color_range: "tv",
+      color_space: "bt709",
+      color_primaries: "bt709",
+      color_transfer: "bt709",
     },
   ],
   format: {
@@ -159,7 +165,9 @@ const DEFAULT_ENTRY_POINT_DIR = path.join(process.cwd(), "src", "remotion");
 // renderMedia({codec:"h264"}), same inputProps to both (per the spike's validated
 // requirement). Mirrors spikes/p2.0-sandbox/src/render.mjs, generalized to read its
 // composition id + inputProps from a JSON file instead of hardcoding one composition.
-const RENDER_SCRIPT = `
+// Exported so render-provider.test.ts can assert the encode contract (Issue #111)
+// without opening a Sandbox.
+export const RENDER_SCRIPT = `
 import { bundle } from "@remotion/bundler";
 import { selectComposition, renderMedia } from "@remotion/renderer";
 import path from "node:path";
@@ -197,7 +205,11 @@ async function main() {
 
   {
     const start = process.hrtime.bigint();
-    await renderMedia({ composition, serveUrl: bundleLocation, codec: "h264", outputLocation: outPath, inputProps, delayRenderTimeoutInMilliseconds: 120000 });
+    // colorSpace "bt709" (Issue #111): makes Remotion pass -color_range tv + a zscale
+    // limited-range conversion to ffmpeg — real value conversion of the RGB frames,
+    // matching ADR-0011's prepared-intermediate contract. Without it x264 emits
+    // untagged full-range output that ffprobe reports as yuvj420p/pc.
+    await renderMedia({ composition, serveUrl: bundleLocation, codec: "h264", colorSpace: "bt709", outputLocation: outPath, inputProps, delayRenderTimeoutInMilliseconds: 120000 });
     t("renderMedia_ms", Number(process.hrtime.bigint() - start) / 1e6);
   }
 

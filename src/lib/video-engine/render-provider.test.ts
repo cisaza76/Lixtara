@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FakeRenderProvider, FAKE_FFPROBE_JSON, type RenderInput } from "@/lib/video-engine/render-provider";
-import { parseFfprobe, type ExpectedTechnicalSpec } from "@/lib/video-engine/qa";
+import { FakeRenderProvider, FAKE_FFPROBE_JSON, RENDER_SCRIPT, type RenderInput } from "@/lib/video-engine/render-provider";
+import { FINAL_OUTPUT_COLOR_CONTRACT, parseFfprobe, type ExpectedTechnicalSpec } from "@/lib/video-engine/qa";
 
 function input(overrides: Partial<RenderInput> = {}): RenderInput {
   return {
@@ -81,6 +81,7 @@ describe("FakeRenderProvider", () => {
       fps: 30,
       durationSec: 13.5,
       toleranceSec: 2,
+      color: FINAL_OUTPUT_COLOR_CONTRACT,
     };
     const qa = parseFfprobe(JSON.parse(out.ffprobeJson), expected, out.bytes);
     expect(qa.ok).toBe(true);
@@ -102,9 +103,19 @@ describe("FakeRenderProvider", () => {
       fps: 30,
       durationSec: 13.5,
       toleranceSec: 2,
+      color: FINAL_OUTPUT_COLOR_CONTRACT,
     };
     const qa = parseFfprobe(JSON.parse(out.ffprobeJson), expected, out.bytes);
     expect(qa.ok).toBe(false);
     expect(qa.checks.codec).toBe(false);
+  });
+});
+
+// Issue #111: the in-sandbox render script must pin Remotion's encode to bt709 —
+// that option is what makes ffmpeg receive `-color_range tv` + the zscale
+// limited-range conversion filter instead of emitting untagged full-range output.
+describe("RENDER_SCRIPT — final-output encode contract (Issue #111)", () => {
+  it('renderMedia is called with colorSpace: "bt709"', () => {
+    expect(RENDER_SCRIPT ?? "").toContain('colorSpace: "bt709"');
   });
 });

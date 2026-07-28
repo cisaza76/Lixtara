@@ -4,6 +4,26 @@
 // technically valid" — it never decides Creative Job state (no such import here).
 import { createHash } from "node:crypto";
 
+// Issue #111 — the color contract every FINAL Remotion output must satisfy. Mirrors the
+// prepared-intermediate contract (prepare-video.ts / ADR-0011): real limited-range values,
+// not VUI retagging. The render script pins renderMedia to colorSpace "bt709", which is
+// what makes ffmpeg apply `-color_range tv` + a zscale limited-range conversion.
+export interface ExpectedColorContract {
+  pixFmt: string; // ffprobe `pix_fmt`, e.g. "yuv420p"
+  colorRange: string; // ffprobe `color_range`, e.g. "tv"
+  colorSpace: string; // ffprobe `color_space`, e.g. "bt709"
+  colorPrimaries: string; // ffprobe `color_primaries`, e.g. "bt709"
+  colorTransfer: string; // ffprobe `color_transfer`, e.g. "bt709"
+}
+
+export const FINAL_OUTPUT_COLOR_CONTRACT: ExpectedColorContract = {
+  pixFmt: "yuv420p",
+  colorRange: "tv",
+  colorSpace: "bt709",
+  colorPrimaries: "bt709",
+  colorTransfer: "bt709",
+};
+
 export interface ExpectedTechnicalSpec {
   container: string; // e.g. "mp4"
   codec: string; // e.g. "h264"
@@ -12,6 +32,7 @@ export interface ExpectedTechnicalSpec {
   fps: number; // e.g. 30
   durationSec: number; // expected duration
   toleranceSec: number; // allowed +/- drift before QA fails
+  color: ExpectedColorContract; // fail-closed: a stream missing any field fails its check
 }
 
 export interface TechnicalQaResult {
@@ -22,6 +43,13 @@ export interface TechnicalQaResult {
   height: number;
   fps: string; // ffprobe's raw r_frame_rate string (e.g. "30/1")
   durationSec: number;
+  // Detected color metadata ("" when the stream omits the field) — kept in the result so
+  // a failing render's actual encode characteristics land in logs/diagnostics verbatim.
+  pixFmt: string;
+  colorRange: string;
+  colorSpace: string;
+  colorPrimaries: string;
+  colorTransfer: string;
   bytes: number;
   checksumSha256: string;
   checks: Record<string, boolean>;
@@ -34,6 +62,11 @@ interface FfprobeStream {
   height?: number;
   r_frame_rate?: string;
   duration?: string;
+  pix_fmt?: string;
+  color_range?: string;
+  color_space?: string;
+  color_primaries?: string;
+  color_transfer?: string;
 }
 interface FfprobeFormat {
   format_name?: string;
@@ -67,6 +100,11 @@ export function parseFfprobe(ffprobeJson: unknown, expected: ExpectedTechnicalSp
   const fps = videoStream?.r_frame_rate ?? "";
   const durationSec = Number(probe.format?.duration ?? videoStream?.duration ?? NaN);
   const fpsValue = frameRateToNumber(fps);
+  const pixFmt = videoStream?.pix_fmt ?? "";
+  const colorRange = videoStream?.color_range ?? "";
+  const colorSpace = videoStream?.color_space ?? "";
+  const colorPrimaries = videoStream?.color_primaries ?? "";
+  const colorTransfer = videoStream?.color_transfer ?? "";
 
   const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
 
@@ -83,6 +121,14 @@ export function parseFfprobe(ffprobeJson: unknown, expected: ExpectedTechnicalSp
     duration: Number.isFinite(durationSec) && Math.abs(durationSec - expected.durationSec) <= expected.toleranceSec,
     bytesPositive: bytes.length > 0,
     decodable: Boolean(videoStream),
+    // Issue #111: strict equality against the color contract — an absent field parses
+    // to "" and therefore FAILS its check (fail-closed, same posture as the prepared-
+    // intermediate validator in prepare-video.ts).
+    pixFmt: pixFmt === expected.color.pixFmt,
+    colorRange: colorRange === expected.color.colorRange,
+    colorSpace: colorSpace === expected.color.colorSpace,
+    colorPrimaries: colorPrimaries === expected.color.colorPrimaries,
+    colorTransfer: colorTransfer === expected.color.colorTransfer,
   };
 
   return {
@@ -93,6 +139,11 @@ export function parseFfprobe(ffprobeJson: unknown, expected: ExpectedTechnicalSp
     height,
     fps,
     durationSec,
+    pixFmt,
+    colorRange,
+    colorSpace,
+    colorPrimaries,
+    colorTransfer,
     bytes: bytes.length,
     checksumSha256,
     checks,
