@@ -81,6 +81,8 @@ export class VideoPreparationExecutionError extends Error {
     readonly code: VideoErrorCode,
     readonly kind: VideoPreparationFailureKind,
     message: string,
+    // #112 — structured facts for the failure evidence pack (additive, optional).
+    readonly detail?: { exitCode?: number },
   ) {
     super(message);
     this.name = "VideoPreparationExecutionError";
@@ -302,7 +304,7 @@ export async function executeVideoPreparation(
   }
   if (ffmpegResult.exitCode !== 0) {
     const stderr = (await ffmpegResult.stderr()).slice(-MAX_CAPTURED_LOG_CHARS);
-    throw new VideoPreparationExecutionError("VIDEO_PREPARATION_FAILED", "ffmpeg_exec_failed", `ffmpeg failed (exit ${ffmpegResult.exitCode}): ${stderr}`);
+    throw new VideoPreparationExecutionError("VIDEO_PREPARATION_FAILED", "ffmpeg_exec_failed", `ffmpeg failed (exit ${ffmpegResult.exitCode}): ${stderr}`, { exitCode: ffmpegResult.exitCode });
   }
 
   // ---- 2. verify output exists + positive size BEFORE ffprobe ----

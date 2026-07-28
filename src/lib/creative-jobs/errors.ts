@@ -5,6 +5,7 @@
 // `errorMessage` — that field is for humans/logs only.
 
 export const CREATIVE_JOB_ERROR_CODES = [
+  "VIDEO_SOURCE_MISSING",
   "ASSET_DOWNLOAD_FAILED",
   "VIDEO_PREPARATION_FAILED",
   "VIDEO_PREPARED_SOURCE_INVALID",
@@ -35,6 +36,9 @@ export type ErrorClass = "retriable" | "non_retriable" | "cancelled";
 //   already exhausted its retry budget.
 // - cancelled: not a failure at all — the seller/system explicitly stopped the job.
 export const ERROR_CLASS: Record<CreativeJobErrorCode, ErrorClass> = {
+  // #112 — a listing with no usable source (photo Assets / uploaded video) fails
+  // identically on retry; mirrors the video-engine catalog's user_input/retryable:false.
+  VIDEO_SOURCE_MISSING: "non_retriable",
   ASSET_DOWNLOAD_FAILED: "retriable",
   // FFmpeg normalization on the SAME source is deterministic — a retry re-runs the same
   // command on the same bytes and fails identically (mirrors the video-engine catalog,

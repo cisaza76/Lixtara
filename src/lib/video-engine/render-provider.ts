@@ -22,6 +22,16 @@ import {
   FontStrategyMismatchError,
 } from "@/lib/video-engine/font-guard";
 
+// #112 — the sandbox identity facts the provider can report the moment the sandbox
+// exists, consumed by the failure evidence pack. Reported via callback (never thrown
+// state) so later-stage failures still know WHICH sandbox rendered.
+export interface SandboxIdentity {
+  sandboxId?: string;
+  region?: string;
+  snapshotId?: string;
+  baseArtifactVersion?: string;
+}
+
 export interface RenderInput {
   compositionId: string;
   templateVersion: string;
@@ -30,6 +40,8 @@ export interface RenderInput {
   localAssetPaths: string[];
   inputProps: unknown;
   traceId: string | null;
+  // #112 — optional observability callback; a throwing observer must never break a render.
+  onSandboxIdentity?: (identity: SandboxIdentity) => void;
 }
 
 export interface RenderMediaMetrics {
@@ -69,6 +81,21 @@ export class SandboxCreateFailedError extends Error {
   ) {
     super(message);
     this.name = "SandboxCreateFailedError";
+  }
+}
+
+// #112 — a DETERMINISTIC render-timeout marker, thrown only where the provider can
+// actually establish a timeout from facts it owns (the render command exceeded its
+// configured budget and was SIGKILLed). Replaces pipeline.ts's old substring sniff
+// ("timeout" anywhere in a message ⇒ RENDER_TIMEOUT), which false-positived on stack
+// traces that merely MENTION a timeout.
+export class RenderTimeoutError extends Error {
+  constructor(
+    message: string,
+    public readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = "RenderTimeoutError";
   }
 }
 
@@ -149,6 +176,8 @@ export interface SandboxRemotionProviderOptions {
   baseArtifactVersion?: string; // defaults to versions.ts's BASE_ARTIFACT_VERSION
   vcpus?: number;
   timeoutMs?: number;
+  // #112 — injectable clock for deterministic timeout attribution in tests.
+  now?: () => number;
   // Local (host) paths to the Remotion composition source that gets shipped into the
   // sandbox each render (small; NOT baked into the base, since TEMPLATE_VERSION can
   // change independently of BASE_ARTIFACT_VERSION). Defaults to this repo's
@@ -317,6 +346,18 @@ export class SandboxRemotionProvider implements RenderProvider {
       }
       metrics.sandboxStartupMs = Date.now() - startupStart;
 
+      // #112 — report the sandbox identity as soon as it exists (evidence pack).
+      try {
+        input.onSandboxIdentity?.({
+          sandboxId: sandbox.name,
+          region: sandbox.region,
+          snapshotId: "snapshotId" in this.opts.baseArtifact ? this.opts.baseArtifact.snapshotId : undefined,
+          baseArtifactVersion: this.opts.baseArtifactVersion ?? BASE_ARTIFACT_VERSION,
+        });
+      } catch {
+        // a broken observer must never break the render
+      }
+
       // ---- 1b. FAIL-CLOSED font guard: prove code<->snapshot compatibility BEFORE opening
       // the render. Aborts with FontStrategyMismatchError (job -> FONT_STRATEGY_MISMATCH) if
       // the snapshot's baked version/strategy or its installed faces don't match what this
@@ -387,6 +428,8 @@ export class SandboxRemotionProvider implements RenderProvider {
       // ---- 3. bundle -> selectComposition -> renderMedia (in-sandbox) ----
       // `sh -c` per the spike (§5.2): a missing/failing binary/script returns a clean
       // exit code instead of an opaque SDK 400.
+      const nowFn = this.opts.now ?? Date.now;
+      const renderStartMs = nowFn();
       const result = await sandbox.runCommand(
         "sh",
         ["-c", "node render.mjs render-input.json /tmp/out.mp4 /tmp/timings.json"],
@@ -394,6 +437,16 @@ export class SandboxRemotionProvider implements RenderProvider {
       );
       if (result.exitCode !== 0) {
         const stderr = await result.stderr();
+        // #112 — DETERMINISTIC timeout attribution from facts this provider owns: the
+        // SDK SIGKILLs (exit 137) a command that exceeds timeoutMs. Only that exit code
+        // combined with the elapsed budget classifies as RENDER_TIMEOUT (retriable);
+        // everything else is a plain render failure. Replaces the message sniff.
+        const elapsedMs = nowFn() - renderStartMs;
+        if (result.exitCode === 137 && elapsedMs >= timeout) {
+          throw new RenderTimeoutError(
+            `SandboxRemotionProvider: render timed out after ${elapsedMs}ms (budget ${timeout}ms, SIGKILL): ${stderr.slice(-2000)}`,
+          );
+        }
         throw new Error(`SandboxRemotionProvider: render failed (exit ${result.exitCode}): ${stderr.slice(-4000)}`);
       }
 

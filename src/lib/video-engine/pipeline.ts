@@ -11,15 +11,20 @@
 import type { CreativeJobErrorCode } from "@/lib/creative-jobs/errors";
 import { setState, type CreativeJob, type JobsStore } from "@/lib/creative-jobs/jobs";
 import { capturePipelineError, type PipelineErrorContext } from "@/lib/observability/sentry.server";
+import { failureTaxonomyFor } from "@/lib/creative-jobs/failure-taxonomy";
 import {
   AssetDownloadFailedError,
   AssetPersistFailedError,
   RenderQaFailedError,
   StorageUploadFailedError,
   StorageVerifyFailedError,
+  VideoSourceMissingError,
   type RenderResult,
 } from "@/lib/video-engine/produce-asset";
-import { SandboxCreateFailedError } from "@/lib/video-engine/render-provider";
+import { RenderTimeoutError, SandboxCreateFailedError } from "@/lib/video-engine/render-provider";
+import { FailureEvidenceCollector } from "@/lib/video-engine/failure-evidence";
+import { logVideoEvent } from "@/lib/video-engine/observability-log";
+import { sanitizeErrorMessage, sanitizedCauseChain, sanitizeStderrTail } from "@/lib/video-engine/sanitize-error";
 import { FontStrategyMismatchError } from "@/lib/video-engine/font-guard";
 import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
 import { RENDER_PROVIDER, TEMPLATE_VERSION } from "@/lib/video-engine/versions";
@@ -36,7 +41,20 @@ export interface PipelineProduceInput {
   traceId: string | null;
 }
 
-export type OnStageHook = (stage: "rendering" | "qa" | "uploading") => void | Promise<void>;
+// "preparing" (#112) is an OBSERVABILITY attribute, not a job state: announcing it
+// updates the tracked stage + heartbeat but writes NO state transition
+// (creative_jobs.state has a DB CHECK constraint that does not include it, by design).
+export type OnStageHook = (stage: "preparing" | "rendering" | "qa" | "uploading") => void | Promise<void>;
+
+// The hooks object `produce` receives. `evidence` (#112) lets any layer of the produce
+// path record flow facts (strategy, source asset, sandbox identity) that will be
+// persisted in the failed transition's metadata if — and only if — the job fails.
+export interface ProduceHooks {
+  onStage: OnStageHook;
+  // Optional so existing produce fakes/tests that only know onStage stay valid; the
+  // real pipeline ALWAYS provides it.
+  evidence?: FailureEvidenceCollector;
+}
 
 export interface ReconcileResult {
   // True when a PRIOR attempt for this job already persisted the Asset + Storage
@@ -48,7 +66,7 @@ export interface ReconcileResult {
 
 export interface PipelineDeps {
   jobs: JobsStore;
-  produce: (input: PipelineProduceInput, hooks: { onStage: OnStageHook }) => Promise<RenderResult>;
+  produce: (input: PipelineProduceInput, hooks: ProduceHooks) => Promise<RenderResult>;
   now: () => number;
   heartbeat: (jobId: string) => Promise<void>;
   reconcile: (job: CreativeJob) => Promise<ReconcileResult>;
@@ -60,7 +78,7 @@ export interface PipelineDeps {
 // still has a legal `-> cancelled` edge (see the comment on the "qa" checkpoint below).
 class JobCancelledSentinel extends Error {}
 
-type Stage = "download" | "rendering" | "qa" | "uploading";
+type Stage = "download" | "preparing" | "rendering" | "qa" | "uploading";
 
 // Maps a thrown error to a stable CreativeJobErrorCode. Typed errors (instanceof) are
 // checked FIRST and are authoritative regardless of which stage was last announced —
@@ -71,6 +89,7 @@ type Stage = "download" | "rendering" | "qa" | "uploading";
 // `render()` throws on a plain render failure) falls through to the stage-based default.
 function classifyThrown(err: unknown, stage: Stage): CreativeJobErrorCode {
   if (err instanceof RenderQaFailedError) return "TECHNICAL_QA_FAILED";
+  if (err instanceof VideoSourceMissingError) return "VIDEO_SOURCE_MISSING";
   if (err instanceof AssetDownloadFailedError) return "ASSET_DOWNLOAD_FAILED";
   // Preparation is distinct from download: by the time these throw, the source asset was
   // already fetched. Gate 5A's pixel_format failure surfaced as ASSET_DOWNLOAD_FAILED via
@@ -83,9 +102,11 @@ function classifyThrown(err: unknown, stage: Stage): CreativeJobErrorCode {
   if (err instanceof AssetPersistFailedError) return "ASSET_CREATE_FAILED";
   if (err instanceof SandboxCreateFailedError) return "SANDBOX_CREATE_FAILED";
   if (err instanceof FontStrategyMismatchError) return "FONT_STRATEGY_MISMATCH";
-
-  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  if (message.includes("timeout") || message.includes("timed out")) return "RENDER_TIMEOUT";
+  // #112 — RENDER_TIMEOUT is now TYPED-ONLY (render-provider throws it where it can
+  // establish a timeout from facts it owns). The old substring sniff ("timeout"
+  // anywhere) false-positived stack traces that merely mention a timeout into a
+  // retriable code; those now fall through to the deterministic stage default.
+  if (err instanceof RenderTimeoutError) return "RENDER_TIMEOUT";
 
   switch (stage) {
     case "download":
@@ -100,18 +121,10 @@ function classifyThrown(err: unknown, stage: Stage): CreativeJobErrorCode {
   }
 }
 
-// Never persists a signed URL/manifest/raw provider body — just the message, truncated,
-// with the two most likely leak shapes (a URL, an sb_secret_ token) redacted as
-// defense-in-depth. This is what lands in `creative_jobs.error_message`, a field
-// visible to admin/support tooling (never to the seller — see Task 8's two-level
-// status), so it stays technical-detail-only, never raw provider output.
-function sanitizeErrorMessage(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err);
-  return raw
-    .replace(/https?:\/\/\S+/gi, "[url omitted]")
-    .replace(/sb_secret_\S+/gi, "[secret omitted]")
-    .slice(0, 500);
-}
+// Message sanitation now lives in sanitize-error.ts (#112): same redaction posture
+// (URLs, sb_secret_ tokens; never raw provider output to admin-visible fields), but
+// truncation preserves the TAIL — where ffmpeg/render stderr keeps its fatal line —
+// instead of discarding it.
 
 async function fastForwardToCompleted(
   deps: PipelineDeps,
@@ -176,8 +189,19 @@ export async function processJob(job: CreativeJob, deps: PipelineDeps): Promise<
   }
 
   let currentStage: Stage = "download";
+  const evidence = new FailureEvidenceCollector(deps.now);
+  evidence.observeStage("download");
 
   const onStage: OnStageHook = async (stage) => {
+    // #112 — "preparing" is observability-only: track the stage + heartbeat, but do NOT
+    // setState (it is not a job state; the DB CHECK constraint would reject it, and the
+    // approved scope explicitly leaves the state machine untouched).
+    if (stage === "preparing") {
+      currentStage = stage;
+      evidence.observeStage(stage);
+      await deps.heartbeat(job.id);
+      return;
+    }
     if (stage === "qa") {
       // Cancel "during render" — this fires right after render output exists but
       // BEFORE the rendering -> qa transition, i.e. the job is still 'rendering' here,
@@ -195,6 +219,7 @@ export async function processJob(job: CreativeJob, deps: PipelineDeps): Promise<
       }
     }
     currentStage = stage;
+    evidence.observeStage(stage);
     await deps.heartbeat(job.id);
     await setState(deps.jobs, job.id, stage, { actor: "worker", nowMs: deps.now(), attempt, capability: job.capability });
   };
@@ -203,7 +228,7 @@ export async function processJob(job: CreativeJob, deps: PipelineDeps): Promise<
   try {
     result = await deps.produce(
       { jobId: job.id, listingId: job.listingId, ownerId: job.ownerId, traceId: job.traceId ?? null },
-      { onStage },
+      { onStage, evidence },
     );
   } catch (err) {
     if (err instanceof JobCancelledSentinel) {
@@ -213,12 +238,44 @@ export async function processJob(job: CreativeJob, deps: PipelineDeps): Promise<
 
     const errorCode = classifyThrown(err, currentStage);
     const message = sanitizeErrorMessage(err);
+
+    // #112 — assemble the evidence pack. Every step here follows the non-regression
+    // doctrine: the collector never throws, and anything error-derived goes through the
+    // sanitizers. A RenderQaFailedError contributes the full DETECTED values (booleans
+    // alone can't tell an operator whether colorRange was pc, unknown, or absent).
+    const taxonomy = failureTaxonomyFor(errorCode);
+    if (err instanceof RenderQaFailedError) {
+      evidence.record({ qaDetected: { ...err.qa } });
+    }
+    if (err instanceof VideoPreparationExecutionError) {
+      evidence.record({ preparation: { kind: err.kind, ...(err.detail ?? {}) } });
+    }
+    evidence.record({
+      stderrTail: sanitizeStderrTail(err),
+      causeChain: sanitizedCauseChain(err),
+    });
+    const pack = {
+      ...evidence.snapshot({ finalize: true }),
+      classification: { errorCode, category: taxonomy.category, stage: currentStage },
+    };
+
     const failed = await setState(deps.jobs, job.id, "failed", {
       actor: "worker",
       nowMs: deps.now(),
       attempt,
       capability: job.capability,
       error: { code: errorCode, message },
+      metadata: { evidence: pack },
+    });
+
+    logVideoEvent("video_job_failed", {
+      jobId: job.id,
+      traceId: job.traceId ?? null,
+      listingId: job.listingId,
+      errorCode,
+      category: taxonomy.category,
+      stage: currentStage,
+      attempt,
     });
 
     const ctx: PipelineErrorContext = {

@@ -7,6 +7,8 @@ import { createFakeStoragePort } from "@/lib/video-engine/storage-port";
 import { FakeRenderProvider } from "@/lib/video-engine/render-provider";
 import type { SandboxCommandResult, VideoPreparationSandbox } from "@/lib/video-engine/execute-video-preparation";
 import { buildRealProduce, buildRealWorkerDeps, defaultRunQa } from "@/lib/video-engine/worker-deps";
+import { VideoSourceMissingError } from "@/lib/video-engine/produce-asset";
+import { FailureEvidenceCollector } from "@/lib/video-engine/failure-evidence";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const OWNER = "owner-1";
@@ -187,5 +189,32 @@ describe("F4.2 — feature-flag gating via buildRealWorkerDeps", () => {
     const { produce } = buildRealWorkerDeps(client, o);
     await produce(INPUT, HOOKS);
     expect(prep.ffmpegRenders).toBe(0); // photo path
+  });
+});
+
+
+// ---- Issue #112 — typed source-missing + strategy evidence --------------------------
+
+describe("#112 — routing observability wiring", () => {
+  it("photo path with ZERO wrapped photo Assets throws typed VideoSourceMissingError", async () => {
+    const { resolved } = autoDeps({ hasSource: false });
+    resolved.assets = store([]); // nothing to render from
+    await expect(buildRealProduce(resolved)(INPUT, HOOKS)).rejects.toBeInstanceOf(VideoSourceMissingError);
+  });
+
+  it("records the decided strategy into hooks.evidence", async () => {
+    const { resolved } = autoDeps({ hasSource: false });
+    const evidence = new FailureEvidenceCollector(() => Date.now());
+    await buildRealProduce(resolved)(INPUT, { onStage: async () => {}, evidence });
+    expect(evidence.snapshot().strategy).toBe("photo_slideshow");
+  });
+
+  it("records uploaded_video strategy + sourceAssetId when auto-routed to the source branch", async () => {
+    const { resolved } = autoDeps({ hasSource: true });
+    const evidence = new FailureEvidenceCollector(() => Date.now());
+    await buildRealProduce(resolved)(INPUT, { onStage: async () => {}, evidence });
+    const snap = evidence.snapshot();
+    expect(snap.strategy).toBe("uploaded_video");
+    expect(snap.sourceAssetId).toBe("srcv");
   });
 });

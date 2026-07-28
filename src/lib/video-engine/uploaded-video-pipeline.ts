@@ -12,8 +12,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Asset, AssetStore } from "@/lib/assets/types";
-import type { OnStageHook, PipelineProduceInput } from "@/lib/video-engine/pipeline";
-import { produceVideoAsset, type ProduceVideoAssetDeps, type RenderResult } from "@/lib/video-engine/produce-asset";
+import type { PipelineProduceInput, ProduceHooks } from "@/lib/video-engine/pipeline";
+import { produceVideoAsset, VideoSourceMissingError, type ProduceVideoAssetDeps, type RenderResult } from "@/lib/video-engine/produce-asset";
 import type { RenderProvider } from "@/lib/video-engine/render-provider";
 import type { StoragePort } from "@/lib/video-engine/storage-port";
 import { getRenderProfile } from "@/lib/video-engine/render-profiles";
@@ -64,7 +64,7 @@ export interface UploadedVideoListing {
 // existing `running` state, before onStage.
 export async function produceUploadedVideoStrategy(
   input: PipelineProduceInput,
-  hooks: { onStage: OnStageHook },
+  hooks: ProduceHooks,
   deps: UploadedVideoPipelineDeps,
   listing: UploadedVideoListing,
 ): Promise<RenderResult> {
@@ -78,14 +78,21 @@ export async function produceUploadedVideoStrategy(
 
   const source = await resolveVideoSource(input.listingId, input.ownerId);
   if (!source) {
-    throw new Error(`uploaded-video-pipeline: no uploaded source video for listing ${input.listingId}`);
+    // #112 — typed INPUT condition (VIDEO_SOURCE_MISSING, non_retriable).
+    throw new VideoSourceMissingError(`uploaded-video-pipeline: no uploaded source video for listing ${input.listingId}`);
   }
+  hooks.evidence?.record({ sourceAssetId: source.id });
 
   const profile = getRenderProfile("standard");
   let hostTempDir: string | null = null;
   try {
     // ---- preparation (own sandbox; prepared file lives ONLY here + a host temp) ----
+    // #112 — announce the observability-only 'preparing' stage BEFORE any prep work, so
+    // a failure anywhere in this block carries the true stage (not 'download').
+    await hooks.onStage("preparing");
+    hooks.evidence?.record({ preparation: { executed: true, snapshotId: deps.snapshotId } });
     const prep = await createPrepSandbox();
+    hooks.evidence?.record({ preparation: { sandboxId: (prep as { name?: string }).name } });
     const workspaceDir = `video-jobs/${input.jobId}`;
     const sourcePath = `${workspaceDir}/source.mp4`;
     const outputPath = `${workspaceDir}/prepared.mp4`;
@@ -137,6 +144,7 @@ export async function produceUploadedVideoStrategy(
       preparationFingerprint = exec.preparedSource.preparationFingerprint;
       ffmpegVersion = exec.preparedSource.ffmpegVersion;
       preparationMs = exec.provenance.durationMs;
+      hooks.evidence?.record({ preparation: { fingerprint: preparationFingerprint, durationMs: preparationMs } });
 
       const preparedBuf = await prep.readFileToBuffer({ path: outputPath });
       if (!preparedBuf?.length) {
@@ -193,6 +201,7 @@ export async function produceUploadedVideoStrategy(
         downloadAssets: async () => [hostPreparedPath],
         now: deps.now,
         onStage: hooks.onStage,
+        evidence: hooks.evidence,
       },
     );
   } finally {
