@@ -114,7 +114,12 @@ export async function produceUploadedVideoStrategy(
         { timeoutMs: 60000 },
       );
       if (probe.exitCode !== 0) {
-        throw new Error(`uploaded-video-pipeline: source ffprobe failed (exit ${probe.exitCode})`);
+        // #112 — carry the probe's stderr TAIL (the fatal line, e.g. "moov atom not
+        // found") so the evidence pack and error_message tell the operator WHY.
+        const probeStderr = await probe.stderr().catch(() => "");
+        throw new Error(
+          `uploaded-video-pipeline: source ffprobe failed (exit ${probe.exitCode}): ${probeStderr.slice(-1500)}`,
+        );
       }
       const sourceMetadata = parseFfprobeToPreparedProbe(await probe.stdout(), bytes.length);
       sourceHash = sha256Hex(bytes);

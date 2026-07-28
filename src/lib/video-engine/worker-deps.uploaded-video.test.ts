@@ -388,3 +388,20 @@ describe("#112 — uploaded_video observability wiring", () => {
     expect(evidence.snapshot().preparation?.executed).toBe(true);
   });
 });
+
+describe("#112 — source ffprobe failure carries the probe's stderr (the fatal line)", () => {
+  it("includes ffprobe stderr tail in the thrown message", async () => {
+    const prep = fakePrep();
+    const orig = prep.runCommand.bind(prep);
+    prep.runCommand = async (c, a, o) => {
+      if (c === "ffprobe" && [...a].some((x) => String(x).includes("source"))) {
+        return { exitCode: 1, stdout: async () => "", stderr: async () => "moov atom not found\nInvalid data found when processing input" };
+      }
+      return orig(c, a, o);
+    };
+    const { resolved } = uploadedResolved({ prep });
+    const err = await produceUploadedVideoStrategy(INPUT, HOOKS, resolved, { addressLine: "x", priceLabel: "$1" }).catch((e) => e);
+    expect(String(err.message)).toContain("source ffprobe failed (exit 1)");
+    expect(String(err.message)).toContain("moov atom not found");
+  });
+});
