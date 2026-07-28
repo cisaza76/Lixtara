@@ -254,3 +254,25 @@ order by t.at desc limit 10;
 Evolution rule: every new `CreativeJobErrorCode` gets a deliberate entry in
 `src/lib/creative-jobs/failure-taxonomy.ts` before it ships (compiler-enforced);
 `INTERNAL` is reserved for legacy strings and genuine pipeline bugs.
+
+### Support lookup by seller reference code (UX 5C)
+
+A seller reporting a failure sees `Reference: XXXXXXXX` (8 hex chars, also in the failure
+email). It is `sha256(trace_id)` truncated — it reconstructs nothing, but operations can
+find the case directly:
+
+```sql
+select id as job_id, listing_id, error_code, state, trace_id
+from creative_jobs
+where upper(substr(encode(sha256(trace_id::text::bytea),'hex'),1,8)) = upper('XXXXXXXX');
+-- then join creative_job_transitions (metadata->'evidence') for the full #112 story
+```
+
+### Rate-limit resets on warm instances (demo/validation gotcha)
+
+`@upstash/ratelimit` keeps an **ephemeral in-process cache** of blocked identifiers.
+Deleting the limiter keys in Redis does NOT immediately unblock a user on warm Fluid
+Compute instances — the cached "blocked until window reset" state survives until the
+instance recycles. For a controlled validation that needs the window reset NOW: delete
+the Redis keys (`<label>:u:<userId>*`) AND redeploy the target deployment (fresh
+instances, empty cache). Observed live during the UX 5C acceptance demo (2026-07-28).

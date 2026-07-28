@@ -30,6 +30,8 @@ interface SendInput {
   text: string;
   /** Optional override of from address (e.g. for broker-only notifications). */
   from?: string;
+  /** UX 5C — provider-side dedup: identical key ⇒ Resend sends at most once. */
+  idempotencyKey?: string;
 }
 
 async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -41,13 +43,16 @@ async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error
   const override = process.env.EMAIL_DEV_OVERRIDE_TO;
   const to = override ?? input.to;
   try {
-    const { data, error } = await c.emails.send({
-      from: input.from ?? DEFAULT_FROM,
-      to,
-      subject: input.subject,
-      html: input.html,
-      text: input.text,
-    });
+    const { data, error } = await c.emails.send(
+      {
+        from: input.from ?? DEFAULT_FROM,
+        to,
+        subject: input.subject,
+        html: input.html,
+        text: input.text,
+      },
+      input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
+    );
     if (error) {
       console.error("email send error", { to, subject: input.subject, error });
       return { ok: false, error: error.message };
@@ -246,4 +251,19 @@ export async function sendBrokerNewPending(input: BrokerNewPendingInput) {
     html: shell({ preheader: `New listing pending review: ${input.propertyAddress}`, body }),
     text: `New listing pending review.\nAddress: ${input.propertyAddress}\nSeller: ${input.sellerName}\nTier: ${tierName}\nList price: $${input.listPrice.toLocaleString()}\n\n${input.adminUrl}`,
   });
+}
+
+
+// ---- UX 5C — listing-video terminal notification ------------------------------------
+// Fire-and-forget like every sender here (NEVER throws). `idempotencyKey` makes the
+// send at-most-once per (job, outcome) at the PROVIDER — retries/reconciliation of the
+// same terminal transition cannot double-send (approved dedup basis: no migrations).
+export async function sendListingVideoTerminal(input: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  idempotencyKey: string;
+}): Promise<{ ok: boolean; id?: string; error?: string }> {
+  return send(input);
 }

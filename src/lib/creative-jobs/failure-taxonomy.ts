@@ -45,6 +45,13 @@ export interface FailureTaxonomyEntry {
 
 export const FAILURE_TAXONOMY: Record<CreativeJobErrorCode, FailureTaxonomyEntry> = {
   VIDEO_SOURCE_MISSING: { category: "INPUT", stage: "download" },
+  VIDEO_CORRUPT: { category: "INPUT", stage: "preparing" },
+  VIDEO_CONTAINER_UNSUPPORTED: { category: "INPUT", stage: "preparing" },
+  VIDEO_CODEC_UNSUPPORTED: { category: "INPUT", stage: "preparing" },
+  VIDEO_STREAM_MISSING: { category: "INPUT", stage: "preparing" },
+  VIDEO_DURATION_EXCEEDED: { category: "INPUT", stage: "preparing" },
+  VIDEO_FILE_TOO_LARGE: { category: "INPUT", stage: "preparing" },
+  VIDEO_RESOLUTION_EXCEEDED: { category: "INPUT", stage: "preparing" },
   ASSET_DOWNLOAD_FAILED: { category: "SOURCE", stage: "download" },
   VIDEO_PREPARATION_FAILED: { category: "PREPARATION", stage: "preparing" },
   VIDEO_PREPARED_SOURCE_INVALID: { category: "PREPARATION", stage: "preparing" },
