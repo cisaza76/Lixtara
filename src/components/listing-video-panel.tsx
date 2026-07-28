@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { deriveFailedViewModel } from "@/lib/creative-studio/video-panel-model";
 import type {
   SellerVideoMeta,
   SellerVideoState,
@@ -25,6 +26,12 @@ interface Copy {
   errorHeading: string;
   errorReassurance: string;
   errorDetail: string;
+  supportErrorDetail: string;
+  sourceErrorHeading: string;
+  sourceErrorDetail: string;
+  replaceVideoCta: string;
+  referenceLabel: string;
+  madeFromUploadChip: string;
   tryAgain: string;
   stillTrouble: string;
   contactSupport: string;
@@ -183,12 +190,13 @@ export function ListingVideoPanel({
         ) : view === "creating" ? (
           <CreatingView copy={copy} />
         ) : view === "failed" ? (
-          <FailedView copy={copy} lang={lang} pending={pendingCreate} onRetry={create} />
+          <FailedView copy={copy} lang={lang} pending={pendingCreate} onRetry={create} failure={status?.failure ?? null} />
         ) : view === "completed" && status?.video ? (
           <CompletedView
             copy={copy}
             lang={lang}
             video={status.video}
+            madeFrom={status.madeFrom ?? "photos"}
             previewOpen={previewOpen}
             onPreview={() => setPreviewOpen(true)}
           />
@@ -258,12 +266,14 @@ function CompletedView({
   copy,
   lang,
   video,
+  madeFrom,
   previewOpen,
   onPreview,
 }: {
   copy: Copy;
   lang: Locale;
   video: NonNullable<SellerVideoStatusDto["video"]>;
+  madeFrom: "photos" | "uploaded_video";
   previewOpen: boolean;
   onPreview: () => void;
 }): React.JSX.Element {
@@ -302,7 +312,7 @@ function CompletedView({
       <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-500">
         <span>{formatMeta(video.meta, copy.createdLabel, lang)}</span>
         <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
-          {copy.madeFromChip}
+          {madeFrom === "uploaded_video" ? copy.madeFromUploadChip : copy.madeFromChip}
         </span>
       </div>
 
@@ -323,30 +333,58 @@ function FailedView({
   lang,
   pending,
   onRetry,
+  failure,
 }: {
   copy: Copy;
   lang: Locale;
   pending: boolean;
   onRetry: () => void;
+  failure: SellerVideoStatusDto["failure"] | null;
 }): React.JSX.Element {
+  // UX 5C — the approved CTA matrix, derived by the pure view-model (tested in
+  // video-panel-model.test.ts). Never a dead CTA: retry renders only when useful+possible.
+  const vm = deriveFailedViewModel(failure);
+  const supportHref = `/${lang}/contact?topic=listing-video${vm.reference ? `&ref=${vm.reference}` : ""}`;
+
+  const retryButton = (primary: boolean): React.JSX.Element => (
+    <button type="button" onClick={onRetry} disabled={pending} className={primary ? PRIMARY_CLASSES : SECONDARY_CLASSES}>
+      {pending && <span className={SPINNER_CLASSES} aria-hidden="true" />}
+      {copy.tryAgain}
+    </button>
+  );
+  const supportLink = (primary: boolean): React.JSX.Element => (
+    <a href={supportHref} className={primary ? PRIMARY_CLASSES : SECONDARY_CLASSES}>
+      {copy.contactSupport}
+    </a>
+  );
+  // "Replace video" points at the source section on the same dashboard card.
+  const replaceLink = (
+    <a href="#source-video-heading" className={PRIMARY_CLASSES}>
+      {copy.replaceVideoCta}
+    </a>
+  );
+
   return (
     <>
       <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 text-sm">
-        <p className="font-medium">{copy.errorHeading}</p>
-        <p className="mt-1">{copy.errorReassurance}</p>
-        <p className="mt-1 text-neutral-500">{copy.errorDetail}</p>
+        <p className="font-medium">{copy[vm.headingKey]}</p>
+        {vm.showReassurance && <p className="mt-1">{copy.errorReassurance}</p>}
+        <p className="mt-1 text-neutral-500">{copy[vm.detailKey]}</p>
+        {vm.showReference && (
+          <p className="mt-2 text-xs text-neutral-400">
+            {copy.referenceLabel}: <span className="font-mono">{vm.reference}</span>
+          </p>
+        )}
       </div>
       <div className="flex flex-col gap-2">
-        <div>
-          <button type="button" onClick={onRetry} disabled={pending} className={PRIMARY_CLASSES}>
-            {pending && <span className={SPINNER_CLASSES} aria-hidden="true" />}
-            {copy.tryAgain}
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {vm.primary === "retry" ? retryButton(true) : vm.primary === "replace" ? replaceLink : supportLink(true)}
+          {vm.secondary === "retry" ? retryButton(false) : vm.secondary === "support" ? supportLink(false) : null}
         </div>
         <p className="text-xs text-neutral-500">
           {copy.stillTrouble}{" "}
           <a
-            href={`/${lang}/contact?topic=listing-video`}
+            href={supportHref}
             className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
           >
             {copy.contactSupport}
