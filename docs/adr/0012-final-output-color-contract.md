@@ -1,7 +1,9 @@
 # ADR-0012 — Final Remotion output color contract (yuv420p / tv / bt709)
 
-- **Status:** accepted (2026-07-27) — implementation merged per Issue #111; Preview
-  validation renders (photos + uploaded_video) are a pre-close condition tracked on the PR
+- **Status:** implemented, pending Preview validation (2026-07-28) — PR #113 is a DRAFT;
+  the Preview validation renders (photos + uploaded_video), the visual review, and the
+  owner sign-off are pre-merge conditions tracked on the PR. Becomes **accepted** only
+  when PR #113 merges.
 - **Context:** Issue #111 (Gate 5A residual finding, 2026-07-27)
 - **Related:** ADR-0011 (color-range normalization in the preparation stage), ADR-0005
   (single-sandbox pipeline)
