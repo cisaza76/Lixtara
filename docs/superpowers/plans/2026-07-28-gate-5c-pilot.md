@@ -1,143 +1,169 @@
-# Gate 5C — Piloto controlado con usuarios reales (documento operativo)
+# Gate 5C — Piloto controlado con usuarios reales (documento operativo, rev. 2)
 
-**Estado:** BORRADOR — pendiente de aprobación del owner. Una vez aprobado, este
-documento GOBIERNA la ejecución del piloto y es la referencia para avanzar o detener.
-**Autorización vigente (2026-07-28):** inicio formal del TRABAJO de Gate 5C. La
-apertura del piloto al primer participante requiere la decisión **Go** expresa del
-punto 11 — nunca es automática.
-**Antecedentes:** Gate Review ejecutivo aprobado 2026-07-28 (criterios de éxito y
-diseño de cohorte) · prerrequisitos 4/4 cerrados con evidencia congelada
+**Estado:** BORRADOR rev. 2 — incorpora la resolución del owner de 2026-07-28 sobre la
+rev. 1: «APROBADO EN ESTRUCTURA, CON CAMBIOS BLOQUEANTES ANTES DEL GO» (6 cambios,
+todos incorporados abajo). Pendiente de aprobación final. Una vez aprobado, este
+documento GOBIERNA la ejecución del piloto.
+**Autorización vigente:** inicio formal del TRABAJO de Gate 5C (2026-07-28). La
+apertura al primer participante requiere el **Go** expreso del punto 11.
+**Antecedentes:** Gate Review aprobado 2026-07-28 · prerrequisitos 4/4 cerrados
 (#111 PR #113 · #112 PR #115 · comunicación PR #116 · acta Upstash `bc887cf`).
 
 ---
 
 ## 1. Objetivo
 
-Validar con usuarios reales, bajo la misma gobernanza estricta de Gates 5A/5B, que el
-pipeline de video (photos y uploaded_video) y su experiencia de producto están listos
-para una apertura más amplia — produciendo la evidencia necesaria para esa decisión.
+Validar con usuarios reales, bajo la gobernanza de Gates 5A/5B, que el pipeline de
+video (photos y uploaded_video) y su experiencia de producto — incluida la
+**notificación real al seller** — están listos para una apertura más amplia,
+produciendo la evidencia para esa decisión.
 
 ## 2. Hipótesis a validar
 
-- **H1 (producto):** un seller real completa el flujo (subir video / usar fotos →
-  generar → revisar resultado) sin intervención manual del equipo en el camino feliz.
-- **H2 (entradas reales):** los sources reales no controlados (HDR, rotación, códecs,
-  tamaños/duraciones límite) son o bien procesados correctamente o bien rechazados
-  fail-closed **con comunicación accionable** (kinds de UX 5C), nunca con fallo opaco.
-- **H3 (gobernanza):** allowlist, cuotas, aislamiento y RLS se comportan con usuarios
-  reales igual que en 5A/5B.
-- **H4 (operación):** el evidence pack de #112 basta para diagnosticar cualquier fallo
-  desde la DB, sin reconstrucción manual.
+- **H1 (producto/autonomía):** un seller real completa el flujo SIN asistencia. La
+  autonomía se mide ANTES de cualquier ayuda (ver protocolo de intervención, punto 6).
+- **H2 (entradas reales):** sources reales no controlados se procesan correctamente o
+  se rechazan fail-closed con comunicación accionable (kinds UX 5C), nunca opacamente.
+- **H3 (gobernanza):** allowlist, cuotas, aislamiento y RLS aguantan usuarios reales.
+- **H4 (operación):** el evidence pack (#112) basta para diagnosticar desde la DB.
+- **H5 (notificación):** el email terminal llega AL SELLER REAL, se entiende, y
+  produce la acción correcta (volver a revisar/descargar; reemplazar el source;
+  contactar soporte). Con override activo esta hipótesis NO es evaluable — por eso el
+  override se retira antes del Go (punto 3).
 
 ## 3. Alcance
 
-- Cohorte **pequeña y observable**: el tamaño lo determina la capacidad de observación
-  del equipo, no un N objetivo (Gate Review). Ejecución serial o semi-serial: un
-  participante nuevo solo entra cuando el anterior está estable.
-- 1 listing por participante; ambas estrategias admitidas (la que corresponda al
-  participante).
-- Producción real (allowlist-gated; el resto del mundo sigue fail-closed).
-- Grants por listing con `max_generations ≥ 3` y vigencia definida; alta con sign-off
-  del owner, baja (revocación) al cierre de cada participante o de la cohorte.
-- **Emails:** activos, con `EMAIL_DEV_OVERRIDE_TO` de Production **mantenido** durante
-  la primera cohorte (decisión owner 2026-07-28): todas las notificaciones llegan al
-  buzón de supervisión; el seguimiento del participante es manual. Remitente
-  `onboarding@resend.dev` aceptado **solo para el piloto cerrado**.
+- **Cohorte inicial: DOS participantes, secuenciales** — uno con `photo_slideshow` y
+  uno con `uploaded_video`. Revisión y cierre de evidencia del participante 1 ANTES de
+  abrir al participante 2. Ampliar la cohorte = nueva decisión del owner.
+- 1 listing por participante; producción real (allowlist-gated; el resto fail-closed).
+- Grants por listing con **`max_generations = 3` exactamente** para esta cohorte
+  (aumentar exige razón operativa concreta y sign-off); vigencia definida; alta con
+  sign-off; revocación al cierre.
+- **Emails — regla de override (cambio bloqueante 1):** `EMAIL_DEV_OVERRIDE_TO` de
+  Production puede permanecer SOLO durante preparación y ensayos internos.
+  **Se retira antes del Go de apertura al primer seller real.** El participante recibe
+  sus propios emails (H5); el owner/operador verifica mediante logs estructurados, DB
+  y seguimiento directo. No existe entrega dual en el código actual y NO se autoriza
+  implementarla dentro de Gate 5C.
+- **Remitente:** `onboarding@resend.dev` aceptado SOLO para esta cohorte cerrada y
+  SOLO si la prueba de entrega previa al Go (punto 5) es satisfactoria; si no entrega
+  de forma fiable, el piloto no abre hasta verificar `lixtara.com` u otro remitente
+  válido.
 
 ## 4. Exclusiones
 
-Sin apertura amplia · sin cambios de visibilidad pública del video · sin re-render de
-assets históricos · sin features nuevas ni variables nuevas durante el piloto · sin
-retiro del override de email en esta cohorte · sin emails por locale (deuda post-piloto
-registrada) · sin migraciones ni cambios de esquema · sin cambios al modelo de grants ·
-sin activación de Sentry (R1 del acta Upstash se cubre con revisión manual diaria).
+Sin apertura amplia · sin cambios de visibilidad pública · sin re-render de históricos ·
+sin features/variables nuevas (incluida la entrega dual de email) · sin emails por
+locale (deuda post-piloto) · sin migraciones/esquema · sin cambios al modelo de grants ·
+sin activación de Sentry (R1 del acta cubierto con revisión manual diaria).
 
-## 5. Criterios de entrada (checklist previo al Go del primer participante)
+## 5. Criterios de entrada (checklist previo al Go de CADA participante)
 
+**Del documento y el entorno:**
 - [ ] Este documento aprobado por el owner.
-- [ ] Participante identificado, informado y dispuesto (sabe que es piloto, sabe a
-      quién reportar fricción; NO recibirá los emails directamente en esta cohorte).
-- [ ] Listing del participante en estado `active` con fotos interiores.
-- [ ] Grant creado con sign-off (listing-scoped, `max_generations ≥ 3`, motivo con
+- [ ] `EMAIL_DEV_OVERRIDE_TO` retirado de Production (verificado) — cambio bloqueante 1.
+- [ ] Verificación previa: 0 grants activos ajenos al piloto; 0 jobs no terminales;
+      estado previo de assets y jobs del listing capturado (snapshot en el expediente).
+- [ ] Runbook a mano: kill-switch, worker, consultas de evidencia y de referencia.
+
+**Del participante (cambio bloqueante — registro completo):**
+- [ ] Seller identificado y **consentimiento para participar** registrado.
+- [ ] Listing exacto identificado (`active`, con fotos interiores).
+- [ ] Estrategia que probará: `photos` o `uploaded_video` (según su posición en la
+      cohorte).
+- [ ] **Email verificado mediante prueba previa (cambio bloqueante 2):**
+      1) correo de prueba enviado al participante con el remitente del piloto;
+      2) recepción confirmada por el participante;
+      3) carpeta de spam comprobada;
+      4) enlaces del correo apuntan al entorno correcto;
+      5) resultado registrado en este checklist.
+- [ ] Teléfono o canal alternativo de contacto registrado.
+- [ ] Operador asignado y ventana horaria de observación acordada.
+- [ ] Confirmación de que no existe otro job en curso para el listing.
+- [ ] Grant creado con sign-off (listing-scoped, `max_generations = 3`, motivo con
       referencia a este documento).
-- [ ] Operador disponible durante la ventana de generación (capacidad de observación).
-- [ ] Runbook a mano: kill-switch, cron/worker, consultas de evidencia y de referencia.
-- [ ] Verificación previa: 0 grants activos ajenos al piloto; 0 jobs no terminales.
 
 ## 6. Protocolo por participante
 
-1. **Alta:** grant con sign-off; registro de ids (participante, listing, grant).
-2. **Ejecución:** el participante opera SOLO (H1); el operador observa sin intervenir.
-   En producción el cron procesa los jobs (el código de main ES el código validado —
-   la carrera Preview/prod del runbook no aplica al piloto).
-3. **Observación por job:** estado del job, DTO seller (kind/CTAs correctos), email en
-   el buzón de supervisión (contenido, timing, idempotencia), evidence pack en fallos.
-4. **Verificación técnica por éxito:** integridad (checksum == outputHash == descarga
-   como en 5A/5B) + probe del contrato de color (#111) en muestreo.
-5. **Cierre del participante:** resultado revisado con el participante; fricción
-   anotada; evidencia congelada; decisión de continuar con el siguiente.
-6. **Incidente:** aplicar halt criteria (punto 8); congelar evidencia SIEMPRE.
+1. **Alta:** checklist del punto 5 completo; ids registrados en el expediente.
+2. **Ejecución autónoma primero (cambio bloqueante 4):** el participante opera SOLO.
+   El operador observa sin intervenir. Si el seller duda o se detiene:
+   a) primero se OBSERVA el intento autónomo y se registra dónde se detuvo;
+   b) solo después se presta asistencia;
+   c) toda ayuda se clasifica: **aclaración verbal · navegación · corrección de
+      datos · intervención técnica**;
+   d) un flujo completado con ayuda NO se contabiliza como completado autónomamente
+      (H1 se evalúa sobre el tramo previo a la primera asistencia).
+3. **Observación por job:** estado del job; DTO seller (kind/CTAs correctos); email
+   terminal **recibido por el seller** (variante, contenido, timing — confirmado con
+   el participante) e idempotencia; evidence pack en fallos.
+4. **Verificación técnica por éxito:** integridad (checksum == outputHash == descarga,
+   como 5A/5B) + probe del contrato de color (#111) en muestreo.
+5. **Cierre del participante:** resultado y fricción revisados con el participante;
+   expediente congelado (punto 10) con conclusión por hipótesis; decisión del owner
+   antes de abrir al siguiente.
+6. **Incidente:** halt criteria (punto 8); congelar evidencia SIEMPRE.
 7. **Cierre de cohorte:** revocación de todos los grants; verificación 0 activos.
 
 ## 7. Observabilidad durante el piloto
 
-- **Diaria (operador):** consultas del runbook — fallos por categoría, últimos
-  PREPARATION/QA con evidencia, jobs no terminales, `video_worker_run` en logs de
-  función; buzón de supervisión de emails.
-- **Por fallo:** reconstrucción DB-only (#112); si la DB no explica un fallo, eso es en
-  sí un hallazgo de gate (H4 falla).
-- **Referencia de soporte:** los códigos de referencia que reporte un participante se
-  resuelven con la consulta del runbook.
+- **Diaria:** consultas del runbook (fallos por categoría, PREPARATION/QA con
+  evidencia, jobs no terminales), `video_worker_run` en logs, y — sin override — la
+  verificación de emails se hace por logs de envío + confirmación directa del
+  participante.
+- **Por fallo:** reconstrucción DB-only (#112); un fallo inexplicable desde la DB es
+  en sí un hallazgo (H4 falla).
+- **Referencias de soporte:** consulta del runbook.
 
 ## 8. Criterios de detención (halt)
 
 **Halt inmediato + kill-switch** (flag OFF + verificación 404) ante:
-- H8.1 Cualquier incidente de seguridad/aislamiento (acceso cruzado, fuga en página
-  pública, bypass de allowlist o RLS).
-- H8.2 Cualquier sobre-consumo de cuota o grant operando fuera de su alcance.
-- H8.3 Cualquier divergencia de integridad (checksum/outputHash/descarga).
+- H8.1 Incidente de seguridad/aislamiento (acceso cruzado, fuga pública, bypass de
+  allowlist o RLS).
+- H8.2 Sobre-consumo de cuota o grant fuera de su alcance.
+- H8.3 Divergencia de integridad (checksum/outputHash/descarga).
+- **H8.4 (cambio bloqueante 6 — privacidad): email terminal enviado a un destinatario
+  distinto del seller autorizado o del destinatario operativo aprobado.**
 
-**Pausa (sin nuevos jobs ni participantes) hasta explicación** ante:
-- H8.4 Un fallo cuya causa no pueda reconstruirse desde la DB.
-- H8.5 Anomalía de costo o de duración fuera de todo rango conocido (referencia
-  5A/5B: 42–145 s; alarma orientativa: p95 > 10 min).
-- H8.6 Email incorrecto (contenido con fuga técnica, doble envío, o variante errónea).
+**Pausa (sin nuevos jobs/participantes) hasta explicación** ante:
+- H8.5 Fallo cuya causa no pueda reconstruirse desde la DB.
+- H8.6 Anomalía de costo/duración (referencia 5A/5B: 42–145 s; alarma p95 > 10 min).
+- H8.7 Email incorrecto en contenido (fuga técnica, doble envío, variante errónea).
 
-La reanudación tras cualquier halt/pausa exige decisión expresa del owner.
+Reanudación tras cualquier halt/pausa: decisión expresa del owner.
 
-## 9. Criterios de salida (definición de éxito del gate — Gate Review aprobado)
+## 9. Criterios de salida (definición de éxito — Gate Review aprobado)
 
-El gate es exitoso si y solo si:
-1. **Ningún incidente** comprometió seguridad, aislamiento o gobernanza.
-2. **Todas las desviaciones** observadas quedaron explicadas.
-3. **Evidencia suficiente** para decidir si el producto está listo para ampliarse
-   (expediente congelado con la disciplina de 5A/5B; todos los grants revocados).
+1. **Ningún incidente** de seguridad, aislamiento o gobernanza (incluido H8.4).
+2. **Todas las desviaciones** explicadas.
+3. **Evidencia suficiente** para decidir la ampliación (expedientes congelados; grants
+   revocados).
 
-**Métricas operativas (evidencia para la decisión, NO definición de éxito):** tasa de
-éxito funcional sin intervención; tasa y causas de rechazo de sources reales (una tasa
-muy alta = señal de producto contra la apertura amplia aunque el gate sea limpio);
-tiempos generate→completed; fricción reportada por participante.
+**Métricas (evidencia, NO definición):** tasa de éxito autónomo (per H1, sin contar
+flujos asistidos); tasa y causas de rechazo de sources; tiempos generate→completed;
+fricción por participante; **resultado de H5 con destinatarios reales** (recepción,
+comprensión, acción — contenido/timing/idempotencia en producción).
 
-**Criterio específico de notificaciones (owner, 2026-07-28) — condición para retirar el
-override antes de ampliar:** primera cohorte completada sin incidencias relevantes en el
-flujo de notificaciones + validación de contenido + timing + idempotencia en producción.
+## 10. Unidad de evidencia: expediente individual por participante (cambio bloqueante 5)
 
-## 10. Evidencia requerida
-
-- **Por participante:** ids (participante/listing/grant/jobs/assets), hashes, DTOs
-  relevantes, emails observados (asunto/variante/timing), fricción anotada.
-- **Por incidente:** evidence pack + cronología + resolución, congelados.
-- **De cohorte:** resumen con métricas del punto 9, hallazgos, y recomendación.
+Cada participante tiene UN expediente único que incluye: estado inicial (snapshot de
+assets/jobs del listing) · timestamps de cada paso · estrategia · source utilizado
+(cuando aplique) · job(s) y transiciones · resultado del QA · emails terminales
+(variante, destinatario, timing, confirmación del seller) · acciones del seller ·
+intervenciones del operador (clasificadas) · incidentes · resultado final ·
+**conclusión por hipótesis H1–H5**.
 
 ## 11. Decisión Go / No-Go
 
-- **Go de apertura (primer participante):** decisión expresa del owner con el
-  checklist del punto 5 completo. La aprobación de este documento NO la constituye.
-- **Go/No-Go de salida:** al cierre de la cohorte, el owner decide sobre la apertura
-  más amplia con la evidencia del punto 10. Prerrequisitos ya registrados para esa
-  apertura: retiro del override de email (criterio del punto 9), dominio verificado en
-  Resend (remitente propio), emails por locale del seller, y el alerting que resuelve
+- **Go de apertura (participante 1):** decisión expresa del owner con el checklist del
+  punto 5 completo — incluida la verificación de que el override fue retirado y la
+  prueba de entrega real. La aprobación de este documento NO la constituye.
+- **Go intermedio (participante 2):** decisión del owner tras el cierre del expediente
+  del participante 1.
+- **Go/No-Go de salida:** al cierre de la cohorte, decisión del owner sobre la
+  apertura amplia. Prerrequisitos ya registrados para esa apertura: dominio verificado
+  en Resend (remitente propio) · emails por locale del seller · alerting que resuelve
   el R1 del acta Upstash.
 - **No-Go / halt:** el gate puede cerrarse como fallido o suspenderse en cualquier
-  punto por decisión del owner; la evidencia congelada hasta ese momento forma el
-  expediente igualmente.
+  punto por decisión del owner; la evidencia congelada forma el expediente igualmente.
