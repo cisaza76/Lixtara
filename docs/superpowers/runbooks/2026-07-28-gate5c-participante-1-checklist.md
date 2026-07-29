@@ -40,6 +40,10 @@ aquí la evidencia.
       · `[OPERADOR]` verificado `mls_status = active` y fotos interiores presentes.
 - [x] Estrategia: `photo_slideshow` (posición 1 de la cohorte).
 - [ ] `[OPERADOR]` **Prueba de entrega de email (5 pasos, cambio bloqueante 2):**
+      *Precondición de secuencia (owner, 2026-07-28): la verificación del retiro del
+      override (sección A) debe estar REGISTRADA antes de ejecutar esta prueba y antes
+      de cualquier actividad real del participante — la prueba debe viajar por el mismo
+      camino de entrega que vivirá el piloto.*
       1. [ ] Correo de prueba enviado al email real del seller con remitente
              `onboarding@resend.dev` (id de envío: ____________)
       2. [ ] Recepción confirmada por el seller (fecha/hora: ____________)
