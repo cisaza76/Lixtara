@@ -1,9 +1,13 @@
-# Gate 5C — Piloto controlado con usuarios reales (documento operativo, rev. 2)
+# Gate 5C — Piloto controlado con usuarios reales (documento operativo)
 
-**Estado:** BORRADOR rev. 2 — incorpora la resolución del owner de 2026-07-28 sobre la
-rev. 1: «APROBADO EN ESTRUCTURA, CON CAMBIOS BLOQUEANTES ANTES DEL GO» (6 cambios,
-todos incorporados abajo). Pendiente de aprobación final. Una vez aprobado, este
-documento GOBIERNA la ejecución del piloto.
+**Estado:** **APROBADO** — resolución del owner 2026-07-28: «APROBADO PARA GOBERNAR
+GATE 5C, SUJETO A VERIFICACIÓN DE LIMPIEZA DOCUMENTAL»; limpieza verificada
+mecánicamente (7/7: sin restos de rev. 1, sin encabezados duplicados, H8.1–H8.7
+únicos, exclusiones coherentes, checklist coherente con H5, evidencia referida al
+punto 10) y estado elevado a APROBADO el 2026-07-28. Historia: rev. 1 «aprobado en
+estructura, con cambios bloqueantes» → rev. 2 con los 6 cambios incorporados →
+aprobación final. Este documento GOBIERNA la ejecución del piloto.
+**La aprobación de este documento NO es el Go de apertura** (punto 11).
 **Autorización vigente:** inicio formal del TRABAJO de Gate 5C (2026-07-28). La
 apertura al primer participante requiere el **Go** expreso del punto 11.
 **Antecedentes:** Gate Review aprobado 2026-07-28 · prerrequisitos 4/4 cerrados
