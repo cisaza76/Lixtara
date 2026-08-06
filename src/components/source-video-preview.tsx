@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isAccessExpired, type SourcePreviewDto, type TemporaryMediaAccess } from "@/lib/creative-studio/source-preview";
 import {
+  announceFor,
   createSingleFlight,
   nextPreviewStateOnError,
   runDownloadAttempt,
@@ -123,16 +124,7 @@ export function SourceVideoPreview({
     return () => document.removeEventListener("keydown", onKey);
   }, [expanded]);
 
-  const announce =
-    state === "loading"
-      ? copy.sr.loading
-      : state === "error"
-        ? copy.sr.error
-        : state === "unplayable"
-          ? copy.unsupported
-          : state === "playing"
-            ? copy.sr.playing
-            : "";
+  const announce = announceFor(state, copy);
   const fallback = unplayableView({ unsupported: copy.unsupported, downloadCta: copy.downloadCta }, access?.locator ?? null);
 
   const videoEl = access ? (

@@ -11,6 +11,7 @@ import type { SellerSourceDto } from "@/lib/creative-studio/seller-source-status
 import { SourceVideoPreview, type SourceVideoPreviewCopy } from "@/components/source-video-preview";
 import {
   runSourceUpload,
+  createXhrPutSignedUrl,
   validateLocalFile,
   SourceUploadError,
   type SourceUploadDeps,
@@ -70,28 +71,7 @@ function apiDeps(): SourceUploadDeps {
       if (!res.ok) throw new Error(`initiate_${res.status}`);
       return res.json();
     },
-    putSignedUrl(signedUrl, _token, file, opts) {
-      return new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", signedUrl);
-        xhr.setRequestHeader("content-type", file.type || "video/mp4");
-        xhr.setRequestHeader("x-upsert", "false");
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            opts.onProgress?.({ sentBytes: e.loaded, totalBytes: e.total, pct: Math.round((e.loaded / e.total) * 100) });
-          }
-        };
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`upload_${xhr.status}`)));
-        xhr.onerror = () => reject(new Error("upload_network_error"));
-        xhr.onabort = () => {
-          const err = new Error("aborted");
-          err.name = "AbortError";
-          reject(err);
-        };
-        opts.signal?.addEventListener("abort", () => xhr.abort());
-        xhr.send(file as unknown as XMLHttpRequestBodyInit);
-      });
-    },
+    putSignedUrl: createXhrPutSignedUrl(),
     async complete(body) {
       const res = await fetch("/api/creative-studio/video/source/complete", {
         method: "POST",
@@ -166,7 +146,7 @@ export function SourceVideoSection({
     try {
       await runSourceUpload(apiDeps(), {
         listingId: propertyId,
-        file: { name: file.name, type: file.type, size: file.size } as unknown as File,
+        file, // el File REAL (es un Blob): nunca un descriptor plano — ver source-upload-flow.test.ts
         onPhase: setPhase,
         onProgress: setProgress,
         signal: controller.signal,

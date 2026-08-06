@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextPreviewStateOnError, unplayableView, type PreviewViewState } from "@/lib/creative-studio/source-preview-view";
+import { announceFor, nextPreviewStateOnError, unplayableView, type PreviewViewState } from "@/lib/creative-studio/source-preview-view";
 
 // Condición 1 (owner, 2026-08-05) — fallback estable cuando el navegador no puede
 // reproducir el contenedor del source (p. ej. .mov en un navegador sin soporte).
@@ -169,5 +169,21 @@ describe("no-fuga y paridad del mensaje de fallo de descarga", () => {
         expect(t, `filtra "${banned}"`).not.toContain(banned);
       }
     }
+  });
+});
+
+describe("announceFor — accesibilidad sin texto duplicado", () => {
+  const COPY = {
+    unsupported: "This browser can't preview this video.",
+    sr: { loading: "Loading video preview", playing: "Playing video preview", error: "Preview failed to load" },
+  };
+  it("en 'unplayable' NO duplica: el texto visible ya es role=status y lo anuncia solo", () => {
+    expect(announceFor("unplayable", COPY)).toBe("");
+  });
+  it("los demás estados conservan su anuncio sr-only (sin regresión de accesibilidad)", () => {
+    expect(announceFor("loading", COPY)).toBe(COPY.sr.loading);
+    expect(announceFor("playing", COPY)).toBe(COPY.sr.playing);
+    expect(announceFor("error", COPY)).toBe(COPY.sr.error);
+    expect(announceFor("idle", COPY)).toBe("");
   });
 });

@@ -45,12 +45,18 @@ export interface CompleteResult {
   status?: string;
 }
 
+// Lo que el PUT necesita: un Blob REAL (con bytes) que además expone name/type/size —
+// exactamente lo que es un `File` del navegador. Tiparlo así impide que un descriptor
+// plano {name,type,size} vuelva a colarse sin un cast explícito: fue justo eso lo que
+// convirtió cada upload en "[object Object]" (15 bytes) hasta 2026-08-06.
+export type UploadableFile = Blob & { readonly name: string; readonly type: string; readonly size: number };
+
 export interface SourceUploadDeps {
   initiate(body: { listingId: string; fileName: string; mimeType: string; sizeBytes: number }): Promise<InitiateResult>;
   putSignedUrl(
     signedUrl: string,
     token: string,
-    file: LocalFile,
+    file: UploadableFile,
     opts: { onProgress?: (p: UploadProgress) => void; signal?: AbortSignal },
   ): Promise<void>;
   complete(body: { listingId: string; assetId: string; storagePath: string }): Promise<CompleteResult>;
@@ -77,7 +83,7 @@ function isAbort(e: unknown): boolean {
 
 export interface RunSourceUploadInput {
   listingId: string;
-  file: LocalFile;
+  file: UploadableFile;
   onPhase?: (p: SourceUploadPhase) => void;
   onProgress?: (p: UploadProgress) => void;
   signal?: AbortSignal;
@@ -122,4 +128,36 @@ export async function runSourceUpload(deps: SourceUploadDeps, input: RunSourceUp
 
   input.onPhase?.("registered");
   return { assetId: done.assetId ?? init.assetId };
+}
+
+
+// Transporte real del PUT firmado. Vivía embebido en el componente (no testeable en la
+// suite, que corre en node), y ahí el `xhr.send(file as unknown as XMLHttpRequestBodyInit)`
+// aceptaba cualquier cosa. Extraído + inyectable: la prueba browser-like captura el body y
+// verifica byte a byte que viaja el Blob, no una serialización.
+export function createXhrPutSignedUrl(
+  newXhr: () => XMLHttpRequest = () => new XMLHttpRequest(),
+): SourceUploadDeps["putSignedUrl"] {
+  return (signedUrl, _token, file, opts) =>
+    new Promise<void>((resolve, reject) => {
+      const xhr = newXhr();
+      xhr.open("PUT", signedUrl);
+      xhr.setRequestHeader("content-type", file.type || "video/mp4");
+      xhr.setRequestHeader("x-upsert", "false");
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          opts.onProgress?.({ sentBytes: e.loaded, totalBytes: e.total, pct: Math.round((e.loaded / e.total) * 100) });
+        }
+      };
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`upload_${xhr.status}`)));
+      xhr.onerror = () => reject(new Error("upload_network_error"));
+      xhr.onabort = () => {
+        const err = new Error("aborted");
+        err.name = "AbortError";
+        reject(err);
+      };
+      opts.signal?.addEventListener("abort", () => xhr.abort());
+      // El File ES un Blob: se envía tal cual, sin reconstruir, clonar ni serializar.
+      xhr.send(file);
+    });
 }

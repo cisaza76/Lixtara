@@ -30,6 +30,27 @@ export function nextPreviewStateOnError(input: { alreadyRetried: boolean; hasAcc
   return { state: input.hasAccess ? "unplayable" : "error", renewAccess: false };
 }
 
+// Anuncio para lectores de pantalla. En `unplayable` devuelve cadena vacía A PROPÓSITO:
+// el mensaje visible ya vive en un contenedor con role="status", así que duplicarlo en la
+// región sr-only lo hacía sonar dos veces (y aparecer dos veces al copiar la página).
+export function announceFor(
+  state: PreviewViewState,
+  copy: { unsupported: string; sr: { loading: string; playing: string; error: string } },
+): string {
+  switch (state) {
+    case "loading":
+      return copy.sr.loading;
+    case "playing":
+      return copy.sr.playing;
+    case "error":
+      return copy.sr.error;
+    case "unplayable": // anunciado por el role="status" del texto visible
+    case "idle":
+    default:
+      return "";
+  }
+}
+
 export interface UnplayableCopy {
   unsupported: string;
   downloadCta: string;
