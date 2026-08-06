@@ -57,3 +57,117 @@ describe("unplayableView — qué se muestra en el fallback", () => {
     }
   });
 });
+
+// ---- Ajuste final (owner, 2026-08-05): renovación bajo demanda SOLO al pulsar el CTA --
+import { createSingleFlight, runDownloadAttempt } from "@/lib/creative-studio/source-preview-view";
+
+const FRESH = { locator: "https://storage.example/fresh.mov?token=new", expiresAt: new Date(Date.now() + 300_000).toISOString() };
+const STALE = { locator: "https://storage.example/stale.mov?token=old", expiresAt: new Date(Date.now() - 1000).toISOString() };
+const NOW = Date.now();
+
+describe("runDownloadAttempt — renovación bajo demanda al pulsar descargar", () => {
+  it("URL VIGENTE: descarga directa, sin renovación innecesaria", async () => {
+    let renews = 0;
+    const opened: string[] = [];
+    const r = await runDownloadAttempt({
+      access: FRESH, nowMs: NOW,
+      renew: async () => { renews++; return FRESH; },
+      open: (h) => void opened.push(h),
+    });
+    expect(r).toEqual({ status: "opened", renewed: false });
+    expect(renews).toBe(0);
+    expect(opened).toEqual([FRESH.locator]);
+  });
+
+  it("URL EXPIRADA: obtiene una nueva al hacer clic y descarga con ella", async () => {
+    const opened: string[] = [];
+    let renews = 0;
+    const r = await runDownloadAttempt({
+      access: STALE, nowMs: NOW,
+      renew: async () => { renews++; return FRESH; },
+      open: (h) => void opened.push(h),
+    });
+    expect(r).toEqual({ status: "opened", renewed: true });
+    expect(renews).toBe(1); // MÁXIMO un intento por clic
+    expect(opened).toEqual([FRESH.locator]);
+  });
+
+  it("URL DESCONOCIDA (sin access): renueva una vez y descarga", async () => {
+    const opened: string[] = [];
+    const r = await runDownloadAttempt({ access: null, nowMs: NOW, renew: async () => FRESH, open: (h) => void opened.push(h) });
+    expect(r).toEqual({ status: "opened", renewed: true });
+    expect(opened).toEqual([FRESH.locator]);
+  });
+
+  it("renovación FALLIDA: estado estable, sin abrir nada, sin lanzar", async () => {
+    const opened: string[] = [];
+    const r = await runDownloadAttempt({ access: STALE, nowMs: NOW, renew: async () => null, open: (h) => void opened.push(h) });
+    expect(r).toEqual({ status: "failed" });
+    expect(opened).toEqual([]);
+  });
+
+  it("NEVER-THROW: un renew que explota degrada a failed", async () => {
+    const r = await runDownloadAttempt({
+      access: STALE, nowMs: NOW,
+      renew: async () => { throw new Error("network down"); },
+      open: () => {},
+    });
+    expect(r).toEqual({ status: "failed" });
+  });
+
+  it("NEVER-THROW: un open que explota degrada a failed", async () => {
+    const r = await runDownloadAttempt({
+      access: FRESH, nowMs: NOW, renew: async () => FRESH,
+      open: () => { throw new Error("popup blocked"); },
+    });
+    expect(r).toEqual({ status: "failed" });
+  });
+
+  it("CERO efectos operativos: solo devuelve estado y usa las dependencias inyectadas", async () => {
+    const r = await runDownloadAttempt({ access: FRESH, nowMs: NOW, renew: async () => FRESH, open: () => {} });
+    expect(Object.keys(r).sort()).toEqual(["renewed", "status"]);
+  });
+});
+
+describe("createSingleFlight — un doble clic no dispara dos solicitudes", () => {
+  it("la segunda llamada concurrente devuelve 'busy' y el trabajo corre una sola vez", async () => {
+    const flight = createSingleFlight();
+    let runs = 0;
+    let release: (v: string) => void = () => {};
+    const work = () => { runs++; return new Promise<string>((res) => { release = res; }); };
+    const first = flight.run(work);
+    const second = await flight.run(work); // clic inmediato mientras el primero sigue
+    expect(second).toBe("busy");
+    expect(flight.isBusy()).toBe(true);
+    release("done");
+    expect(await first).toBe("done");
+    expect(runs).toBe(1);
+    expect(flight.isBusy()).toBe(false);
+  });
+
+  it("tras terminar, permite un nuevo intento manual", async () => {
+    const flight = createSingleFlight();
+    expect(await flight.run(async () => "a")).toBe("a");
+    expect(await flight.run(async () => "b")).toBe("b");
+  });
+
+  it("libera el candado aunque el trabajo lance (never-throw del candado)", async () => {
+    const flight = createSingleFlight();
+    await expect(flight.run(async () => { throw new Error("x"); })).rejects.toThrow();
+    expect(flight.isBusy()).toBe(false);
+  });
+});
+
+describe("no-fuga y paridad del mensaje de fallo de descarga", () => {
+  it("el copy de error de descarga no expone detalle técnico", () => {
+    for (const msg of [
+      "We couldn't prepare the download. Please try again.",
+      "No pudimos preparar la descarga. Inténtalo de nuevo.",
+    ]) {
+      const t = msg.toLowerCase();
+      for (const banned of ["url", "token", "403", "signed", "firmada", "bucket", "storage", "mime", "codec", "error_code"]) {
+        expect(t, `filtra "${banned}"`).not.toContain(banned);
+      }
+    }
+  });
+});
