@@ -12,7 +12,7 @@ import { produceUploadedVideoStrategy } from "@/lib/video-engine/uploaded-video-
 import { VideoSourceMissingError } from "@/lib/video-engine/produce-asset";
 import { FailureEvidenceCollector } from "@/lib/video-engine/failure-evidence";
 import { VideoPreparationExecutionError } from "@/lib/video-engine/execute-video-preparation";
-import { VideoPreparationError } from "@/lib/video-engine/prepare-video";
+import { PREPARATION_PLAN_SCHEMA_VERSION, VideoPreparationError } from "@/lib/video-engine/prepare-video";
 import type { SandboxCommandResult, VideoPreparationSandbox } from "@/lib/video-engine/execute-video-preparation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -217,7 +217,7 @@ describe("Step 5 — uploaded_video pipeline branch", () => {
     const prov = result.outputAsset.provenance as unknown as Record<string, unknown>;
     expect(prov.sourceStrategy).toBe("uploaded_video");
     expect(prov.renderProfile).toBe("standard");
-    expect(prov.preparationFingerprint).toMatch(/^2:[0-9a-f]{64}$/);
+    expect(prov.preparationFingerprint).toMatch(new RegExp(`^${PREPARATION_PLAN_SCHEMA_VERSION}:[0-9a-f]{64}$`));
     expect(prov.sourceHash).toEqual(expect.any(String));
     expect(prov.ffmpegVersion).toContain("8.1.2-fake");
     expect(prov.preparationMs).toEqual(expect.any(Number));
@@ -422,5 +422,66 @@ describe("UX 5C — an unreadable source classifies as VIDEO_CORRUPT (seller-act
     expect(err).toBeInstanceOf(VideoPreparationError);
     expect((err as VideoPreparationError).code).toBe("VIDEO_CORRUPT");
     expect(String(err.message)).toContain("moov atom not found");
+  });
+});
+
+// ---- Etapa 1 — integración: MOV/H.264 SDR pasa; HEVC y HDR se rechazan tipados --------
+describe("Etapa 1 — el pipeline con el archivo real (MOV/H.264 SDR)", () => {
+  // Probe equivalente a IMG_6371.MOV del owner (iPhone 16 Pro).
+  const iphoneProbe = (over: Record<string, unknown> = {}) => JSON.stringify({
+    streams: [
+      {
+        codec_type: "video",
+        codec_name: "h264",
+        width: 1920,
+        height: 1080,
+        r_frame_rate: "30000/1001",
+        pix_fmt: "yuv420p",
+        color_range: "tv",
+        color_transfer: "bt709",
+        color_primaries: "bt709",
+        color_space: "bt709",
+        ...over,
+      },
+      { codec_type: "audio", codec_name: "aac" },
+    ],
+    format: { format_name: "mov,mp4,m4a,3gp,3g2,mj2", duration: "26.12" },
+  });
+  const IPHONE_SOURCE_PROBE = iphoneProbe();
+
+  function prepWithSource(sourceProbe: string): FakePrep {
+    const prep = fakePrep();
+    const orig = prep.runCommand.bind(prep);
+    prep.runCommand = async (c, a, o) => {
+      if (c === "ffprobe" && [...a].some((x) => String(x).includes("source"))) {
+        return { exitCode: 0, stdout: async () => sourceProbe, stderr: async () => "" };
+      }
+      return orig(c, a, o);
+    };
+    return prep;
+  }
+
+  it("MOV/H.264 SDR se prepara y renderiza (ffmpeg corre una vez)", async () => {
+    const prep = prepWithSource(IPHONE_SOURCE_PROBE);
+    const { resolved, render } = uploadedResolved({ prep });
+    await produceUploadedVideoStrategy(INPUT, HOOKS, resolved, { addressLine: "x", priceLabel: "$1" });
+    expect(ffmpegRenders(prep).length).toBe(1);
+    expect((render.calls[0].inputProps as { source: string }).source).toBe("uploaded_video");
+  });
+
+  it("HEVC todavía se rechaza con VIDEO_CODEC_UNSUPPORTED (Etapa 2 pendiente)", async () => {
+    const prep = prepWithSource(iphoneProbe({ codec_name: "hevc" }));
+    const { resolved } = uploadedResolved({ prep });
+    const err = await produceUploadedVideoStrategy(INPUT, HOOKS, resolved, { addressLine: "x", priceLabel: "$1" }).catch((e) => e);
+    expect(err).toBeInstanceOf(VideoPreparationError);
+    expect((err as VideoPreparationError).code).toBe("VIDEO_CODEC_UNSUPPORTED");
+  });
+
+  it("HDR (HLG) se rechaza fail-closed con VIDEO_HDR_UNSUPPORTED, sin tone-mapping ni retag", async () => {
+    const prep = prepWithSource(iphoneProbe({ color_transfer: "arib-std-b67" }));
+    const { resolved } = uploadedResolved({ prep });
+    const err = await produceUploadedVideoStrategy(INPUT, HOOKS, resolved, { addressLine: "x", priceLabel: "$1" }).catch((e) => e);
+    expect((err as VideoPreparationError).code).toBe("VIDEO_HDR_UNSUPPORTED");
+    expect(ffmpegRenders(prep).length).toBe(0); // ni siquiera intenta preparar
   });
 });

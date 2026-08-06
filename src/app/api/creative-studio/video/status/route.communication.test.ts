@@ -187,3 +187,15 @@ describe("UX 5C — madeFrom chip on completed", () => {
     expect((await (await handleVideoStatus(REQ, deps({ findLatestByListing: async () => job({ state: "completed", assetId: "asset-1", errorCode: null }), getAsset: async () => completedAsset("photo_slideshow") }))).json()).madeFrom).toBe("photos");
   });
 });
+
+describe("Etapa 1 — HDR: causa distinguible sin filtrar el código técnico", () => {
+  it("expone sourceIssue 'hdr' pero NUNCA VIDEO_HDR_UNSUPPORTED", async () => {
+    const res = await handleVideoStatus(REQ, deps({ findLatestByListing: async () => job({ errorCode: "VIDEO_HDR_UNSUPPORTED" }) }));
+    const body = await res.json();
+    expect(body.failure).toMatchObject({ kind: "source_action_required", sourceIssue: "hdr", canRetry: false });
+    const raw = JSON.stringify(body);
+    expect(raw).not.toContain("VIDEO_HDR_UNSUPPORTED");
+    expect(raw).not.toContain("INPUT");
+    expect(raw).not.toContain("preparing");
+  });
+});

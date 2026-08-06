@@ -4,10 +4,19 @@
 // it is both useful (kind) and possible (capacity).
 import type { SellerFailureDto } from "@/lib/creative-studio/seller-video-status";
 
+export type FailedDetailKey =
+  | "errorDetail"
+  | "sourceErrorDetail"
+  | "supportErrorDetail"
+  | "sourceErrorContainer"
+  | "sourceErrorCodec"
+  | "sourceErrorHdr"
+  | "sourceErrorCorrupt";
+
 export interface FailedViewModel {
   headingKey: "errorHeading" | "sourceErrorHeading";
   showReassurance: boolean;
-  detailKey: "errorDetail" | "sourceErrorDetail" | "supportErrorDetail";
+  detailKey: FailedDetailKey;
   primary: "retry" | "replace" | "support";
   secondary: "support" | "retry" | null;
   showReference: boolean;
@@ -32,10 +41,18 @@ export function deriveFailedViewModel(failure?: SellerFailureDto | null): Failed
   const showReference = reference !== null;
 
   if (failure.kind === "source_action_required") {
+    // Etapa 1 — cuatro causas distinguibles para el vendedor (contenedor, códec, HDR,
+    // archivo corrupto); cualquier otra cae al mensaje genérico de source.
+    const byIssue: Record<string, FailedDetailKey> = {
+      container: "sourceErrorContainer",
+      codec: "sourceErrorCodec",
+      hdr: "sourceErrorHdr",
+      corrupt: "sourceErrorCorrupt",
+    };
     return {
       headingKey: "sourceErrorHeading",
       showReassurance: false,
-      detailKey: "sourceErrorDetail",
+      detailKey: byIssue[failure.sourceIssue ?? ""] ?? "sourceErrorDetail",
       primary: "replace",
       secondary: "support",
       showReference,

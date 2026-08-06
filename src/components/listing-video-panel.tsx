@@ -29,6 +29,10 @@ interface Copy {
   supportErrorDetail: string;
   sourceErrorHeading: string;
   sourceErrorDetail: string;
+  sourceErrorContainer: string;
+  sourceErrorCodec: string;
+  sourceErrorHdr: string;
+  sourceErrorCorrupt: string;
   replaceVideoCta: string;
   referenceLabel: string;
   madeFromUploadChip: string;

@@ -43,3 +43,19 @@ describe("deriveFailedViewModel", () => {
     expect(vm).toMatchObject({ primary: "retry", secondary: "support", showReference: false });
   });
 });
+
+describe("Etapa 1 — el detalle del panel distingue las cuatro causas de source", () => {
+  const vm = (sourceIssue: string) =>
+    deriveFailedViewModel({ kind: "source_action_required", sourceIssue, reference: "A1", canRetry: false, supportPrimary: false } as SellerFailureDto);
+
+  it("cada causa tiene su propio mensaje", () => {
+    expect(vm("container").detailKey).toBe("sourceErrorContainer");
+    expect(vm("codec").detailKey).toBe("sourceErrorCodec");
+    expect(vm("hdr").detailKey).toBe("sourceErrorHdr");
+    expect(vm("corrupt").detailKey).toBe("sourceErrorCorrupt");
+  });
+  it("una causa desconocida cae al genérico y NUNCA ofrece retry", () => {
+    expect(vm("other").detailKey).toBe("sourceErrorDetail");
+    expect(vm("other").primary).toBe("replace");
+  });
+});

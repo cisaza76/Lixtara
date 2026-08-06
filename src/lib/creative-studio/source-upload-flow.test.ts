@@ -15,9 +15,13 @@ describe("validateLocalFile (preventive UX; backend is authority)", () => {
   it("accepts a valid mp4 under the limit", () => {
     expect(validateLocalFile(FILE)).toEqual({ ok: true });
   });
-  it("rejects non-mp4 mime / extension / empty / oversized", () => {
-    expect(validateLocalFile({ ...FILE, type: "video/quicktime" })).toEqual({ ok: false, error: "invalid_mime" });
-    expect(validateLocalFile({ ...FILE, name: "clip.mov" })).toEqual({ ok: false, error: "invalid_extension" });
+  // Etapa 1: MOV/QuickTime entra al set cerrado (autorizado 2026-08-05).
+  it("acepta .mov/video/quicktime — el archivo tal como sale del iPhone", () => {
+    expect(validateLocalFile({ ...FILE, type: "video/quicktime", name: "IMG_6371.MOV" })).toEqual({ ok: true });
+  });
+  it("rejects mime / extension outside the closed set / empty / oversized", () => {
+    expect(validateLocalFile({ ...FILE, type: "video/webm" })).toEqual({ ok: false, error: "invalid_mime" });
+    expect(validateLocalFile({ ...FILE, name: "clip.mkv" })).toEqual({ ok: false, error: "invalid_extension" });
     expect(validateLocalFile({ ...FILE, size: 0 })).toEqual({ ok: false, error: "empty_file" });
     expect(validateLocalFile({ ...FILE, size: VIDEO_SOURCE_LIMITS.maxFileBytes + 1 })).toEqual({ ok: false, error: "file_too_large" });
   });

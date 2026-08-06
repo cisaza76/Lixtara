@@ -3,6 +3,7 @@ import { getRenderProfile, type RenderProfileSpec } from "./render-profiles";
 import { VIDEO_SOURCE_LIMITS } from "./video-source-limits";
 import type { SourceVideoMetadata } from "./media-metadata";
 import {
+  PREPARATION_PLAN_SCHEMA_VERSION,
   buildNormalizeFfmpegArgs,
   planVideoPreparation,
   validatePreparedMetadata,
@@ -261,7 +262,7 @@ describe("18/19. fingerprint invariants", () => {
     expect(new Set([base, diffDims, diffRot, diffProfile]).size).toBe(4);
   });
   it("fingerprint is schema-versioned + hex", () => {
-    expect(planVideoPreparation(meta(), STANDARD, VIDEO_SOURCE_LIMITS, REFS).preparationFingerprint).toMatch(/^2:[0-9a-f]{64}$/);
+    expect(planVideoPreparation(meta(), STANDARD, VIDEO_SOURCE_LIMITS, REFS).preparationFingerprint).toMatch(new RegExp(`^${PREPARATION_PLAN_SCHEMA_VERSION}:[0-9a-f]{64}$`));
   });
 });
 

@@ -211,6 +211,18 @@ function parseRotationDegrees(videoStream: Record<string, unknown>): number {
   return deg;
 }
 
+// Dolby Vision se declara como un record en side_data_list; el mismo array transporta la
+// Display Matrix de rotación, así que se matchea por tipo, nunca por presencia.
+function hasDolbyVisionSideData(videoStream: Record<string, unknown>): boolean {
+  const list = videoStream.side_data_list;
+  if (!Array.isArray(list)) return false;
+  return list.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const type = String((entry as Record<string, unknown>).side_data_type ?? "").toLowerCase();
+    return type.includes("dovi") || type.includes("dolby vision");
+  });
+}
+
 export function parseFfprobeToPreparedProbe(jsonStr: string, fileBytes: number): PreparedVideoProbe {
   let json: unknown;
   try {
@@ -238,6 +250,12 @@ export function parseFfprobeToPreparedProbe(jsonStr: string, fileBytes: number):
     rotationDegrees: parseRotationDegrees(video),
     pixelFormat: typeof video.pix_fmt === "string" ? video.pix_fmt : null,
     colorRange: typeof video.color_range === "string" ? video.color_range : null,
+    // Etapa 1 — señales que permiten detectar HDR (isHdrSource). Nunca se infiere nada:
+    // lo no declarado queda null y el checker lo trata como SDR.
+    colorTransfer: typeof video.color_transfer === "string" ? video.color_transfer : null,
+    colorPrimaries: typeof video.color_primaries === "string" ? video.color_primaries : null,
+    colorSpace: typeof video.color_space === "string" ? video.color_space : null,
+    dolbyVision: hasDolbyVisionSideData(video),
   };
 }
 

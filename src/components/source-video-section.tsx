@@ -204,7 +204,7 @@ export function SourceVideoSection({
       <input
         ref={fileInput}
         type="file"
-        accept="video/mp4"
+        accept="video/mp4,video/quicktime,.mp4,.mov"
         className="sr-only"
         aria-hidden="true"
         tabIndex={-1}

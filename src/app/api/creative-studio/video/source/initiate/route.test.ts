@@ -63,7 +63,7 @@ describe("initiate route", () => {
     expect(r.status).toBe(200);
   });
   it("5. invalid mime → 400", async () => {
-    const r = await handleInitiateSourceUpload(req({ ...goodBody, mimeType: "video/quicktime" }), deps());
+    const r = await handleInitiateSourceUpload(req({ ...goodBody, mimeType: "video/webm" }), deps());
     expect(r.status).toBe(400);
     expect(await r.json()).toEqual({ error: "invalid_mime" });
   });
@@ -125,5 +125,23 @@ describe("initiate route", () => {
     const logged = JSON.parse(errSpy.mock.calls[0][0] as string);
     expect(logged).toMatchObject({ event: "rate_limit_provider_failure", action: "fail_open_bypass" });
     errSpy.mockRestore();
+  });
+});
+
+describe("Etapa 1 — MOV: el key refleja el contenedor real", () => {
+  it("un .mov produce storagePath source.mov (nunca source.mp4)", async () => {
+    const res = await handleInitiateSourceUpload(
+      req({ ...goodBody, fileName: "IMG_6371.MOV", mimeType: "video/quicktime", sizeBytes: 48_412_268 }),
+      deps(),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.storagePath.endsWith("/source.mov")).toBe(true);
+  });
+
+  it("un .mp4 conserva source.mp4 (sin regresión)", async () => {
+    const res = await handleInitiateSourceUpload(req(goodBody), deps());
+    const body = await res.json();
+    expect(body.storagePath.endsWith("/source.mp4")).toBe(true);
   });
 });

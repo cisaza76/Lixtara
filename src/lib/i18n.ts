@@ -1195,7 +1195,7 @@ export const dictionaries = {
         cancel: "Cancel",
         errorHeading: "Upload didn't complete",
         tryAgain: "Try again",
-        errInvalidType: "Unsupported format. Please use an MP4 file.",
+        errInvalidType: "Unsupported format. Please use an MP4 or MOV video — the file straight from your phone works.",
         errTooLarge: "This file is larger than the maximum size.",
         errEmpty: "This file is empty.",
         errGeneric: "Something went wrong. Please try again.",
@@ -1232,7 +1232,15 @@ export const dictionaries = {
         supportErrorDetail: "Our team can look into it for you — contact support and they'll take it from there.",
         sourceErrorHeading: "There's a problem with your video",
         sourceErrorDetail:
-          "We couldn't process the video you uploaded. Replace it with another MP4 file — phone camera videos work well.",
+          "We couldn't process the video you uploaded. Replace it with another MP4 or MOV video — phone camera videos work well.",
+        sourceErrorContainer:
+          "That file type isn't supported yet. Upload an MP4 or MOV video — the file straight from your phone works.",
+        sourceErrorCodec:
+          "That video was recorded in a format we can't process yet. On iPhone: Settings → Camera → Formats → Most Compatible, then record again.",
+        sourceErrorHdr:
+          "That video was recorded in HDR, which we can't process yet. On iPhone: Settings → Camera → Record Video, turn HDR off, then record again.",
+        sourceErrorCorrupt:
+          "That video file looks incomplete — it may not have finished copying. Try uploading it again from the original.",
         replaceVideoCta: "Replace video",
         referenceLabel: "Reference",
         tryAgain: "Try again",
@@ -2529,7 +2537,7 @@ export const dictionaries = {
         cancel: "Cancelar",
         errorHeading: "No se pudo completar la carga",
         tryAgain: "Reintentar",
-        errInvalidType: "Formato no soportado. Usa un archivo MP4.",
+        errInvalidType: "Formato no soportado. Usa un video MP4 o MOV — el archivo tal como sale de tu teléfono sirve.",
         errTooLarge: "El archivo supera el tamaño máximo.",
         errEmpty: "El archivo está vacío.",
         errGeneric: "Ocurrió un error. Intenta de nuevo.",
@@ -2566,7 +2574,15 @@ export const dictionaries = {
         supportErrorDetail: "Nuestro equipo puede revisarlo por ti — contacta a soporte y ellos se encargan.",
         sourceErrorHeading: "Hay un problema con tu video",
         sourceErrorDetail:
-          "No pudimos procesar el video que subiste. Reemplázalo con otro archivo MP4 — los videos de cámara de celular funcionan bien.",
+          "No pudimos procesar el video que subiste. Reemplázalo con otro video MP4 o MOV — los videos de cámara de celular funcionan bien.",
+        sourceErrorContainer:
+          "Ese tipo de archivo aún no está soportado. Sube un video MP4 o MOV — el archivo tal como sale de tu teléfono sirve.",
+        sourceErrorCodec:
+          "Ese video se grabó en un formato que todavía no podemos procesar. En iPhone: Ajustes → Cámara → Formatos → Más compatible, y vuelve a grabar.",
+        sourceErrorHdr:
+          "Ese video se grabó en HDR y todavía no podemos procesarlo. En iPhone: Ajustes → Cámara → Grabar video, desactiva HDR y vuelve a grabar.",
+        sourceErrorCorrupt:
+          "Ese archivo de video parece incompleto — puede que no haya terminado de copiarse. Intenta subirlo de nuevo desde el original.",
         replaceVideoCta: "Reemplazar video",
         referenceLabel: "Referencia",
         tryAgain: "Intentar de nuevo",

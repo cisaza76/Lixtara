@@ -12,6 +12,8 @@ import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import {
   SOURCE_BUCKET,
   buildSourceStoragePath,
+  sourceExtFromFileName,
+  mimeForSourceExt,
   isCreativeStudioVideoEnabled,
   validateInitiate,
 } from "@/lib/creative-studio/source-upload";
@@ -107,7 +109,11 @@ export async function handleInitiateSourceUpload(req: Request, deps: InitiateSou
 
   // Server owns the id + path — the client cannot choose either.
   const assetId = deps.generateAssetId();
-  const storagePath = buildSourceStoragePath(user.id, listingId, assetId);
+  // Etapa 1 — el key refleja el contenedor REAL (source.mov / source.mp4); nunca se
+  // etiqueta un MOV como MP4. La extensión sale del set cerrado, no del cliente: si el
+  // nombre no trae una válida, validateInitiate ya rechazó antes de llegar aquí.
+  const sourceExt = sourceExtFromFileName(body.fileName) ?? "mp4";
+  const storagePath = buildSourceStoragePath(user.id, listingId, assetId, sourceExt);
 
   const signed = await deps.createSignedUpload(SOURCE_BUCKET, storagePath);
   if ("error" in signed) return NextResponse.json({ error: "upload_init_failed" }, { status: 500 });

@@ -43,7 +43,12 @@ export interface PreparedVideoProbe extends SourceVideoMetadata {
 // visible double-compression loss — deliberately not `veryfast`. A speed pass, if ever
 // needed, is a documented change here, not scattered flags.
 // ---------------------------------------------------------------------------
-export const PREPARATION_PLAN_SCHEMA_VERSION = "2";
+// Etapa 1 (2026-08-05): 2 → 3. El contrato de ENTRADA cambió (contenedores aceptados
+// pasan de {mp4} a {mp4, mov}) y ese contrato forma parte del payload del fingerprint,
+// así que el bump evita drift silencioso bajo el mismo número de versión (mismo
+// precedente que ADR-0011). Nota: para un source MP4 los argumentos de ffmpeg son
+// byte-idénticos a los de la versión 2 — lo que cambia es qué entradas se aceptan.
+export const PREPARATION_PLAN_SCHEMA_VERSION = "3";
 
 export const ENCODE_PARAMS = {
   videoCodec: "libx264",
@@ -465,7 +470,7 @@ function computeFingerprint(input: {
       maxFileBytes: input.limits.maxFileBytes,
       maxLongEdgePx: input.limits.maxLongEdgePx,
       maxShortEdgePx: input.limits.maxShortEdgePx,
-      container: input.limits.container,
+      containers: [...input.limits.containers],
       videoCodec: input.limits.videoCodec,
       audioCodecs: [...input.limits.audioCodecs],
     },
