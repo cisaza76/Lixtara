@@ -25,7 +25,10 @@ export const VIDEO_SOURCE_LIMITS = {
   maxLongEdgePx: 3840,
   maxShortEdgePx: 2160,
 
-  container: "mp4" as const, // MP4 only for the MVP (no MOV/HEVC in this gate)
+  // Etapa 1 (2026-08-05): MP4 y MOV/QuickTime. Nota técnica: ffprobe reporta el MISMO
+  // `format_name` ("mov,mp4,m4a,3gp,3g2,mj2") para ambos — la lista deja la intención
+  // explícita y no depende de ese alias compartido. HEVC sigue fuera (Etapa 2).
+  containers: ["mp4", "mov"] as const,
   videoCodec: "h264" as const, // H.264 only
   audioCodecs: ["aac"] as const, // AAC, or no audio at all
   videoStreamRequired: true, // a video stream is mandatory
@@ -67,6 +70,23 @@ export function sortedEdges(width: number, height: number): { longEdge: number; 
   return width >= height ? { longEdge: width, shortEdge: height } : { longEdge: height, shortEdge: width };
 }
 
+// PURE, positive-signal-only HDR detection (Etapa 1). Nunca lanza; nunca infiere HDR de
+// la ausencia de metadata.
+const HDR_TRANSFERS = ["smpte2084", "arib-std-b67", "smpte428", "bt2020-10", "bt2020-12"] as const;
+const HDR_PRIMARIES_OR_SPACE = ["bt2020", "bt2020nc", "bt2020_ncl", "bt2020c"] as const;
+
+export function isHdrSource(meta: SourceVideoMetadata): boolean {
+  if (meta.dolbyVision === true) return true;
+  const transfer = (meta.colorTransfer ?? "").toLowerCase();
+  if ((HDR_TRANSFERS as readonly string[]).includes(transfer)) return true;
+  const primaries = (meta.colorPrimaries ?? "").toLowerCase();
+  const space = (meta.colorSpace ?? "").toLowerCase();
+  return (
+    (HDR_PRIMARIES_OR_SPACE as readonly string[]).includes(primaries) ||
+    (HDR_PRIMARIES_OR_SPACE as readonly string[]).includes(space)
+  );
+}
+
 // PURE: compares parsed metadata to the limits and returns ALL violations (never throws,
 // never short-circuits — the caller decides which single code to surface first, but the
 // full list is available for logging/provenance). Does NOT cover VIDEO_CORRUPT: corruption
@@ -86,11 +106,12 @@ export function checkSourceLimits(meta: SourceVideoMetadata): SourceLimitViolati
   }
 
   // Container.
-  const containerOk = meta.container.split(",").includes(VIDEO_SOURCE_LIMITS.container);
+  const declared = meta.container.split(",");
+  const containerOk = VIDEO_SOURCE_LIMITS.containers.some((c) => declared.includes(c));
   if (!containerOk) {
     v.push({
       code: "VIDEO_CONTAINER_UNSUPPORTED",
-      message: `Source container "${meta.container}" is not supported (only ${VIDEO_SOURCE_LIMITS.container} is accepted).`,
+      message: `Source container "${meta.container}" is not supported (accepted: ${VIDEO_SOURCE_LIMITS.containers.join(", ")}).`,
     });
   }
 
@@ -99,6 +120,17 @@ export function checkSourceLimits(meta: SourceVideoMetadata): SourceLimitViolati
     v.push({
       code: "VIDEO_CODEC_UNSUPPORTED",
       message: `Source video codec "${meta.videoCodec}" is not supported (only ${VIDEO_SOURCE_LIMITS.videoCodec} is accepted).`,
+    });
+  }
+
+  // HDR (Etapa 1: rechazo fail-closed; el tone-mapping real llega en Etapa 2). Solo una
+  // señal POSITIVA cuenta: transferencia PQ/HLG, primarios o matriz BT.2020, o un record
+  // Dolby Vision en side_data. Un source sin estas etiquetas se trata como SDR — lo
+  // contrario tumbaría archivos legítimos que simplemente no las declaran.
+  if (isHdrSource(meta)) {
+    v.push({
+      code: "VIDEO_HDR_UNSUPPORTED",
+      message: `Source is HDR (transfer "${meta.colorTransfer ?? "?"}", primaries "${meta.colorPrimaries ?? "?"}"${meta.dolbyVision ? ", Dolby Vision" : ""}); HDR is not supported yet.`,
     });
   }
 

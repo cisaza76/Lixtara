@@ -16,6 +16,7 @@ export const CREATIVE_JOB_ERROR_CODES = [
   "VIDEO_DURATION_EXCEEDED",
   "VIDEO_FILE_TOO_LARGE",
   "VIDEO_RESOLUTION_EXCEEDED",
+  "VIDEO_HDR_UNSUPPORTED",
   "ASSET_DOWNLOAD_FAILED",
   "VIDEO_PREPARATION_FAILED",
   "VIDEO_PREPARED_SOURCE_INVALID",
@@ -57,6 +58,7 @@ export const ERROR_CLASS: Record<CreativeJobErrorCode, ErrorClass> = {
   VIDEO_DURATION_EXCEEDED: "non_retriable",
   VIDEO_FILE_TOO_LARGE: "non_retriable",
   VIDEO_RESOLUTION_EXCEEDED: "non_retriable",
+  VIDEO_HDR_UNSUPPORTED: "non_retriable",
   ASSET_DOWNLOAD_FAILED: "retriable",
   // FFmpeg normalization on the SAME source is deterministic — a retry re-runs the same
   // command on the same bytes and fails identically (mirrors the video-engine catalog,

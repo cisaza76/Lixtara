@@ -93,8 +93,22 @@ import {
   type SellerFailureKind,
 } from "@/lib/creative-studio/seller-failure-kind";
 
+// Etapa 1 (2026-08-05) — vocabulario CERRADO y seller-facing para diferenciar los cuatro
+// problemas de source que el vendedor puede corregir. No es el error_code (que nunca cruza
+// la frontera): es una etiqueta de producto, del mismo espíritu que `kind`.
+export type SellerSourceIssue = "container" | "codec" | "hdr" | "corrupt" | "other";
+
+const SOURCE_ISSUE_BY_CODE: Record<string, SellerSourceIssue> = {
+  VIDEO_CONTAINER_UNSUPPORTED: "container",
+  VIDEO_CODEC_UNSUPPORTED: "codec",
+  VIDEO_HDR_UNSUPPORTED: "hdr",
+  VIDEO_CORRUPT: "corrupt",
+};
+
 export interface SellerFailureDto {
   kind: SellerFailureKind;
+  // Presente SOLO cuando kind === "source_action_required".
+  sourceIssue?: SellerSourceIssue;
   reference: string | null; // 8-hex support handle; failure states only
   canRetry: boolean; // capacity remains AND the kind makes a retry legitimately useful
   supportPrimary: boolean; // support becomes the primary CTA
@@ -114,6 +128,9 @@ export function deriveSellerFailure(input: {
     (kind === "technical_retryable" && (input.isRepeatEquivalentFailure || !hasCapacity));
   return {
     kind,
+    ...(kind === "source_action_required"
+      ? { sourceIssue: SOURCE_ISSUE_BY_CODE[input.errorCode ?? ""] ?? "other" }
+      : {}),
     reference: referenceCodeFromTraceId(input.traceId),
     canRetry,
     supportPrimary,

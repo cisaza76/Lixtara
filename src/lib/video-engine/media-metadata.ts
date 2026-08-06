@@ -30,4 +30,13 @@ export interface SourceVideoMetadata {
   // Display rotation from container metadata / side-data (0 | 90 | 180 | 270). Applied by
   // the preparation step, not by the limit check.
   rotationDegrees: number;
+  // Etapa 1 (2026-08-05) — señales de color del SOURCE, para detectar HDR. Opcionales: un
+  // metadata sin ellas (o con null) NO es HDR — solo una señal POSITIVA lo es (misma
+  // postura que ADR-0011 frente al rango de color: nunca se adivina, nunca se penaliza lo
+  // no etiquetado). ffprobe: color_transfer / color_primaries / color_space, y
+  // side_data_list con "DOVI configuration record" para Dolby Vision.
+  colorTransfer?: string | null;
+  colorPrimaries?: string | null;
+  colorSpace?: string | null;
+  dolbyVision?: boolean;
 }

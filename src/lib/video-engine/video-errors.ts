@@ -41,6 +41,7 @@ export const VIDEO_ERROR_CODES = [
   "VIDEO_FILE_TOO_LARGE",
   "VIDEO_RESOLUTION_EXCEEDED",
   "VIDEO_CORRUPT",
+  "VIDEO_HDR_UNSUPPORTED",
   // --- authorization ---
   "VIDEO_SOURCE_UNAUTHORIZED",
   // --- preparation ---
@@ -80,6 +81,10 @@ export const VIDEO_ERROR_CATALOG: Record<VideoErrorCode, VideoErrorDescriptor> =
   VIDEO_FILE_TOO_LARGE: { code: "VIDEO_FILE_TOO_LARGE", category: "user_input", retryable: false, sellerFacing: true },
   VIDEO_RESOLUTION_EXCEEDED: { code: "VIDEO_RESOLUTION_EXCEEDED", category: "user_input", retryable: false, sellerFacing: true },
   VIDEO_CORRUPT: { code: "VIDEO_CORRUPT", category: "user_input", retryable: false, sellerFacing: true },
+  // Etapa 1 (2026-08-05): HDR/Dolby Vision aún no soportado. sellerFacing: el vendedor
+  // PUEDE actuar (grabar sin HDR o reemplazar el archivo) — de ahí que la UX lo trate
+  // como "problema con tu video" y no como fallo técnico.
+  VIDEO_HDR_UNSUPPORTED: { code: "VIDEO_HDR_UNSUPPORTED", category: "user_input", retryable: false, sellerFacing: true },
 
   VIDEO_SOURCE_UNAUTHORIZED: { code: "VIDEO_SOURCE_UNAUTHORIZED", category: "authorization", retryable: false, sellerFacing: false },
 

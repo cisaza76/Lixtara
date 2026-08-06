@@ -16,9 +16,27 @@ export const SOURCE_PREFIX = "source";
 export const SOURCE_ASSET_KIND = "video" as const;
 export const SOURCE_ASSET_SOURCE_TYPE = "seller_upload" as const;
 
-// Only what VIDEO_SOURCE_LIMITS.container guarantees (mp4). Declared explicitly, not generic.
-export const ALLOWED_SOURCE_MIME = ["video/mp4"] as const;
-export const ALLOWED_SOURCE_EXT = ["mp4"] as const;
+// Etapa 1 (autorizado 2026-08-05): MP4 y MOV/QuickTime — los dos contenedores que las
+// cámaras de teléfono producen de fábrica (iPhone graba .mov). Declarados explícitamente,
+// nunca genéricos. Este par es solo un filtro barato de primera línea: la AUTORIDAD real
+// sobre el contenido sigue siendo ffprobe en el pipeline (checkSourceLimits), que es quien
+// puede desmentir una extensión o un MIME mentirosos.
+export const ALLOWED_SOURCE_MIME = ["video/mp4", "video/quicktime"] as const;
+export const ALLOWED_SOURCE_EXT = ["mp4", "mov"] as const;
+export type SourceExt = (typeof ALLOWED_SOURCE_EXT)[number];
+
+// Extensión normalizada (IMG_6371.MOV → "mov") o null si no está en el set cerrado.
+export function sourceExtFromFileName(fileName: unknown): SourceExt | null {
+  if (typeof fileName !== "string") return null;
+  const ext = (fileName.split(".").pop() ?? "").toLowerCase();
+  return (ALLOWED_SOURCE_EXT as readonly string[]).includes(ext) ? (ext as SourceExt) : null;
+}
+
+// Content-type que el PUT firmado debe declarar para cada contenedor. Nunca se etiqueta un
+// MOV como MP4 (requisito del owner: no falsear el contenedor del input).
+export function mimeForSourceExt(ext: SourceExt): (typeof ALLOWED_SOURCE_MIME)[number] {
+  return ext === "mov" ? "video/quicktime" : "video/mp4";
+}
 
 export function isCreativeStudioVideoEnabled(): boolean {
   return process.env.CREATIVE_STUDIO_VIDEO_ENABLED === "true";
@@ -32,8 +50,13 @@ export function isUuid(v: unknown): v is string {
 // Server-built object key — the client NEVER chooses this. Only opaque ids + a fixed
 // filename, so the key is safe to log / show in support tooling regardless of the bucket
 // being private.
-export function buildSourceStoragePath(ownerId: string, listingId: string, assetId: string): string {
-  return `${SOURCE_PREFIX}/${ownerId}/${listingId}/${assetId}/source.mp4`;
+export function buildSourceStoragePath(
+  ownerId: string,
+  listingId: string,
+  assetId: string,
+  ext: SourceExt = "mp4",
+): string {
+  return `${SOURCE_PREFIX}/${ownerId}/${listingId}/${assetId}/source.${ext}`;
 }
 
 export interface InitiateInput {
@@ -69,7 +92,15 @@ export function validateInitiate(input: InitiateInput): { ok: true } | { ok: fal
 export function isExpectedSourcePath(path: unknown, ownerId: string, listingId: string, assetId: string): boolean {
   if (typeof path !== "string") return false;
   if (path.includes("..") || path.includes("\0")) return false;
-  return path === buildSourceStoragePath(ownerId, listingId, assetId);
+  // El servidor sigue siendo dueño de TODO el key: lo único que varía es la extensión,
+  // dentro del set cerrado ALLOWED_SOURCE_EXT. El cliente nunca elige el nombre.
+  return ALLOWED_SOURCE_EXT.some((ext) => path === buildSourceStoragePath(ownerId, listingId, assetId, ext));
+}
+
+// Extensión implícita en un path server-built ya validado (para derivar el MIME de
+// fallback sin volver a confiar en el cliente).
+export function sourceExtFromStoragePath(path: string): SourceExt {
+  return path.endsWith(".mov") ? "mov" : "mp4";
 }
 
 // Idempotency identity for the Source Asset: (source_type, source_id) with source_id =

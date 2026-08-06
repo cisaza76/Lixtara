@@ -28,7 +28,7 @@ describe("VIDEO_SOURCE_LIMITS — named, unit-clear values (gate §10)", () => {
     expect(VIDEO_SOURCE_LIMITS.maxFileBytes).toBe(300 * 1024 * 1024);
     expect(VIDEO_SOURCE_LIMITS.maxLongEdgePx).toBe(3840);
     expect(VIDEO_SOURCE_LIMITS.maxShortEdgePx).toBe(2160);
-    expect(VIDEO_SOURCE_LIMITS.container).toBe("mp4");
+    expect(VIDEO_SOURCE_LIMITS.containers).toEqual(["mp4", "mov"]);
     expect(VIDEO_SOURCE_LIMITS.videoCodec).toBe("h264");
     expect(VIDEO_SOURCE_LIMITS.audioCodecs).toEqual(["aac"]);
     expect(VIDEO_SOURCE_LIMITS.videoStreamRequired).toBe(true);
@@ -111,5 +111,77 @@ describe("checkSourceLimits — multiple simultaneous violations are all reporte
     expect(codes).toContain("VIDEO_CODEC_UNSUPPORTED");
     expect(codes).toContain("VIDEO_DURATION_EXCEEDED");
     expect(codes).toContain("VIDEO_FILE_TOO_LARGE");
+  });
+});
+
+// ---- Etapa 1 — MOV/H.264 SDR aceptado; HEVC y HDR rechazados fail-closed -----------
+// Fixture equivalente al archivo real del owner (iPhone 16 Pro, IMG_6371.MOV):
+// mov/h264 High, 1920x1080, yuv420p, tv, bt709 en las tres dimensiones, ~29.97 fps,
+// 26.12 s, 48.412.268 bytes, sin HDR.
+const IPHONE_MOV_SDR: SourceVideoMetadata = {
+  container: "mov,mp4,m4a,3gp,3g2,mj2",
+  videoCodec: "h264",
+  audioCodec: "aac",
+  width: 1920,
+  height: 1080,
+  fps: 29.97,
+  durationSeconds: 26.12,
+  bytes: 48_412_268,
+  rotationDegrees: 0,
+  colorTransfer: "bt709",
+  colorPrimaries: "bt709",
+  colorSpace: "bt709",
+  dolbyVision: false,
+};
+
+describe("Etapa 1 — el archivo real del iPhone pasa sin violaciones", () => {
+  it("MOV/H.264 SDR dentro de límites: cero violaciones", () => {
+    expect(checkSourceLimits(IPHONE_MOV_SDR)).toEqual([]);
+  });
+
+  it("el contenedor MOV es aceptado explícitamente (no por accidente del alias mp4)", () => {
+    expect([...VIDEO_SOURCE_LIMITS.containers].sort()).toEqual(["mov", "mp4"]);
+    // un contenedor realmente ajeno sigue siendo rechazado
+    expect(firstSourceLimitViolation({ ...IPHONE_MOV_SDR, container: "matroska,webm" })?.code).toBe(
+      "VIDEO_CONTAINER_UNSUPPORTED",
+    );
+  });
+});
+
+describe("Etapa 1 — HEVC sigue rechazado (habilitación diferida a Etapa 2)", () => {
+  it("hevc → VIDEO_CODEC_UNSUPPORTED", () => {
+    expect(firstSourceLimitViolation({ ...IPHONE_MOV_SDR, videoCodec: "hevc" })?.code).toBe("VIDEO_CODEC_UNSUPPORTED");
+  });
+});
+
+describe("Etapa 1 — HDR rechazado fail-closed, con código propio", () => {
+  it("HDR10 (smpte2084) → VIDEO_HDR_UNSUPPORTED", () => {
+    expect(firstSourceLimitViolation({ ...IPHONE_MOV_SDR, colorTransfer: "smpte2084" })?.code).toBe(
+      "VIDEO_HDR_UNSUPPORTED",
+    );
+  });
+  it("HLG (arib-std-b67) → VIDEO_HDR_UNSUPPORTED", () => {
+    expect(firstSourceLimitViolation({ ...IPHONE_MOV_SDR, colorTransfer: "arib-std-b67" })?.code).toBe(
+      "VIDEO_HDR_UNSUPPORTED",
+    );
+  });
+  it("primarios/espacio bt2020 → VIDEO_HDR_UNSUPPORTED", () => {
+    expect(firstSourceLimitViolation({ ...IPHONE_MOV_SDR, colorPrimaries: "bt2020" })?.code).toBe("VIDEO_HDR_UNSUPPORTED");
+    expect(firstSourceLimitViolation({ ...IPHONE_MOV_SDR, colorSpace: "bt2020nc" })?.code).toBe("VIDEO_HDR_UNSUPPORTED");
+  });
+  it("Dolby Vision (side_data) → VIDEO_HDR_UNSUPPORTED", () => {
+    expect(firstSourceLimitViolation({ ...IPHONE_MOV_SDR, dolbyVision: true })?.code).toBe("VIDEO_HDR_UNSUPPORTED");
+  });
+  it("señal AUSENTE no se trata como HDR (positive-signal-only, misma postura que ADR-0011)", () => {
+    const untagged = { ...IPHONE_MOV_SDR, colorTransfer: null, colorPrimaries: null, colorSpace: null };
+    expect(checkSourceLimits(untagged)).toEqual([]);
+    const legacy = { ...IPHONE_MOV_SDR };
+    delete (legacy as { colorTransfer?: unknown }).colorTransfer;
+    expect(checkSourceLimits(legacy)).toEqual([]);
+  });
+  it("el mensaje es técnico pero no expone comandos ni rutas internas", () => {
+    const msg = firstSourceLimitViolation({ ...IPHONE_MOV_SDR, colorTransfer: "smpte2084" })?.message ?? "";
+    expect(msg.toLowerCase()).toContain("hdr");
+    expect(msg).not.toContain("/");
   });
 });

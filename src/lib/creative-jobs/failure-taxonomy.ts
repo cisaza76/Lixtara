@@ -52,6 +52,7 @@ export const FAILURE_TAXONOMY: Record<CreativeJobErrorCode, FailureTaxonomyEntry
   VIDEO_DURATION_EXCEEDED: { category: "INPUT", stage: "preparing" },
   VIDEO_FILE_TOO_LARGE: { category: "INPUT", stage: "preparing" },
   VIDEO_RESOLUTION_EXCEEDED: { category: "INPUT", stage: "preparing" },
+  VIDEO_HDR_UNSUPPORTED: { category: "INPUT", stage: "preparing" },
   ASSET_DOWNLOAD_FAILED: { category: "SOURCE", stage: "download" },
   VIDEO_PREPARATION_FAILED: { category: "PREPARATION", stage: "preparing" },
   VIDEO_PREPARED_SOURCE_INVALID: { category: "PREPARATION", stage: "preparing" },

@@ -7,6 +7,14 @@
 // the browser showing a first frame (poster is best-effort only). No render/preparation.
 import { useEffect, useRef, useState } from "react";
 import { isAccessExpired, type SourcePreviewDto, type TemporaryMediaAccess } from "@/lib/creative-studio/source-preview";
+import {
+  announceFor,
+  createSingleFlight,
+  nextPreviewStateOnError,
+  runDownloadAttempt,
+  unplayableView,
+  type PreviewViewState,
+} from "@/lib/creative-studio/source-preview-view";
 
 export interface SourceVideoPreviewCopy {
   play: string;
@@ -15,6 +23,9 @@ export interface SourceVideoPreviewCopy {
   loading: string;
   error: string;
   retry: string;
+  unsupported: string;
+  downloadCta: string;
+  downloadError: string;
   sr: { loading: string; playing: string; error: string };
 }
 
@@ -29,9 +40,13 @@ export function SourceVideoPreview({
   copy: SourceVideoPreviewCopy;
 }): React.JSX.Element {
   const [access, setAccess] = useState<TemporaryMediaAccess | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "playing" | "error">("idle");
+  const [state, setState] = useState<PreviewViewState>("idle");
   const [expanded, setExpanded] = useState(false);
   const retriedRef = useRef(false);
+  // Candado de una sola solicitud en curso para el CTA de descarga (doble clic).
+  const downloadFlightRef = useRef(createSingleFlight());
+  const [downloading, setDownloading] = useState(false);
+  const [downloadFailed, setDownloadFailed] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   // Fetch/renew the ephemeral access. `force` re-fetches even if the current grant looks
@@ -62,15 +77,39 @@ export function SourceVideoPreview({
   }
 
   // <video> error is how an EXPIRED signed URL surfaces (403). Renew ONCE, reactively.
+  // Si vuelve a fallar, el navegador no puede con este contenedor: estado estable con
+  // descarga (nextPreviewStateOnError, testeado en source-preview-view.test.ts).
   async function onVideoError(): Promise<void> {
-    if (retriedRef.current) {
-      setState("error");
+    const decision = nextPreviewStateOnError({ alreadyRetried: retriedRef.current, hasAccess: access !== null });
+    if (!decision.renewAccess) {
+      setState(decision.state);
       return;
     }
     retriedRef.current = true;
     const a = await ensureAccess(true);
     if (!a) setState("error");
     // a successful renew updates `access`; the <video> src (derived from access) re-loads.
+  }
+
+  // Descarga del fallback: renovación BAJO DEMANDA, solo al pulsar. Un intento por clic,
+  // sin timers ni renovación automática. Un fallo deja un estado estable y reintentable
+  // y jamás toca source/Asset/job/grant/cuota/upload.
+  async function onDownloadClick(): Promise<void> {
+    if (downloadFlightRef.current.isBusy()) return;
+    setDownloadFailed(false);
+    setDownloading(true);
+    const result = await downloadFlightRef.current.run(() =>
+      runDownloadAttempt({
+        access,
+        nowMs: Date.now(),
+        renew: () => ensureAccess(true),
+        open: (href) => {
+          window.open(href, "_blank", "noopener,noreferrer");
+        },
+      }),
+    );
+    setDownloading(false);
+    if (result !== "busy" && result.status === "failed") setDownloadFailed(true);
   }
 
   useEffect(() => {
@@ -85,8 +124,8 @@ export function SourceVideoPreview({
     return () => document.removeEventListener("keydown", onKey);
   }, [expanded]);
 
-  const announce =
-    state === "loading" ? copy.sr.loading : state === "error" ? copy.sr.error : state === "playing" ? copy.sr.playing : "";
+  const announce = announceFor(state, copy);
+  const fallback = unplayableView({ unsupported: copy.unsupported, downloadCta: copy.downloadCta }, access?.locator ?? null);
 
   const videoEl = access ? (
     <video
@@ -118,6 +157,30 @@ export function SourceVideoPreview({
               {copy.expand}
             </button>
           </div>
+        </div>
+      ) : state === "unplayable" ? (
+        // Fallback estable: sin player roto, sin renovar URL, sin polling. Reutiliza la
+        // URL firmada ya obtenida para permitir ver el video fuera del navegador.
+        <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+          <p className="text-sm text-neutral-700" role="status">
+            {fallback.message}
+          </p>
+          <div>
+            <button
+              type="button"
+              onClick={() => void onDownloadClick()}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 rounded-md border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+            >
+              {downloading && <span className={SPINNER} aria-hidden="true" />}
+              {fallback.cta}
+            </button>
+          </div>
+          {downloadFailed ? (
+            <p className="text-sm text-amber-700" role="alert">
+              {copy.downloadError}
+            </p>
+          ) : null}
         </div>
       ) : state === "error" ? (
         <div className="flex flex-col gap-2">

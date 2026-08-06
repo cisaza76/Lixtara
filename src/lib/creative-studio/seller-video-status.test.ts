@@ -229,3 +229,32 @@ describe("madeFromStrategy — chip source", () => {
     expect(madeFromStrategy("unknown-future")).toBe("photos");
   });
 });
+
+describe("Etapa 1 — sourceIssue: 4 causas distinguibles sin exponer códigos", () => {
+  const f = (errorCode: string) =>
+    deriveSellerFailure({ errorCode, traceId: "t", remainingGenerations: 3, isRepeatEquivalentFailure: false });
+
+  it("distingue contenedor / códec / HDR / corrupto", () => {
+    expect(f("VIDEO_CONTAINER_UNSUPPORTED").sourceIssue).toBe("container");
+    expect(f("VIDEO_CODEC_UNSUPPORTED").sourceIssue).toBe("codec");
+    expect(f("VIDEO_HDR_UNSUPPORTED").sourceIssue).toBe("hdr");
+    expect(f("VIDEO_CORRUPT").sourceIssue).toBe("corrupt");
+  });
+
+  it("todas son source_action_required (el vendedor puede actuar) y ninguna ofrece retry ciego", () => {
+    for (const code of ["VIDEO_CONTAINER_UNSUPPORTED", "VIDEO_CODEC_UNSUPPORTED", "VIDEO_HDR_UNSUPPORTED", "VIDEO_CORRUPT"]) {
+      expect(f(code).kind, code).toBe("source_action_required");
+      expect(f(code).canRetry, code).toBe(false);
+    }
+  });
+
+  it("otras causas de source usan el mensaje genérico (sourceIssue 'other')", () => {
+    expect(f("VIDEO_DURATION_EXCEEDED").sourceIssue).toBe("other");
+    expect(f("VIDEO_FILE_TOO_LARGE").sourceIssue).toBe("other");
+  });
+
+  it("los fallos técnicos NO llevan sourceIssue", () => {
+    expect(f("RENDER_FAILED").sourceIssue).toBeUndefined();
+    expect(f("SANDBOX_CREATE_FAILED").sourceIssue).toBeUndefined();
+  });
+});

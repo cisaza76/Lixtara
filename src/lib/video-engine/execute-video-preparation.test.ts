@@ -400,3 +400,58 @@ describe("parseFfprobeToPreparedProbe (strict)", () => {
     expect(parseFfprobeToPreparedProbe(probeJson({ audio: false }), 1).audioCodec).toBeNull();
   });
 });
+
+// ---- Etapa 1 — el probe del SOURCE captura las señales de color (detección HDR) ------
+describe("parseFfprobeToPreparedProbe — señales de color del source (Etapa 1)", () => {
+  const withColor = (extra: Record<string, unknown>, sideData?: unknown[]) =>
+    JSON.stringify({
+      streams: [
+        {
+          codec_type: "video",
+          codec_name: "h264",
+          width: 1920,
+          height: 1080,
+          r_frame_rate: "30000/1001",
+          pix_fmt: "yuv420p",
+          color_range: "tv",
+          ...extra,
+          ...(sideData ? { side_data_list: sideData } : {}),
+        },
+      ],
+      format: { format_name: "mov,mp4,m4a,3gp,3g2,mj2", duration: "26.12" },
+    });
+
+  it("captura transfer/primaries/space del archivo real (bt709 en las tres)", () => {
+    const p = parseFfprobeToPreparedProbe(
+      withColor({ color_transfer: "bt709", color_primaries: "bt709", color_space: "bt709" }),
+      48_412_268,
+    );
+    expect(p.colorTransfer).toBe("bt709");
+    expect(p.colorPrimaries).toBe("bt709");
+    expect(p.colorSpace).toBe("bt709");
+    expect(p.dolbyVision).toBe(false);
+  });
+
+  it("detecta Dolby Vision desde side_data_list", () => {
+    const p = parseFfprobeToPreparedProbe(
+      withColor({ color_transfer: "smpte2084" }, [{ side_data_type: "DOVI configuration record", dv_profile: 8 }]),
+      1000,
+    );
+    expect(p.dolbyVision).toBe(true);
+    expect(p.colorTransfer).toBe("smpte2084");
+  });
+
+  it("un side_data de rotación NO se confunde con Dolby Vision", () => {
+    const p = parseFfprobeToPreparedProbe(withColor({}, [{ side_data_type: "Display Matrix", rotation: -90 }]), 1000);
+    expect(p.dolbyVision).toBe(false);
+    expect(p.rotationDegrees).toBe(90);
+  });
+
+  it("ausencia de etiquetas de color → null (no se inventa nada)", () => {
+    const p = parseFfprobeToPreparedProbe(withColor({}), 1000);
+    expect(p.colorTransfer).toBeNull();
+    expect(p.colorPrimaries).toBeNull();
+    expect(p.colorSpace).toBeNull();
+    expect(p.dolbyVision).toBe(false);
+  });
+});

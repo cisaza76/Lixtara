@@ -19,6 +19,8 @@ import {
   SOURCE_ASSET_SOURCE_TYPE,
   SOURCE_BUCKET,
   buildSourceStoragePath,
+  sourceExtFromStoragePath,
+  mimeForSourceExt,
   isCreativeStudioVideoEnabled,
   isExpectedSourcePath,
   isUuid,
@@ -169,7 +171,11 @@ export async function handleCompleteSourceUpload(req: Request, deps: CompleteSou
   if (!isExpectedSourcePath(body.storagePath, user.id, listingId, uploadId)) {
     return NextResponse.json({ error: "invalid_storage_path" }, { status: 403 });
   }
-  const expectedPath = buildSourceStoragePath(user.id, listingId, uploadId);
+  // Etapa 1 — la extensión del key la fija el servidor dentro del set cerrado; se deriva
+  // del path YA validado (isExpectedSourcePath probó que es byte-igual a uno de los dos
+  // candidatos server-built), nunca de texto libre del cliente.
+  const sourceExt = sourceExtFromStoragePath(String(body.storagePath));
+  const expectedPath = buildSourceStoragePath(user.id, listingId, uploadId, sourceExt);
 
   const identity = sourceAssetIdentity(uploadId);
 
@@ -229,7 +235,7 @@ export async function handleCompleteSourceUpload(req: Request, deps: CompleteSou
       storageBucket: SOURCE_BUCKET,
       storagePath: expectedPath,
       bytes: meta.sizeBytes,
-      mime: meta.mimeType ?? "video/mp4",
+      mime: meta.mimeType ?? mimeForSourceExt(sourceExt),
       costUsd: 0,
       costProvider: null,
       createdBy: user.id,
