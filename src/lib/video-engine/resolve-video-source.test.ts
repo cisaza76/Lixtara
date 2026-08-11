@@ -61,10 +61,15 @@ describe("defaultResolveVideoSource (canonical current-source authority — beha
     expect(r?.id).toBe("new");
   });
 
-  it("lifecycle plays no role in selection — an archived newest is still chosen (F4.6 Stage B left the authority untouched)", async () => {
-    // Pins the ADR-0009 single-authority contract across Stage B: the retention engine reads
-    // `lifecycle`, the authority does NOT. Selection remains newest-createdAt over eligible
-    // seller uploads, whatever their lifecycle.
+  // CONTRATO CAMBIADO — Issue #118 (2026-08-11), autorizado por el owner.
+  //
+  // Este test afirmaba lo contrario: que `lifecycle` NO participaba en la selección y que un
+  // archivado más reciente seguía siendo elegido. Eso codificaba el defecto de #118 como si
+  // fuera intencional: la autoridad podía devolver un Asset cuyos bytes ya no existen en
+  // Storage (retención F4.6 los borra, y ahora también la eliminación del vendedor).
+  //
+  // El contrato vigente es: archivado = fuera de la selección, de forma terminal.
+  it("un archivado más reciente NO se elige; gana el más reciente no archivado", async () => {
     const resolve = defaultResolveVideoSource(
       store([
         asset({ id: "activeOld", createdAt: "2026-07-01T00:00:00.000Z", lifecycle: "approved" }),
@@ -72,7 +77,7 @@ describe("defaultResolveVideoSource (canonical current-source authority — beha
       ]),
     );
     const r = await resolve(LISTING, OWNER);
-    expect(r?.id).toBe("archivedNew");
+    expect(r?.id).toBe("activeOld");
   });
 
   it("returns an Asset when a match exists, null otherwise", async () => {
@@ -82,5 +87,49 @@ describe("defaultResolveVideoSource (canonical current-source authority — beha
     expect(r?.id).toBe("only");
     // and null for a listing with no candidates
     expect(await resolve("no-such-listing", OWNER)).toBeNull();
+  });
+});
+
+// ---- Issue #118 — lifecycle: un source ARCHIVADO nunca vuelve a resolverse -------------
+// El resolver ignoraba `lifecycle`, así que un asset archivado (por retención F4.6 o por
+// eliminación del vendedor) seguía siendo elegible como "source vigente": el worker podía
+// renderizar desde bytes ya borrados de Storage, y la UI mostrarlo como si existiera.
+describe("Issue #118 — el lifecycle 'archived' excluye al asset de la resolución", () => {
+  it("ignora un source archivado aunque sea el más reciente", async () => {
+    const resolve = defaultResolveVideoSource(
+      store([
+        asset({ id: "viejo-vivo", createdAt: "2026-07-01T00:00:00.000Z", lifecycle: "draft" }),
+        asset({ id: "nuevo-archivado", createdAt: "2026-07-09T00:00:00.000Z", lifecycle: "archived" }),
+      ]),
+    );
+    expect((await resolve(LISTING, OWNER))?.id).toBe("viejo-vivo");
+  });
+
+  it("si TODOS los sources están archivados → null (no hay source vigente)", async () => {
+    const resolve = defaultResolveVideoSource(
+      store([
+        asset({ id: "a1", createdAt: "2026-07-01T00:00:00.000Z", lifecycle: "archived" }),
+        asset({ id: "a2", createdAt: "2026-07-05T00:00:00.000Z", lifecycle: "archived" }),
+      ]),
+    );
+    expect(await resolve(LISTING, OWNER)).toBeNull();
+  });
+
+  it("ningún source histórico archivado reaparece tras eliminar el vigente", async () => {
+    const resolve = defaultResolveVideoSource(
+      store([
+        asset({ id: "h1", createdAt: "2026-07-01T00:00:00.000Z", lifecycle: "archived" }),
+        asset({ id: "h2", createdAt: "2026-07-02T00:00:00.000Z", lifecycle: "archived" }),
+        asset({ id: "vigente-eliminado", createdAt: "2026-07-03T00:00:00.000Z", lifecycle: "archived" }),
+      ]),
+    );
+    expect(await resolve(LISTING, OWNER)).toBeNull();
+  });
+
+  it("los demás lifecycles siguen siendo elegibles (solo 'archived' excluye)", async () => {
+    for (const lc of ["draft", "ready_for_review", "approved", "rejected"] as const) {
+      const resolve = defaultResolveVideoSource(store([asset({ id: `x-${lc}`, lifecycle: lc })]));
+      expect((await resolve(LISTING, OWNER))?.id).toBe(`x-${lc}`);
+    }
   });
 });
