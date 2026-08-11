@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import { SupabaseAssetStore } from "@/lib/assets/asset-store.supabase";
+import { defaultResolveVideoSource } from "@/lib/video-engine/resolve-video-source";
 import type { Asset } from "@/lib/assets/types";
 import { SOURCE_BUCKET, isCreativeStudioVideoEnabled, isUuid } from "@/lib/creative-studio/source-upload";
 import {
@@ -50,13 +51,9 @@ function defaultDeps(): SourcePreviewDeps {
       const { data } = await supabase.from("properties").select("id, owner_id").eq("id", listingId).maybeSingle();
       return (data as PropertyRow | null) ?? null;
     },
-    async loadCurrentSource(listingId, ownerId) {
-      const assets = new SupabaseAssetStore(createService());
-      const all = await assets.listByListing(listingId);
-      const uploads = all.filter((a) => a.kind === "video" && a.sourceType === "seller_upload" && a.ownerId === ownerId);
-      if (uploads.length === 0) return null;
-      return [...uploads].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    },
+    // Issue #118 — autoridad única (ver nota en GET /source). Un preview firmado sobre un
+    // source archivado apuntaría a un objeto ya borrado de Storage.
+    loadCurrentSource: defaultResolveVideoSource(new SupabaseAssetStore(createService())),
     async createTemporaryAccess(bucket, path) {
       const { data, error } = await createService().storage.from(bucket).createSignedUrl(path, SOURCE_PREVIEW_TTL_SECONDS);
       if (error || !data?.signedUrl) return null;
