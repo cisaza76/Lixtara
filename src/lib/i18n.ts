@@ -1238,6 +1238,9 @@ export const dictionaries = {
         errorHeading: "We couldn't finish your video",
         errorReassurance: "Your listing and photos are safe. No video was added.",
         errorDetail: "This sometimes happens — trying again usually works.",
+        // Fallo pre-job: el copy debe decir la verdad sobre si reintentar sirve.
+        errorDetailTransient: "A service we rely on is momentarily unavailable. Trying again in a few minutes usually works.",
+        errorDetailDeterministic: "Trying again won't change the result. Our team can look into it with the reference below.",
         supportErrorDetail: "Our team can look into it for you — contact support and they'll take it from there.",
         sourceErrorHeading: "There's a problem with your video",
         sourceErrorDetail:
@@ -2589,6 +2592,9 @@ export const dictionaries = {
         errorHeading: "No pudimos terminar tu video",
         errorReassurance: "Tu publicación y tus fotos están seguras. No se agregó ningún video.",
         errorDetail: "A veces pasa — volver a intentarlo suele funcionar.",
+        // Fallo pre-job: el copy debe decir la verdad sobre si reintentar sirve.
+        errorDetailTransient: "Un servicio del que dependemos no está disponible por un momento. Reintentar en unos minutos suele funcionar.",
+        errorDetailDeterministic: "Reintentar no va a cambiar el resultado. Nuestro equipo puede revisarlo con la referencia de abajo.",
         supportErrorDetail: "Nuestro equipo puede revisarlo por ti — contacta a soporte y ellos se encargan.",
         sourceErrorHeading: "Hay un problema con tu video",
         sourceErrorDetail:
