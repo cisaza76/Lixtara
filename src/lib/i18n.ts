@@ -1323,7 +1323,7 @@ export const dictionaries = {
       items: [
         {
           q: "What is Lixtara?",
-          a: "Lixtara is a Florida flat-fee real estate brokerage (brokerage license pending). We help you sell your home for a flat fee plus low commission — full home.com exposure, licensed broker support, none of the traditional 6% drag.",
+          a: "Lixtara is a licensed Florida flat-fee real estate brokerage (Lic #CQ1075352). We help you sell your home for a flat fee plus low commission — full home.com exposure, licensed broker support, none of the traditional 6% drag.",
         },
         {
           q: "How is Lixtara different from a traditional 6% agent?",
@@ -1335,7 +1335,7 @@ export const dictionaries = {
         },
         {
           q: "Is Lixtara a licensed brokerage?",
-          a: "Yes. Lixtara is a Florida real estate brokerage (license pending). All transactions are supervised by a licensed broker-of-record in compliance with Florida Statute 475 and FAR/BAR contracts.",
+          a: "Yes. Lixtara is a licensed Florida real estate brokerage (Lic #CQ1075352). All transactions are supervised by our licensed broker-of-record in compliance with Florida Statute 475 and FAR/BAR contracts.",
         },
         {
           q: "What about the buyer's agent commission?",
@@ -2668,7 +2668,7 @@ export const dictionaries = {
       items: [
         {
           q: "¿Qué es Lixtara?",
-          a: "Lixtara es una correduría inmobiliaria de tarifa fija en Florida (licencia en trámite). Te ayudamos a vender tu casa con una tarifa fija más una comisión baja — exposición completa en home.com, respaldo de broker licenciado, sin el 6% tradicional.",
+          a: "Lixtara es una correduría inmobiliaria licenciada de tarifa fija en Florida (Lic #CQ1075352). Te ayudamos a vender tu casa con una tarifa fija más una comisión baja — exposición completa en home.com, respaldo de broker licenciado, sin el 6% tradicional.",
         },
         {
           q: "¿En qué se diferencia Lixtara de un agente tradicional del 6%?",
@@ -2680,7 +2680,7 @@ export const dictionaries = {
         },
         {
           q: "¿Lixtara es una correduría licenciada?",
-          a: "Sí. Lixtara es una correduría inmobiliaria en Florida (licencia en trámite). Todas las transacciones son supervisadas por un broker-of-record licenciado en cumplimiento con el Estatuto 475 de Florida y los contratos FAR/BAR.",
+          a: "Sí. Lixtara es una correduría inmobiliaria licenciada en Florida (Lic #CQ1075352). Todas las transacciones son supervisadas por nuestro broker-of-record licenciado en cumplimiento con el Estatuto 475 de Florida y los contratos FAR/BAR.",
         },
         {
           q: "¿Y la comisión del agente del comprador?",
