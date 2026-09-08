@@ -18,7 +18,10 @@ function Section({ section, level }: { section: LegalSection; level: number }) {
     <section>
       <Heading className={headingClass}>{section.heading}</Heading>
       {section.body.map((p, i) => (
-        <p key={i} className="text-sm leading-relaxed text-ink/75 mb-3">
+        // whitespace-pre-line: preserva los saltos de línea de un bloque de
+        // dirección (p. ej. el agente DMCA). Los documentos existentes no traen
+        // "\n" en su body, así que no cambia su renderizado.
+        <p key={i} className="text-sm leading-relaxed text-ink/75 mb-3 whitespace-pre-line">
           {p}
         </p>
       ))}
