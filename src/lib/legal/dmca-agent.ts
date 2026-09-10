@@ -4,7 +4,12 @@
 // ante la U.S. Copyright Office Y publicado en el sitio. El acuerdo de datos de
 // MIAMI AOR § VII.B.2 exige lo mismo como condición para activar el feed del MLS.
 //
-// REGISTRO VIGENTE: DMCA-1080195 · presentado 2026-09-10 · vence 2029-09-10.
+// REGISTRO VIGENTE: DMCA-1080195 · efectivo 2026-09-10 · vence 2029-09-10.
+// Estado ACTIVE confirmado por la U.S. Copyright Office el 2026-09-10.
+//
+// La Copyright Office publica en su directorio todo lo de abajo EXCEPTO el
+// teléfono y el correo del service provider — la misma separación que impone
+// publicAgentBlock(). Ver DmcaRegistration.
 //
 // Los valores de abajo deben coincidir EXACTAMENTE con lo presentado ante la
 // Copyright Office. Si divergen, el safe harbor queda defectuoso.
@@ -29,6 +34,12 @@ export interface DmcaRegistration {
   registeredOn: string;
   /** Caducidad: 3 años exactos desde el registro (ISO). */
   expiresOn: string;
+  /**
+   * Fecha en que la Copyright Office confirmó el estado "Active" (ISO).
+   * Presentar el formulario no basta: el safe harbor se apoya en un registro
+   * activo, y hasta esa confirmación no existe.
+   */
+  confirmedActiveOn: string;
   serviceProvider: {
     legalName: string;
     address: DmcaAddress;
@@ -59,6 +70,7 @@ export const DMCA_REGISTRATION: DmcaRegistration = {
   registrationNumber: "DMCA-1080195",
   registeredOn: "2026-09-10",
   expiresOn: "2029-09-10",
+  confirmedActiveOn: "2026-09-10",
   serviceProvider: {
     legalName: "LIXTARA LLC",
     address: REGISTERED_ADDRESS,

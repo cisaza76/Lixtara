@@ -33,11 +33,19 @@ Telephone: 786-210-3562
 un canal de avisos. `publicAgentBlock()` solo lee los campos públicos, y un test verifica que el
 administrativo no aparezca en ninguna página.
 
-### Verificar que quedó "Active"
+### ✅ Estado ACTIVE confirmado — 2026-09-10
 
-El estado pasó de *Payment Processing* a *Active* de forma automática. **Confírmalo** en el
-directorio público de la Copyright Office. Si por algún motivo no quedó activo, el safe harbor
-no existe todavía aunque la página ya esté publicada.
+Correo de confirmación de la U.S. Copyright Office (`donotreply@loc.gov`):
+**Status: Active · Effective: September 10, 2026 to Present**. Los 12 campos del registro
+fueron cotejados uno a uno contra el código: coinciden exactamente.
+
+El correo confirma además la separación de contactos:
+
+> *"The below information, **except for the service provider's phone number and email address**,
+> can now be viewed in the DMCA Designated Agent Directory."*
+
+La propia Copyright Office retiene del directorio público el teléfono y correo del service
+provider. `publicAgentBlock()` aplica la misma regla en el sitio.
 
 ### 🔴 Vencimiento: 2029-09-10 — no se renueva solo
 
@@ -132,4 +140,4 @@ abierta.
   publicado como canal oficial: si rebota, el procedimiento no funciona.
 - **Revisión de abogado** — la política sigue el texto del § 512, pero no ha pasado por counsel
   de Florida.
-- **Verificar estado "Active"** en el directorio de la Copyright Office.
+- ~~Verificar estado "Active"~~ ✅ confirmado 2026-09-10.

@@ -16,6 +16,8 @@ describe("DMCA registration record", () => {
     expect(DMCA_REGISTRATION.registrationNumber).toBe("DMCA-1080195");
     expect(DMCA_REGISTRATION.registeredOn).toBe("2026-09-10");
     expect(DMCA_REGISTRATION.expiresOn).toBe("2029-09-10");
+    // Confirmado "Active" por la Copyright Office, no solo presentado.
+    expect(DMCA_REGISTRATION.confirmedActiveOn).toBe("2026-09-10");
     expect(DMCA_REGISTRATION.serviceProvider.legalName).toBe("LIXTARA LLC");
   });
 
