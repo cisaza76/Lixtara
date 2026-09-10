@@ -6,39 +6,64 @@ AOR § VII.B.2 exige lo mismo como **condición previa** para activar el feed de
 
 ---
 
-## Parte 1 — Registrar el agente (acción del owner, ~15 min, ~$6)
+## ✅ Registro COMPLETADO — 2026-09-10
 
-Esto **no lo puede hacer nadie más**: requiere la cuenta de la entidad, el pago y declaraciones
-legales en nombre de Lixtara, LLC.
+| Campo | Valor |
+|---|---|
+| **Registration Number** | `DMCA-1080195` |
+| Entidad (service provider) | `LIXTARA LLC` |
+| Fecha de registro | **2026-09-10** |
+| **Vence** | **2029-09-10** |
+| Pay.gov Tracking ID | `285SDUVV` · $6.00 |
 
-1. Entra a **https://dmca.copyright.gov** y crea una cuenta de *service provider*.
-2. Registra la **entidad legal**: `Lixtara, LLC`. No un nombre comercial ni una persona.
-3. Designa el agente. Puede ser un rol, no obligatoriamente una persona nombrada:
-   - **Nombre:** `Copyright Agent, Lixtara, LLC`
-   - **Dirección postal:** la de la LLC en Miami *(debe ser una dirección real que reciba correo)*
-   - **Correo:** `dmca@lixtara.com` — **créalo antes**, tiene que recibir de verdad
-   - **Teléfono:** un número atendible
-4. Paga la tasa (~$6) y guarda el comprobante.
-5. **Anota la fecha de registro.** Caduca a los **3 años** y hay que renovarlo.
+**Agente designado — datos PÚBLICOS** (los que aparecen en `/dmca`):
 
-### Parte 2 — Pasar los datos al código
-
-Abre `src/lib/legal/dmca-agent.ts` y reemplaza los tres marcadores con los valores
-**exactamente como quedaron registrados** (si no coinciden con el registro, el safe harbor
-queda defectuoso):
-
-```ts
-addressLines: ["[STREET ADDRESS]", "Miami, Florida [ZIP]", "United States"],
-phone: "[PHONE]",
-registeredOn: "[YYYY-MM-DD]",
+```
+Copyright Agent
+LIXTARA LLC
+181 Vera Court
+Coral Gables, FL 33143
+United States
+Email: dmca@lixtara.com
+Telephone: 786-210-3562
 ```
 
-Luego, en `src/lib/legal/dmca-agent.test.ts`, quita el `.skip` del test
-`SKIP-UNTIL-REGISTERED`. A partir de ahí queda bloqueada cualquier regresión que vacíe el
-registro.
+**Contacto del service provider — ADMINISTRATIVO, nunca se publica:**
+`camilo@lixtara.com` · `305-522-3454`. Es el contacto de la cuenta ante la Copyright Office, no
+un canal de avisos. `publicAgentBlock()` solo lee los campos públicos, y un test verifica que el
+administrativo no aparezca en ninguna página.
 
-> ⚠️ **No despliegues a producción con los marcadores puestos.** Una página DMCA en vivo con
-> `[STREET ADDRESS]` anuncia un procedimiento que no funciona: es peor que no tenerla.
+### Verificar que quedó "Active"
+
+El estado pasó de *Payment Processing* a *Active* de forma automática. **Confírmalo** en el
+directorio público de la Copyright Office. Si por algún motivo no quedó activo, el safe harbor
+no existe todavía aunque la página ya esté publicada.
+
+### 🔴 Vencimiento: 2029-09-10 — no se renueva solo
+
+Al vencer, el registro pasa a **Terminated** y el safe harbor del § 512 **desaparece en
+silencio**: nada en el producto falla, simplemente deja de haber protección.
+
+Por eso hay un **guard en la suite de tests** (`dmca-agent.test.ts`). Se pone rojo el
+**2029-07-12**, 60 días antes, y bloquea los cinco gates hasta que se recertifique. Verificado:
+a 61 días pasa, a 60 falla, vencido falla.
+
+**Cuando el test falle:**
+1. Recertifica en https://dmca.copyright.gov (~$6, ~15 min)
+2. Actualiza `registeredOn` y `expiresOn` en `src/lib/legal/dmca-agent.ts`
+3. Actualiza las fechas fijadas en el primer test de `dmca-agent.test.ts`
+
+> Un recordatorio de calendario **además** del guard no sobra, pero el guard es la red que no
+> depende de que nadie se acuerde. Un cron a tres años vista no es fiable; el test sí, porque
+> corre en cada push.
+
+### ⚠️ La dirección publicada es residencial
+
+`181 Vera Court, Coral Gables` queda publicada en `/dmca` **y en el directorio público de la
+Copyright Office** — la ley exige que la dirección del agente sea pública, así que ya lo es
+por el registro mismo. Si prefieres no exponer un domicilio particular, la alternativa es
+re-registrar con la dirección de un *registered agent* o un buzón comercial. Es una decisión
+tuya, no un defecto.
 
 ---
 
@@ -100,7 +125,11 @@ abierta.
 
 ## Deuda abierta
 
-- **Registro de reincidentes** — declarado en la política, no implementado.
-- **Buzón `dmca@lixtara.com`** — hay que crearlo y que alguien lo vigile.
-- **Revisión de abogado** — esta política sigue el texto del § 512, pero no ha pasado por
-  counsel de Florida.
+- **Registro de reincidentes** — declarado en `/dmca` §6, **no implementado**. El § 512(i) exige
+  implementarlo razonablemente, no solo declararlo. Hace falta llevar cuenta de notificaciones
+  válidas por cuenta y definir el umbral de terminación.
+- **Buzón `dmca@lixtara.com`** — confirmar que existe, que recibe y que alguien lo vigila. Está
+  publicado como canal oficial: si rebota, el procedimiento no funciona.
+- **Revisión de abogado** — la política sigue el texto del § 512, pero no ha pasado por counsel
+  de Florida.
+- **Verificar estado "Active"** en el directorio de la Copyright Office.

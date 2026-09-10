@@ -1,5 +1,5 @@
 import type { LegalContent } from "./types";
-import { DMCA_AGENT } from "./dmca-agent";
+import { publicAgentBlock } from "./dmca-agent";
 
 // DMCA notice-and-takedown policy. Structured to satisfy 17 U.S.C. § 512:
 // § 512(c)(2) designated agent · § 512(c)(3)(A) notice elements ·
@@ -8,13 +8,9 @@ import { DMCA_AGENT } from "./dmca-agent";
 // Also satisfies MIAMI AOR Data License Agreement § VII.B.2 / § VII.C.2, which
 // require these disclosures as a condition of the MLS data feed.
 
-const agentBlock = [
-  DMCA_AGENT.agentName,
-  DMCA_AGENT.entity,
-  ...DMCA_AGENT.addressLines,
-  `Email: ${DMCA_AGENT.email}`,
-  `Telephone: ${DMCA_AGENT.phone}`,
-];
+// Solo los campos públicos del registro. El contacto administrativo del service
+// provider jamás llega aquí — ver publicAgentBlock() y su test.
+const agentBlock = publicAgentBlock();
 
 export const dmcaDoc: LegalContent = {
   en: {

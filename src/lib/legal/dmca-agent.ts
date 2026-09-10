@@ -1,65 +1,125 @@
-// Designated Copyright Agent — single source of truth for the DMCA page.
+// Designated Copyright Agent — registro oficial y única fuente de verdad.
 //
-// WHY THIS FILE EXISTS SEPARATELY: 17 U.S.C. § 512(c)(2) only grants safe-harbor
-// protection if the agent is BOTH registered with the U.S. Copyright Office AND
-// published on the site. The MIAMI AOR Data License Agreement § VII.B.2 requires
-// the same, as a condition of receiving the MLS data feed.
+// 17 U.S.C. § 512(c)(2) solo concede el safe harbor si el agente está registrado
+// ante la U.S. Copyright Office Y publicado en el sitio. El acuerdo de datos de
+// MIAMI AOR § VII.B.2 exige lo mismo como condición para activar el feed del MLS.
 //
-// ─────────────────────────────────────────────────────────────────────────────
-// OWNER ACTION REQUIRED — the three [PLACEHOLDER] values below.
+// REGISTRO VIGENTE: DMCA-1080195 · presentado 2026-09-10 · vence 2029-09-10.
 //
-// 1. Register at https://dmca.copyright.gov (US Copyright Office, ~$6, one
-//    account per service provider). Register the LEGAL ENTITY: "Lixtara, LLC".
-// 2. Copy the registered values into this file EXACTLY as filed. They must match
-//    the registry, or the safe harbor is defective.
-// 3. Registration must be renewed every three (3) years or it lapses.
-//
-// `dmca-agent.test.ts` FAILS while any placeholder remains, so an incomplete
-// agent cannot reach production.
-// ─────────────────────────────────────────────────────────────────────────────
+// Los valores de abajo deben coincidir EXACTAMENTE con lo presentado ante la
+// Copyright Office. Si divergen, el safe harbor queda defectuoso.
 
-export interface DmcaAgent {
-  /** Service provider legal entity, as filed with the Copyright Office. */
-  entity: string;
-  /** Agent name or role, as filed. */
-  agentName: string;
-  /** Full mailing address, as filed. */
-  addressLines: string[];
-  email: string;
-  phone: string;
-  /** ISO date the registration was filed. Renewal is due 3 years later. */
-  registeredOn: string;
+export interface DmcaAddress {
+  line1: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
 }
 
-export const DMCA_AGENT: DmcaAgent = {
-  entity: "Lixtara, LLC",
-  agentName: "Copyright Agent, Lixtara, LLC",
-  addressLines: ["[STREET ADDRESS]", "Miami, Florida [ZIP]", "United States"],
-  email: "dmca@lixtara.com",
-  phone: "[PHONE]",
-  registeredOn: "[YYYY-MM-DD]",
+export interface DmcaContact {
+  phone: string;
+  email: string;
+}
+
+export interface DmcaRegistration {
+  /** Número asignado por la Copyright Office. */
+  registrationNumber: string;
+  /** Fecha de presentación (ISO). */
+  registeredOn: string;
+  /** Caducidad: 3 años exactos desde el registro (ISO). */
+  expiresOn: string;
+  serviceProvider: {
+    legalName: string;
+    address: DmcaAddress;
+    /**
+     * ADMINISTRATIVO — NUNCA se renderiza en el sitio. Es el contacto de la
+     * cuenta ante la Copyright Office, no el canal de avisos DMCA.
+     */
+    adminContact: DmcaContact;
+  };
+  designatedAgent: {
+    name: string;
+    organization: string;
+    address: DmcaAddress;
+    /** PÚBLICO — esto es lo que § 512(c)(2) obliga a publicar. */
+    publicContact: DmcaContact;
+  };
+}
+
+const REGISTERED_ADDRESS: DmcaAddress = {
+  line1: "181 Vera Court",
+  city: "Coral Gables",
+  state: "FL",
+  zip: "33143",
+  country: "US",
 };
 
-/** Values that must be replaced before the DMCA page may go live. */
-export const DMCA_PLACEHOLDER_PATTERN = /\[[A-Z][A-Z\s-]*\]/;
+export const DMCA_REGISTRATION: DmcaRegistration = {
+  registrationNumber: "DMCA-1080195",
+  registeredOn: "2026-09-10",
+  expiresOn: "2029-09-10",
+  serviceProvider: {
+    legalName: "LIXTARA LLC",
+    address: REGISTERED_ADDRESS,
+    adminContact: { phone: "305-522-3454", email: "camilo@lixtara.com" },
+  },
+  designatedAgent: {
+    name: "Copyright Agent",
+    organization: "LIXTARA LLC",
+    address: REGISTERED_ADDRESS,
+    publicContact: { phone: "786-210-3562", email: "dmca@lixtara.com" },
+  },
+};
 
-/** True once every field carries a real, filed value. */
-export function isDmcaAgentComplete(agent: DmcaAgent = DMCA_AGENT): boolean {
-  const values = [
-    agent.entity, agent.agentName, agent.email, agent.phone,
-    agent.registeredOn, ...agent.addressLines,
+/**
+ * Bloque de contacto publicable. Es la ÚNICA vía por la que la página DMCA debe
+ * obtener datos del agente: toma exclusivamente los campos públicos, así que el
+ * contacto administrativo no puede filtrarse al sitio por descuido.
+ */
+export function publicAgentBlock(reg: DmcaRegistration = DMCA_REGISTRATION): string[] {
+  const a = reg.designatedAgent;
+  return [
+    a.name,
+    a.organization,
+    a.address.line1,
+    `${a.address.city}, ${a.address.state} ${a.address.zip}`,
+    a.address.country === "US" ? "United States" : a.address.country,
+    `Email: ${a.publicContact.email}`,
+    `Telephone: ${a.publicContact.phone}`,
+    `U.S. Copyright Office Registration No. ${reg.registrationNumber}`,
   ];
-  return values.every((v) => v.trim().length > 0 && !DMCA_PLACEHOLDER_PATTERN.test(v));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MLS FORWARDING DUTY — operational, not shown on the public page.
-//
-// The MIAMI AOR agreement requires that a takedown notice be forwarded to MIAMI
-// IN WRITING WITHIN 24 HOURS of receipt. Two addresses are named because Lixtara
-// is both the Participant (§ VII.C.2 → dmca@miamire.com) and the Technology
-// Provider (§ VII.B.2 → legal@miamire.com). Send to BOTH.
+// ── Vigencia ────────────────────────────────────────────────────────────────
+/** Antelación con la que el guard empieza a exigir la recertificación. */
+export const DMCA_RENEWAL_WARNING_DAYS = 60;
+
+export type DmcaStatus = "active" | "expiring_soon" | "expired";
+
+/**
+ * El registro NO se renueva solo. Al vencer pasa a "Terminated" y el safe harbor
+ * se pierde en silencio — nada en el producto falla, simplemente desaparece la
+ * protección. Por eso hay un guard en tests: ver dmca-agent.test.ts.
+ */
+export function dmcaStatus(now: Date, reg: DmcaRegistration = DMCA_REGISTRATION): DmcaStatus {
+  const expiry = new Date(`${reg.expiresOn}T00:00:00Z`).getTime();
+  const days = (expiry - now.getTime()) / 86_400_000;
+  if (days <= 0) return "expired";
+  if (days <= DMCA_RENEWAL_WARNING_DAYS) return "expiring_soon";
+  return "active";
+}
+
+export function daysUntilDmcaExpiry(now: Date, reg: DmcaRegistration = DMCA_REGISTRATION): number {
+  const expiry = new Date(`${reg.expiresOn}T00:00:00Z`).getTime();
+  return Math.floor((expiry - now.getTime()) / 86_400_000);
+}
+
+// ── Deber de reenvío al MLS ─────────────────────────────────────────────────
+// Operativo, no se muestra en la página pública. El acuerdo obliga a reenviar la
+// notificación POR ESCRITO DENTRO DE 24 HORAS. Nombra dos direcciones porque
+// Lixtara es a la vez Participant (§ VII.C.2 → dmca@miamire.com) y Technology
+// Provider (§ VII.B.2 → legal@miamire.com). Enviar a AMBAS.
 // Runbook: docs/legal/2026-09-07-dmca-runbook.md
-// ─────────────────────────────────────────────────────────────────────────────
 export const MLS_TAKEDOWN_NOTICE_RECIPIENTS = ["legal@miamire.com", "dmca@miamire.com"] as const;
 export const MLS_TAKEDOWN_NOTICE_DEADLINE_HOURS = 24;
