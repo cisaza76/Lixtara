@@ -15,5 +15,6 @@ dated files are working documents that predate the numbering scheme.
 | [0011](0011-video-color-range-normalization.md) | Color-range normalization in the preparation stage | accepted (2026-07-27) |
 | [0012](0012-final-output-color-contract.md) | Final output color contract (yuv420p/tv/bt709) | accepted (2026-07-28, PR #113 — closes Issue #111) |
 | [0013](0013-mls-single-website-environment-gate.md) | Single-website environment gate for MLS Licensed Content | accepted (2026-09-10) |
+| [0014](0014-mls-ai-boundary.md) | Hard boundary between MLS Licensed Content and AI | accepted (2026-09-10) |
 
 Unnumbered: [render execution target](2026-07-15-render-execution-target.md).
