@@ -54,7 +54,7 @@ export function PaymentStatusPoller({ propertyId, label }: PaymentStatusPollerPr
 
   return (
     <div className="flex items-center gap-3 text-xs text-ink/55">
-      <span className="inline-block w-3 h-3 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+      <span className="inline-block w-3 h-3 border-2 border-gold border-t-transparent rounded-full animate-spin motion-reduce:animate-none" />
       <span>
         {label} ({tick}/8)
       </span>

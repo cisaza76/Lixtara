@@ -50,7 +50,7 @@ const PRIMARY_CLASSES =
 const SECONDARY_CLASSES =
   "inline-flex items-center justify-center gap-2 rounded-md border border-neutral-300 px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400";
 const SPINNER_CLASSES =
-  "h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
+  "h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
 
 function formatMeta(meta: SellerVideoMeta, createdLabel: string, lang: string): string {
   const parts: string[] = [];

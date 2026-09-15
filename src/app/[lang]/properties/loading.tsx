@@ -11,7 +11,9 @@ function Box({ className }: { className: string }) {
 
 export default function Loading() {
   return (
-    <main className="bg-background flex-1">
+    // El esqueleto NO es <main>: la página real aporta ese landmark y un
+    // documento solo puede tener uno (WCAG 1.3.1 / landmark-unique).
+    <div className="bg-background flex-1">
       <section className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
         <Box className="mb-5 h-3 w-28" />
         <Box className="mb-16 h-12 w-2/3 max-w-xl lg:mb-20" />
@@ -29,6 +31,6 @@ export default function Loading() {
           ))}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

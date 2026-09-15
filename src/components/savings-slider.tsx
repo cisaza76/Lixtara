@@ -174,6 +174,8 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
           </div>
           <input
             type="range"
+            aria-label="Sale price"
+            aria-valuetext={`$${price.toLocaleString("en-US")}`}
             min={200_000}
             max={2_000_000}
             step={25_000}

@@ -173,6 +173,8 @@ export function SavingsCalculator({
           </div>
           <input
             type="range"
+            aria-label="Sale price"
+            aria-valuetext={`$${price.toLocaleString("en-US")}`}
             min={100_000}
             max={2_000_000}
             step={25_000}

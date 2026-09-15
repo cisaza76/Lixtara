@@ -44,7 +44,7 @@ const PRIMARY =
 const SECONDARY =
   "inline-flex items-center justify-center gap-2 rounded-md border border-neutral-300 px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400";
 const SPINNER =
-  "h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
+  "h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
 
 function formatBytes(n: number): string {
   if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
