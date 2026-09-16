@@ -5,6 +5,7 @@ import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { SITE_URL } from "@/lib/config";
+import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
 import { StepShell } from "@/components/step-shell";
 import {
@@ -125,6 +126,7 @@ export default async function ListingNewPage({
     event?: string;
     aerror?: string;
     pending?: string;
+    resent?: string;
     cerror?: string;
     verified?: string;
   }>;
@@ -1147,6 +1149,62 @@ export default async function ListingNewPage({
     }
 
     redirect(`${back}&pending=1`);
+  }
+
+  // Reenvío del código de confirmación. Existe porque el código expira y los
+  // correos se pierden: sin esto, un vendedor que no lo recibe queda atrapado en
+  // el paso 7 con su listing completo y sin salida.
+  //
+  // Manda correo, así que va con rate limit propio. Supabase también limita por
+  // su lado; este límite es el que da un mensaje útil en vez de un fallo opaco.
+  async function resendEmailCode(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    const back = `/${lang}/listing/new?step=7&id=${id}`;
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    // Solo hay algo que reenviar si hay un cambio de correo pendiente.
+    const pending = (user.new_email as string | undefined) ?? "";
+    if (!pending) redirect(`${back}&aerror=failed`);
+
+    // 3 reenvíos por hora y por usuario. Suficiente para un correo perdido o un
+    // código expirado; no para usar la cuenta como relay de spam.
+    const limiter = apiLimiter("listing:resend-code", 3, "1 h");
+    if (limiter) {
+      const { success } = await limiter.limit(user.id);
+      if (!success) redirect(`${back}&pending=1&cerror=resend_limit`);
+    }
+
+    const emailRedirectTo = `${SITE_URL}/${lang}/auth/callback?next=${encodeURIComponent(
+      `/${lang}/listing/new?step=7&id=${id}`,
+    )}`;
+
+    // `resend` es la vía específica; si Supabase clasifica distinto el upgrade de
+    // un usuario anónimo, `updateUser` re-dispara el mismo correo. Mismo patrón de
+    // respaldo que usa verifyEmailCode con los tipos de OTP.
+    const { error: resendError } = await supabase.auth.resend({
+      type: "email_change",
+      email: pending,
+      options: { emailRedirectTo },
+    });
+
+    if (resendError) {
+      const { error: updateError } = await supabase.auth.updateUser(
+        { email: pending },
+        { emailRedirectTo },
+      );
+      if (updateError) redirect(`${back}&pending=1&cerror=resend_failed`);
+    }
+
+    // El sello permite al cliente calcular el enfriamiento y que sobreviva a la
+    // recarga que provoca este redirect.
+    redirect(`${back}&pending=1&resent=${Math.floor(Date.now() / 1000)}`);
   }
 
   // #6: confirm the new email with a 6-digit code entered in the SAME tab
@@ -2742,8 +2800,12 @@ export default async function ListingNewPage({
             <AccountGate
               registerAction={registerAccount}
               verifyAction={verifyEmailCode}
+              resendAction={resendEmailCode}
               draftId={draftId}
               pendingEmail={pendingEmail}
+              resentAt={
+                typeof sp.resent === "string" ? Number.parseInt(sp.resent, 10) : null
+              }
               error={typeof sp.aerror === "string" ? sp.aerror : null}
               codeError={typeof sp.cerror === "string" ? sp.cerror : null}
               labels={{
@@ -2764,6 +2826,13 @@ export default async function ListingNewPage({
                 codeLabel: copy.step7.gateCodeLabel,
                 codeHint: copy.step7.gateCodeHint,
                 codeSubmit: copy.step7.gateCodeSubmit,
+                resendPrompt: copy.step7.gateResendPrompt,
+                resendCta: copy.step7.gateResendCta,
+                resendSending: copy.step7.gateResendSending,
+                resendCooldown: copy.step7.gateResendCooldown,
+                resendDone: copy.step7.gateResendDone,
+                errResendLimit: copy.step7.gateErrResendLimit,
+                errResendFailed: copy.step7.gateErrResendFailed,
                 errName: copy.step7.gateErrName,
                 errEmail: copy.step7.gateErrEmail,
                 errPassword: copy.step7.gateErrPassword,

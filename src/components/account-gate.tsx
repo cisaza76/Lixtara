@@ -8,7 +8,7 @@
 //      the session and advances automatically once the email is verified.
 // Framed as "secure your listing", not "sign up" — the value is already built.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface AccountGateLabels {
   createEyebrow: string;
@@ -28,6 +28,14 @@ interface AccountGateLabels {
   codeLabel: string;
   codeHint: string;
   codeSubmit: string;
+  resendPrompt: string;
+  resendCta: string;
+  resendSending: string;
+  /** Lleva {s} — se sustituye por los segundos restantes. */
+  resendCooldown: string;
+  resendDone: string;
+  errResendLimit: string;
+  errResendFailed: string;
   errName: string;
   errEmail: string;
   errPassword: string;
@@ -37,23 +45,33 @@ interface AccountGateLabels {
   errCodeInvalid: string;
 }
 
+/** Segundos de espera entre reenvíos. El control real es el límite del servidor;
+ *  esto evita que el usuario pulse dos veces creyendo que no pasó nada. */
+const RESEND_COOLDOWN_SECONDS = 60;
+
 interface AccountGateProps {
   registerAction: (formData: FormData) => Promise<void>;
   verifyAction: (formData: FormData) => Promise<void>;
+  resendAction: (formData: FormData) => Promise<void>;
   draftId: string;
   pendingEmail: string | null;
   error: string | null;
   codeError: string | null;
+  /** Epoch en segundos del último reenvío, propagado por la URL para que el
+   *  enfriamiento sobreviva a la recarga que provoca el server action. */
+  resentAt: number | null;
   labels: AccountGateLabels;
 }
 
 export function AccountGate({
   registerAction,
   verifyAction,
+  resendAction,
   draftId,
   pendingEmail,
   error,
   codeError,
+  resentAt,
   labels,
 }: AccountGateProps) {
   if (pendingEmail) {
@@ -61,8 +79,10 @@ export function AccountGate({
       <ConfirmEmail
         email={pendingEmail}
         verifyAction={verifyAction}
+        resendAction={resendAction}
         draftId={draftId}
         codeError={codeError}
+        resentAt={resentAt}
         labels={labels}
       />
     );
@@ -218,23 +238,52 @@ function CreateAccount({
 function ConfirmEmail({
   email,
   verifyAction,
+  resendAction,
   draftId,
   codeError,
+  resentAt,
   labels,
 }: {
   email: string;
   verifyAction: (formData: FormData) => Promise<void>;
+  resendAction: (formData: FormData) => Promise<void>;
   draftId: string;
   codeError: string | null;
+  resentAt: number | null;
   labels: AccountGateLabels;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  // El enfriamiento se deriva del sello que viene en la URL, no de un estado
+  // local: así sobrevive a la recarga que provoca el server action.
+  useEffect(() => {
+    if (!resentAt || Number.isNaN(resentAt)) return;
+    const tick = () => {
+      const queda = RESEND_COOLDOWN_SECONDS - (Math.floor(Date.now() / 1000) - resentAt);
+      // Acotado por arriba: un sello en el futuro — reloj desfasado o URL
+      // manipulada — no puede producir una espera absurda.
+      setCooldown(Math.max(0, Math.min(queda, RESEND_COOLDOWN_SECONDS)));
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [resentAt]);
+
   const msg =
     codeError === "format"
       ? labels.errCodeFormat
       : codeError === "invalid"
         ? labels.errCodeInvalid
-        : null;
+        : codeError === "resend_limit"
+          ? labels.errResendLimit
+          : codeError === "resend_failed"
+            ? labels.errResendFailed
+            : null;
+
+  // Solo se anuncia el reenvío exitoso: si hubo error, manda el mensaje de error.
+  const reenviado = Boolean(resentAt) && !codeError;
 
   return (
     <form
@@ -294,6 +343,35 @@ function ConfirmEmail({
       >
         {labels.codeSubmit} →
       </button>
+
+      {/* Reenvío. Va DENTRO de este form con formAction porque anidar <form> no
+          es válido en HTML; formNoValidate evita que el campo `required` del
+          código bloquee el envío cuando justamente no se tiene el código. */}
+      <div className="flex flex-col gap-2 border-t border-gold-soft pt-4">
+        {reenviado && (
+          <p role="status" className="text-sm text-ink/80">
+            {labels.resendDone}{" "}
+            <span className="font-semibold text-ink">{email}</span>
+          </p>
+        )}
+        <p className="text-sm text-ink/70">
+          {labels.resendPrompt}{" "}
+          <button
+            type="submit"
+            formAction={resendAction}
+            formNoValidate
+            onClick={() => setResending(true)}
+            disabled={resending || cooldown > 0}
+            className="underline underline-offset-4 text-gold hover:text-ink transition-colors disabled:no-underline disabled:text-ink/40 disabled:cursor-not-allowed"
+          >
+            {resending
+              ? labels.resendSending
+              : cooldown > 0
+                ? labels.resendCooldown.replace("{s}", String(cooldown))
+                : labels.resendCta}
+          </button>
+        </p>
+      </div>
     </form>
   );
 }
