@@ -20,6 +20,14 @@ import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { classifyAssets } from "@/lib/media-intelligence/classify";
 import type { Asset as MediaAsset, Classification } from "@/lib/media-intelligence/types";
 import { evaluateCapabilityReadiness } from "@/lib/media-intelligence/readiness";
+import { classifyVisionFailure } from "@/lib/media-intelligence/classify-errors";
+import { defaultResolveVideoSource } from "@/lib/video-engine/resolve-video-source";
+import { isUsableSourceVideo } from "@/lib/video-engine/job-routing";
+import type { SourceStrategy } from "@/lib/video-engine/source-strategy";
+import { referenceCodeFromTraceId } from "@/lib/creative-studio/seller-failure-kind";
+import { logVideoEvent } from "@/lib/video-engine/observability-log";
+import { SupabaseAssetStore } from "@/lib/assets/asset-store.supabase";
+import type { Asset } from "@/lib/assets/types";
 import { createJob, type JobsStore } from "@/lib/creative-jobs/jobs";
 import { SupabaseJobsStore } from "@/lib/creative-jobs/jobs-store.supabase";
 import { buildIdempotencyKey, hashSourceAssetIds } from "@/lib/video-engine/idempotency";
@@ -71,6 +79,9 @@ export interface GenerateVideoDeps {
   loadProperty(propertyId: string): Promise<PropertyRow | null>;
   loadPhotos(propertyId: string): Promise<PhotoRow[]>;
   classify(assets: MediaAsset[]): Promise<Classification[]>;
+  // Autoridad única del Source Video vigente (excluye archivados — Issue #118). Decide la
+  // estrategia AQUÍ con la misma función que el worker, para que no puedan divergir.
+  resolveSource(listingId: string, ownerId: string): Promise<Asset | null>;
   jobsStore: JobsStore;
   now(): number;
   checkRateLimit(userId: string): Promise<Response | null>;
@@ -120,6 +131,7 @@ function defaultDeps(): GenerateVideoDeps {
       return (data as PhotoRow[] | null) ?? [];
     },
     classify: (assets) => classifyAssets(assets),
+    resolveSource: defaultResolveVideoSource(new SupabaseAssetStore(createService())),
     // Constructed once, lazily, only when a real POST reaches here (after the flag
     // gate) — never at module load, never in a test that supplies its own jobsStore.
     jobsStore: new SupabaseJobsStore(createService()),
@@ -185,31 +197,110 @@ export async function handleGenerateVideo(req: Request, deps: GenerateVideoDeps)
     return NextResponse.json(denial.body, { status: denial.status });
   }
 
-  const photoRows = await deps.loadPhotos(propertyId);
-  const mediaAssets: MediaAsset[] = photoRows
-    .filter((r): r is { id: string; url: string } => Boolean(r.url))
-    .map((r) => ({ photoId: r.id, url: r.url }));
-
-  const classifications = await deps.classify(mediaAssets);
+  // -------------------------------------------------------------------------------------
+  // READINESS POR ESTRATEGIA (2026-08-11).
+  //
+  // Antes, TODA generación pasaba por el clasificador de fotos, aun cuando el vendedor había
+  // subido un video. Una foto de 8160×6120 hizo que el proveedor de visión devolviera 400 y
+  // que /generate reventara antes de crear el job: sin trace_id, sin evidence pack, y con la
+  // UI prometiendo que reintentar funcionaría. Las fotos NO participan en uploaded_video.
+  //
+  // La estrategia se decide con `isUsableSourceVideo`, la MISMA función que usa el worker
+  // (job-routing.ts), así que enqueue y ejecución no pueden divergir.
+  //
+  // Puertas que siguen aplicando a AMBAS estrategias (ninguna se relaja aquí):
+  //   flag · sesión · ownership del listing · allowlist/grant · cuota · rate limit ·
+  //   listing aprobado (mls_status = "active")
+  // Exclusivo de photo_slideshow: fotos presentes + al menos un interior clasificado.
+  // Exclusivo de uploaded_video: un Source Video vigente y utilizable (ya resuelto aquí);
+  //   su validez TÉCNICA (contenedor, códec, duración, HDR…) la comprueba el pipeline en la
+  //   etapa `validating`, donde sí existe job, trace y evidence pack.
+  // -------------------------------------------------------------------------------------
+  const sourceVideo = await deps.resolveSource(propertyId, user.id);
+  const strategy: SourceStrategy = isUsableSourceVideo(sourceVideo) ? "uploaded_video" : "photo_slideshow";
   const listingApproved = property.mls_status === "active";
-  const readiness = evaluateCapabilityReadiness("video", {
-    photoCount: mediaAssets.length,
-    scores: [], // video's readiness branch never reads ctx.scores — see readiness.ts
-    classifications,
-    listingApproved,
-  });
 
-  if (readiness.status !== "ready") {
-    return NextResponse.json(
-      { error: "not_ready", reasons: readiness.reasons, suggestedActions: readiness.suggestedActions },
-      { status: 422 },
-    );
+  // Referencia de soporte acuñada ANTES de evaluar readiness: un fallo pre-job no tiene
+  // creative_job donde colgar un trace_id, así que este es su único identificador estable.
+  const preflightRef = crypto.randomUUID();
+  const reference = referenceCodeFromTraceId(preflightRef);
+
+  const preflightFailure = (
+    status: number,
+    body: Record<string, unknown>,
+    log: { category: string; reason: string; retryable: boolean; provider?: string },
+  ): Response => {
+    logVideoEvent("video_preflight_failed", {
+      stage: "readiness",
+      strategy,
+      listingId: propertyId,
+      userId: user.id,
+      preflightRef,
+      reference,
+      ...log,
+    });
+    return NextResponse.json({ ...body, retryable: log.retryable, reference }, { status });
+  };
+
+  let sourceAssetIds: string[];
+
+  if (strategy === "uploaded_video") {
+    // Ni loadPhotos ni classify: el desacoplamiento es estructural, no una comprobación.
+    if (!listingApproved) {
+      return preflightFailure(
+        422,
+        { error: "not_ready", reasons: [{ code: "listing_not_approved" }], suggestedActions: [{ code: "await_listing_approval" }] },
+        { category: "INPUT", reason: "listing_not_approved", retryable: false },
+      );
+    }
+    sourceAssetIds = [sourceVideo!.id];
+  } else {
+    const photoRows = await deps.loadPhotos(propertyId);
+    const mediaAssets: MediaAsset[] = photoRows
+      .filter((r): r is { id: string; url: string } => Boolean(r.url))
+      .map((r) => ({ photoId: r.id, url: r.url }));
+
+    // El clasificador es una llamada a un proveedor externo: puede fallar de formas que NO
+    // son culpa del vendedor. Ninguna puede escapar como 500 sin clasificar.
+    let classifications: Classification[];
+    try {
+      classifications = await deps.classify(mediaAssets);
+    } catch (err) {
+      const failure = classifyVisionFailure(err);
+      return preflightFailure(
+        failure.retryable ? 503 : 422,
+        {
+          error: failure.retryable ? "provider_unavailable" : "not_ready",
+          reasons: [{ code: `photo_analysis_${failure.kind}` }],
+          suggestedActions: [{ code: failure.retryable ? "retry_later" : "review_photos" }],
+        },
+        { category: "INPUT", reason: `photo_analysis_${failure.kind}`, retryable: failure.retryable, provider: "vision" },
+      );
+    }
+
+    const readiness = evaluateCapabilityReadiness("video", {
+      photoCount: mediaAssets.length,
+      scores: [], // video's readiness branch never reads ctx.scores — see readiness.ts
+      classifications,
+      listingApproved,
+    });
+
+    if (readiness.status !== "ready") {
+      return preflightFailure(
+        422,
+        { error: "not_ready", reasons: readiness.reasons, suggestedActions: readiness.suggestedActions },
+        { category: "INPUT", reason: readiness.reasons.map((r) => r.code).join(",") || "not_ready", retryable: false },
+      );
+    }
+    sourceAssetIds = mediaAssets.map((a) => a.photoId);
   }
 
   // Server-built idempotency key — NEVER the client-supplied `idempotencyKey` (there is
   // none to read; `Body` has no such field). Derived entirely from the ownership-checked
-  // listingId, the pinned template version, and the resolved source-photo id set.
-  const sourceAssetIds = mediaAssets.map((a) => a.photoId);
+  // listingId, the pinned template version, and the resolved source-asset id set: las fotos
+  // para photo_slideshow, el Source Video para uploaded_video. Así, reemplazar el source
+  // produce una clave distinta (y por tanto un job nuevo), mientras que volver a pulsar el
+  // botón con el mismo source colapsa sobre el job existente.
   const idempotencyKey = buildIdempotencyKey({
     listingId: propertyId,
     capability: "video",

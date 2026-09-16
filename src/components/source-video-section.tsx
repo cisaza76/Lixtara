@@ -26,6 +26,14 @@ export interface SourceVideoCopy {
   replaceCta: string;
   statusPending: string; // e.g. "Video cargado · Pendiente de validación técnica"
   statusUploaded: string;
+  // Eliminación del source (nunca afecta al Listing Video generado).
+  removeCta: string;
+  confirmRemoveTitle: string;
+  confirmRemoveBody: string;
+  confirmRemoveCancel: string;
+  confirmRemoveConfirm: string;
+  removeError: string;
+  removing: string;
   uploadedOn: string;
   uploadingLabel: string;
   cancel: string;
@@ -44,7 +52,11 @@ const PRIMARY =
 const SECONDARY =
   "inline-flex items-center justify-center gap-2 rounded-md border border-neutral-300 px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400";
 const SPINNER =
-  "h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
+  "h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
+// Acción destructiva: se distingue del secundario para que "Eliminar" no se confunda con
+// "Reemplazar", que es la causa documentada de subidas repetidas por error.
+const DESTRUCTIVE =
+  "inline-flex items-center justify-center gap-2 rounded-md border border-red-300 px-4 py-2 text-sm text-red-700 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500";
 
 function formatBytes(n: number): string {
   if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
@@ -103,8 +115,46 @@ export function SourceVideoSection({
   const [phase, setPhase] = useState<SourceUploadPhase | null>(null);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const confirmBtn = useRef<HTMLButtonElement>(null);
+
+  // Foco al botón destructivo al abrir; Escape cierra sin eliminar.
+  useEffect(() => {
+    if (!confirmRemove) return;
+    confirmBtn.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirmRemove(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [confirmRemove]);
+
+  // Eliminar el source vigente. El servidor es la autoridad: archiva, borra los bytes y
+  // audita. El Listing Video generado NO se toca — ni aquí ni en el endpoint.
+  async function removeSource(): Promise<void> {
+    setRemoving(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch(
+        `/api/creative-studio/video/source?listingId=${encodeURIComponent(propertyId)}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error(`remove_${res.status}`);
+      setConfirmRemove(false);
+      setDto(null); // el DTO se recarga desde el servidor; nunca se infiere en cliente
+      await refetch();
+      setView("ready");
+    } catch {
+      setErrorMsg(copy.removeError);
+      setView("error");
+      setConfirmRemove(false);
+    } finally {
+      setRemoving(false);
+    }
+  }
 
   async function refetch(): Promise<void> {
     try {
@@ -231,11 +281,57 @@ export function SourceVideoSection({
             <p className="text-sm text-neutral-500">
               {copy.uploadedOn} {formatDate(dto.source.uploadedAt, lang)} · {formatBytes(dto.source.sizeBytes)}
             </p>
-            <div>
+            <div className="flex flex-wrap gap-3">
               <button type="button" className={SECONDARY} onClick={() => fileInput.current?.click()}>
                 {copy.replaceCta}
               </button>
+              <button
+                type="button"
+                className={DESTRUCTIVE}
+                onClick={() => setConfirmRemove(true)}
+                disabled={removing}
+              >
+                {removing && <span className={SPINNER} aria-hidden="true" />}
+                {removing ? copy.removing : copy.removeCta}
+              </button>
             </div>
+
+            {confirmRemove ? (
+              <div
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="remove-source-title"
+                aria-describedby="remove-source-body"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setConfirmRemove(false);
+                }}
+              >
+                <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+                  <h4 id="remove-source-title" className="text-lg font-semibold">
+                    {copy.confirmRemoveTitle}
+                  </h4>
+                  <p id="remove-source-body" className="mt-2 text-sm text-neutral-600">
+                    {copy.confirmRemoveBody}
+                  </p>
+                  <div className="mt-5 flex flex-wrap justify-end gap-3">
+                    <button type="button" className={SECONDARY} onClick={() => setConfirmRemove(false)} disabled={removing}>
+                      {copy.confirmRemoveCancel}
+                    </button>
+                    <button
+                      ref={confirmBtn}
+                      type="button"
+                      className={DESTRUCTIVE}
+                      onClick={() => void removeSource()}
+                      disabled={removing}
+                    >
+                      {removing && <span className={SPINNER} aria-hidden="true" />}
+                      {copy.confirmRemoveConfirm}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {view === "error" && errorMsg ? (
               <p className="text-sm text-amber-700" role="alert">
                 {errorMsg}

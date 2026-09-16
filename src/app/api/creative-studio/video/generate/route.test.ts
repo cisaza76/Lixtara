@@ -9,6 +9,7 @@ import { UniqueViolationError } from "@/lib/creative-jobs/jobs";
 import type { CreativeJob, JobsStore, StoredTransition } from "@/lib/creative-jobs/jobs";
 import type { JobTransition } from "@/lib/creative-jobs/states";
 import type { Classification } from "@/lib/media-intelligence/types";
+import type { Asset } from "@/lib/assets/types";
 import { buildIdempotencyKey, hashSourceAssetIds } from "@/lib/video-engine/idempotency";
 import { TEMPLATE_VERSION } from "@/lib/video-engine/versions";
 import type { VideoAccessResult } from "@/lib/creative-studio/video-access";
@@ -160,6 +161,9 @@ function makeDeps(over: Partial<GenerateVideoDeps> = {}): GenerateVideoDeps {
       { id: "photo-3", url: "https://example.com/3.jpg" },
     ],
     classify: async () => READY_CLASSIFICATIONS,
+    // Por defecto NO hay Source Video → estrategia photo_slideshow, que es el
+    // comportamiento que cubrían todas las pruebas existentes.
+    resolveSource: async () => null,
     jobsStore: fakeJobsStore(),
     now: () => FIXED_NOW,
     checkRateLimit: async () => null,
@@ -463,5 +467,179 @@ describe("handleGenerateVideo — Gate 5 access + quota", () => {
     const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
     expect(res.status).toBe(202); // the already-created job proceeds; safe direction
     expect(store.jobs).toHaveLength(1);
+  });
+});
+
+// ==========================================================================================
+// REGRESIÓN DEL INCIDENTE 2026-08-11 + desacoplamiento de readiness por estrategia.
+//
+// Un vendedor con un Source Video válido no pudo generar porque UNA de sus 11 fotos medía
+// 8160×6120 y el clasificador de visión devolvió 400. El fallo escapó como excepción, antes
+// de crear el job: sin trace_id, sin evidence pack, y con copy que prometía que reintentar
+// funcionaría. Las fotos NO participan en la estrategia uploaded_video.
+// ==========================================================================================
+
+const SOURCE_VIDEO: Asset = {
+  id: "src-video-1", listingId: PROPERTY_ID, ownerId: OWNER_ID, kind: "video", version: 1, parentAsset: null,
+  sourceType: "seller_upload", sourceId: "up-1",
+  provenance: { sourceAssetIds: [], capability: "video", engine: "asset-manager", provider: "seller_upload", prompt: null },
+  storageBucket: "creative-studio", storagePath: "source/o/l/up-1/source.mov", checksum: null,
+  bytes: 48_412_268, mime: "video/quicktime", costUsd: 0, costProvider: null, createdBy: OWNER_ID,
+  lifecycle: "draft", qa: null, policy: null, createdAt: "2026-08-11T21:36:25.922Z",
+};
+
+// El error EXACTO que devolvió Anthropic en el incidente.
+const OVERSIZED_PHOTO_ERROR = Object.assign(new Error("AI_APICallError"), {
+  name: "AI_APICallError",
+  statusCode: 400,
+  isRetryable: false,
+  responseBody:
+    '{"type":"error","error":{"type":"invalid_request_error","message":"messages.0.content.10.image.source.url: At least one of the image dimensions exceed max allowed size: 8000 pixels"}}',
+});
+
+describe("readiness por estrategia — uploaded_video NO depende del clasificador de fotos", () => {
+  afterEach(() => delete process.env.CREATIVE_STUDIO_VIDEO_ENABLED);
+
+  it("con Source Video vigente, classifyAssets NUNCA se invoca", async () => {
+    let classifyCalls = 0;
+    const deps = makeDeps({
+      resolveSource: async () => SOURCE_VIDEO,
+      classify: async () => { classifyCalls += 1; return READY_CLASSIFICATIONS; },
+    });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(202);
+    expect(classifyCalls).toBe(0);
+  });
+
+  it("con Source Video vigente, loadPhotos tampoco se invoca (desacoplamiento total)", async () => {
+    let photoCalls = 0;
+    const deps = makeDeps({
+      resolveSource: async () => SOURCE_VIDEO,
+      loadPhotos: async () => { photoCalls += 1; return []; },
+    });
+    expect((await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps)).status).toBe(202);
+    expect(photoCalls).toBe(0);
+  });
+
+  it("EL CASO REAL: una foto de 8160×6120 no impide generar cuando hay Source Video", async () => {
+    const deps = makeDeps({
+      resolveSource: async () => SOURCE_VIDEO,
+      classify: async () => { throw OVERSIZED_PHOTO_ERROR; }, // nunca debe alcanzarse
+    });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(202);
+    expect(await res.json()).toHaveProperty("jobId");
+  });
+
+  it("sin interior photos, uploaded_video sigue pudiendo generar", async () => {
+    const deps = makeDeps({ resolveSource: async () => SOURCE_VIDEO, classify: async () => [] });
+    expect((await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps)).status).toBe(202);
+  });
+
+  it("uploaded_video NO relaja las demás puertas: listing no aprobado sigue bloqueando", async () => {
+    const deps = makeDeps({
+      resolveSource: async () => SOURCE_VIDEO,
+      loadProperty: async () => ({ id: PROPERTY_ID, owner_id: OWNER_ID, mls_status: "draft" }),
+    });
+    expect((await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps)).status).toBe(422);
+  });
+
+  it("uploaded_video NO relaja ownership ni allowlist", async () => {
+    const ajeno = makeDeps({ resolveSource: async () => SOURCE_VIDEO, loadProperty: async () => ({ id: PROPERTY_ID, owner_id: "otro", mls_status: "active" }) });
+    expect((await handleGenerateVideo(req({ property_id: PROPERTY_ID }), ajeno)).status).toBe(403);
+    const sinGrant = makeDeps({ resolveSource: async () => SOURCE_VIDEO, checkAccess: async () => ({ ...allowedAccess(), allowed: false, reason: "no_grant", listingAllowed: false }) });
+    expect((await handleGenerateVideo(req({ property_id: PROPERTY_ID }), sinGrant)).status).toBe(404);
+  });
+});
+
+describe("readiness por estrategia — photo_slideshow conserva sus requisitos", () => {
+  afterEach(() => delete process.env.CREATIVE_STUDIO_VIDEO_ENABLED);
+
+  it("sin Source Video, sigue exigiendo interior photos", async () => {
+    const deps = makeDeps({ resolveSource: async () => null, classify: async () => [] });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(422);
+    expect(JSON.stringify(await res.json())).toContain("no_interior_photos");
+  });
+
+  it("sin Source Video, con interiores válidos, genera igual que antes", async () => {
+    const deps = makeDeps({ resolveSource: async () => null });
+    expect((await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps)).status).toBe(202);
+  });
+
+  it("un asset de video INUTILIZABLE (sin storagePath) cae a photo_slideshow", async () => {
+    const roto = { ...SOURCE_VIDEO, storagePath: "" };
+    let classifyCalls = 0;
+    const deps = makeDeps({ resolveSource: async () => roto, classify: async () => { classifyCalls += 1; return READY_CLASSIFICATIONS; } });
+    expect((await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps)).status).toBe(202);
+    expect(classifyCalls).toBe(1); // sí clasifica: es la ruta de fotos
+  });
+});
+
+describe("fallo del clasificador — nunca un 500 sin clasificar", () => {
+  afterEach(() => delete process.env.CREATIVE_STUDIO_VIDEO_ENABLED);
+
+  it("foto demasiado grande → 422 determinístico, NO 500, NO retryable", async () => {
+    const deps = makeDeps({ resolveSource: async () => null, classify: async () => { throw OVERSIZED_PHOTO_ERROR; } });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(422);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.retryable).toBe(false);
+    expect(body.error).toBe("not_ready");
+  });
+
+  it("proveedor caído (503) → 503 y SÍ retryable", async () => {
+    const caido = Object.assign(new Error("upstream"), { name: "AI_APICallError", statusCode: 503, isRetryable: true });
+    const deps = makeDeps({ resolveSource: async () => null, classify: async () => { throw caido; } });
+    const res = await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(res.status).toBe(503);
+    expect((await res.json() as Record<string, unknown>).retryable).toBe(true);
+  });
+
+  it("la respuesta NUNCA expone proveedor, modelo, request_id ni stack", async () => {
+    const deps = makeDeps({ resolveSource: async () => null, classify: async () => { throw OVERSIZED_PHOTO_ERROR; } });
+    const body = JSON.stringify(await (await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps)).json());
+    expect(body).not.toMatch(/anthropic|claude|sonnet|req_|AI_APICallError|responseBody|at Object/i);
+  });
+
+  it("toda respuesta de fallo pre-job trae una referencia de 8 hex para soporte", async () => {
+    const deps = makeDeps({ resolveSource: async () => null, classify: async () => { throw OVERSIZED_PHOTO_ERROR; } });
+    const body = await (await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps)).json() as Record<string, unknown>;
+    // Mismo formato que la referencia de fallo de UX 5C (referenceCodeFromTraceId).
+    expect(String(body.reference)).toMatch(/^[0-9A-F]{8}$/);
+  });
+});
+
+describe("cuota — un fallo pre-job jamás la consume", () => {
+  afterEach(() => delete process.env.CREATIVE_STUDIO_VIDEO_ENABLED);
+
+  it("readiness fallido (sin interiores) → consumeQuota NO se llama", async () => {
+    let consumed = 0;
+    const deps = makeDeps({
+      resolveSource: async () => null, classify: async () => [],
+      consumeQuota: async () => { consumed += 1; return { consumed: true, remainingGenerations: 0 }; },
+    });
+    await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(consumed).toBe(0);
+  });
+
+  it("fallo del proveedor → consumeQuota NO se llama", async () => {
+    let consumed = 0;
+    const deps = makeDeps({
+      resolveSource: async () => null, classify: async () => { throw OVERSIZED_PHOTO_ERROR; },
+      consumeQuota: async () => { consumed += 1; return { consumed: true, remainingGenerations: 0 }; },
+    });
+    await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps);
+    expect(consumed).toBe(0);
+  });
+
+  it("uploaded_video válido → consume exactamente una vez", async () => {
+    let consumed = 0;
+    const deps = makeDeps({
+      resolveSource: async () => SOURCE_VIDEO,
+      consumeQuota: async () => { consumed += 1; return { consumed: true, remainingGenerations: 0 }; },
+    });
+    expect((await handleGenerateVideo(req({ property_id: PROPERTY_ID }), deps)).status).toBe(202);
+    expect(consumed).toBe(1);
   });
 });

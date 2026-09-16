@@ -93,3 +93,33 @@ export function deriveFailedViewModel(failure?: SellerFailureDto | null): Failed
     reference,
   };
 }
+
+// ---------------------------------------------------------------------------------------
+// Fallo PRE-JOB (readiness / proveedor), incidente 2026-08-11.
+//
+// Estos fallos ocurren ANTES de crear el creative_job, así que no existe `failure` en el
+// DTO de estado y la matriz de UX 5C no puede derivar nada. La regla que fija este modelo:
+// un fallo determinístico NUNCA promete que reintentar funcione, y no ofrece Try again como
+// acción principal. Ante la duda, se asume determinístico.
+// ---------------------------------------------------------------------------------------
+export interface PreflightFailure {
+  retryable: boolean;
+  reference?: string | null;
+}
+
+export interface PreflightViewModel {
+  detailKey: "errorDetailTransient" | "errorDetailDeterministic";
+  primary: "retry" | "support";
+  showRetry: boolean;
+  reference: string | null;
+}
+
+export function derivePreflightViewModel(failure: PreflightFailure | null): PreflightViewModel {
+  const retryable = failure?.retryable === true;
+  return {
+    detailKey: retryable ? "errorDetailTransient" : "errorDetailDeterministic",
+    primary: retryable ? "retry" : "support",
+    showRetry: retryable,
+    reference: failure?.reference ?? null,
+  };
+}

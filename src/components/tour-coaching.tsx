@@ -1,47 +1,46 @@
-// Seller-side premium coaching panel for the 3D / premium video tour.
-// The capture engine is not yet wired, so this is INFORMATIONAL ONLY:
-// a premium "in preparation" state + a how-to-record guide + a disabled
-// early-access CTA. No upload, no storage, no backend — it never implies
-// immediate processing. When the engine is chosen, real upload replaces this.
+// Seller-side recording guide for the property video. INFORMATIONAL ONLY:
+// no upload, no storage, no backend — the real uploader is SourceVideoSection
+// in the dashboard, gated by the Creative Studio allowlist.
+//
+// 2026-08-10 — reemplazo del bloque "3D / Premium video tour · In preparation"
+// (auditoría de producción, hallazgos B-5 y B-6). Se retiraron: toda mención a
+// tours 3D (capacidad inexistente), la píldora de estado "In preparation", el
+// CTA "Request early activation" (botón deshabilitado sin endpoint detrás) y el
+// motivo decorativo de cubo 3D. Se añadieron los límites REALES de ingesta
+// (MP4/MOV · 60 s · 300 MB), que hasta ahora no se comunicaban en ninguna
+// superficie del producto. Este panel NO promete disponibilidad ni fechas.
 
 export interface TourCoachingCopy {
   eyebrow: string;
-  status: string;
   title: string;
   body: string;
   guideTitle: string;
   tips: readonly string[];
-  cta: string;
 }
 
 export function TourCoaching({ copy }: { copy: TourCoachingCopy }) {
   return (
     <div className="relative overflow-hidden border border-gold-soft bg-ivory-strong/30 p-6 lg:p-8">
-      {/* faint 3D-cube motif, decorative */}
+      {/* faint camera motif, decorative */}
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
         strokeWidth="1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         className="pointer-events-none absolute -right-8 -bottom-10 h-48 w-48 text-gold/10"
       >
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-        <path d="M3.27 6.96 12 12.01l8.73-5.05" />
-        <path d="M12 22.08V12" />
+        <path d="m22 8-6 4 6 4V8z" />
+        <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
       </svg>
 
       <div className="relative flex flex-col gap-6">
-        {/* header: eyebrow + status pill */}
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
-            {copy.eyebrow}
-          </p>
-          <span className="inline-flex items-center gap-1.5 border border-gold-soft bg-ivory px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink/60">
-            <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-            {copy.status}
-          </span>
-        </div>
+        {/* header: eyebrow */}
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+          {copy.eyebrow}
+        </p>
 
         {/* medallion + title + microcopy */}
         <div className="flex items-start gap-5">
@@ -56,9 +55,8 @@ export function TourCoaching({ copy }: { copy: TourCoachingCopy }) {
               strokeLinejoin="round"
               className="h-6 w-6"
             >
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-              <path d="M3.27 6.96 12 12.01l8.73-5.05" />
-              <path d="M12 22.08V12" />
+              <path d="m22 8-6 4 6 4V8z" />
+              <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
             </svg>
           </div>
           <div className="flex flex-col gap-2">
@@ -98,16 +96,6 @@ export function TourCoaching({ copy }: { copy: TourCoachingCopy }) {
             ))}
           </ul>
         </div>
-
-        {/* disabled early-access CTA */}
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          className="inline-flex w-full cursor-not-allowed items-center justify-center border border-gold-soft bg-ivory px-6 py-3.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/45 sm:w-auto"
-        >
-          {copy.cta}
-        </button>
       </div>
     </div>
   );

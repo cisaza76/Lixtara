@@ -30,7 +30,7 @@ export interface SourceVideoPreviewCopy {
 }
 
 const SPINNER =
-  "h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
+  "h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
 
 export function SourceVideoPreview({
   propertyId,

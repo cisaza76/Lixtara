@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { deriveFailedViewModel } from "@/lib/creative-studio/video-panel-model";
+import { deriveFailedViewModel, derivePreflightViewModel, type PreflightFailure } from "@/lib/creative-studio/video-panel-model";
 import type {
   SellerVideoMeta,
   SellerVideoState,
@@ -26,6 +26,8 @@ interface Copy {
   errorHeading: string;
   errorReassurance: string;
   errorDetail: string;
+  errorDetailTransient: string;
+  errorDetailDeterministic: string;
   supportErrorDetail: string;
   sourceErrorHeading: string;
   sourceErrorDetail: string;
@@ -50,7 +52,7 @@ const PRIMARY_CLASSES =
 const SECONDARY_CLASSES =
   "inline-flex items-center justify-center gap-2 rounded-md border border-neutral-300 px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400";
 const SPINNER_CLASSES =
-  "h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
+  "h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent motion-reduce:animate-none";
 
 function formatMeta(meta: SellerVideoMeta, createdLabel: string, lang: string): string {
   const parts: string[] = [];
@@ -84,6 +86,8 @@ export function ListingVideoPanel({
   const [status, setStatus] = useState<SellerVideoStatusDto | null>(null);
   const [pendingCreate, setPendingCreate] = useState(false);
   const [createFailed, setCreateFailed] = useState(false);
+  // Fallo ANTERIOR a la creación del job: no existe `failure` en el DTO de estado.
+  const [preflight, setPreflight] = useState<PreflightFailure | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // Refs mirror the latest values so the polling interval (built once, deps
@@ -115,11 +119,17 @@ export function ListingVideoPanel({
         body: JSON.stringify({ property_id: propertyId }),
       });
       if (res.status === 202) {
+        setPreflight(null);
         await refetch();
       } else {
+        // El servidor declara si reintentar sirve. Sin cuerpo legible se asume que NO,
+        // para no repetir el defecto de prometer un reintento inútil.
+        const body = (await res.json().catch(() => ({}))) as { retryable?: boolean; reference?: string };
+        setPreflight({ retryable: body.retryable === true, reference: body.reference ?? null });
         setCreateFailed(true);
       }
     } catch {
+      setPreflight({ retryable: false, reference: null });
       setCreateFailed(true);
     } finally {
       setPendingCreate(false);
@@ -194,7 +204,7 @@ export function ListingVideoPanel({
         ) : view === "creating" ? (
           <CreatingView copy={copy} />
         ) : view === "failed" ? (
-          <FailedView copy={copy} lang={lang} pending={pendingCreate} onRetry={create} failure={status?.failure ?? null} />
+          <FailedView copy={copy} lang={lang} pending={pendingCreate} onRetry={create} failure={status?.failure ?? null} preflight={preflight} />
         ) : view === "completed" && status?.video ? (
           <CompletedView
             copy={copy}
@@ -338,16 +348,21 @@ function FailedView({
   pending,
   onRetry,
   failure,
+  preflight,
 }: {
   copy: Copy;
   lang: Locale;
   pending: boolean;
   onRetry: () => void;
   failure: SellerVideoStatusDto["failure"] | null;
+  preflight: PreflightFailure | null;
 }): React.JSX.Element {
   // UX 5C — the approved CTA matrix, derived by the pure view-model (tested in
   // video-panel-model.test.ts). Never a dead CTA: retry renders only when useful+possible.
   const vm = deriveFailedViewModel(failure);
+  // Fallo PRE-JOB: no hay `failure` en el DTO porque nunca se creó el job. Este modelo
+  // decide, con la retryabilidad que declara el servidor, si se puede prometer un reintento.
+  const pre = failure === null && preflight !== null ? derivePreflightViewModel(preflight) : null;
   const supportHref = `/${lang}/contact?topic=listing-video${vm.reference ? `&ref=${vm.reference}` : ""}`;
 
   const retryButton = (primary: boolean): React.JSX.Element => (
@@ -373,17 +388,25 @@ function FailedView({
       <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 text-sm">
         <p className="font-medium">{copy[vm.headingKey]}</p>
         {vm.showReassurance && <p className="mt-1">{copy.errorReassurance}</p>}
-        <p className="mt-1 text-neutral-500">{copy[vm.detailKey]}</p>
-        {vm.showReference && (
+        <p className="mt-1 text-neutral-500">{copy[pre ? pre.detailKey : vm.detailKey]}</p>
+        {(pre?.reference ?? (vm.showReference ? vm.reference : null)) && (
           <p className="mt-2 text-xs text-neutral-400">
-            {copy.referenceLabel}: <span className="font-mono">{vm.reference}</span>
+            {copy.referenceLabel}: <span className="font-mono">{pre?.reference ?? vm.reference}</span>
           </p>
         )}
       </div>
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          {vm.primary === "retry" ? retryButton(true) : vm.primary === "replace" ? replaceLink : supportLink(true)}
-          {vm.secondary === "retry" ? retryButton(false) : vm.secondary === "support" ? supportLink(false) : null}
+          {pre
+            ? pre.showRetry
+              ? retryButton(true)
+              : supportLink(true)
+            : vm.primary === "retry"
+              ? retryButton(true)
+              : vm.primary === "replace"
+                ? replaceLink
+                : supportLink(true)}
+          {!pre && (vm.secondary === "retry" ? retryButton(false) : vm.secondary === "support" ? supportLink(false) : null)}
         </div>
         <p className="text-xs text-neutral-500">
           {copy.stillTrouble}{" "}

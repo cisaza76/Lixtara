@@ -59,3 +59,37 @@ describe("Etapa 1 — el detalle del panel distingue las cuatro causas de source
     expect(vm("other").primary).toBe("replace");
   });
 });
+
+// ---- Fallo PRE-JOB (readiness / proveedor) — incidente 2026-08-11 ----------------------
+// Un fallo anterior a createJob no tiene `failure` en el DTO de estado, así que la matriz
+// de UX 5C no aplica. Lo importante: si el fallo es determinístico, la UI NO puede decir
+// "trying again usually works" ni ofrecer Try again como acción principal.
+import { derivePreflightViewModel } from "./video-panel-model";
+
+describe("derivePreflightViewModel", () => {
+  it("determinístico: sin promesa de reintento y sin retry como CTA primario", () => {
+    const vm = derivePreflightViewModel({ retryable: false, reference: "A1B2C3D4" });
+    expect(vm.detailKey).not.toBe("errorDetail"); // el copy de "suele funcionar" queda prohibido
+    expect(vm.primary).not.toBe("retry");
+    expect(vm.showRetry).toBe(false);
+    expect(vm.reference).toBe("A1B2C3D4");
+  });
+
+  it("transitorio: sí ofrece reintentar", () => {
+    const vm = derivePreflightViewModel({ retryable: true, reference: "FFFFFFFF" });
+    expect(vm.showRetry).toBe(true);
+    expect(vm.primary).toBe("retry");
+    expect(vm.detailKey).toBe("errorDetailTransient");
+  });
+
+  it("sin información se trata como determinístico (no prometer de más)", () => {
+    const vm = derivePreflightViewModel(null);
+    expect(vm.showRetry).toBe(false);
+    expect(vm.primary).toBe("support");
+  });
+
+  it("nunca expone proveedor, modelo ni códigos internos", () => {
+    const payload = JSON.stringify(derivePreflightViewModel({ retryable: false, reference: "DEADBEEF" }));
+    expect(payload).not.toMatch(/anthropic|claude|vision|8000|px|photo_analysis/i);
+  });
+});

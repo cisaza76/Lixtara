@@ -17,8 +17,16 @@ import type {
   TourStartResult,
 } from "../processor";
 
-// Veo model id — overridable without a code change.
-const VEO_MODEL = process.env.VEO_MODEL ?? "veo-3.1-generate-preview";
+// Veo model id — overridable without a code change (env VEO_MODEL).
+//
+// Lite en vez del estándar por costo (2026-08-10): $0.08/s vs $0.40/s a 1080p —
+// un clip de 8 s pasa de $3.20 a $0.64. Living Listing es un push-in sutil sobre
+// una foto real, no generación creativa, así que el tramo "high-efficiency" cubre
+// el caso de uso. NOTA: Veo 3.1 NO expone un modelo "fast"; los únicos ids
+// documentados son `veo-3.1-generate-preview` y `veo-3.1-lite-generate-preview`
+// (el fast era de Veo 3.0, apagado el 2026-06-30). Para volver al estándar basta
+// con setear VEO_MODEL=veo-3.1-generate-preview y redeployar.
+const VEO_MODEL = process.env.VEO_MODEL ?? "veo-3.1-lite-generate-preview";
 
 // The "source of truth" prompt. Every rule is a guardrail against the model
 // inventing anything that isn't in the seller's real photo.
