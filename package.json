@@ -12,7 +12,8 @@
     "archive:source-retention": "tsx scripts/archive-source-retention.ts",
     "e2e:source": "tsx --env-file=.env.local scripts/e2e/source-lifecycle.ts",
     "e2e:ui-setup": "tsx --env-file=.env.local scripts/e2e/ui-setup.ts",
-    "e2e:ui-teardown": "tsx --env-file=.env.local scripts/e2e/ui-teardown.ts"
+    "e2e:ui-teardown": "tsx --env-file=.env.local scripts/e2e/ui-teardown.ts",
+    "mls:inspect-fields": "tsx scripts/inspect-bridge-fields.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.78",
