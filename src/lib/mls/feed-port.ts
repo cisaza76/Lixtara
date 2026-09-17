@@ -58,12 +58,15 @@ export interface MlsFeedProvider {
   /** Identifica el dataset. Es la PK de `mls_sync_state`. */
   readonly dataset: string;
   /**
-   * Página de listings modificados DESPUÉS de `since`, en orden ASCENDENTE por
-   * ModificationTimestamp.
+   * Página de listings modificados DESPUÉS de `since`.
    *
-   * El orden ascendente es un requisito del contrato, no una preferencia: es lo que
-   * permite avanzar el cursor al máximo de cada página y reanudar sin perder registros
-   * si el worker se queda sin presupuesto a mitad.
+   * EL ORDEN NO ESTÁ GARANTIZADO. El primer diseño lo exigía ascendente, pero el endpoint
+   * /replication de Bridge devuelve `400 "$orderby is not supported on this endpoint"`
+   * (verificado 2026-09-16). Un proveedor PUEDE ordenar; ningún consumidor puede asumirlo.
+   *
+   * Consecuencia para quien consuma este puerto: el cursor de reanudación es `nextCursor`,
+   * y `last_modification_ts` solo puede avanzar cuando la pasada COMPLETA termina — ver
+   * SYNC_CURSOR_POLICY en bridge-adapter.ts.
    *
    * `since = null` → carga inicial completa.
    * `cursor` no nulo → continuar esa paginación; `since` se ignora.

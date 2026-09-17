@@ -116,7 +116,9 @@ describe("proveedor falso", () => {
     expect(p.callCount()).toBe(3);
   });
 
-  it("devuelve en orden ascendente — es lo que hace reanudable el cursor", async () => {
+  it("este fake ordena, aunque el contrato NO lo exige", async () => {
+    // El puerto no garantiza orden: /replication de Bridge rechaza $orderby. El fake
+    // ordena porque es determinista y cómodo, no porque un consumidor pueda asumirlo.
     const desordenados = [...datos].reverse();
     const p = createFakeFeedProvider(desordenados, { pageSize: 10 });
     const pag = await p.fetchModifiedSince(null, null);
