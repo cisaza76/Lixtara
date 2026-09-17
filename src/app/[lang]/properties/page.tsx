@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
-import { getActiveProperties, isDemoListing } from "@/lib/properties";
+import { getActiveProperties, getActiveListingMlsRefs, isDemoListing } from "@/lib/properties";
 import { PropertyCard } from "@/components/property-card";
+import { getPublicMlsListings } from "@/lib/mls/public-listings.supabase";
+import { MlsListingCard } from "@/components/mls-listing-card";
+import { MlsDisclosures } from "@/components/mls-disclosures";
 
 export default async function PropertiesPage({
   params,
@@ -13,6 +16,13 @@ export default async function PropertiesPage({
 
   const copy = t(lang).properties;
   const properties = await getActiveProperties();
+
+  // Inventario de terceros del feed IDX, ya deduplicado contra los listings propios.
+  // Cuando el gate niega —preview, sin flag, o host no licenciado— devuelve vacío y la
+  // página queda exactamente como antes: solo listings propios.
+  const mlsRefs = await getActiveListingMlsRefs();
+  const mls = await getPublicMlsListings(mlsRefs, lang);
+  const total = properties.length + mls.listings.length;
 
   return (
     <main className="bg-background text-foreground flex-1 flex flex-col">
@@ -27,12 +37,12 @@ export default async function PropertiesPage({
             {copy.titleAfter}
           </h1>
           <p className="text-[10px] uppercase tracking-[0.22em] text-ink/55">
-            {properties.length}{" "}
-            {properties.length === 1 ? copy.countSuffixOne : copy.countSuffixMany}
+            {total}{" "}
+            {total === 1 ? copy.countSuffixOne : copy.countSuffixMany}
           </p>
         </div>
 
-        {properties.length === 0 ? (
+        {total === 0 ? (
           <p className="text-lg text-ink/70 leading-relaxed max-w-xl">
             {copy.emptyState}
           </p>
@@ -54,7 +64,19 @@ export default async function PropertiesPage({
                 }}
               />
             ))}
+
+            {/* Inventario de terceros. Cada tarjeta lleva su atribución obligatoria; no
+                es una prop opcional, va dentro del componente. */}
+            {mls.listings.map((l) => (
+              <MlsListingCard key={l.listingKey} listing={l} />
+            ))}
           </div>
+        )}
+
+        {/* Avisos del MLS SOLO si hay contenido licenciado en pantalla: mostrarlos sin
+            fichas del feed confundiría el origen de los listings propios. */}
+        {mls.listings.length > 0 && (
+          <MlsDisclosures lang={lang} year={new Date().getUTCFullYear()} />
         )}
       </section>
     </main>
