@@ -112,6 +112,14 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   before it stops (`SandboxRemotionProvider.render`, `src/lib/video-engine/
   render-provider.ts`) — no `ffprobe` binary is needed on the worker's own Node
   runtime.
+- `MLS_FEED_ENABLED` — server-only (`"true"` to enable). Kill switch for MIAMI MLS
+  Licensed Content. **Production only** — never Preview, never Development. Unset =
+  fail-closed. Read only through `src/lib/mls/environment-gate.ts`.
+- `MLS_BRIDGE_SERVER_TOKEN` — server-only Bridge Interactive server token. **Production
+  only.** Never `NEXT_PUBLIC_`-prefixed. Obtainable only via `requireMlsServerToken()`,
+  which asserts the environment gate first, so a preview cannot reach Bridge even if the
+  variable were set there by mistake. The MIAMI agreement licenses the Data Feed for
+  `lixtara.com` alone (Schedule B §1, §IX.J) — see ADR-0013.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 

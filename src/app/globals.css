@@ -60,6 +60,13 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Base de foco visible (WCAG 2.4.7). Los componentes pueden sobrescribirla,
+   pero ningún elemento enfocable queda sin indicador. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
 :root {
   /* Lixtara editorial palette — overrides shadcn neutral defaults */
   --background: hsl(45 50% 98%);          /* ivory */

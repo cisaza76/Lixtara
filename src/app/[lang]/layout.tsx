@@ -300,6 +300,12 @@ export default async function RootLayout({
                 >
                   {footerCopy.links.disclaimers}
                 </Link>
+                <Link
+                  href={`/${lang}/dmca`}
+                  className="text-sm text-ink/70 hover:text-gold transition-colors"
+                >
+                  {footerCopy.links.dmca}
+                </Link>
               </div>
             </div>
 

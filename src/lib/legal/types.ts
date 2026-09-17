@@ -25,4 +25,4 @@ export interface LegalContent {
 }
 
 /** Single source for the "last updated / effective" date shown on every doc. */
-export const LEGAL_LAST_UPDATED = "2026-06-18";
+export const LEGAL_LAST_UPDATED = "2026-09-02";

@@ -29,7 +29,7 @@ export const termsDoc: LegalContent = {
         body: [
           "Lixtara provides an online platform that gives sellers FSBO-style tools to create and manage a property listing, combined with support from a real estate brokerage. Through the Services you can, among other things, build a listing, upload photos and property details, choose a plan, offer a cooperating (buyer-agent) commission, order optional add-ons, sign documents electronically, and have your listing marketed and syndicated to third-party real estate portals.",
           "When your listing is published through our brokerage, it may be syndicated to third-party portals including home.com, Zillow, Realtor.com, Redfin, and Trulia. Availability, format, and timing on any third-party portal are controlled by that portal and are not guaranteed by Lixtara.",
-          "Lixtara is a technology platform and a Florida real estate brokerage (license application pending). Lixtara is not a law firm, lender or mortgage broker, title or escrow company, appraiser, home inspector, surveyor, accountant, or tax advisor, and nothing in the Services constitutes legal, financial, tax, appraisal, or investment advice.",
+          "Lixtara is a technology platform and a licensed Florida real estate brokerage (Florida license CQ1075352). Lixtara is not a law firm, lender or mortgage broker, title or escrow company, appraiser, home inspector, surveyor, accountant, or tax advisor, and nothing in the Services constitutes legal, financial, tax, appraisal, or investment advice.",
         ],
         bullets: [
           "We do not provide legal advice or prepare legal documents for you as your attorney; you are responsible for obtaining your own legal counsel where appropriate.",
@@ -42,7 +42,7 @@ export const termsDoc: LegalContent = {
       {
         heading: "4. Brokerage Relationship and Florida Real Estate Disclosures",
         body: [
-          "Lixtara operates as a Florida real estate brokerage (license application pending). Our principal broker oversees the brokerage activities conducted through the Services in accordance with Florida real estate law.",
+          "Lixtara operates as a licensed Florida real estate brokerage (Florida license CQ1075352). Our principal broker of record oversees the brokerage activities conducted through the Services in accordance with Florida real estate law.",
           "The specific brokerage relationship between you and Lixtara — including the nature, scope, and duties of that relationship — is established and governed by the listing agreement and any related disclosures that you sign. These Terms do not by themselves create a brokerage, agency, or fiduciary relationship. Any agency or representation obligations arise only under, and are limited by, the signed listing agreement and applicable Florida real estate law and disclosure requirements.",
           "Lixtara does not guarantee any result. We make no promise or guarantee that your property will sell, that it will attract any offer, or that any sale will close at a particular price, on particular terms, or within any particular period of time. Real estate outcomes depend on many factors outside our control, including market conditions, pricing, property condition, and buyer behavior.",
           "Fair Housing. Lixtara is committed to the principles of equal housing opportunity. You agree that your listing and your conduct through the Services will comply with the federal Fair Housing Act and the Florida Fair Housing Act and all other applicable anti-discrimination laws. You may not discriminate, or state any preference, limitation, or discrimination, on the basis of race, color, religion, sex, disability, familial status, national origin, or any other protected class.",
@@ -217,7 +217,7 @@ export const termsDoc: LegalContent = {
           "If you have questions about these Terms or the Services, please contact us:",
           "Lixtara — Lixtara, Miami, Florida, United States. Mailing address: Miami, Florida, United States.",
           "Legal: legal@lixtara.com. Support: support@lixtara.com.",
-          "Florida real estate brokerage (license application pending). Brokerage license number: XXXXXX. Principal broker of record: XXXXXX.",
+          "Licensed Florida real estate brokerage. Brokerage license number: CQ1075352. Principal broker of record: AnaMaria Velasquez.",
         ],
       },
     ],
@@ -250,7 +250,7 @@ export const termsDoc: LegalContent = {
         body: [
           "Lixtara ofrece una plataforma en línea que brinda a los vendedores herramientas tipo FSBO para crear y administrar la publicación de una propiedad, combinadas con el apoyo de una correduría de bienes raíces. A través de los Servicios usted puede, entre otras cosas, crear una publicación, cargar fotos y datos de la propiedad, elegir un plan, ofrecer una comisión al agente del comprador (cooperante), solicitar servicios adicionales opcionales, firmar documentos electrónicamente y hacer que su publicación se promocione y se distribuya a portales inmobiliarios de terceros.",
           "Cuando su publicación se difunde a través de nuestra correduría, puede distribuirse a portales de terceros que incluyen home.com, Zillow, Realtor.com, Redfin y Trulia. La disponibilidad, el formato y los tiempos en cualquier portal de terceros son controlados por ese portal y no están garantizados por Lixtara.",
-          "Lixtara es una plataforma tecnológica y una correduría de bienes raíces de Florida (solicitud de licencia en trámite). Lixtara no es un bufete de abogados, prestamista o corredor hipotecario, compañía de títulos o plica (escrow), tasador, inspector de viviendas, agrimensor, contador ni asesor fiscal, y nada en los Servicios constituye asesoría legal, financiera, fiscal, de tasación o de inversión.",
+          "Lixtara es una plataforma tecnológica y una correduría de bienes raíces licenciada en Florida (licencia de Florida CQ1075352). Lixtara no es un bufete de abogados, prestamista o corredor hipotecario, compañía de títulos o plica (escrow), tasador, inspector de viviendas, agrimensor, contador ni asesor fiscal, y nada en los Servicios constituye asesoría legal, financiera, fiscal, de tasación o de inversión.",
         ],
         bullets: [
           "No brindamos asesoría legal ni preparamos documentos legales para usted como su abogado; usted es responsable de obtener su propia asesoría legal cuando corresponda.",
@@ -263,7 +263,7 @@ export const termsDoc: LegalContent = {
       {
         heading: "4. Relación de Correduría y Divulgaciones Inmobiliarias de Florida",
         body: [
-          "Lixtara opera como una correduría de bienes raíces de Florida (solicitud de licencia en trámite). Nuestro corredor principal supervisa las actividades de correduría realizadas a través de los Servicios de conformidad con la ley inmobiliaria de Florida.",
+          "Lixtara opera como una correduría de bienes raíces licenciada en Florida (licencia de Florida CQ1075352). Nuestra corredora principal a cargo supervisa las actividades de correduría realizadas a través de los Servicios de conformidad con la ley inmobiliaria de Florida.",
           "La relación de correduría específica entre usted y Lixtara —incluyendo la naturaleza, el alcance y los deberes de esa relación— se establece y se rige por el acuerdo de publicación y cualquier divulgación relacionada que usted firme. Estos Términos no crean por sí mismos una relación de correduría, de agencia ni fiduciaria. Cualquier obligación de agencia o representación surge únicamente bajo, y está limitada por, el acuerdo de publicación firmado y la ley inmobiliaria de Florida y los requisitos de divulgación aplicables.",
           "Lixtara no garantiza ningún resultado. No prometemos ni garantizamos que su propiedad se venderá, que atraerá alguna oferta, ni que alguna venta se cerrará a un precio determinado, en condiciones determinadas o dentro de un período de tiempo determinado. Los resultados inmobiliarios dependen de muchos factores fuera de nuestro control, incluidas las condiciones del mercado, el precio, el estado de la propiedad y el comportamiento del comprador.",
           "Vivienda Justa. Lixtara está comprometida con los principios de igualdad de oportunidades en la vivienda. Usted acepta que su publicación y su conducta a través de los Servicios cumplirán con la Ley Federal de Vivienda Justa y la Ley de Vivienda Justa de Florida y todas las demás leyes antidiscriminatorias aplicables. No podrá discriminar, ni expresar preferencia, limitación o discriminación alguna, por motivos de raza, color, religión, sexo, discapacidad, estado familiar, origen nacional o cualquier otra clase protegida.",
@@ -438,7 +438,7 @@ export const termsDoc: LegalContent = {
           "Si tiene preguntas sobre estos Términos o los Servicios, comuníquese con nosotros:",
           "Lixtara — Lixtara, Miami, Florida, Estados Unidos. Dirección postal: Miami, Florida, United States.",
           "Legal: legal@lixtara.com. Soporte: support@lixtara.com.",
-          "Correduría de bienes raíces de Florida (solicitud de licencia en trámite). Número de licencia de correduría: XXXXXX. Corredor principal a cargo: XXXXXX.",
+          "Correduría de bienes raíces licenciada en Florida. Número de licencia de correduría: CQ1075352. Corredora principal a cargo: AnaMaria Velasquez.",
         ],
       },
     ],
