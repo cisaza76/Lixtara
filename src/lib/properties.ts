@@ -28,6 +28,25 @@ export interface PropertyDetail extends PropertySummary {
   }[];
 }
 
+/**
+ * Pares (id, mls_number) de los listings activos. Es lo único que necesita la
+ * deduplicación contra el feed IDX, así que se consulta aparte en vez de engordar
+ * `PropertySummary` con un campo que ninguna tarjeta muestra.
+ *
+ * `mls_number` es null mientras nadie lo anote: hoy no se escribe en ningún sitio del
+ * código. Una fila sin número simplemente no participa del cruce.
+ */
+export async function getActiveListingMlsRefs(): Promise<
+  { id: string; mlsNumber: string | null }[]
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("properties")
+    .select("id,mls_number")
+    .eq("mls_status", "active");
+  return (data ?? []).map((r) => ({ id: r.id as string, mlsNumber: (r.mls_number as string | null) ?? null }));
+}
+
 export async function getActiveProperties(): Promise<PropertySummary[]> {
   // Uses the publishable-key SSR client now that the RLS recursion is fixed
   // (migration supabase/migrations/20260517_fix_rls_recursion.sql). The

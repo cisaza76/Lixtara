@@ -4,6 +4,10 @@
     {
       "path": "/api/creative-studio/video/worker",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/mls/sync",
+      "schedule": "23 */6 * * *"
     }
   ]
 }
