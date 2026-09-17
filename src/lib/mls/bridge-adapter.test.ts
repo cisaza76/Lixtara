@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   createBridgeProvider, buildReplicationUrl, BridgeFeedError,
-  BRIDGE_API_BASE, BRIDGE_REPLICATION_PAGE_SIZE,
+  BRIDGE_API_BASE, BRIDGE_REPLICATION_PAGE_SIZE, SYNC_CURSOR_POLICY,
 } from "./bridge-adapter";
 import { makeResoListing } from "./feed-port.fake";
 
@@ -12,11 +12,21 @@ const respuesta = (body: unknown, status = 200) =>
   ({ ok: status >= 200 && status < 300, status, json: async () => body }) as Response;
 
 describe("buildReplicationUrl", () => {
-  it("pide orden ASCENDENTE — es lo que hace reanudable el cursor", () => {
-    // Sin orden ascendente no se puede avanzar el cursor al máximo de cada página:
-    // un corte por presupuesto perdería registros silenciosamente.
+  it("NO manda $orderby: /replication lo rechaza con 400", () => {
+    // Verificado contra la API real (2026-09-16): el endpoint responde
+    // `400 "$orderby is not supported on this endpoint"`. El diseño original lo
+    // mandaba y habría fallado en la primera llamada real.
     const u = new URL(buildReplicationUrl("mia", null, 200));
-    expect(u.searchParams.get("$orderby")).toBe("ModificationTimestamp asc");
+    expect(u.searchParams.get("$orderby")).toBeNull();
+    expect(u.toString()).not.toContain("orderby");
+  });
+
+  it("la política del cursor no depende del orden", () => {
+    // Como /replication no ordena, last_modification_ts solo puede avanzar cuando la
+    // pasada COMPLETA termina, y avanza a runStartedAt — no al máximo visto, que
+    // saltaría registros modificados durante la pasada.
+    expect(SYNC_CURSOR_POLICY.advanceOnlyOnCompleteRun).toBe(true);
+    expect(SYNC_CURSOR_POLICY.advanceTo).toBe("runStartedAt");
   });
 
   it("usa /replication, no el endpoint OData normal", () => {

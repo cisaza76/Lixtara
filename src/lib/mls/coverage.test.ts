@@ -47,6 +47,16 @@ describe("normalizeGeoName", () => {
     expect(normalizeGeoName("Palm Beach County")).toBe("palm beach");
   });
 
+  it("no se vacía al quitar el sufijo: un valor degenerado ≠ campo ausente", () => {
+    // Encontrado corriendo contra el feed real: el dataset `test` de Bridge trae
+    // CountyOrParish: "County" como relleno. Quitar el sufijo a ciegas lo dejaba vacío,
+    // el campo parecía AUSENTE y el filtro excluía todo por county_field_missing.
+    expect(normalizeGeoName("County")).toBe("county");
+    expect(normalizeGeoName("COUNTY")).toBe("county");
+    // Y sigue quitándolo cuando queda algo:
+    expect(normalizeGeoName("Broward County")).toBe("broward");
+  });
+
   it("devuelve null ante lo que no es un nombre", () => {
     for (const v of [null, undefined, "", "   ", 42, {}, []]) {
       expect(normalizeGeoName(v)).toBeNull();

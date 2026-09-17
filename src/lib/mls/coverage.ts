@@ -26,15 +26,16 @@ export const SUPPORTED_COUNTIES = ["Miami-Dade", "Broward", "Palm Beach"] as con
 export const SUPPORTED_STATE = "FL";
 
 /**
- * ⚠️ NOMBRES DE CAMPO NO VERIFICADOS CONTRA EL FEED REAL.
+ * VERIFICADO contra la API real de Bridge el 2026-09-16 (dataset `test`, 20 registros):
+ *   CountyOrParish   presente en 20/20   ← candidato primario, confirmado
+ *   StateOrProvince  presente en 18/20   ← candidato primario, confirmado
+ *   County / State   presentes en 0/20   ← no existen en Bridge; se conservan por si otro
+ *                                          dataset los usara, sin coste
  *
- * El estándar RESO Data Dictionary usa `CountyOrParish` y `StateOrProvince`, pero **no se
- * ha confirmado contra una respuesta real de Bridge** porque aún no hay credenciales. Por
- * eso esto es una LISTA DE CANDIDATOS en orden de preferencia y no un nombre fijo: si el
- * feed usa otro, se añade aquí sin tocar la lógica.
- *
- * Verificación: `pnpm tsx scripts/inspect-bridge-fields.ts` contra el feed real imprime los
- * campos que realmente llegan. Correrlo es el paso que convierte esta suposición en un hecho.
+ * ⚠️ La verificación se hizo contra el dataset `test` de Bridge, NO contra `miamire`, que
+ * todavía devuelve 401 (acceso a los datos de MIAMI sin aprobar). Los nombres son RESO
+ * estándar y Bridge los sirve así, pero conviene re-correr `pnpm mls:inspect-fields` con
+ * MLS_BRIDGE_DATASET=miamire en cuanto el acceso esté vivo.
  */
 export const COUNTY_FIELD_CANDIDATES = ["CountyOrParish", "County"] as const;
 export const STATE_FIELD_CANDIDATES = ["StateOrProvince", "State"] as const;
@@ -48,13 +49,21 @@ export const STATE_FIELD_CANDIDATES = ["StateOrProvince", "State"] as const;
  */
 export function normalizeGeoName(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const limpio = raw
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+
+  const base = raw
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/\bcounty\b/g, "")
     .replace(/[\s_-]+/g, " ")
     .trim();
-  return limpio.length > 0 ? limpio : null;
+  if (base.length === 0) return null;
+
+  // Quitar el sufijo "county" SOLO si queda algo. Verificado contra el feed real: el
+  // dataset `test` de Bridge trae `CountyOrParish: "County"` como valor de relleno, y
+  // quitarlo a ciegas lo dejaba vacío → el campo parecía ausente y el filtro excluía todo.
+  // Un condado real nunca se llama solo "County", pero la regla defensiva cuesta nada y
+  // evita que un valor degenerado se confunda con un campo faltante.
+  const sinSufijo = base.replace(/\bcounty\b/g, "").replace(/\s+/g, " ").trim();
+  return sinSufijo.length > 0 ? sinSufijo : base;
 }
 
 /**

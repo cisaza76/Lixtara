@@ -1,10 +1,10 @@
 // Adaptador de Bridge Data Output para el puerto MlsFeedProvider.
 //
-// ⚠️ NO VERIFICADO CONTRA LA API REAL. La documentación de Bridge
-// (bridgedataoutput.com/docs) es una SPA que no sirve contenido a un fetch, así que la
-// forma de abajo viene de fuentes secundarias. Todo lo marcado con [SIN VERIFICAR] debe
-// confirmarse en cuanto existan credenciales; `scripts/inspect-bridge-fields.ts` hace
-// exactamente eso contra el feed real.
+// VERIFICADO PARCIALMENTE contra la API real el 2026-09-16, usando el dataset `test` de
+// Bridge: base, ruta /replication, auth Bearer, paginación por `$next` y soporte de
+// `$filter` están confirmados; `$orderby` está confirmado como NO soportado. Lo que NO
+// está verificado es el dataset `miamire`, que aún devuelve 401 — el acceso a los datos
+// de MIAMI no está aprobado todavía.
 //
 // El diseño acota el daño de equivocarse: si la forma difiere, cambia ESTE archivo y nada
 // más — el puerto, el normalizador, el filtro de cobertura y el worker no se enteran.
@@ -12,13 +12,13 @@ import { requireMlsServerToken } from "@/lib/mls/environment-gate";
 import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
 import type { MlsFeedPage, MlsFeedProvider, ResoListing } from "@/lib/mls/feed-port";
 
-/** [SIN VERIFICAR] Base documentada de la Web API v2 de Bridge. */
+/** VERIFICADO: base de la Web API v2 de Bridge. */
 export const BRIDGE_API_BASE = "https://api.bridgedataoutput.com/api/v2/OData";
 
 /**
- * [SIN VERIFICAR] `/replication` frente al endpoint OData normal: soporta `$top` hasta
- * 2.000 por página contra 200 del normal, y es el que Bridge documenta para sincronización
- * incremental — que es exactamente nuestro caso.
+ * VERIFICADO: `/replication` responde y pagina. Frente al endpoint OData normal admite
+ * páginas mucho mayores, y es el que Bridge documenta para sincronización incremental.
+ * A cambio no ordena — ver SYNC_CURSOR_POLICY.
  */
 export const BRIDGE_REPLICATION_PAGE_SIZE = 200;
 
@@ -41,7 +41,7 @@ export class BridgeFeedError extends Error {
   }
 }
 
-/** Forma [SIN VERIFICAR] de la respuesta OData de Bridge. */
+/** Forma de la respuesta, verificada contra el dataset `test`. */
 interface BridgeResponse {
   value?: unknown;
   "@odata.nextLink"?: unknown;
@@ -101,11 +101,20 @@ export function createBridgeProvider(opts: BridgeAdapterOptions): MlsFeedProvide
 }
 
 /**
- * Construye la URL de la primera página. [SIN VERIFICAR] contra la API real.
+ * Construye la URL de la primera página.
  *
- * El orden ascendente por ModificationTimestamp NO es opcional: es lo que permite avanzar
- * el cursor al máximo de cada página y reanudar sin perder registros si el worker se queda
- * sin presupuesto a mitad.
+ * VERIFICADO contra la API real (2026-09-16, dataset `test`):
+ *   - `/replication` responde 200 y pagina con `$next=` en el nextLink.
+ *   - `$filter` sobre ModificationTimestamp FUNCIONA — es lo que hace posible el
+ *     incremental.
+ *   - **`$orderby` NO está soportado en este endpoint**: devuelve
+ *     `400 "$orderby is not supported on this endpoint"`.
+ *
+ * Ese último punto invalidó el diseño original, que avanzaba el cursor al máximo de cada
+ * página asumiendo orden ascendente. Sin orden garantizado eso perdería registros. La
+ * estrategia correcta —y de hecho más robusta— es la contraria: paginar la pasada COMPLETA
+ * con el nextLink y avanzar `last_modification_ts` SOLO cuando la pasada termina. Ver
+ * `SYNC_CURSOR_POLICY`.
  */
 export function buildReplicationUrl(
   dataset: string,
@@ -113,10 +122,31 @@ export function buildReplicationUrl(
   pageSize: number,
 ): string {
   const url = new URL(`${BRIDGE_API_BASE}/${dataset}/Property/replication`);
-  url.searchParams.set("$orderby", "ModificationTimestamp asc");
   url.searchParams.set("$top", String(pageSize));
   if (since) {
     url.searchParams.set("$filter", `ModificationTimestamp gt ${since.toISOString()}`);
   }
   return url.toString();
 }
+
+/**
+ * Política del cursor, documentada aquí porque nace de una restricción de la API y no de
+ * una preferencia de diseño.
+ *
+ * `/replication` no ordena, así que dentro de una pasada NO se puede saber si ya se vio
+ * todo lo anterior a un timestamp dado. Por tanto:
+ *
+ *   1. Al empezar, se anota `runStartedAt`.
+ *   2. Se pagina TODO con el nextLink, filtrando por `ModificationTimestamp gt {since}`.
+ *   3. Solo si la pasada COMPLETA termina, `last_modification_ts = runStartedAt`.
+ *   4. Si se interrumpe, la siguiente pasada repite desde el mismo `since`. El upsert por
+ *      listing_key hace que repetir sea inocuo.
+ *
+ * Se avanza a `runStartedAt` y no al máximo visto: un registro modificado DURANTE la
+ * pasada puede haber aparecido en una página temprana, y usar el máximo lo saltaría. El
+ * solapamiento que produce `runStartedAt` se reprocesa sin consecuencias.
+ */
+export const SYNC_CURSOR_POLICY = {
+  advanceOnlyOnCompleteRun: true,
+  advanceTo: "runStartedAt",
+} as const;
