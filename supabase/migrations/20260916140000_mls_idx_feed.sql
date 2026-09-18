@@ -87,6 +87,11 @@ create table if not exists public.mls_sync_state (
   last_modification_ts timestamptz,
   last_run_at          timestamptz,
   last_run_status      text check (last_run_status in ('ok','partial','failed')),
+  -- Cursor de REANUDACIÓN dentro de una pasada. Sin esto una pasada parcial reempieza
+  -- desde cero en la siguiente invocación, y con 1,4 M de fichas en el feed de MIAMI eso
+  -- no converge nunca: el cron re-descargaría eternamente las mismas primeras páginas.
+  -- Se guarda el nextLink OPACO del proveedor y se limpia al completar la pasada.
+  resume_cursor        text,
   last_error           text,
   records_seen         bigint not null default 0,
   updated_at           timestamptz not null default now()

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   createBridgeProvider, buildReplicationUrl, BridgeFeedError,
-  BRIDGE_API_BASE, BRIDGE_REPLICATION_PAGE_SIZE, SYNC_CURSOR_POLICY,
+  BRIDGE_API_BASE, BRIDGE_REPLICATION_PAGE_SIZE, SYNC_CURSOR_POLICY, ingestableStatusFilter,
 } from "./bridge-adapter";
+import { PUBLICLY_DISPLAYABLE_STATUSES } from "./display-compliance";
 import { makeResoListing } from "./feed-port.fake";
 
 const TOKEN = "tok_de_prueba";
@@ -35,13 +36,33 @@ describe("buildReplicationUrl", () => {
     expect(buildReplicationUrl("mia", null, 200)).toContain(BRIDGE_API_BASE);
   });
 
-  it("sin `since` no manda $filter: es la carga inicial", () => {
-    expect(new URL(buildReplicationUrl("mia", null, 200)).searchParams.get("$filter")).toBeNull();
+  it("sin `since` el $filter lleva solo el estado: es la carga inicial", () => {
+    const f = new URL(buildReplicationUrl("mia", null, 200)).searchParams.get("$filter") ?? "";
+    expect(f).toContain("StandardStatus");
+    expect(f).not.toContain("ModificationTimestamp");
   });
 
   it("con `since` filtra por ModificationTimestamp en ISO", () => {
     const u = new URL(buildReplicationUrl("mia", new Date("2026-09-16T10:00:00Z"), 200));
-    expect(u.searchParams.get("$filter")).toBe("ModificationTimestamp gt 2026-09-16T10:00:00.000Z");
+    expect(u.searchParams.get("$filter")).toContain("ModificationTimestamp gt 2026-09-16T10:00:00.000Z");
+  });
+
+  it("filtra por estado en la consulta: el 92% del feed son Closed", () => {
+    // Medido contra el feed real: 1.327.107 de 1.438.500 fichas son Closed y jamás llegan
+    // al buscador público. Descargarlas para descartarlas es derroche y difícil de
+    // defender bajo § III.B.9, que solo autoriza descargar para exhibir.
+    const f = ingestableStatusFilter();
+    for (const s of PUBLICLY_DISPLAYABLE_STATUSES) expect(f).toContain(`'${s}'`);
+    expect(f).not.toContain("Closed");
+    expect(new URL(buildReplicationUrl("mia", null, 200)).searchParams.get("$filter")).toContain("StandardStatus");
+  });
+
+  it("combina estado y ModificationTimestamp en un solo $filter", () => {
+    const f = new URL(buildReplicationUrl("mia", new Date("2026-09-16T10:00:00Z"), 200))
+      .searchParams.get("$filter") ?? "";
+    expect(f).toContain("StandardStatus");
+    expect(f).toContain("ModificationTimestamp gt 2026-09-16T10:00:00.000Z");
+    expect(f).toContain(" and ");
   });
 
   it("el tamaño de página por defecto es el documentado", () => {
