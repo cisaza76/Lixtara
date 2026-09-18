@@ -26,6 +26,27 @@ export const SUPPORTED_COUNTIES = ["Miami-Dade", "Broward", "Palm Beach"] as con
 export const SUPPORTED_STATE = "FL";
 
 /**
+ * Tipos de propiedad que se ingieren. DECISIÓN DEL OWNER (2026-09-18): solo venta
+ * residencial. Vender terrenos o listar alquileres sería una expansión de producto, no
+ * parte de encender el feed.
+ *
+ * ⚠️ LA COMPARACIÓN ES POR IGUALDAD EXACTA, NUNCA POR PREFIJO. Medido contra el feed real:
+ * "Residential" comparte prefijo con "Residential Lease" (26,2 % del feed, mediana $3.500)
+ * y "Residential Income" (1,1 %). Un `startsWith` metería un cuarto del inventario en
+ * alquiler dentro de una búsqueda de compra.
+ *
+ * Reparto real del feed (2.000 fichas de los 4 estados públicos):
+ *   Residential          43,1 %  mediana $499.000   ← lo único que entra
+ *   Residential Lease    26,2 %  mediana   $3.500
+ *   Land/Boat Docks      12,5 %  mediana  $48.800
+ *   Commercial Sale      10,0 %
+ *   Commercial Land       4,2 %
+ *   Business Opportunity  2,9 %
+ *   Residential Income    1,1 %
+ */
+export const SUPPORTED_PROPERTY_TYPES = ["Residential"] as const;
+
+/**
  * VERIFICADO contra la API real de Bridge el 2026-09-16 (dataset `test`, 20 registros):
  *   CountyOrParish   presente en 20/20   ← candidato primario, confirmado
  *   StateOrProvince  presente en 18/20   ← candidato primario, confirmado
@@ -90,13 +111,15 @@ export function readCandidate(
 }
 
 export type CoverageVerdict =
-  | { included: true; county: string; countyField: string }
+  | { included: true; county: string; countyField: string; propertyType: string }
   | { included: false; reason: CoverageExclusionReason; detail?: string };
 
 export type CoverageExclusionReason =
   | "county_field_missing"   // ⚠️ probablemente el nombre del campo es otro — ver script
   | "state_not_supported"
-  | "county_not_supported";
+  | "county_not_supported"
+  | "property_type_missing"
+  | "property_type_not_supported";
 
 /**
  * ¿Este listing entra?
@@ -124,7 +147,23 @@ export function coverageVerdict(listing: ResoListing): CoverageVerdict {
     return { included: false, reason: "county_not_supported", detail: condado.value };
   }
 
-  return { included: true, county: condado.value, countyField: condado.field };
+  // Tipo de propiedad. Igualdad exacta sobre el valor SIN normalizar: los tipos del feed
+  // son una enumeración cerrada del MLS, no texto tecleado por una persona, así que
+  // normalizar aquí solo crearía falsos positivos entre "Residential" y sus variantes.
+  const tipo = typeof listing.PropertyType === "string" ? listing.PropertyType.trim() : "";
+  if (tipo.length === 0) {
+    return { included: false, reason: "property_type_missing" };
+  }
+  if (!(SUPPORTED_PROPERTY_TYPES as readonly string[]).includes(tipo)) {
+    return { included: false, reason: "property_type_not_supported", detail: tipo };
+  }
+
+  return {
+    included: true,
+    county: condado.value,
+    countyField: condado.field,
+    propertyType: tipo,
+  };
 }
 
 export function isWithinCoverage(listing: ResoListing): boolean {
@@ -149,6 +188,8 @@ export function partitionByCoverage(listings: ResoListing[]): {
     county_field_missing: 0,
     state_not_supported: 0,
     county_not_supported: 0,
+    property_type_missing: 0,
+    property_type_not_supported: 0,
   };
 
   for (const l of listings) {

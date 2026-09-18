@@ -12,6 +12,7 @@ import { requireMlsServerToken } from "@/lib/mls/environment-gate";
 import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
 import type { MlsFeedPage, MlsFeedProvider, ResoListing } from "@/lib/mls/feed-port";
 import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { SUPPORTED_PROPERTY_TYPES } from "@/lib/mls/coverage";
 
 /** VERIFICADO: base de la Web API v2 de Bridge. */
 export const BRIDGE_API_BASE = "https://api.bridgedataoutput.com/api/v2/OData";
@@ -125,7 +126,7 @@ export function buildReplicationUrl(
   const url = new URL(`${BRIDGE_API_BASE}/${dataset}/Property/replication`);
   url.searchParams.set("$top", String(pageSize));
 
-  const clausulas = [ingestableStatusFilter()];
+  const clausulas = [ingestableStatusFilter(), ingestablePropertyTypeFilter()];
   if (since) clausulas.push(`ModificationTimestamp gt ${since.toISOString()}`);
   url.searchParams.set("$filter", clausulas.join(" and "));
 
@@ -149,6 +150,23 @@ export function buildReplicationUrl(
  * caso pide una consulta BAJO DEMANDA —ventas cercanas a una dirección concreta en los
  * últimos N meses— y no replicar 1,3 M de filas con su carga de purga bajo § VI.C.
  */
+/**
+ * Filtro de TIPO en la consulta. La AUTORIDAD sigue siendo `coverageVerdict` en nuestro
+ * código —igual que el filtro de condado, y por la misma razón: el criterio debe estar
+ * testeado y ser auditable—. Esto es una optimización encima, no un reemplazo.
+ *
+ * Vale la pena porque el 56,9 % de lo que bajaríamos se descarta: alquileres 26,2 %,
+ * terrenos 12,5 %, comercial 14,2 %, resto 4 %. Y si Bridge cambiara el comportamiento de
+ * `$filter`, el filtro de código sigue protegiendo la tabla — que es justo lo que pidió el
+ * owner al exigir que la ingesta no acumule filas que nunca se muestran.
+ */
+export function ingestablePropertyTypeFilter(): string {
+  return SUPPORTED_PROPERTY_TYPES
+    .map((t) => `PropertyType eq '${t}'`)
+    .join(" or ")
+    .replace(/^(.*)$/, "($1)");
+}
+
 export function ingestableStatusFilter(): string {
   return PUBLICLY_DISPLAYABLE_STATUSES
     .map((s) => `StandardStatus eq '${s}'`)
