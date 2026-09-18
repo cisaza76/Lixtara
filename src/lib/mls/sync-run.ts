@@ -15,6 +15,8 @@ import { partitionByCoverage, type CoverageExclusionReason } from "@/lib/mls/cov
 export interface SyncState {
   dataset: string;
   lastModificationTs: string | null;
+  /** nextLink opaco de una pasada interrumpida. null = empezar desde el principio. */
+  resumeCursor: string | null;
 }
 
 export interface SyncStore {
@@ -22,10 +24,16 @@ export interface SyncStore {
   /** Upsert por listing_key. Idempotente: repetir una página no duplica. */
   upsertListings(rows: NormalizedListing[]): Promise<number>;
   /**
-   * Avanza el cursor. SOLO se llama tras una pasada completa — el motor no expone otra
-   * forma de moverlo, para que la política no dependa de la disciplina de quien llame.
+   * Avanza el cursor y LIMPIA el de reanudación. Solo tras una pasada completa — el motor
+   * no expone otra forma de moverlo, para que la política no dependa de la disciplina de
+   * quien llame.
    */
   commitCursor(dataset: string, lastModificationTs: string, recordsSeen: number): Promise<void>;
+  /**
+   * Guarda dónde se quedó una pasada interrumpida. Sin esto, con 1,4 M de fichas en el
+   * feed real, el worker reempezaría desde cero cada 6 h y no convergería jamás.
+   */
+  saveResumeCursor(dataset: string, cursor: string | null): Promise<void>;
   /** Registra el resultado aunque la pasada no termine, para diagnóstico. */
   recordRun(dataset: string, status: "ok" | "partial" | "failed", error: string | null): Promise<void>;
 }
@@ -42,6 +50,8 @@ export interface SyncDeps {
 
 export interface SyncSummary {
   dataset: string;
+  /** true si esta invocación continuó una pasada interrumpida. */
+  resumed: boolean;
   /** true = se paginó hasta el final; es la ÚNICA condición que mueve el cursor. */
   completed: boolean;
   pages: number;
@@ -68,13 +78,15 @@ export async function runMlsSync(deps: SyncDeps): Promise<SyncSummary> {
 
   const estado = await store.readState(dataset);
   const since = estado?.lastModificationTs ? new Date(estado.lastModificationTs) : null;
+  // Se reanuda donde quedó la pasada anterior, si la hubo.
+  const reanudando = estado?.resumeCursor ?? null;
 
   const resumen: SyncSummary = {
-    dataset, completed: false, pages: 0, received: 0, upserted: 0,
+    dataset, resumed: reanudando !== null, completed: false, pages: 0, received: 0, upserted: 0,
     excluded: vacío(), malformed: 0, stoppedBy: "completed", error: null,
   };
 
-  let cursor: string | null = null;
+  let cursor: string | null = reanudando;
   try {
     for (;;) {
       if (now() - runStartedAtMs >= timeBudgetMs) { resumen.stoppedBy = "time_budget"; break; }
@@ -114,11 +126,13 @@ export async function runMlsSync(deps: SyncDeps): Promise<SyncSummary> {
   }
 
   if (resumen.completed) {
-    // Solo aquí. Una pasada incompleta deja el cursor donde estaba, así que la próxima
-    // repite desde el mismo `since` — inocuo porque el upsert va por listing_key.
+    // Solo aquí. commitCursor limpia también el cursor de reanudación.
     await store.commitCursor(dataset, runStartedAt, resumen.received);
     await store.recordRun(dataset, "ok", null);
   } else {
+    // Se persiste DÓNDE quedó para que la próxima invocación continúe en vez de
+    // reempezar. `last_modification_ts` sigue sin moverse: la pasada no terminó.
+    await store.saveResumeCursor(dataset, cursor);
     await store.recordRun(dataset, resumen.stoppedBy === "error" ? "failed" : "partial", resumen.error);
   }
 

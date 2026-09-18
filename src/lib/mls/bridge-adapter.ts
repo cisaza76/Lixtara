@@ -11,6 +11,7 @@
 import { requireMlsServerToken } from "@/lib/mls/environment-gate";
 import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
 import type { MlsFeedPage, MlsFeedProvider, ResoListing } from "@/lib/mls/feed-port";
+import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
 
 /** VERIFICADO: base de la Web API v2 de Bridge. */
 export const BRIDGE_API_BASE = "https://api.bridgedataoutput.com/api/v2/OData";
@@ -123,10 +124,36 @@ export function buildReplicationUrl(
 ): string {
   const url = new URL(`${BRIDGE_API_BASE}/${dataset}/Property/replication`);
   url.searchParams.set("$top", String(pageSize));
-  if (since) {
-    url.searchParams.set("$filter", `ModificationTimestamp gt ${since.toISOString()}`);
-  }
+
+  const clausulas = [ingestableStatusFilter()];
+  if (since) clausulas.push(`ModificationTimestamp gt ${since.toISOString()}`);
+  url.searchParams.set("$filter", clausulas.join(" and "));
+
   return url.toString();
+}
+
+/**
+ * Filtro de ESTADO en la consulta. Distinto del de cobertura geográfica, que por decisión
+ * del owner vive en nuestro código y no aquí.
+ *
+ * Medido contra el feed real de MIAMI el 2026-09-18:
+ *   total del feed          1.438.500
+ *   Closed (7 años)         1.327.107   = 92% del feed
+ *   4 estados públicos × 3 condados 93.980
+ *
+ * Descargar el 92% para descartarlo en memoria no es solo derroche: § III.B.9 prohíbe
+ * "download ... any of the Licensed Content ... except Participant's Website", y bajarse
+ * 1,3 M de fichas que jamás se exhiben es difícil de defender como exhibición.
+ *
+ * Los datos de venta cerrada SÍ hacen falta para los comparables del vendedor, pero ese
+ * caso pide una consulta BAJO DEMANDA —ventas cercanas a una dirección concreta en los
+ * últimos N meses— y no replicar 1,3 M de filas con su carga de purga bajo § VI.C.
+ */
+export function ingestableStatusFilter(): string {
+  return PUBLICLY_DISPLAYABLE_STATUSES
+    .map((s) => `StandardStatus eq '${s}'`)
+    .join(" or ")
+    .replace(/^(.*)$/, "($1)");
 }
 
 /**
