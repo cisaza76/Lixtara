@@ -14,10 +14,24 @@ Importan porque definen qué es "normal" en la primera pasada.
 |---|---|
 | Fichas totales en el feed | **1.438.500** |
 | De las cuales `Closed` (histórico 7 años) | **1.327.107** — el 92 % |
-| **Lo que ingerimos** (4 estados públicos, sin filtro de condado) | **~94.000** |
-| Tras el filtro de cobertura (Miami-Dade · Broward · Palm Beach) | **~81 %** de lo recibido |
+| 4 estados públicos, cualquier tipo | ~94.000 |
+| **Lo que ingerimos** (+ solo `PropertyType = Residential`) | **59.943** |
+| Tras el filtro de condado (Miami-Dade · Broward · Palm Beach) | **~81 %** → **~48.500 filas** |
 | Modificadas en 24 h | ~17.000 → **~4.250 por pasada de 6 h** |
 | Velocidad observada | 200 fichas / ~0,5 s |
+
+**Reparto de `PropertyType` en el feed** (medido sobre 2.000 fichas de los 4 estados
+públicos) — solo entra la primera fila:
+
+| Tipo | % | Precio mediano |
+|---|---|---|
+| **`Residential`** ✓ | 43,1 % | $499.000 |
+| `Residential Lease` | 26,2 % | $3.500 |
+| `Land/Boat Docks` | 12,5 % | $48.800 |
+| `Commercial Sale` | 10,0 % | — |
+| `Commercial Land` | 4,2 % | — |
+| `Business Opportunity` | 2,9 % | — |
+| `Residential Income` | 1,1 % | — |
 
 **Reparto de condados en 1.000 fichas reales:** Miami-Dade 342 · Palm Beach 333 · Broward
 141 · fuera de cobertura 157 · sin condado 27.
@@ -84,22 +98,26 @@ curl -s -X POST https://lixtara.com/api/mls/sync \
 
 ```json
 {
-  "completed": true,
-  "stoppedBy": "completed",
-  "pages": 470,
-  "received": 94000,
-  "upserted": 76000,
+  "completed": false,
+  "stoppedBy": "time_budget",
+  "pages": 100,
+  "received": 20000,
+  "upserted": 16000,
   "needsAttention": false
 }
 ```
+
+**La primera llamada NO va a completar, y eso es correcto.** Son ~300 páginas y en 50 s
+caben ~100. Guarda `resume_cursor` y la siguiente invocación continúa. Repite el `curl`
+hasta que salga `"completed": true` — tres veces, aproximadamente.
 
 **Rangos esperados:**
 
 | Campo | Normal | Qué significa si se sale |
 |---|---|---|
-| `pages` | 400-500 | Muchas menos: el filtro de estado no se aplicó |
-| `received` | 90.000-100.000 | ~1,4 M: el filtro de estado NO funcionó — **abortar** |
-| `upserted` | ~80 % de `received` | Mucho menos: el filtro de cobertura rechaza de más |
+| `pages` acumuladas | ~300 | Muchas más: algún filtro no se aplicó |
+| `received` acumulado | ~60.000 | ~94.000: falta el filtro de tipo · ~1,4 M: falta el de estado — **abortar** |
+| `upserted` | ~81 % de `received` | Mucho menos: el filtro de condado rechaza de más |
 | `completed` | `true` | `false` → ver "Pasada incompleta" abajo |
 | `needsAttention` | `false` | `true` → ver el log estructurado |
 
@@ -129,6 +147,12 @@ select payload->>'CountyOrParish' as condado, count(*)
 
 -- Estados. NO debe haber Closed.
 select mls_status, count(*) from public.mls_listings group by 1 order by 2 desc;
+
+-- Tipos. SOLO debe haber Residential. Cualquier otra fila aquí significa que el filtro
+-- de tipo no se aplicó, y la página estaría mezclando alquileres o terrenos entre las
+-- casas en venta.
+select payload->>'PropertyType' as tipo, count(*)
+  from public.mls_listings group by 1 order by 2 desc;
 
 -- Atribución: obligatoria en toda ficha de tercero (Schedule A §9).
 select count(*) filter (where list_office_name is null) as sin_oficina, count(*) as total
@@ -183,7 +207,7 @@ select dataset, last_run_at, last_run_status, records_seen
   from public.mls_sync_state;
 ```
 
-En régimen, `records_seen` ronda **4.000-5.000** por pasada, no 94.000.
+En régimen, `records_seen` ronda **4.000-5.000** por pasada, no 60.000.
 
 ---
 
@@ -227,3 +251,13 @@ y motivos.
   completa periódica. Pendiente de decidir.
 - **Fotos.** Se decidió hot-link al CDN del MLS, no descargarlas. El worker actual no toca
   `Media`.
+- **Alquileres, terrenos y comercial.** Excluidos por decisión del owner (2026-09-18): el
+  feed trae 26 % de alquileres y 27 % de terrenos/comercial, y mezclarlos en una búsqueda
+  de compra es un problema de producto. Incorporarlos sería una expansión deliberada, no
+  parte de encender el feed.
+- **Filtros de comprador en `/properties`** (zip, cuartos, precio) y **paginación**. Hoy la
+  página es una vitrina sin controles: trae los activos y los pinta con un tope de 60. Con
+  ~48.500 fichas eso necesita filtros y paginación antes de ser usable. Campos verificados
+  contra el feed real y disponibles para cuando se construyan: `PostalCode` (95 %),
+  `BedroomsTotal` (71 % global, casi total entre residenciales), `BathroomsTotalInteger`,
+  `ListPrice` (100 %), `LivingArea`, `YearBuilt`.
