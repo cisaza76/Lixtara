@@ -7,14 +7,23 @@ function createFakeStore(inicial: SyncState | null = null) {
   const filas = new Map<string, NormalizedListing>();
   const commits: Array<{ ts: string; seen: number }> = [];
   const runs: Array<{ status: string; error: string | null }> = [];
+  const resumes: Array<string | null> = [];
   let estado = inicial;
   const store: SyncStore = {
     async readState() { return estado; },
     async upsertListings(rows) { for (const r of rows) filas.set(r.listing_key, r); return rows.length; },
-    async commitCursor(dataset, ts, seen) { commits.push({ ts, seen }); estado = { dataset, lastModificationTs: ts }; },
+    async commitCursor(dataset, ts, seen) {
+      commits.push({ ts, seen });
+      // commitCursor limpia el cursor de reanudación, igual que la implementación real.
+      estado = { dataset, lastModificationTs: ts, resumeCursor: null };
+    },
+    async saveResumeCursor(dataset, cursor) {
+      resumes.push(cursor);
+      estado = { dataset, lastModificationTs: estado?.lastModificationTs ?? null, resumeCursor: cursor };
+    },
     async recordRun(_d, status, error) { runs.push({ status, error }); },
   };
-  return { store, filas, commits, runs, estadoActual: () => estado };
+  return { store, filas, commits, runs, resumes, estadoActual: () => estado };
 }
 
 /** Fichas en los tres condados cubiertos. */
@@ -62,7 +71,7 @@ describe("pasada completa", () => {
   });
 
   it("aplica `since` del estado previo", async () => {
-    const { store } = createFakeStore({ dataset: "fake", lastModificationTs: "2026-09-15T00:00:00Z" });
+    const { store } = createFakeStore({ dataset: "fake", lastModificationTs: "2026-09-15T00:00:00Z", resumeCursor: null });
     const datos = [
       makeResoListing({ ListingKey: "viejo", CountyOrParish: "Broward", ModificationTimestamp: "2026-09-10T10:00:00Z" } as never),
       makeResoListing({ ListingKey: "nuevo", CountyOrParish: "Broward", ModificationTimestamp: "2026-09-16T10:00:00Z" } as never),
@@ -168,7 +177,7 @@ describe("robustez ante fichas malformadas", () => {
 });
 
 describe("syncNeedsAttention", () => {
-  const base = { dataset: "d", completed: true, pages: 1, received: 100, upserted: 100,
+  const base = { dataset: "d", resumed: false, completed: true, pages: 1, received: 100, upserted: 100,
                  excluded: { county_field_missing: 0, state_not_supported: 0, county_not_supported: 0 },
                  malformed: 0, stoppedBy: "completed" as const, error: null };
 
@@ -191,5 +200,58 @@ describe("syncNeedsAttention", () => {
   it("alerta ante error y ante malformadas sistemáticas", () => {
     expect(syncNeedsAttention({ ...base, error: "boom" }).attention).toBe(true);
     expect(syncNeedsAttention({ ...base, malformed: 20 }).attention).toBe(true);
+  });
+});
+
+describe("reanudación entre invocaciones", () => {
+  // Sin esto el worker NO CONVERGE contra el feed real: 1,4 M de fichas son ~720 páginas
+  // y en un presupuesto de 50 s caben ~56. Reempezar cada vez sería re-descargar
+  // eternamente las mismas primeras páginas.
+  it("una pasada parcial guarda dónde quedó", async () => {
+    const { store, resumes, commits } = createFakeStore();
+    await runMlsSync({
+      provider: createFakeFeedProvider(enCobertura(20), { pageSize: 2 }),
+      store, now: () => 1_000_000, timeBudgetMs: 60_000, maxPages: 3,
+    });
+    expect(commits).toHaveLength(0);           // el cursor de tiempo NO avanza
+    expect(resumes).toHaveLength(1);
+    expect(resumes[0]).not.toBeNull();         // pero sí se recuerda la posición
+  });
+
+  it("la invocación siguiente CONTINÚA en vez de reempezar", async () => {
+    const datos = enCobertura(20);
+    const { store, filas, estadoActual } = createFakeStore();
+
+    const p1 = createFakeFeedProvider(datos, { pageSize: 2 });
+    await runMlsSync({ provider: p1, store, now: () => 1_000_000, timeBudgetMs: 60_000, maxPages: 3 });
+    const trasPrimera = filas.size;
+    expect(estadoActual()?.resumeCursor).not.toBeNull();
+
+    const p2 = createFakeFeedProvider(datos, { pageSize: 2 });
+    const r2 = await runMlsSync({ provider: p2, store, now: () => 2_000_000, timeBudgetMs: 60_000, maxPages: 3 });
+
+    expect(r2.resumed).toBe(true);
+    // Si hubiera reempezado, las primeras 6 fichas se re-pedirían y filas.size seguiría
+    // en 6. Continuar significa que avanza.
+    expect(filas.size).toBeGreaterThan(trasPrimera);
+  });
+
+  it("al completar, el cursor de reanudación se limpia", async () => {
+    const { store, estadoActual } = createFakeStore();
+    await runMlsSync({
+      provider: createFakeFeedProvider(enCobertura(4), { pageSize: 2 }),
+      store, now: () => 1_000_000, timeBudgetMs: 60_000, maxPages: 100,
+    });
+    expect(estadoActual()?.resumeCursor).toBeNull();
+  });
+
+  it("un fallo a mitad también guarda la posición", async () => {
+    const { store, resumes } = createFakeStore();
+    const r = await runMlsSync({
+      provider: createFakeFeedProvider(enCobertura(20), { pageSize: 2, failOnCall: 3 }),
+      store, now: () => 1_000_000, timeBudgetMs: 60_000, maxPages: 100,
+    });
+    expect(r.stoppedBy).toBe("error");
+    expect(resumes).toHaveLength(1);
   });
 });

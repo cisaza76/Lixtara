@@ -12,12 +12,16 @@ export function createSupabaseSyncStore(): SyncStore {
     async readState(dataset: string): Promise<SyncState | null> {
       const { data, error } = await db
         .from("mls_sync_state")
-        .select("dataset,last_modification_ts")
+        .select("dataset,last_modification_ts,resume_cursor")
         .eq("dataset", dataset)
         .maybeSingle();
       if (error) throw new Error(`no se pudo leer mls_sync_state: ${error.message}`);
       if (!data) return null;
-      return { dataset: data.dataset, lastModificationTs: data.last_modification_ts };
+      return {
+        dataset: data.dataset,
+        lastModificationTs: data.last_modification_ts,
+        resumeCursor: data.resume_cursor ?? null,
+      };
     },
 
     async upsertListings(rows: NormalizedListing[]): Promise<number> {
@@ -39,6 +43,8 @@ export function createSupabaseSyncStore(): SyncStore {
         {
           dataset,
           last_modification_ts: lastModificationTs,
+          // Pasada completa: ya no hay dónde reanudar.
+          resume_cursor: null,
           last_run_at: new Date().toISOString(),
           last_run_status: "ok",
           last_error: null,
@@ -48,6 +54,16 @@ export function createSupabaseSyncStore(): SyncStore {
         { onConflict: "dataset" },
       );
       if (error) throw new Error(`no se pudo avanzar el cursor: ${error.message}`);
+    },
+
+    async saveResumeCursor(dataset, cursor): Promise<void> {
+      const { error } = await db.from("mls_sync_state").upsert(
+        { dataset, resume_cursor: cursor, updated_at: new Date().toISOString() },
+        { onConflict: "dataset" },
+      );
+      // Sí lanza: perder el cursor significa que la próxima pasada reempieza desde cero,
+      // y con 1,4 M de fichas eso es la diferencia entre converger y no converger.
+      if (error) throw new Error(`no se pudo guardar el cursor de reanudación: ${error.message}`);
     },
 
     async recordRun(dataset, status, error): Promise<void> {
