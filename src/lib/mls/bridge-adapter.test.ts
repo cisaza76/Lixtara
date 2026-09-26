@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import {
   createBridgeProvider, buildReplicationUrl, BridgeFeedError,
   BRIDGE_API_BASE, BRIDGE_REPLICATION_PAGE_SIZE, SYNC_CURSOR_POLICY, ingestableStatusFilter,
+  ingestablePropertyTypeFilter, buildRemovedKeysUrl, buildDisplayableKeysUrl,
+  nonDisplayableStatusFilter, nonIngestablePropertyTypeFilter, BRIDGE_REPLICATION_MAX_TOP,
 } from "./bridge-adapter";
 import { PUBLICLY_DISPLAYABLE_STATUSES } from "./display-compliance";
 import { makeResoListing } from "./feed-port.fake";
@@ -24,10 +26,11 @@ describe("buildReplicationUrl", () => {
 
   it("la política del cursor no depende del orden", () => {
     // Como /replication no ordena, last_modification_ts solo puede avanzar cuando la
-    // pasada COMPLETA termina, y avanza a runStartedAt — no al máximo visto, que
-    // saltaría registros modificados durante la pasada.
+    // pasada COMPLETA termina, y avanza al inicio de la PASADA — no al máximo visto, que
+    // saltaría registros modificados durante la pasada, ni al inicio de la última
+    // invocación, que saltaría lo modificado entre invocaciones.
     expect(SYNC_CURSOR_POLICY.advanceOnlyOnCompleteRun).toBe(true);
-    expect(SYNC_CURSOR_POLICY.advanceTo).toBe("runStartedAt");
+    expect(SYNC_CURSOR_POLICY.advanceTo).toBe("passStartedAt");
   });
 
   it("usa /replication, no el endpoint OData normal", () => {
@@ -153,6 +156,78 @@ describe("createBridgeProvider", () => {
     const fetchImpl = vi.fn(async () => respuesta({ value: [] }));
     const p = createBridgeProvider({ dataset: "mia", fetchImpl: fetchImpl as never });
     await expect(p.fetchModifiedSince(null, null)).rejects.toThrow();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+// ── A · Consultas de SOLO CLAVES ─────────────────────────────────────────────────────
+describe("consulta de bajas del incremental", () => {
+  const since = new Date("2026-09-20T00:00:00Z");
+  const url = () => new URL(buildRemovedKeysUrl("mia", since, BRIDGE_REPLICATION_MAX_TOP));
+
+  it("pide SOLO claves: nunca el payload de una ficha no mostrable", () => {
+    expect(url().searchParams.get("$select")).toBe("ListingKey,StandardStatus,PropertyType");
+  });
+
+  it("usa el $top máximo verificado de /replication (2.000)", () => {
+    expect(BRIDGE_REPLICATION_MAX_TOP).toBe(2000);
+    expect(url().searchParams.get("$top")).toBe("2000");
+    expect(url().pathname).toContain("/Property/replication");
+  });
+
+  it("filtra por ModificationTimestamp Y (estado NO mostrable O tipo NO ingerible) con `ne`", () => {
+    const f = url().searchParams.get("$filter") ?? "";
+    expect(f.startsWith("ModificationTimestamp gt 2026-09-20T00:00:00.000Z and (")).toBe(true);
+    for (const s of PUBLICLY_DISPLAYABLE_STATUSES) expect(f).toContain(`StandardStatus ne '${s}'`);
+    expect(f).toContain("PropertyType ne 'Residential'");
+    expect(f).toContain(") or (");
+    // Negación explícita con `ne`: nada de `eq` que la invierta por accidente.
+    expect(f).not.toMatch(/StandardStatus eq|PropertyType eq/);
+  });
+
+  it("la negación es exacta: complementa al filtro positivo de la ingesta", () => {
+    expect(nonDisplayableStatusFilter()).toBe(
+      "(StandardStatus ne 'Active' and StandardStatus ne 'Active Under Contract' and " +
+      "StandardStatus ne 'Pending' and StandardStatus ne 'Coming Soon')");
+    expect(nonIngestablePropertyTypeFilter()).toBe("(PropertyType ne 'Residential')");
+  });
+
+  it("devuelve solo registros con ListingKey y sigue el nextLink tal cual", async () => {
+    const siguiente = "https://api.bridgedataoutput.com/api/v2/OData/mia/Property/replication?$next=abc";
+    const fetchImpl = vi.fn(async () => respuesta({
+      value: [{ ListingKey: "K1", StandardStatus: "Closed" }, { ListingKey: "" }, { StandardStatus: "Closed" }],
+      "@odata.nextLink": siguiente,
+    }));
+    const p = createBridgeProvider({ dataset: "mia", fetchImpl: fetchImpl as never, ...conToken });
+    const pag = await p.fetchRemovedKeysSince(since, null);
+    expect(pag.keys.map((k) => k.ListingKey)).toEqual(["K1"]);
+    expect(pag.nextCursor).toBe(siguiente);
+    await p.fetchRemovedKeysSince(since, siguiente);
+    expect((fetchImpl.mock.calls[1] as unknown as [string])[0]).toBe(siguiente);
+  });
+});
+
+describe("consulta de la reconciliación", () => {
+  const url = () => new URL(buildDisplayableKeysUrl("mia", BRIDGE_REPLICATION_MAX_TOP));
+
+  it("pide claves + los campos que lee el filtro de cobertura, nada más", () => {
+    expect(url().searchParams.get("$select"))
+      .toBe("ListingKey,StandardStatus,PropertyType,CountyOrParish,StateOrProvince");
+    expect(url().searchParams.get("$top")).toBe("2000");
+  });
+
+  it("mismos filtros de estado y tipo que la ingesta, SIN condado ni ModificationTimestamp", () => {
+    const f = url().searchParams.get("$filter") ?? "";
+    expect(f).toBe(`${ingestableStatusFilter()} and ${ingestablePropertyTypeFilter()}`);
+    expect(f).not.toContain("CountyOrParish");
+    expect(f).not.toContain("ModificationTimestamp");
+  });
+
+  it("la credencial pasa por el gate también en las consultas de claves", async () => {
+    const fetchImpl = vi.fn(async () => respuesta({ value: [] }));
+    const p = createBridgeProvider({ dataset: "mia", fetchImpl: fetchImpl as never });
+    await expect(p.fetchDisplayableKeys(null)).rejects.toThrow();
+    await expect(p.fetchRemovedKeysSince(new Date(), null)).rejects.toThrow();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

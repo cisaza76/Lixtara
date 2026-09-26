@@ -10,7 +10,9 @@
 // más — el puerto, el normalizador, el filtro de cobertura y el worker no se enteran.
 import { requireMlsServerToken } from "@/lib/mls/environment-gate";
 import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
-import type { MlsFeedPage, MlsFeedProvider, ResoListing } from "@/lib/mls/feed-port";
+import type {
+  MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
+} from "@/lib/mls/feed-port";
 import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
 import { SUPPORTED_PROPERTY_TYPES } from "@/lib/mls/coverage";
 
@@ -23,6 +25,26 @@ export const BRIDGE_API_BASE = "https://api.bridgedataoutput.com/api/v2/OData";
  * A cambio no ordena — ver SYNC_CURSOR_POLICY.
  */
 export const BRIDGE_REPLICATION_PAGE_SIZE = 200;
+
+/**
+ * VERIFICADO (2026-09-26, dataset `test`): el `$top` máximo de `/replication` es 2.000;
+ * con 2.001 responde `400 "Maximum value for $top is 2000"`. Las consultas de SOLO CLAVES
+ * lo usan: cada registro son unos pocos campos, así que una página de 2.000 pesa menos
+ * que una de 200 fichas completas.
+ */
+export const BRIDGE_REPLICATION_MAX_TOP = 2000;
+
+/** Campos de una consulta de bajas: lo justo para auditar por qué se borra. */
+export const REMOVED_KEYS_SELECT = ["ListingKey", "StandardStatus", "PropertyType"] as const;
+
+/**
+ * Campos de la reconciliación: la clave más lo que lee `coverageVerdict`. Solo los
+ * nombres VERIFICADOS en Bridge (CountyOrParish, StateOrProvince): `$select` de un campo
+ * inexistente podría responder 400 y tumbar la reconciliación entera.
+ */
+export const DISPLAYABLE_KEYS_SELECT = [
+  "ListingKey", "StandardStatus", "PropertyType", "CountyOrParish", "StateOrProvince",
+] as const;
 
 export interface BridgeAdapterOptions {
   /** Identificador del dataset en Bridge (p. ej. el de MIAMI). */
@@ -59,45 +81,71 @@ export function createBridgeProvider(opts: BridgeAdapterOptions): MlsFeedProvide
   // ni con la variable puesta por error.
   const getToken = opts.tokenProvider ?? requireMlsServerToken;
 
+  /** Pide una página y devuelve el arreglo crudo y el enlace siguiente. */
+  async function fetchPage(url: string): Promise<{ value: unknown[]; nextCursor: string | null }> {
+    const token = getToken();
+    const res = await doFetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      // Nunca se incluye el cuerpo ni la URL en el mensaje: la URL lleva el dataset y
+      // podría llevar el token según cómo Bridge acepte la auth.
+      throw new BridgeFeedError(
+        `Bridge respondió ${res.status} al leer el feed`,
+        res.status,
+      );
+    }
+
+    const body = (await res.json()) as BridgeResponse;
+    const value = body.value;
+    if (!Array.isArray(value)) {
+      throw new BridgeFeedError("Respuesta de Bridge sin arreglo `value`");
+    }
+
+    const next = body["@odata.nextLink"] ?? body.nextLink;
+    return { value, nextCursor: typeof next === "string" && next.length > 0 ? next : null };
+  }
+
+  /** Solo registros con ListingKey utilizable; el resto no se puede borrar ni confirmar. */
+  function toKeyPage(p: { value: unknown[]; nextCursor: string | null }): MlsKeyPage {
+    return {
+      keys: p.value
+        .filter((k): k is ResoKeyRecord =>
+          typeof k === "object" && k !== null &&
+          typeof (k as ResoKeyRecord).ListingKey === "string" &&
+          (k as ResoKeyRecord).ListingKey.trim().length > 0)
+        .map((k) => markAsMlsLicensed(k)),
+      nextCursor: p.nextCursor,
+    };
+  }
+
   return {
     dataset: opts.dataset,
 
     async fetchModifiedSince(since: Date | null, cursor: string | null): Promise<MlsFeedPage> {
-      const token = getToken();
-
       // Un cursor es un enlace completo que devolvió Bridge: se sigue tal cual, sin
       // reconstruirlo. Reconstruirlo es como se pierden registros entre páginas.
-      const url = cursor ?? buildReplicationUrl(opts.dataset, since, pageSize);
-
-      const res = await doFetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
-
-      if (!res.ok) {
-        // Nunca se incluye el cuerpo ni la URL en el mensaje: la URL lleva el dataset y
-        // podría llevar el token según cómo Bridge acepte la auth.
-        throw new BridgeFeedError(
-          `Bridge respondió ${res.status} al leer el feed`,
-          res.status,
-        );
-      }
-
-      const body = (await res.json()) as BridgeResponse;
-      const value = body.value;
-      if (!Array.isArray(value)) {
-        throw new BridgeFeedError("Respuesta de Bridge sin arreglo `value`");
-      }
-
-      const next = body["@odata.nextLink"] ?? body.nextLink;
+      const p = await fetchPage(cursor ?? buildReplicationUrl(opts.dataset, since, pageSize));
       return {
         // La marca se aplica AQUÍ: es el punto por el que entra el contenido licenciado
         // al sistema, así que todo lo que salga queda teñido (ADR-0014).
-        listings: value.map((l) => markAsMlsLicensed(l as ResoListing)),
-        nextCursor: typeof next === "string" && next.length > 0 ? next : null,
+        listings: p.value.map((l) => markAsMlsLicensed(l as ResoListing)),
+        nextCursor: p.nextCursor,
       };
+    },
+
+    async fetchRemovedKeysSince(since: Date, cursor: string | null): Promise<MlsKeyPage> {
+      return toKeyPage(await fetchPage(
+        cursor ?? buildRemovedKeysUrl(opts.dataset, since, BRIDGE_REPLICATION_MAX_TOP)));
+    },
+
+    async fetchDisplayableKeys(cursor: string | null): Promise<MlsKeyPage> {
+      return toKeyPage(await fetchPage(
+        cursor ?? buildDisplayableKeysUrl(opts.dataset, BRIDGE_REPLICATION_MAX_TOP)));
     },
   };
 }
@@ -131,6 +179,59 @@ export function buildReplicationUrl(
   url.searchParams.set("$filter", clausulas.join(" and "));
 
   return url.toString();
+}
+
+/**
+ * Consulta de BAJAS del incremental: claves modificadas después de `since` cuyo estado o
+ * tipo ya NO es mostrable. Complementa a `buildReplicationUrl`, que por filtrar estado y
+ * tipo nunca vuelve a ver una ficha que pasó a Closed / Expired / Withdrawn.
+ *
+ * Solo `$select` de claves: el payload de una ficha no mostrable jamás se descarga.
+ *
+ * NEGACIÓN — VERIFICADO contra Bridge (2026-09-26, dataset `test`): `ne`, `not (…)` e
+ * `in (…)` responden 200 y filtran igual. Se usa `ne` encadenado con `and`/`or`:
+ *   - es la misma familia de operadores que el filtro positivo (`eq` + `or`), el que ya
+ *     está probado contra `miamire`;
+ *   - VERIFICADO que `PropertyType ne 'X'` DEVUELVE los registros con el campo en null
+ *     (33 de 2.000 en `test`). Es lo correcto aquí: una ficha sin tipo tampoco es
+ *     mostrable (coverageVerdict la excluye), así que debe salir.
+ */
+export function buildRemovedKeysUrl(dataset: string, since: Date, pageSize: number): string {
+  const url = new URL(`${BRIDGE_API_BASE}/${dataset}/Property/replication`);
+  url.searchParams.set("$top", String(pageSize));
+  url.searchParams.set("$select", REMOVED_KEYS_SELECT.join(","));
+  url.searchParams.set(
+    "$filter",
+    `ModificationTimestamp gt ${since.toISOString()} and ` +
+      `(${nonDisplayableStatusFilter()} or ${nonIngestablePropertyTypeFilter()})`,
+  );
+  return url.toString();
+}
+
+/**
+ * Universo mostrable, SOLO CLAVES + campos de cobertura, para la reconciliación. Mismos
+ * filtros de estado y tipo que la ingesta y SIN filtro de condado: la cobertura se
+ * decide en nuestro código (decisión del owner), igual que en la ingesta.
+ */
+export function buildDisplayableKeysUrl(dataset: string, pageSize: number): string {
+  const url = new URL(`${BRIDGE_API_BASE}/${dataset}/Property/replication`);
+  url.searchParams.set("$top", String(pageSize));
+  url.searchParams.set("$select", DISPLAYABLE_KEYS_SELECT.join(","));
+  url.searchParams.set(
+    "$filter",
+    [ingestableStatusFilter(), ingestablePropertyTypeFilter()].join(" and "),
+  );
+  return url.toString();
+}
+
+/** Negación del filtro de estado: ningún estado mostrable (incluye StandardStatus null). */
+export function nonDisplayableStatusFilter(): string {
+  return `(${PUBLICLY_DISPLAYABLE_STATUSES.map((s) => `StandardStatus ne '${s}'`).join(" and ")})`;
+}
+
+/** Negación del filtro de tipo: ningún tipo ingerible (incluye PropertyType null). */
+export function nonIngestablePropertyTypeFilter(): string {
+  return `(${SUPPORTED_PROPERTY_TYPES.map((t) => `PropertyType ne '${t}'`).join(" and ")})`;
 }
 
 /**
@@ -181,17 +282,21 @@ export function ingestableStatusFilter(): string {
  * `/replication` no ordena, así que dentro de una pasada NO se puede saber si ya se vio
  * todo lo anterior a un timestamp dado. Por tanto:
  *
- *   1. Al empezar, se anota `runStartedAt`.
- *   2. Se pagina TODO con el nextLink, filtrando por `ModificationTimestamp gt {since}`.
- *   3. Solo si la pasada COMPLETA termina, `last_modification_ts = runStartedAt`.
- *   4. Si se interrumpe, la siguiente pasada repite desde el mismo `since`. El upsert por
- *      listing_key hace que repetir sea inocuo.
+ *   1. Al empezar la pasada, se anota `passStartedAt` (y se persiste si se interrumpe).
+ *   2. Se pagina TODO con el nextLink, filtrando por `ModificationTimestamp gt {since}`,
+ *      y después la consulta de bajas con el mismo `since`.
+ *   3. Solo si la pasada COMPLETA termina, `last_modification_ts = passStartedAt`.
+ *   4. Si se interrumpe, la siguiente invocación continúa con el cursor guardado. El
+ *      upsert por listing_key hace que repetir una página sea inocuo.
  *
- * Se avanza a `runStartedAt` y no al máximo visto: un registro modificado DURANTE la
+ * Se avanza a `passStartedAt` y no al máximo visto: un registro modificado DURANTE la
  * pasada puede haber aparecido en una página temprana, y usar el máximo lo saltaría. El
  * solapamiento que produce `runStartedAt` se reprocesa sin consecuencias.
  */
 export const SYNC_CURSOR_POLICY = {
   advanceOnlyOnCompleteRun: true,
-  advanceTo: "runStartedAt",
+  // El inicio de la PASADA, no de la invocación que la termina: una pasada que cruza
+  // varias invocaciones que avanzara al inicio de la última saltaría todo lo modificado
+  // entre la primera y la última.
+  advanceTo: "passStartedAt",
 } as const;

@@ -54,6 +54,25 @@ export interface MlsFeedPage {
   nextCursor: string | null;
 }
 
+/**
+ * Registro de SOLO CLAVES: lo mínimo para decidir si una ficha sigue siendo mostrable.
+ * Nunca lleva payload — ver `fetchRemovedKeysSince` y `fetchDisplayableKeys`.
+ */
+export interface ResoKeyRecord {
+  ListingKey: string;
+  StandardStatus?: string | null;
+  PropertyType?: string | null;
+  CountyOrParish?: string | null;
+  StateOrProvince?: string | null;
+  [key: string]: unknown;
+}
+
+export interface MlsKeyPage {
+  keys: MlsLicensed<ResoKeyRecord>[];
+  /** Mismo cursor opaco que `MlsFeedPage.nextCursor`. */
+  nextCursor: string | null;
+}
+
 export interface MlsFeedProvider {
   /** Identifica el dataset. Es la PK de `mls_sync_state`. */
   readonly dataset: string;
@@ -72,6 +91,24 @@ export interface MlsFeedProvider {
    * `cursor` no nulo → continuar esa paginación; `since` se ignora.
    */
   fetchModifiedSince(since: Date | null, cursor: string | null): Promise<MlsFeedPage>;
+
+  /**
+   * Claves de fichas modificadas DESPUÉS de `since` que YA NO se pueden mostrar: estado
+   * fuera de PUBLICLY_DISPLAYABLE_STATUSES o tipo fuera de SUPPORTED_PROPERTY_TYPES.
+   *
+   * Existe porque `fetchModifiedSince` filtra por estado y tipo: una ficha que pasa a
+   * Closed / Expired / Withdrawn deja de llegar por ahí y quedaría guardada como
+   * "Active" para siempre. SOLO CLAVES: el payload de una ficha no mostrable nunca entra.
+   */
+  fetchRemovedKeysSince(since: Date, cursor: string | null): Promise<MlsKeyPage>;
+
+  /**
+   * TODAS las claves del universo mostrable (mismos filtros de estado y tipo que la
+   * ingesta), con los campos que necesita el filtro de cobertura. Base de la
+   * reconciliación diaria, que detecta fichas ELIMINADAS del feed — algo que ningún
+   * incremental puede ver, porque una ficha borrada no tiene ModificationTimestamp nuevo.
+   */
+  fetchDisplayableKeys(cursor: string | null): Promise<MlsKeyPage>;
 }
 
 // ── Normalización ───────────────────────────────────────────────────────────────────

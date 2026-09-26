@@ -9,39 +9,14 @@
 //   2. mlsIngestDecision() — producción + MLS_SYNC_ENABLED (o el flag viejo MLS_FEED_ENABLED
 //      si el nuevo no está definido). Fuera de ahí, 404: el
 //      acuerdo licencia el feed para un solo sitio y un preview no es ese sitio.
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { mlsIngestDecision, readMlsGateEnv } from "@/lib/mls/environment-gate";
 import { createBridgeProvider } from "@/lib/mls/bridge-adapter";
 import { createSupabaseSyncStore } from "@/lib/mls/sync-store.supabase";
 import { runMlsSync, syncNeedsAttention } from "@/lib/mls/sync-run";
+import { intEnv, verifyCronSecret } from "@/lib/mls/cron-secret";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Comparación en tiempo constante del VALOR. El pre-chequeo de longitud es la desviación
- * estándar del patrón (timingSafeEqual de Node lanza con buffers de distinto tamaño): solo
- * filtra si las longitudes difieren, nunca qué caracteres coinciden. Todo fallo devuelve el
- * mismo 401 — nunca se revela si faltaba la cabecera, si el valor era otro, o si la
- * variable no está configurada.
- */
-function verifyCronSecret(req: Request): boolean {
-  const configured = process.env.CRON_SECRET;
-  if (!configured) return false; // fail-closed: nunca "abierto" por omisión
-
-  const header = req.headers.get("authorization") ?? "";
-  const presented = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : header;
-
-  const a = Buffer.from(presented);
-  const b = Buffer.from(configured);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
-function intEnv(name: string, def: number): number {
-  const v = Number.parseInt(process.env[name] ?? "", 10);
-  return Number.isFinite(v) && v > 0 ? v : def;
-}
 
 async function handle(req: Request): Promise<Response> {
   if (!verifyCronSecret(req)) {
@@ -79,6 +54,9 @@ async function handle(req: Request): Promise<Response> {
     pages: resumen.pages,
     received: resumen.received,
     upserted: resumen.upserted,
+    phase: resumen.phase,
+    removalKeysReceived: resumen.removalKeysReceived,
+    removed: resumen.removed,
     excluded: resumen.excluded,
     malformed: resumen.malformed,
     error: resumen.error,
@@ -93,6 +71,7 @@ async function handle(req: Request): Promise<Response> {
     pages: resumen.pages,
     received: resumen.received,
     upserted: resumen.upserted,
+    removed: resumen.removed,
     needsAttention: atencion.attention,
   });
 }
