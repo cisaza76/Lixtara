@@ -68,6 +68,8 @@ const vacío = (): Record<CoverageExclusionReason, number> => ({
   county_field_missing: 0,
   state_not_supported: 0,
   county_not_supported: 0,
+  property_type_missing: 0,
+  property_type_not_supported: 0,
 });
 
 export async function runMlsSync(deps: SyncDeps): Promise<SyncSummary> {

@@ -58,6 +58,9 @@ export function makeResoListing(over: Partial<ResoListing> & { ListingKey: strin
   return {
     ListingId: `A${over.ListingKey}`,
     StandardStatus: "Active",
+    // Por defecto una ficha ingerible: sin esto, el filtro de tipo excluiría cada
+    // fixture y los tests pasarían por la razón equivocada.
+    PropertyType: "Residential",
     ModificationTimestamp: "2026-09-16T10:00:00Z",
     ListPrice: 500_000,
     City: "Miami",

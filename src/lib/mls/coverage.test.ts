@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  SUPPORTED_COUNTIES, SUPPORTED_STATE,
+  SUPPORTED_COUNTIES, SUPPORTED_STATE, SUPPORTED_PROPERTY_TYPES,
   COUNTY_FIELD_CANDIDATES, STATE_FIELD_CANDIDATES,
   normalizeGeoName, coverageVerdict, isWithinCoverage, partitionByCoverage,
 } from "./coverage";
@@ -129,6 +129,7 @@ describe("partitionByCoverage", () => {
     expect(r.excluded).toHaveLength(3);
     expect(r.counts).toEqual({
       included: 2, county_not_supported: 1, state_not_supported: 1, county_field_missing: 1,
+      property_type_missing: 0, property_type_not_supported: 0,
     });
   });
 
@@ -140,5 +141,67 @@ describe("partitionByCoverage", () => {
     const r = partitionByCoverage(todosSinCampo);
     expect(r.counts.county_field_missing).toBe(3);
     expect(r.counts.included).toBe(0);
+  });
+});
+
+describe("filtro de tipo de propiedad (decisión del owner 2026-09-18)", () => {
+  const conTipo = (t: unknown) =>
+    makeResoListing({ ListingKey: "K", CountyOrParish: "Broward", StateOrProvince: "FL",
+                      PropertyType: t } as never);
+
+  it("solo entra venta residencial", () => {
+    expect([...SUPPORTED_PROPERTY_TYPES]).toEqual(["Residential"]);
+  });
+
+  it("acepta Residential", () => {
+    expect(coverageVerdict(conTipo("Residential"))).toMatchObject({
+      included: true, propertyType: "Residential",
+    });
+  });
+
+  it("IGUALDAD EXACTA: rechaza los tipos que comparten prefijo", () => {
+    // El fallo que un startsWith habría causado: "Residential Lease" es el 26,2 % del
+    // feed con mediana $3.500 — un cuarto del inventario en alquiler dentro de una
+    // búsqueda de compra.
+    for (const t of ["Residential Lease", "Residential Income"]) {
+      expect(coverageVerdict(conTipo(t)), t).toMatchObject({
+        included: false, reason: "property_type_not_supported", detail: t,
+      });
+    }
+  });
+
+  it("rechaza terrenos, comercial y oportunidades de negocio", () => {
+    for (const t of ["Land/Boat Docks", "Commercial Sale", "Commercial Land",
+                     "Business Opportunity"]) {
+      expect(coverageVerdict(conTipo(t)).included, t).toBe(false);
+    }
+  });
+
+  it("los siete tipos reales del feed: solo uno entra", () => {
+    // Enumeración medida contra miamire el 2026-09-18.
+    const delFeed = ["Residential", "Residential Lease", "Land/Boat Docks", "Commercial Sale",
+                     "Commercial Land", "Business Opportunity", "Residential Income"];
+    const entran = delFeed.filter((t) => coverageVerdict(conTipo(t)).included);
+    expect(entran).toEqual(["Residential"]);
+  });
+
+  it("FAIL-CLOSED sin tipo", () => {
+    for (const t of [undefined, null, "", "   ", 42]) {
+      const v = coverageVerdict(conTipo(t));
+      expect(v.included, String(t)).toBe(false);
+    }
+    expect(coverageVerdict(conTipo(undefined))).toMatchObject({ reason: "property_type_missing" });
+  });
+
+  it("no normaliza el tipo: es enumeración cerrada del MLS, no texto tecleado", () => {
+    // Normalizar aquí crearía falsos positivos entre "Residential" y sus variantes.
+    expect(coverageVerdict(conTipo("residential")).included).toBe(false);
+    expect(coverageVerdict(conTipo("RESIDENTIAL")).included).toBe(false);
+  });
+
+  it("la geografía se evalúa ANTES que el tipo", () => {
+    const fuera = makeResoListing({ ListingKey: "K", CountyOrParish: "Collier",
+                                    StateOrProvince: "FL", PropertyType: "Residential Lease" } as never);
+    expect(coverageVerdict(fuera)).toMatchObject({ reason: "county_not_supported" });
   });
 });

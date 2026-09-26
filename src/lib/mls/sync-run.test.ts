@@ -155,6 +155,7 @@ describe("filtro de cobertura dentro del worker", () => {
     expect(filas.has("a")).toBe(true);
     expect(r.excluded).toEqual({
       county_not_supported: 1, state_not_supported: 1, county_field_missing: 1,
+      property_type_missing: 0, property_type_not_supported: 0,
     });
   });
 });
@@ -165,7 +166,11 @@ describe("robustez ante fichas malformadas", () => {
     const r = await runMlsSync({
       provider: createFakeFeedProvider([
         makeResoListing({ ListingKey: "ok", CountyOrParish: "Broward" } as never),
-        { ListingKey: "roto", ListingId: "", StandardStatus: "Active", CountyOrParish: "Broward" } as never,
+        // Debe pasar el filtro de cobertura para LLEGAR a la normalización: el orden es
+        // cobertura → normalizar, así que una ficha que falla ambos se cuenta como
+        // excluida, no como malformada.
+        { ListingKey: "roto", ListingId: "", StandardStatus: "Active",
+          CountyOrParish: "Broward", StateOrProvince: "FL", PropertyType: "Residential" } as never,
       ], { pageSize: 10 }),
       store, now: () => 1_000_000, timeBudgetMs: 60_000, maxPages: 100,
     });
@@ -178,7 +183,8 @@ describe("robustez ante fichas malformadas", () => {
 
 describe("syncNeedsAttention", () => {
   const base = { dataset: "d", resumed: false, completed: true, pages: 1, received: 100, upserted: 100,
-                 excluded: { county_field_missing: 0, state_not_supported: 0, county_not_supported: 0 },
+                 excluded: { county_field_missing: 0, state_not_supported: 0, county_not_supported: 0,
+                             property_type_missing: 0, property_type_not_supported: 0 },
                  malformed: 0, stoppedBy: "completed" as const, error: null };
 
   it("una pasada sana no pide atención", () => {
