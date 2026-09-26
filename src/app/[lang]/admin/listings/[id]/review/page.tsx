@@ -3,6 +3,12 @@ import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { parseMlsNumber } from "@/lib/listing-mls-number";
+import {
+  ensureEnterMlsNumberTask,
+  mapMlsNumberWriteError,
+  saveListingMlsNumber,
+} from "@/lib/listing-mls-number.server";
 
 interface Property {
   id: string;
@@ -19,6 +25,7 @@ interface Property {
   lot_size: number | null;
   list_price: number | null;
   mls_status: string;
+  mls_number: string | null;
   pricing_tier: string | null;
   description: string | null;
   showing_instructions: string | null;
@@ -63,7 +70,7 @@ export default async function ListingReviewPage({
   searchParams,
 }: {
   params: Promise<{ lang: string; id: string }>;
-  searchParams: Promise<{ done?: string }>;
+  searchParams: Promise<{ done?: string; error?: string }>;
 }) {
   const { lang, id } = await params;
   if (!isLocale(lang)) notFound();
@@ -73,7 +80,7 @@ export default async function ListingReviewPage({
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description,buyer_agent_commission",
+      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description,buyer_agent_commission",
     )
     .eq("id", id)
     .maybeSingle();
@@ -101,10 +108,22 @@ export default async function ListingReviewPage({
   // (rejected / changes_requested / awaiting_broker_signature) don't exist in
   // this DB's mls_status enum, so we map: Approve→active, Reject→withdrawn,
   // Request Changes→draft. Each is audited in activity_log. ──
+  // Solo el texto que necesita la tarea: capturar `prop` entero en las server actions
+  // serializaría el listing completo en el formulario.
+  const shortAddress = `${prop.address_street}, ${prop.address_city}`;
+
+  const MLS_ERRORS: Record<string, string> = {
+    invalid_format: "That MLS number doesn't look right (e.g. A11234567).",
+    empty: "Enter the MLS number.",
+    taken: "That MLS number is already on another listing.",
+    failed: "Could not save the MLS number. Try again.",
+  };
+
   async function transition(
     newStatus: string,
     actionType: string,
     note: string | null,
+    mlsNumber: string | null = null,
   ) {
     const supabase = await createClient();
     const {
@@ -117,10 +136,19 @@ export default async function ListingReviewPage({
     ]);
     if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("properties")
-      .update({ mls_status: newStatus })
+      .update(mlsNumber ? { mls_status: newStatus, mls_number: mlsNumber } : { mls_status: newStatus })
       .eq("id", id);
+    if (mlsNumber && updateError) {
+      // Con número, la aprobación va en la MISMA escritura: si el número choca, no se
+      // aprueba nada y se avisa.
+      redirect(`/${lang}/admin/listings/${id}/review?error=${mapMlsNumberWriteError(updateError)}`);
+    }
+
+    if (newStatus === "active" && !mlsNumber) {
+      await ensureEnterMlsNumberTask(supabase, id, shortAddress);
+    }
 
     if (newStatus === "active" || newStatus === "withdrawn") {
       await supabase
@@ -141,9 +169,38 @@ export default async function ListingReviewPage({
     redirect(`/${lang}/admin/listings/${id}/review?done=${actionType}`);
   }
 
-  async function approve() {
+  async function approve(formData: FormData) {
     "use server";
-    await transition("active", "listing_approved", null);
+    // Opcional: si aún no está en Matrix se deja vacío y queda la tarea enter_mls_number.
+    const mls = parseMlsNumber(String(formData.get("mls_number") ?? ""));
+    if (!mls.ok && mls.reason === "invalid_format") {
+      redirect(`/${lang}/admin/listings/${id}/review?error=invalid_format`);
+    }
+    await transition("active", "listing_approved", null, mls.ok ? mls.value : null);
+  }
+  async function saveMlsNumber(formData: FormData) {
+    "use server";
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
+    const [{ data: a }, { data: b }] = await Promise.all([
+      supabase.rpc("has_role", { _role: "admin" }),
+      supabase.rpc("has_role", { _role: "broker" }),
+    ]);
+    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
+
+    const r = await saveListingMlsNumber(supabase, {
+      propertyId: id,
+      raw: String(formData.get("mls_number") ?? ""),
+      userId: user.id,
+    });
+    redirect(
+      r.ok
+        ? `/${lang}/admin/listings/${id}/review?done=mls_number_saved`
+        : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
+    );
   }
   async function reject() {
     "use server";
@@ -184,6 +241,53 @@ export default async function ListingReviewPage({
           Done: {sp.done.replace(/_/g, " ")}.
         </div>
       )}
+      {sp.error && MLS_ERRORS[sp.error] && (
+        <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {MLS_ERRORS[sp.error]} Nothing was changed.
+        </div>
+      )}
+
+      {/* MLS number — anotado a mano desde Matrix; evita que /properties muestre el
+          listing dos veces (fila propia + ficha del feed IDX). */}
+      <section className="border border-gold-soft p-6 flex flex-col gap-3">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
+          MLS number
+        </span>
+        <p className="text-sm text-ink/80">
+          {prop.mls_number ? (
+            <>Current: <strong className="font-mono">{prop.mls_number}</strong></>
+          ) : (
+            <span className="text-ink/55 italic">Not recorded yet.</span>
+          )}
+        </p>
+        <form action={saveMlsNumber} className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+              {prop.mls_number ? "Correct it" : "Record it"}
+            </span>
+            <input
+              name="mls_number"
+              type="text"
+              required
+              autoComplete="off"
+              spellCheck={false}
+              defaultValue={prop.mls_number ?? ""}
+              placeholder="A11234567"
+              className="w-44 border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink uppercase font-mono focus:outline-none focus:border-gold"
+            />
+          </label>
+          <button
+            type="submit"
+            className="inline-flex items-center px-6 py-3 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.22em] uppercase hover:border-gold transition-colors"
+          >
+            Save MLS number
+          </button>
+        </form>
+        <p className="text-xs text-ink/55">
+          Enter it after the listing is live in Matrix. Saving it closes the
+          &ldquo;Enter MLS number&rdquo; task.
+        </p>
+      </section>
 
       {/* Listing data */}
       <section className="border border-gold-soft p-6 grid grid-cols-2 md:grid-cols-4 gap-5">
@@ -326,7 +430,20 @@ export default async function ListingReviewPage({
 
       {/* Broker actions */}
       <section className="border-t-2 border-gold-soft pt-6 flex flex-wrap items-center gap-4">
-        <form action={approve}>
+        <form action={approve} className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+              MLS number (optional)
+            </span>
+            <input
+              name="mls_number"
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="A11234567"
+              className="w-40 border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink uppercase font-mono focus:outline-none focus:border-gold"
+            />
+          </label>
           <button
             type="submit"
             className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"

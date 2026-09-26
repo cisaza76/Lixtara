@@ -47,3 +47,22 @@ describe("vercel.json — crons del MLS", () => {
     expect(de("/api/mls/reconcile")).toBe("7,22,37,52 8-10 * * *");
   });
 });
+
+describe("migración 20260926120100 — mls_number solo lo escribe un broker/admin", () => {
+  const b = readFileSync(
+    resolve(ROOT, "supabase/migrations/20260926120100_mls_number_admin.sql"), "utf8");
+
+  it("añade enter_mls_number sin perder los task_type existentes", () => {
+    for (const t of ["approve_listing", "review_offer", "coordinate_closing", "resolve_issue",
+                     "follow_up", "enter_mls_number"]) {
+      expect(b).toContain(`'${t}'`);
+    }
+  });
+
+  it("el trigger cubre INSERT y UPDATE de mls_number para roles de la API que no son broker", () => {
+    expect(b).toContain("before insert or update of mls_number on public.properties");
+    expect(b).toContain("current_user in ('authenticated', 'anon') and not public.is_admin_or_broker()");
+    // NO definer: current_user tiene que ser el rol de la petición.
+    expect(b.slice(b.indexOf("guard_properties_mls_number()"))).not.toMatch(/security definer/i);
+  });
+});
