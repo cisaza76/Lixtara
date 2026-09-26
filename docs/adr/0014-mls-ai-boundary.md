@@ -92,3 +92,24 @@ escape hatch. Its appearance inside any AI module is itself the violation.
   written, and gives no signal at review time.
 - **A written policy and code review.** The failure is silent and the counterparty may
   terminate at its sole discretion (§ VI.B.7).
+
+## Amendment — 2026-09-26: gaps closed in the guard
+
+`src/lib/mls/ai-boundary.test.ts` now also fails when:
+
+1. **An AI surface, or anything in its transitive closure, names `mls_listings` or
+   `mls_sync_state`** (comments stripped). A hand-written `.from("mls_listings")` needs no
+   import from `src/lib/mls/`, so the import guard alone could not see it.
+2. **A server module that *reaches* an AI surface touches the MLS** — the "sibling" leak:
+   a route (Loui, Gemini tours, Media Intelligence…) that imports both the model path and
+   the feed reader, then passes rows into the prompt. Checked by import and by table name.
+   Scoped to `app/api/**` and `lib/**/*.ts` on purpose: pages and components are excluded,
+   so the rejected "no module may import both" rule stays rejected for the UI, where
+   co-location (layout + Loui widget) is not data flow and the type brand governs.
+3. **Any pricing / valuation / CMA path touches the MLS**, whether or not it exists yet:
+   every path segment starting with `pric`, `valuation` or `cma` (the `**/pric*`,
+   `**/valuation*`, `**/cma*` globs; prefix matching over-includes on purpose). No price
+   recommendation route exists in `src/` today; F3.3 stays struck.
+
+The import parser also missed side-effect imports (`import "x"`); found by mutation
+testing and fixed. Each new check was verified to fail against a deliberate violation.

@@ -42,13 +42,16 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+// Tres formas: `import … from "x"` / `export … from "x"`, `import("x")`, y el import de
+// efecto lateral `import "x"` — este último se escapaba del grafo (verificado con una
+// mutación el 2026-09-26: un `import "@/lib/…"` añadido a la ruta de Loui no se detectaba).
 const IMPORT_RE =
-  /(?:^|\n)\s*(?:import|export)[\s\S]*?from\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)/g;
+  /(?:^|\n)\s*(?:import|export)[\s\S]*?from\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)|(?:^|\n)\s*import\s*["']([^"']+)["']/g;
 
 function importsOf(file: string): string[] {
   const src = readFileSync(file, "utf8");
   const specs: string[] = [];
-  for (const m of src.matchAll(IMPORT_RE)) specs.push(m[1] ?? m[2]!);
+  for (const m of src.matchAll(IMPORT_RE)) specs.push(m[1] ?? m[2] ?? m[3]!);
   return specs;
 }
 
@@ -96,6 +99,69 @@ function reaches(entry: string, targetPrefix: string): string[] | null {
     }
   }
   return null;
+}
+
+/** Cierre transitivo completo desde `entry` (incluido). */
+function closure(entry: string): Set<string> {
+  const seen = new Set<string>();
+  const stack = [entry];
+  while (stack.length) {
+    const f = stack.pop()!;
+    if (seen.has(f)) continue;
+    seen.add(f);
+    for (const dep of graph.get(f) ?? []) if (!seen.has(dep)) stack.push(dep);
+  }
+  return seen;
+}
+
+/**
+ * Referencias al almacenamiento del feed escritas A MANO: `.from("mls_listings")` o una
+ * consulta SQL no necesitan importar src/lib/mls/, así que el guard de imports no las ve.
+ */
+const MLS_TABLE_RE = /\bmls_(listings|sync_state)\b/;
+/** Quita comentarios: documentar la regla (p. ej. "nunca leer mls_listings") no es violarla. */
+const sinComentarios = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+const mentionsMlsTables = (rel: string) =>
+  !rel.startsWith(MLS_DIR) && MLS_TABLE_RE.test(sinComentarios(readFileSync(join(SRC, rel), "utf8")));
+
+const isTest = (f: string) => /\.test\.tsx?$/.test(f) || f.endsWith(".fake.ts");
+
+/**
+ * Módulos de SERVIDOR que ALCANZAN una superficie de IA: las rutas de Loui, de Gemini
+ * (tours), de Media Intelligence, etc. El riesgo no es solo que la IA importe el MLS, sino
+ * que una ruta que importa AMBOS lea filas del feed y se las pase al modelo — que es justo
+ * cómo se armaría una recomendación de precio.
+ *
+ * SOLO servidor (`app/api/**` y `.ts` de `lib/`), NO páginas ni componentes `.tsx`: ADR-0014
+ * rechazó prohibir la co-ubicación en la UI (el layout pinta el widget de Loui; una página
+ * con fichas del MLS y el widget es co-ubicación, no flujo de datos). Ahí manda la marca
+ * de tipo `MlsLicensed<T>` / `AiSafe<T>`.
+ */
+const isServerModule = (f: string) =>
+  f.startsWith("app/api/") || (f.startsWith("lib/") && f.endsWith(".ts"));
+const aiReachers = files.filter((f) =>
+  !isTest(f) && isServerModule(f) && aiSurfaces.some((s) => closure(f).has(s)));
+
+/**
+ * Rutas de precio o valuación, EXISTAN O NO todavía: cualquier segmento de ruta que
+ * empiece por `pric`, `valuation` o `cma` (≈ globs **\/pric*, **\/valuation*, **\/cma*).
+ * Hoy no hay ninguna ruta de recomendación de precio en src/; el día que se cree, nace
+ * bajo este guard. ADR-0014 tachó el plan F3.3 de mezclar MLS + IA para el precio.
+ */
+export const PRICING_SEGMENT_RE = /^(pric|valuation|cma)/i;
+const isPricingPath = (rel: string) => rel.split("/").some((seg) => PRICING_SEGMENT_RE.test(seg));
+const pricingModules = files.filter((f) => !isTest(f) && !f.startsWith(MLS_DIR) && isPricingPath(f));
+
+/** Violaciones de un módulo: ¿su cierre alcanza src/lib/mls/ o nombra las tablas del feed? */
+function mlsViolations(entry: string): string[] {
+  const out: string[] = [];
+  const path = reaches(entry, MLS_DIR);
+  if (path) out.push(`${path.join(" → ")}  [import de src/lib/mls/]`);
+  for (const f of closure(entry)) {
+    if (!isTest(f) && mentionsMlsTables(f)) out.push(`${entry} ⇝ ${f}  [nombra mls_listings/mls_sync_state]`);
+  }
+  return out;
 }
 
 // ── El guard ────────────────────────────────────────────────────────────────
@@ -156,3 +222,57 @@ describe("frontera MLS ⇄ IA (§ III.B.4)", () => {
     expect(graph.get("app/api/loui/route.ts") ?? []).toContain("lib/loui-prompt.ts");
   });
 });
+
+// ── E · Huecos cerrados (2026-09-26) ─────────────────────────────────────────
+describe("frontera MLS ⇄ IA — cadenas y rutas que alcanzan la IA", () => {
+  it("ninguna superficie de IA ni su cierre NOMBRA mls_listings / mls_sync_state", () => {
+    // `.from("mls_listings")` no pasa por un import: el guard de imports no lo vería.
+    const violations = aiSurfaces.flatMap((s) =>
+      [...closure(s)].filter((f) => !isTest(f) && mentionsMlsTables(f)).map((f) => `${s} ⇝ ${f}`));
+    expect(violations).toEqual([]);
+  });
+
+  it("ninguna ruta/módulo de servidor que ALCANZA la IA (Loui, Gemini, Media…) toca el MLS", () => {
+    // Detecta el caso "hermano": una ruta que importa a la vez el SDK y el lector del feed.
+    expect(aiReachers).toEqual(expect.arrayContaining(["app/api/loui/route.ts"]));
+    expect(aiReachers.length).toBeGreaterThan(aiSurfaces.length);
+    const violations = aiReachers.flatMap(mlsViolations);
+    expect(
+      violations,
+      violations.length
+        ? `§ III.B.4: un módulo que llega a un modelo de IA no puede leer contenido del MLS:\n  ` +
+          violations.join("\n  ")
+        : "",
+    ).toEqual([]);
+  });
+
+  it("ninguna ruta de precio / valuación / CMA toca el MLS, exista hoy o no", () => {
+    const violations = pricingModules.flatMap(mlsViolations);
+    expect(violations).toEqual([]);
+  });
+
+  it("el patrón de rutas de precio reconoce los globs pedidos y no se dispara en falso", () => {
+    for (const p of ["app/api/pricing/route.ts", "app/api/price-recommendation/route.ts",
+                     "lib/valuation.ts", "lib/valuation/comps.ts", "app/[lang]/cma/page.tsx",
+                     "lib/CMA-report.ts", "lib/pricing-tiers.ts",
+                     // Por prefijo, como el glob: sobre-incluir es el lado seguro.
+                     "components/price-tag.tsx"]) {
+      expect(isPricingPath(p), p).toBe(true);
+    }
+    for (const p of ["lib/properties.ts", "app/api/loui/route.ts", "lib/mls/coverage.ts",
+                     "components/listing-card.tsx", "lib/comparables.ts"]) {
+      expect(isPricingPath(p), p).toBe(false);
+    }
+  });
+
+  it("el guard de cadenas no pasa en vacío: sí ve las tablas donde deben estar", () => {
+    // Los lectores del feed viven en src/lib/mls/ y se excluyen a propósito; un archivo
+    // fuera de ahí que las nombrara sí se detecta.
+    expect(MLS_TABLE_RE.test('db.from("mls_listings")')).toBe(true);
+    expect(MLS_TABLE_RE.test("select * from public.mls_sync_state")).toBe(true);
+    expect(MLS_TABLE_RE.test("mls_number")).toBe(false);
+    expect(MLS_TABLE_RE.test(sinComentarios('// nunca leer mls_listings aquí\nconst a = 1;'))).toBe(false);
+    expect(MLS_TABLE_RE.test(sinComentarios('/* mls_listings */ db.from("mls_listings")'))).toBe(true);
+  });
+});
+
