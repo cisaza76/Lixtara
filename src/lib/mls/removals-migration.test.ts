@@ -43,7 +43,8 @@ describe("vercel.json — crons del MLS", () => {
   });
 
   it("la reconciliación tiene su propia tarea, varias veces en una ventana nocturna", () => {
-    // 3:07–5:52 a. m. ET (08–10 UTC): 12 invocaciones; cada una continúa la anterior.
+    // 08:07–10:52 UTC (04:07–06:52 EDT · 03:07–05:52 EST): 12 invocaciones; cada una
+    // continúa la anterior. Vercel Cron interpreta el horario en UTC.
     expect(de("/api/mls/reconcile")).toBe("7,22,37,52 8-10 * * *");
   });
 });
