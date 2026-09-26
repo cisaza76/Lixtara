@@ -6,7 +6,8 @@
 //
 // DOS PUERTAS, en este orden:
 //   1. CRON_SECRET — si no coincide, 401 genérico sin decir por qué.
-//   2. assertMlsIngestAllowed() — producción + MLS_FEED_ENABLED. Fuera de ahí, 404: el
+//   2. mlsIngestDecision() — producción + MLS_SYNC_ENABLED (o el flag viejo MLS_FEED_ENABLED
+//      si el nuevo no está definido). Fuera de ahí, 404: el
 //      acuerdo licencia el feed para un solo sitio y un preview no es ese sitio.
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
