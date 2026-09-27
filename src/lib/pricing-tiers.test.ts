@@ -3,6 +3,7 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   DEFAULT_TIER,
+  isPricingTierId,
   TRADITIONAL_COSTS,
   getTier,
   tierTotalCost,
@@ -84,5 +85,12 @@ describe("tierSavingsVsTraditional", () => {
   it("never goes negative (tiny sale where the flat fee dwarfs 6%)", () => {
     // 6% of 1_000 = 60, below the essentials flat fee + commission
     expect(tierSavingsVsTraditional("essentials", 1_000)).toBe(0);
+  });
+});
+
+describe("isPricingTierId", () => {
+  it("acepta solo los tres tiers, por igualdad exacta", () => {
+    for (const t of ["essentials", "pro", "concierge"]) expect(isPricingTierId(t)).toBe(true);
+    for (const t of ["Pro", "premium", "", null, undefined, 495]) expect(isPricingTierId(t)).toBe(false);
   });
 });

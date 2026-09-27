@@ -28,6 +28,11 @@ export interface PropertyDetail extends PropertySummary {
   }[];
 }
 
+// Lecturas públicas: SIEMPRE `mls_status = 'active'` y `is_test = false`. La RLS pública
+// ya excluye is_test, pero un broker/admin logueado ve todo por su propia política, así que
+// el filtro va también aquí. Un listing de prueba tampoco participa del cruce con el feed:
+// oculto, no debe suprimir la ficha real del MLS.
+
 /**
  * Pares (id, mls_number) de los listings activos. Es lo único que necesita la
  * deduplicación contra el feed IDX, así que se consulta aparte en vez de engordar
@@ -43,7 +48,8 @@ export async function getActiveListingMlsRefs(): Promise<
   const { data } = await supabase
     .from("properties")
     .select("id,mls_number")
-    .eq("mls_status", "active");
+    .eq("mls_status", "active")
+    .eq("is_test", false);
   return (data ?? []).map((r) => ({ id: r.id as string, mlsNumber: (r.mls_number as string | null) ?? null }));
 }
 
@@ -59,6 +65,7 @@ export async function getActiveProperties(): Promise<PropertySummary[]> {
       "id,address_street,address_city,address_state,address_zip,list_price,bedrooms,bathrooms,sqft,property_type,created_at",
     )
     .eq("mls_status", "active")
+    .eq("is_test", false)
     .order("created_at", { ascending: false });
 
   const ids = (props ?? []).map((p) => p.id);
@@ -92,6 +99,7 @@ export async function getPropertyById(
     )
     .eq("id", id)
     .eq("mls_status", "active")
+    .eq("is_test", false)
     .maybeSingle();
 
   if (!prop) return null;

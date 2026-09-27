@@ -15,6 +15,7 @@ import { verifyWebhookSignature } from "@/lib/stripe";
 import { sendPaymentReceipt, sendBrokerNewPending } from "@/lib/email";
 import { claimWebhookEvent } from "@/lib/webhook-dedup";
 import { grantStagingCredits } from "@/lib/staging-credits";
+import { isPricingTierId } from "@/lib/pricing-tiers";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -130,11 +131,18 @@ async function fulfillCheckout(
     }
   }
 
-  // Flip the property to pending_approval so the broker queue picks it up.
+  // Flip the property to pending_approval so the broker queue picks it up. The tier is
+  // set from what Stripe actually charged (session metadata), not trusted from the row: the
+  // seller can edit pricing_tier while the listing is a draft, i.e. until this exact moment.
   if (propertyId) {
+    const paidTier = session.metadata?.tier;
     await supabase
       .from("properties")
-      .update({ mls_status: "pending_approval" })
+      .update(
+        paidTier && isPricingTierId(paidTier)
+          ? { mls_status: "pending_approval", pricing_tier: paidTier }
+          : { mls_status: "pending_approval" },
+      )
       .eq("id", propertyId)
       .eq("mls_status", "draft");
 
