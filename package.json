@@ -13,7 +13,8 @@
     "e2e:source": "tsx --env-file=.env.local scripts/e2e/source-lifecycle.ts",
     "e2e:ui-setup": "tsx --env-file=.env.local scripts/e2e/ui-setup.ts",
     "e2e:ui-teardown": "tsx --env-file=.env.local scripts/e2e/ui-teardown.ts",
-    "mls:inspect-fields": "tsx scripts/inspect-bridge-fields.ts"
+    "mls:inspect-fields": "tsx scripts/inspect-bridge-fields.ts",
+    "db-check:mls-status-guard": "bash scripts/db-checks/run-guard-properties-mls-status.sh"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.78",
