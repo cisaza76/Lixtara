@@ -53,5 +53,58 @@ do $$ begin
     raise exception 'HAY CASOS QUE NO COINCIDEN CON LO ESPERADO';
   end if;
 end $$;
+
+-- ── ROLLBACK: desactivar sin perder datos, y reactivar ─────────────────────────────
+\echo
+\echo '== ROLLBACK (docs/superpowers/runbooks/rollback-20260927120000_…sql)'
+create temp table rb_antes as
+  select (select count(*) from public.property_status_history) as historial,
+         (select count(*) from public.properties where is_test) as con_is_test;
+SQL
+  cat docs/superpowers/runbooks/rollback-20260927120000_guard_properties_mls_status.sql
+  cat <<'SQL'
+create temp table rb (paso text, esperado text, obtenido text);
+insert into rb values
+  ('triggers desactivados', 'D,D',
+   (select string_agg(tgenabled::text, ',' order by tgname) from pg_trigger
+     where tgrelid = 'public.properties'::regclass
+       and tgname in ('guard_properties_seller_columns', 'log_property_status_change'))),
+  ('historial conservado (filas)', (select historial::text from rb_antes),
+   (select count(*)::text from public.property_status_history)),
+  ('is_test conservado (filas true)', (select con_is_test::text from rb_antes),
+   (select count(*)::text from public.properties where is_test)),
+  ('con triggers OFF el vendedor SÍ puede activar (el hueco vuelve)', 'OK:1',
+   pg_temp.intento('authenticated', '11111111-1111-4111-8111-111111111111',
+     $$update public.properties set mls_status = 'active' where id = 'aaaaaaaa-0000-4000-8000-000000000001'$$)),
+  ('con triggers OFF no se escribe historial', (select historial::text from rb_antes),
+   (select count(*)::text from public.property_status_history));
+
+alter table public.properties enable trigger guard_properties_seller_columns;
+alter table public.properties enable trigger log_property_status_change;
+
+-- Un paso por sentencia: dentro de un mismo INSERT … VALUES todas las subconsultas ven la
+-- foto de ANTES de la sentencia, así que el conteo del historial no vería la aprobación.
+insert into rb values ('reactivados', 'O,O',
+   (select string_agg(tgenabled::text, ',' order by tgname) from pg_trigger
+     where tgrelid = 'public.properties'::regclass
+       and tgname in ('guard_properties_seller_columns', 'log_property_status_change')));
+-- aaaaaaaa-…-f1 es del vendedor y está en `withdrawn`.
+insert into rb values ('reactivado: el vendedor vuelve a NO poder activar', 'ERR:42501',
+   pg_temp.intento('authenticated', '11111111-1111-4111-8111-111111111111',
+     $$update public.properties set mls_status = 'active' where id = 'aaaaaaaa-0000-4000-8000-0000000000f1'$$));
+insert into rb values ('reactivado: el broker cambia el estado', 'OK:1',
+   pg_temp.intento('authenticated', '22222222-2222-4222-8222-222222222222',
+     $$update public.properties set mls_status = 'pending_approval' where id = 'aaaaaaaa-0000-4000-8000-0000000000f1'$$));
+insert into rb values ('reactivado: ese cambio SÍ queda en el historial (+1)',
+   ((select historial from rb_antes) + 1)::text,
+   (select count(*)::text from public.property_status_history));
+
+select paso, esperado, obtenido,
+       case when obtenido = esperado then 'ok' else '*** FALLA ***' end as veredicto from rb;
+do $$ begin
+  if exists (select 1 from rb where obtenido is distinct from esperado) then
+    raise exception 'EL ROLLBACK NO SE COMPORTA COMO SE ESPERA';
+  end if;
+end $$;
 SQL
 } | "${PSQL[@]}"

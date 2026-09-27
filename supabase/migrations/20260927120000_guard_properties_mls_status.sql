@@ -30,7 +30,7 @@
 --      mls_status / mls_published_at / mls_expires_at queda registrado, venga de donde
 --      venga (aprobación rápida de /admin incluida). Solo inserciones.
 --   4. payments / agreements: el INSERT de la sesión solo admite el estado inicial.
---   5. Marca is_test = true en los 9 listings de prueba conocidos (6 [DEMO] + 3).
+--   5. Marca is_test = true en los 11 listings de prueba conocidos (6 [DEMO] + 5).
 --
 -- SECURITY DEFINER con search_path fijo en ambas funciones de trigger:
 --   - El historial debe escribirse aunque quien dispara sea `authenticated`, que no tiene
@@ -43,7 +43,8 @@
 --     nada nuevo por la API.
 --
 -- Idempotente. Aplicar SOLO con sign-off del owner (`supabase db push`), DESPUÉS de las
--- migraciones de #132. Rollback: docs/superpowers/runbooks/rollback-20260927120000_guard_properties_mls_status.sql
+-- migraciones de #132. Rollback (desactiva los triggers, conserva datos):
+-- docs/superpowers/runbooks/rollback-20260927120000_guard_properties_mls_status.sql
 
 begin;
 
@@ -246,7 +247,7 @@ create policy "own agreements insert" on public.agreements
                  where p.id = property_id and p.owner_id = auth.uid())
   );
 
--- ── 5. Los 9 listings de prueba conocidos (retirados del sitio el 2026-09-27) ────
+-- ── 5. Los 11 listings de prueba conocidos (retirados del sitio el 2026-09-27) ───
 -- IDs de producción; en cualquier otra base no existen y esto no hace nada.
 update public.properties set is_test = true
  where id in (
@@ -254,7 +255,9 @@ update public.properties set is_test = true
    'b48b6bd9-fbe6-4ef8-b169-25aa17408665', 'a9c98643-01af-4ac0-bea6-c2ac2a3fd7f7',
    'dc57f155-51d1-48f8-8f1d-71b28a5abfd7', '61e682ff-a035-4634-9d92-755a1f16cad8',
    'f5011777-fb80-4e79-ac6d-78891bdec47e', 'abadb9e7-17bd-48cb-80c7-6a9cf6b60a3f',
-   '2da3ae77-7dd1-4e95-88a8-3e0a1ff97c3f')
+   '2da3ae77-7dd1-4e95-88a8-3e0a1ff97c3f',
+   -- Añadidos el 2026-09-27 (tarde): estaban en pending_approval con pagos de prueba.
+   'dc90cbf1-4e94-4c66-98bb-2e38cc801298', 'c2c72a4e-3cf4-4708-b750-52da4b3c8c95')
    and not is_test;
 
 commit;

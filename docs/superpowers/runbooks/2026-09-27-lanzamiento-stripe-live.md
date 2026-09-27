@@ -42,9 +42,9 @@ having count(pay.*) filter (where pay.status = 'succeeded'
 - **Pago real** en modo live, confirmado por el webhook.
 
 Los registros de prueba (`is_test = true`) no se publican nunca, pero también deben salir de
-`active`: el 2026-09-27 los 9 conocidos (6 `[DEMO]` + 3 direcciones reales usadas para
+`active`: el 2026-09-27 los 11 conocidos (6 `[DEMO]` + 5 listings de direcciones reales usadas para
 pruebas) pasaron a `withdrawn` — ver `activity_log` con
-`metadata->>'batch' = 'test-data-withdrawal-2026-09-27'`.
+`metadata->>'batch' like 'test-data-withdrawal-2026-09-27%'`.
 
 `payments` y las sesiones de Stripe de prueba **no se tocan**: son historial.
 
