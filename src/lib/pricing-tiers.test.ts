@@ -7,6 +7,11 @@ import {
   getTier,
   tierTotalCost,
   tierSavingsVsTraditional,
+  tierCostBreakdown,
+  fillTierCopy,
+  fillCommissionCopy,
+  fillPricingCopy,
+  QUIZ_HOME_VALUE_THRESHOLDS,
 } from "@/lib/pricing-tiers";
 
 describe("PRICING_TIERS catalog", () => {
@@ -84,5 +89,63 @@ describe("tierSavingsVsTraditional", () => {
   it("never goes negative (tiny sale where the flat fee dwarfs 6%)", () => {
     // 6% of 1_000 = 60, below the essentials flat fee + commission
     expect(tierSavingsVsTraditional("essentials", 1_000)).toBe(0);
+  });
+});
+
+describe("tierCostBreakdown", () => {
+  it("charges only the flat fee upfront — commissions are paid at closing", () => {
+    const b = tierCostBreakdown("essentials", 500_000, 3);
+    expect(b.upfront).toBe(PRICING_TIERS.essentials.flatFee);
+    expect(b.sellerCommission).toBe(2_500); // 0.5%
+    expect(b.buyerCommission).toBe(15_000); // 3%
+    expect(b.closing).toBe(17_500);
+    expect(b.total).toBe(199 + 17_500);
+  });
+
+  it("follows the buyer-agent % the seller chooses", () => {
+    expect(tierCostBreakdown("pro", 400_000, 2.5).buyerCommission).toBe(10_000);
+  });
+});
+
+describe("copy placeholders", () => {
+  it("fills a tier's own commission, fee, and term", () => {
+    expect(
+      fillTierCopy("{commissionPct}% at closing · ${flatFee} · {termMonths} mo", "pro"),
+    ).toBe("1% at closing · $495 · 24 mo");
+  });
+
+  it("fills every tier's commission plus the traditional benchmark", () => {
+    expect(
+      fillCommissionCopy("{essentials} / {pro} / {concierge} vs {traditional}"),
+    ).toBe("0.5 / 1 / 1.5 vs 3");
+  });
+});
+
+describe("fillPricingCopy", () => {
+  it("fills the photography add-on price from PHOTOGRAPHY_ADDON_PRICE", () => {
+    expect(fillPricingCopy("Add photography — {photoAddonPrice}")).toBe(
+      "Add photography — $495",
+    );
+  });
+
+  it("derives the FAQ cost example from the Pro tier and the traditional 6%", () => {
+    expect(
+      fillPricingCopy(
+        "up to {traditionalExample} on a {exampleSalePrice} home; {proFlatFee} flat plus {proCommissionPct}% ({proTotalExample} total)",
+      ),
+    ).toBe("up to $30,000 on a $500,000 home; $495 flat plus 1% ($5,495 total)");
+  });
+
+  it("formats the quiz home-value thresholds", () => {
+    expect(QUIZ_HOME_VALUE_THRESHOLDS.conciergeMin).toBe(700_000);
+    expect(fillPricingCopy("{quizMidMin} – {quizConciergeMin}")).toBe(
+      "$300K – $700K",
+    );
+  });
+
+  it("is applied by fillTierCopy too (tier features mention the add-on value)", () => {
+    expect(fillTierCopy("Photos ({photoAddonPrice} value)", "pro")).toBe(
+      "Photos ($495 value)",
+    );
   });
 });
