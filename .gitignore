@@ -58,3 +58,6 @@ staging-eval/
 .playwright-mcp/
 /prop-*.jpeg
 /prop-*.png
+
+# DocuSign template exports — contain personal emails; keep out of the repo
+docs/docusign/
