@@ -38,7 +38,7 @@ export const dictionaries = {
         },
         {
           headline: "Licensed brokerage on your side",
-          body: "AnaMaria and her FL-licensed team handle contracts, disclosures, and the legal mechanics — you're never alone.",
+          body: "Anamaria and her FL-licensed team handle contracts, disclosures, and the legal mechanics — you're never alone.",
         },
         {
           headline: "Full exposure in every major site",
@@ -1404,7 +1404,7 @@ export const dictionaries = {
         },
         {
           headline: "Brokerage licenciada a tu lado",
-          body: "AnaMaria y su equipo licenciado en Florida manejan contratos, disclosures, y la mecánica legal — nunca solo.",
+          body: "Anamaria y su equipo licenciado en Florida manejan contratos, disclosures, y la mecánica legal — nunca solo.",
         },
         {
           headline: "Exposición completa en todos los sitios principales",

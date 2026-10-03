@@ -1,17 +1,17 @@
-// Lixtara is both the consumer-facing brand and the licensed brokerage entity.
+// Constantes de marca de la correduría. Los datos de licencia vienen de
+// src/config/brokerage.ts (verificados en el DBPR) — no se repiten aquí.
 //
-// Brokerage license CQ1075352 — a Florida DBPR real-estate CORPORATION license
-// (prefix CQ = entity, not individual). Issued and active as of 2026-09-02.
-// The i18n `licensePending` labels remain as a graceful fallback if this
-// constant is ever emptied; they are not reachable while it is set.
+// Lixtara LLC es a la vez la marca y la entidad licenciada: licencia CQ (corporación) de
+// Florida. El broker de record se nombra en los avisos legales (Florida Statute 475) y en la
+// línea de licencias del pie de página.
+import { BROKERAGE } from "@/config/brokerage";
 
 export const BROKERAGE_NAME = "Lixtara";
-export const BROKERAGE_LICENSED_ENTITY = "Lixtara";
-export const BROKER_LICENSE = "CQ1075352";
+/** Nombre legal de la entidad licenciada; es el que va en acuerdos y avisos. */
+export const BROKERAGE_LICENSED_ENTITY = BROKERAGE.legalName;
+export const BROKER_LICENSE = BROKERAGE.brokerageLicense;
 export const BROKERAGE_LOCATION = "Miami, FL";
 export const BROKERAGE_YEARS = 20;
 
-// NOT for display in marketing copy (Lixtara is a corporate brand, not a
-// personal one). She IS named in the Terms of Service as the principal broker
-// of record — that is a Florida Statute 475 disclosure, not branding.
-export const BROKER_OF_RECORD = "AnaMaria Velasquez";
+export const BROKER_OF_RECORD = BROKERAGE.brokerName;
+export const BROKER_OF_RECORD_LICENSE = BROKERAGE.brokerLicense;

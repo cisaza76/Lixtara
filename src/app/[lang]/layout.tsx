@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Inter, Playfair_Display } from "next/font/google";
 import { notFound } from "next/navigation";
 import { isLocale, locales, t, type Locale } from "@/lib/i18n";
-import { BROKERAGE_LOCATION, BROKER_LICENSE } from "@/lib/broker";
+import { BROKERAGE_LOCATION } from "@/lib/broker";
+import { brokerageLicenseLine, brokerageLicenseLineShort } from "@/config/brokerage";
 import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
 import { CookieNotice } from "@/components/cookie-notice";
@@ -215,13 +216,16 @@ export default async function RootLayout({
                 <p className="text-sm leading-relaxed text-ink/70 max-w-sm">
                   {footerCopy.tagline}
                 </p>
-                <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
-                  {BROKER_LICENSE
-                    ? `${footerCopy.licenseLabel} #${BROKER_LICENSE}`
-                    : footerCopy.licensePending}
+                {/* Licencias verificadas en el DBPR (src/config/brokerage.ts). Sin mayúsculas
+                    forzadas: nombres y números se muestran tal como constan en el registro. */}
+                <p className="text-[11px] leading-relaxed text-ink/60 max-w-md">
+                  <span className="md:hidden">{brokerageLicenseLineShort()}</span>
+                  <span className="hidden md:inline">{brokerageLicenseLine(lang)}</span>
                   <br />
-                  {BROKERAGE_LOCATION}
-                </div>
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                    {BROKERAGE_LOCATION}
+                  </span>
+                </p>
               </div>
 
               <div className="md:col-span-2 flex flex-col gap-4">
