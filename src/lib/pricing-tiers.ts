@@ -42,6 +42,25 @@ export const TIER_ORDER: PricingTierId[] = ["essentials", "pro", "concierge"];
 
 export const DEFAULT_TIER: PricingTierId = "pro";
 
+/** Narrowing de un string externo (p. ej. metadata de Stripe) a un tier conocido. */
+export function isPricingTierId(v: unknown): v is PricingTierId {
+  return typeof v === "string" && (TIER_ORDER as string[]).includes(v);
+}
+
+// Home-value buckets for the "Find your plan" quiz (USD). The quiz only
+// RECOMMENDS a plan — the seller can still pick any plan on the listing form.
+// A seller who wants professional photos and whose home is worth more than
+// `conciergeMin` is pointed to Concierge; below it, to Pro.
+export const QUIZ_HOME_VALUE_THRESHOLDS = {
+  /** lower bound of the middle bucket */
+  midMin: 300_000,
+  /** above this, the quiz recommends Concierge (for pro-photo sellers) */
+  conciergeMin: 700_000,
+} as const;
+
+// Sale price used in illustrative copy (e.g. the FAQ cost comparison).
+export const EXAMPLE_SALE_PRICE = 500_000;
+
 export function getTier(
   id: PricingTierId | string | null | undefined,
 ): PricingTier {
@@ -61,8 +80,105 @@ export function tierSavingsVsTraditional(
   tierId: PricingTierId,
   salePrice: number,
 ): number {
-  const traditional = salePrice * 0.06;
+  const traditional =
+    (salePrice *
+      (TRADITIONAL_COSTS.listingCommissionPct +
+        TRADITIONAL_COSTS.buyerCommissionPct)) /
+    100;
   return Math.max(0, traditional - tierTotalCost(tierId, salePrice));
+}
+
+export interface TierCostBreakdown {
+  /** due at listing — the Lixtara flat fee only */
+  upfront: number;
+  /** Lixtara listing-side commission, paid from proceeds only if the home sells */
+  sellerCommission: number;
+  /** buyer-agent commission the seller offers, paid from proceeds at closing */
+  buyerCommission: number;
+  /** sellerCommission + buyerCommission */
+  closing: number;
+  total: number;
+}
+
+// Cost of selling with a Lixtara tier, split by WHEN it is paid. Only the flat
+// fee is charged upfront (Stripe checkout); every commission comes out of the
+// sale proceeds at closing, so it is owed only if the property sells.
+export function tierCostBreakdown(
+  tierId: PricingTierId,
+  salePrice: number,
+  buyerCommissionPct: number,
+): TierCostBreakdown {
+  const t = PRICING_TIERS[tierId];
+  const sellerCommission = (salePrice * t.commissionPct) / 100;
+  const buyerCommission = (salePrice * buyerCommissionPct) / 100;
+  const closing = sellerCommission + buyerCommission;
+  return {
+    upfront: t.flatFee,
+    sellerCommission,
+    buyerCommission,
+    closing,
+    total: t.flatFee + closing,
+  };
+}
+
+// Fills tier placeholders in copy strings so dictionaries never hardcode
+// prices: {commissionPct}, {flatFee}, {termMonths}.
+export function fillTierCopy(text: string, tierId: PricingTierId): string {
+  const t = PRICING_TIERS[tierId];
+  return fillPricingCopy(
+    text
+      .replaceAll("{commissionPct}", String(t.commissionPct))
+      .replaceAll("{flatFee}", String(t.flatFee))
+      .replaceAll("{termMonths}", String(t.termMonths)),
+  );
+}
+
+function formatThousands(amount: number): string {
+  return `$${amount / 1000}K`;
+}
+
+// Fills catalog-wide placeholders so dictionaries never hardcode amounts:
+//   {photoAddonPrice}       → "$495"   (PHOTOGRAPHY_ADDON_PRICE)
+//   {proFlatFee}            → "$495"   {proCommissionPct} → "1"
+//   {exampleSalePrice}      → "$500,000"
+//   {traditionalExample}    → 6% (listing + buyer) of the example price
+//   {proTotalExample}       → Pro flat fee + Pro commission on the example price
+//   {quizMidMin} / {quizConciergeMin} → "$300K" / "$700K"
+export function fillPricingCopy(text: string): string {
+  const traditionalPct =
+    TRADITIONAL_COSTS.listingCommissionPct + TRADITIONAL_COSTS.buyerCommissionPct;
+  return text
+    .replaceAll("{photoAddonPrice}", formatPrice(PHOTOGRAPHY_ADDON_PRICE))
+    .replaceAll("{proFlatFee}", formatPrice(PRICING_TIERS.pro.flatFee))
+    .replaceAll("{proCommissionPct}", String(PRICING_TIERS.pro.commissionPct))
+    .replaceAll("{exampleSalePrice}", formatPrice(EXAMPLE_SALE_PRICE))
+    .replaceAll(
+      "{traditionalExample}",
+      formatPrice((EXAMPLE_SALE_PRICE * traditionalPct) / 100),
+    )
+    .replaceAll(
+      "{proTotalExample}",
+      formatPrice(tierTotalCost("pro", EXAMPLE_SALE_PRICE)),
+    )
+    .replaceAll("{quizMidMin}", formatThousands(QUIZ_HOME_VALUE_THRESHOLDS.midMin))
+    .replaceAll(
+      "{quizConciergeMin}",
+      formatThousands(QUIZ_HOME_VALUE_THRESHOLDS.conciergeMin),
+    );
+}
+
+// Fills the per-tier commission placeholders used in comparison copy:
+// {essentials}, {pro}, {concierge} → that tier's commission %, and
+// {traditional} → the traditional listing-side commission %.
+export function fillCommissionCopy(text: string): string {
+  return text
+    .replaceAll("{essentials}", String(PRICING_TIERS.essentials.commissionPct))
+    .replaceAll("{pro}", String(PRICING_TIERS.pro.commissionPct))
+    .replaceAll("{concierge}", String(PRICING_TIERS.concierge.commissionPct))
+    .replaceAll(
+      "{traditional}",
+      String(TRADITIONAL_COSTS.listingCommissionPct),
+    );
 }
 
 export function formatPrice(amount: number): string {

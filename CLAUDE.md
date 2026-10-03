@@ -55,6 +55,14 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   All new strings and identifiers use Lixtara. When porting from Lovable, rename `NEXXOS_*`
   → `LIXTARA_*` constants.
 
+### Brokerage & licenses
+- Legal name, brokerage license (CQ), broker of record and her license (BK), and the
+  registered address live in **one** module: `src/config/brokerage.ts` (verified in the FL
+  DBPR, 2026-09-27). Never hardcode a license number or the broker's name — import from
+  there (`brokerageLicenseLine(lang)` for footers/emails). `src/config/brokerage.test.ts`
+  fails on any other `CQ`/`BK`/`SL` number, on another spelling of the broker's name, and on
+  the old Nexxos Realty number.
+
 ### Pricing
 - Pricing tiers live in **one** module: `src/lib/pricing-tiers.ts`. Never hardcode
   `199`, `495`, `995` in components — import from there (and Stripe amounts derive from it).
@@ -67,6 +75,18 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 - All 28 tables have RLS active. Personal data follows `owner_id = auth.uid()`. Admin access
   goes through `has_role('admin')`.
 - Email verification is **required**. Never enable auto-confirm.
+- A seller writes only the listing's own data. `guard_properties_seller_columns`
+  (migration `20260927120000`) enforces an **allowlist**
+  (`properties_seller_writable_columns()`) for non-staff API roles: status, publication
+  dates, `mls_number`, `owner_id`, `is_test` and `pricing_tier` after draft are broker/admin
+  or `service_role` only. A new seller-editable column must be added to that list (a test
+  fails otherwise). Every `mls_status` change is logged in `property_status_history`.
+
+### Test data
+- Tests run in **preview**, not production. If something must be tested in production,
+  create the record with `properties.is_test = true` (admin or `service_role` only). Public
+  reads exclude `is_test` regardless of status — keep the `.eq("is_test", false)` filter on
+  every public query in `src/lib/properties.ts`.
 
 ### Supabase clients
 - Browser: `import { createClient } from "@/lib/supabase/client"`
@@ -112,9 +132,13 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   before it stops (`SandboxRemotionProvider.render`, `src/lib/video-engine/
   render-provider.ts`) — no `ffprobe` binary is needed on the worker's own Node
   runtime.
-- `MLS_FEED_ENABLED` — server-only (`"true"` to enable). Kill switch for MIAMI MLS
-  Licensed Content. **Production only** — never Preview, never Development. Unset =
-  fail-closed. Read only through `src/lib/mls/environment-gate.ts`.
+- `MLS_SYNC_ENABLED` / `MLS_DISPLAY_ENABLED` — server-only (`"true"` to enable). Two
+  independent kill switches for MIAMI MLS Licensed Content: sync gates the Bridge
+  credential and the `/api/mls/sync` + `/api/mls/reconcile` crons; display gates rendering
+  on `lixtara.com` (plus host check). **Production only** — never Preview, never
+  Development. Unset = inherits the legacy `MLS_FEED_ENABLED` (which opened both); if that
+  is unset too, fail-closed. Read only through `src/lib/mls/environment-gate.ts` (ADR-0013
+  amendment 2026-09-26).
 - `MLS_BRIDGE_DATASET` — server-only. Código del dataset en Bridge (`miamire` para
   MIAMI Association of REALTORS®). No es secreto, pero sí server-only: nombra el feed.
 - `MLS_SYNC_BUDGET_MS` / `MLS_SYNC_MAX_PAGES` — server-only, opcionales (50.000 ms / 200).

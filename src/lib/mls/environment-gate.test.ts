@@ -63,9 +63,9 @@ describe("puerta de ingesta (cron → Bridge → base de datos)", () => {
 
   it("niega sin el flag — fail-closed por defecto", () => {
     expect(mlsIngestDecision({ vercelEnv: "production" }))
-      .toEqual({ allowed: false, reason: "feed_disabled" });
+      .toEqual({ allowed: false, reason: "sync_disabled" });
     expect(mlsIngestDecision({ vercelEnv: "production", feedEnabled: "false" }))
-      .toEqual({ allowed: false, reason: "feed_disabled" });
+      .toEqual({ allowed: false, reason: "sync_disabled" });
     // Solo el literal "true" habilita: nada de valores ambiguos.
     expect(mlsIngestDecision({ vercelEnv: "production", feedEnabled: "1" }).allowed).toBe(false);
     expect(mlsIngestDecision({ vercelEnv: "production", feedEnabled: "TRUE" }).allowed).toBe(false);
@@ -105,13 +105,74 @@ describe("puerta de exhibición (servir contenido del MLS)", () => {
     expect(mlsDisplayDecision(null, PROD)).toEqual({ allowed: false, reason: "host_missing" });
   });
 
-  it("es estrictamente más fuerte que la ingesta", () => {
-    // Todo lo que la exhibición permite, la ingesta también.
+  it("con el flag viejo, exhibe en el host licenciado y en ningún otro", () => {
     expect(mlsDisplayDecision("lixtara.com", PROD).allowed).toBe(true);
-    expect(mlsIngestDecision(PROD).allowed).toBe(true);
-    // Pero no al revés.
-    expect(mlsIngestDecision(PROD).allowed).toBe(true);
     expect(mlsDisplayDecision("lixtara.vercel.app", PROD).allowed).toBe(false);
+  });
+});
+
+// ── D · Separación del interruptor ────────────────────────────────────────────
+// La activación va en fases: primero se llena la tabla (solo sincronización), se revisa
+// el payload real, y solo después se publica. Con un único flag eso era imposible.
+describe("interruptores separados MLS_SYNC_ENABLED / MLS_DISPLAY_ENABLED", () => {
+  const SOLO_SYNC: MlsGateEnv = { vercelEnv: "production", syncEnabled: "true" };
+  const SOLO_DISPLAY: MlsGateEnv = { vercelEnv: "production", displayEnabled: "true" };
+
+  it("sincronización encendida + exhibición apagada: ingiere pero NO exhibe", () => {
+    expect(mlsIngestDecision(SOLO_SYNC)).toEqual({ allowed: true });
+    expect(mlsDisplayDecision("lixtara.com", SOLO_SYNC))
+      .toEqual({ allowed: false, reason: "display_disabled" });
+    expect(mlsDisplayDecision("lixtara.com", { ...SOLO_SYNC, displayEnabled: "false" }))
+      .toEqual({ allowed: false, reason: "display_disabled" });
+  });
+
+  it("exhibición encendida + sincronización apagada: exhibe pero NO entrega el token", () => {
+    expect(mlsDisplayDecision("lixtara.com", SOLO_DISPLAY)).toEqual({ allowed: true });
+    expect(mlsIngestDecision(SOLO_DISPLAY))
+      .toEqual({ allowed: false, reason: "sync_disabled" });
+    process.env.MLS_BRIDGE_SERVER_TOKEN = "tok_real";
+    try {
+      expect(() => requireMlsServerToken(SOLO_DISPLAY)).toThrow(MlsAccessDeniedError);
+    } finally {
+      delete process.env.MLS_BRIDGE_SERVER_TOKEN;
+    }
+  });
+
+  it("la exhibición sigue exigiendo producción y host licenciado", () => {
+    expect(mlsDisplayDecision("lixtara.vercel.app", SOLO_DISPLAY))
+      .toEqual({ allowed: false, reason: "host_not_licensed" });
+    expect(mlsDisplayDecision("lixtara.com", { ...SOLO_DISPLAY, vercelEnv: "preview" }))
+      .toEqual({ allowed: false, reason: "not_production" });
+    expect(mlsDisplayDecision(null, SOLO_DISPLAY))
+      .toEqual({ allowed: false, reason: "host_missing" });
+  });
+
+  it("retrocompatible: solo MLS_FEED_ENABLED=true abre ambas puertas, como antes", () => {
+    const VIEJO: MlsGateEnv = { vercelEnv: "production", feedEnabled: "true" };
+    expect(mlsIngestDecision(VIEJO).allowed).toBe(true);
+    expect(mlsDisplayDecision("lixtara.com", VIEJO).allowed).toBe(true);
+    expect(mlsDisplayDecision("lixtara.vercel.app", VIEJO).allowed).toBe(false);
+  });
+
+  it("un flag nuevo DEFINIDO manda sobre el viejo, en ambos sentidos", () => {
+    // Apagar la exhibición con el flag viejo aún puesto: el nuevo gana.
+    const env: MlsGateEnv = { vercelEnv: "production", feedEnabled: "true", displayEnabled: "false" };
+    expect(mlsDisplayDecision("lixtara.com", env).allowed).toBe(false);
+    expect(mlsIngestDecision(env).allowed).toBe(true); // sync hereda el viejo
+    // Cadena vacía cuenta como definido: no reabre por herencia.
+    expect(mlsIngestDecision({ vercelEnv: "production", feedEnabled: "true", syncEnabled: "" }).allowed)
+      .toBe(false);
+    // Y encender con el nuevo aunque el viejo diga "false".
+    expect(mlsIngestDecision({ vercelEnv: "production", feedEnabled: "false", syncEnabled: "true" }).allowed)
+      .toBe(true);
+  });
+
+  it("solo el literal \"true\" abre los flags nuevos", () => {
+    for (const v of ["1", "TRUE", "yes", " true"]) {
+      expect(mlsIngestDecision({ vercelEnv: "production", syncEnabled: v }).allowed, v).toBe(false);
+      expect(mlsDisplayDecision("lixtara.com", { vercelEnv: "production", displayEnabled: v }).allowed, v)
+        .toBe(false);
+    }
   });
 });
 
@@ -166,8 +227,9 @@ describe("credencial de Bridge", () => {
 
 describe("lectura del entorno real", () => {
   it("readMlsGateEnv es fail-closed en el entorno de pruebas", () => {
-    // Ni VERCEL_ENV ni MLS_FEED_ENABLED están puestas al correr tests.
+    // Ni VERCEL_ENV ni los flags del MLS están puestos al correr tests.
     expect(mlsIngestDecision(readMlsGateEnv()).allowed).toBe(false);
+    expect(mlsDisplayDecision("lixtara.com", readMlsGateEnv()).allowed).toBe(false);
   });
 
   it("el sitio licenciado es exactamente el del acuerdo", () => {
