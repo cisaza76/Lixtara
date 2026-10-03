@@ -8,6 +8,7 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   DEFAULT_TIER,
+  fillCommissionCopy,
   fillTierCopy,
   formatPrice,
   type PricingTierId,
@@ -250,7 +251,7 @@ export default async function Home({
                   {s.headline}
                 </h3>
                 <p className="text-sm leading-relaxed text-ink/70 md:max-w-[18rem]">
-                  {s.body}
+                  {fillCommissionCopy(s.body)}
                 </p>
               </div>
             ))}
