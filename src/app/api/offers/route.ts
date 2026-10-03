@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
   const { data: property } = await supabase
     .from("properties")
-    .select("id, owner_id, mls_status, address_street, address_city, address_state, address_zip")
+    .select("id, owner_id, mls_status, is_test, address_street, address_city, address_state, address_zip")
     .eq("id", propertyId)
     .maybeSingle();
   if (!property) {
@@ -76,7 +76,8 @@ export async function POST(req: Request) {
   if (property.owner_id === user.id) {
     return NextResponse.json({ error: "cannot_offer_on_own_property" }, { status: 409 });
   }
-  if (property.mls_status !== "active") {
+  // Un listing de prueba nunca recibe ofertas, aunque alguien conozca su id.
+  if (property.mls_status !== "active" || property.is_test) {
     return NextResponse.json(
       { error: "property_not_active", status: property.mls_status },
       { status: 409 },

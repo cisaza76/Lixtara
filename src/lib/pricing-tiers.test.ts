@@ -3,6 +3,7 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   DEFAULT_TIER,
+  isPricingTierId,
   TRADITIONAL_COSTS,
   getTier,
   tierTotalCost,
@@ -147,5 +148,12 @@ describe("fillPricingCopy", () => {
     expect(fillTierCopy("Photos ({photoAddonPrice} value)", "pro")).toBe(
       "Photos ($495 value)",
     );
+  });
+});
+
+describe("isPricingTierId", () => {
+  it("acepta solo los tres tiers, por igualdad exacta", () => {
+    for (const t of ["essentials", "pro", "concierge"]) expect(isPricingTierId(t)).toBe(true);
+    for (const t of ["Pro", "premium", "", null, undefined, 495]) expect(isPricingTierId(t)).toBe(false);
   });
 });

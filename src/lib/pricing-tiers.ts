@@ -42,6 +42,11 @@ export const TIER_ORDER: PricingTierId[] = ["essentials", "pro", "concierge"];
 
 export const DEFAULT_TIER: PricingTierId = "pro";
 
+/** Narrowing de un string externo (p. ej. metadata de Stripe) a un tier conocido. */
+export function isPricingTierId(v: unknown): v is PricingTierId {
+  return typeof v === "string" && (TIER_ORDER as string[]).includes(v);
+}
+
 // Home-value buckets for the "Find your plan" quiz (USD). The quiz only
 // RECOMMENDS a plan — the seller can still pick any plan on the listing form.
 // A seller who wants professional photos and whose home is worth more than

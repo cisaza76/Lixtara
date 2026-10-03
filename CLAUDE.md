@@ -75,6 +75,18 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 - All 28 tables have RLS active. Personal data follows `owner_id = auth.uid()`. Admin access
   goes through `has_role('admin')`.
 - Email verification is **required**. Never enable auto-confirm.
+- A seller writes only the listing's own data. `guard_properties_seller_columns`
+  (migration `20260927120000`) enforces an **allowlist**
+  (`properties_seller_writable_columns()`) for non-staff API roles: status, publication
+  dates, `mls_number`, `owner_id`, `is_test` and `pricing_tier` after draft are broker/admin
+  or `service_role` only. A new seller-editable column must be added to that list (a test
+  fails otherwise). Every `mls_status` change is logged in `property_status_history`.
+
+### Test data
+- Tests run in **preview**, not production. If something must be tested in production,
+  create the record with `properties.is_test = true` (admin or `service_role` only). Public
+  reads exclude `is_test` regardless of status — keep the `.eq("is_test", false)` filter on
+  every public query in `src/lib/properties.ts`.
 
 ### Supabase clients
 - Browser: `import { createClient } from "@/lib/supabase/client"`
