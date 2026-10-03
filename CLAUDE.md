@@ -124,9 +124,13 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   before it stops (`SandboxRemotionProvider.render`, `src/lib/video-engine/
   render-provider.ts`) — no `ffprobe` binary is needed on the worker's own Node
   runtime.
-- `MLS_FEED_ENABLED` — server-only (`"true"` to enable). Kill switch for MIAMI MLS
-  Licensed Content. **Production only** — never Preview, never Development. Unset =
-  fail-closed. Read only through `src/lib/mls/environment-gate.ts`.
+- `MLS_SYNC_ENABLED` / `MLS_DISPLAY_ENABLED` — server-only (`"true"` to enable). Two
+  independent kill switches for MIAMI MLS Licensed Content: sync gates the Bridge
+  credential and the `/api/mls/sync` + `/api/mls/reconcile` crons; display gates rendering
+  on `lixtara.com` (plus host check). **Production only** — never Preview, never
+  Development. Unset = inherits the legacy `MLS_FEED_ENABLED` (which opened both); if that
+  is unset too, fail-closed. Read only through `src/lib/mls/environment-gate.ts` (ADR-0013
+  amendment 2026-09-26).
 - `MLS_BRIDGE_DATASET` — server-only. Código del dataset en Bridge (`miamire` para
   MIAMI Association of REALTORS®). No es secreto, pero sí server-only: nombra el feed.
 - `MLS_SYNC_BUDGET_MS` / `MLS_SYNC_MAX_PAGES` — server-only, opcionales (50.000 ms / 200).

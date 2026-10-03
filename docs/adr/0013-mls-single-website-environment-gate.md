@@ -87,3 +87,24 @@ Supporting choices:
   additional Fees."*
 - **Relying on the reviewer.** The failure is silent, the detection is external, and the
   remedy is termination at the counterparty's sole discretion.
+
+## Amendment — 2026-09-26: one switch per gate
+
+`MLS_FEED_ENABLED` opened both gates at once, which made a staged activation impossible:
+the table could not be filled and its real payload reviewed (e.g. `Media`, before building
+photos) without simultaneously publishing on `lixtara.com`. The single flag is split:
+
+| Gate | Flag | Also required |
+|---|---|---|
+| Ingest (and `requireMlsServerToken()`) | `MLS_SYNC_ENABLED === "true"` | production |
+| Display | `MLS_DISPLAY_ENABLED === "true"` | production + licensed host |
+
+- **Backward compatible.** When a new flag is *unset*, it inherits `MLS_FEED_ENABLED`, so an
+  environment with only the old flag behaves exactly as before. When a new flag is *defined*
+  — with any value, including `""` — it wins; that is what lets `MLS_DISPLAY_ENABLED=false`
+  close display while the old flag is still set.
+- **Display no longer implies ingest.** The "display is strictly stronger than ingest"
+  relation above is retired: display now checks its own flag, production and host, and does
+  not look at the sync flag. Turning sync off must not blank the page by itself; the 24 h
+  withdrawal obligation is an operational watch item, not a side effect of this module.
+- Denial reason `feed_disabled` is replaced by `sync_disabled` and `display_disabled`.

@@ -16,12 +16,24 @@
 // worker de sincronización no entra por el dominio público:
 //
 //   Ingesta   (cron → Bridge API → base de datos)
-//             producción + flag. SIN chequeo de host: una invocación de Vercel
-//             Cron no llega por lixtara.com.
+//             producción + MLS_SYNC_ENABLED. SIN chequeo de host: una invocación
+//             de Vercel Cron no llega por lixtara.com.
 //
 //   Exhibición (páginas que sirven contenido del MLS)
-//             producción + flag + el host DEBE ser el sitio licenciado.
-//             Estrictamente más fuerte que la ingesta.
+//             producción + MLS_DISPLAY_ENABLED + el host DEBE ser el sitio
+//             licenciado.
+//
+// DOS INTERRUPTORES, NO UNO
+// Antes un solo MLS_FEED_ENABLED abría las dos puertas a la vez, así que era
+// imposible llenar la tabla y revisarla (p. ej. el `Media` del payload real) antes
+// de publicar nada en lixtara.com. Ahora cada puerta tiene su flag. La exhibición
+// NO depende del flag de sincronización: son decisiones independientes, y apagar la
+// sincronización no debe tumbar la página (los datos ya ingeridos siguen vigentes
+// hasta 24 h; el plazo lo vigila la operación, no este módulo).
+//
+// COMPATIBILIDAD: si un flag nuevo no está definido, se usa MLS_FEED_ENABLED. Un
+// entorno que solo tenga el flag viejo se comporta exactamente como antes. En
+// cuanto un flag nuevo está definido —con cualquier valor— manda él.
 //
 // Módulo PURO: sin I/O, entorno inyectable. Fail-closed en todos los caminos —
 // si no puede demostrar que está autorizado, niega.
@@ -30,7 +42,8 @@
 export const MLS_LICENSED_HOSTS = ["lixtara.com", "www.lixtara.com"] as const;
 
 export type MlsDenialReason =
-  | "feed_disabled"     // el kill switch está apagado o ausente
+  | "sync_disabled"     // MLS_SYNC_ENABLED (o el flag viejo) apagado o ausente
+  | "display_disabled"  // MLS_DISPLAY_ENABLED (o el flag viejo) apagado o ausente
   | "not_production"    // preview, development o entorno desconocido
   | "host_missing"      // no se pudo determinar el host de la petición
   | "host_not_licensed"; // host real, pero no es el sitio del acuerdo
@@ -38,7 +51,14 @@ export type MlsDenialReason =
 export interface MlsGateEnv {
   /** `process.env.VERCEL_ENV` — "production" | "preview" | "development". */
   vercelEnv?: string;
-  /** `process.env.MLS_FEED_ENABLED` — "true" habilita. Ausente = cerrado. */
+  /** `process.env.MLS_SYNC_ENABLED` — "true" habilita la ingesta. */
+  syncEnabled?: string;
+  /** `process.env.MLS_DISPLAY_ENABLED` — "true" habilita la exhibición. */
+  displayEnabled?: string;
+  /**
+   * `process.env.MLS_FEED_ENABLED` — flag VIEJO, anterior a la separación. Solo se
+   * consulta cuando el flag nuevo correspondiente no está definido.
+   */
   feedEnabled?: string;
 }
 
@@ -54,8 +74,26 @@ const deny = (reason: MlsDenialReason): MlsGateDecision => ({ allowed: false, re
 export function readMlsGateEnv(): MlsGateEnv {
   return {
     vercelEnv: process.env.VERCEL_ENV,
+    syncEnabled: process.env.MLS_SYNC_ENABLED,
+    displayEnabled: process.env.MLS_DISPLAY_ENABLED,
     feedEnabled: process.env.MLS_FEED_ENABLED,
   };
+}
+
+/**
+ * Resuelve un flag nuevo con retrocompatibilidad. Definido (aunque sea "false" o "")
+ * → manda él. Ausente → hereda el flag viejo. Solo el literal "true" abre.
+ */
+function flagOn(nuevo: string | undefined, viejo: string | undefined): boolean {
+  return (nuevo !== undefined ? nuevo : viejo) === "true";
+}
+
+export function mlsSyncFlagOn(env: MlsGateEnv): boolean {
+  return flagOn(env.syncEnabled, env.feedEnabled);
+}
+
+export function mlsDisplayFlagOn(env: MlsGateEnv): boolean {
+  return flagOn(env.displayEnabled, env.feedEnabled);
 }
 
 /**
@@ -78,24 +116,25 @@ export function isLicensedHost(raw: string | null | undefined): boolean {
 
 /**
  * Ingesta: traer contenido licenciado desde Bridge y persistirlo.
- * Producción + flag. El host no aplica — el cron no entra por el dominio.
+ * Producción + MLS_SYNC_ENABLED. El host no aplica — el cron no entra por el dominio.
  */
 export function mlsIngestDecision(env: MlsGateEnv): MlsGateDecision {
-  if (env.feedEnabled !== "true") return deny("feed_disabled");
+  if (!mlsSyncFlagOn(env)) return deny("sync_disabled");
   if (env.vercelEnv !== "production") return deny("not_production");
   return ALLOW;
 }
 
 /**
  * Exhibición: servir contenido licenciado en una respuesta.
- * Todo lo de la ingesta MÁS que el host sea el sitio del acuerdo.
+ * Producción + MLS_DISPLAY_ENABLED + que el host sea el sitio del acuerdo. NO mira el
+ * flag de sincronización — ver "DOS INTERRUPTORES" arriba.
  */
 export function mlsDisplayDecision(
   host: string | null | undefined,
   env: MlsGateEnv,
 ): MlsGateDecision {
-  const ingest = mlsIngestDecision(env);
-  if (!ingest.allowed) return ingest;
+  if (!mlsDisplayFlagOn(env)) return deny("display_disabled");
+  if (env.vercelEnv !== "production") return deny("not_production");
   if (normalizeHost(host) === null) return deny("host_missing");
   if (!isLicensedHost(host)) return deny("host_not_licensed");
   return ALLOW;
@@ -128,8 +167,9 @@ export function assertMlsDisplayAllowed(
 }
 
 /**
- * Token de servidor de Bridge. Pasa por la puerta a propósito: obtener la
- * credencial es imposible sin estar autorizado, así que un preview no puede
+ * Token de servidor de Bridge. Pasa por la puerta de INGESTA (solo MLS_SYNC_ENABLED;
+ * el flag de exhibición no la abre): obtener la credencial es imposible sin estar
+ * autorizado, así que un preview no puede
  * llamar a Bridge ni siquiera si la variable quedara puesta por error.
  * NUNCA con prefijo NEXT_PUBLIC_ — jamás debe entrar al bundle del cliente.
  */
@@ -137,7 +177,7 @@ export function requireMlsServerToken(env: MlsGateEnv = readMlsGateEnv()): strin
   assertMlsIngestAllowed(env);
   const token = process.env.MLS_BRIDGE_SERVER_TOKEN;
   if (!token || token.trim().length === 0) {
-    throw new MlsAccessDeniedError("feed_disabled", "MLS_BRIDGE_SERVER_TOKEN is not set");
+    throw new MlsAccessDeniedError("sync_disabled", "MLS_BRIDGE_SERVER_TOKEN is not set");
   }
   return token;
 }

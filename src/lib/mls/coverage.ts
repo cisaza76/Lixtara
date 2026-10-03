@@ -98,9 +98,15 @@ const ESTADOS_ACEPTADOS = new Set(
   [SUPPORTED_STATE, "Florida"].map((s) => normalizeGeoName(s)).filter((s): s is string => s !== null),
 );
 
+/**
+ * Lo único que el filtro de cobertura lee: campos por nombre. Tanto una ficha completa
+ * como un registro de solo claves (reconciliación) lo cumplen.
+ */
+export type CoverageInput = { readonly [field: string]: unknown };
+
 /** Lee el primer candidato presente. Devuelve también CUÁL se usó, para poder auditarlo. */
 export function readCandidate(
-  listing: ResoListing,
+  listing: CoverageInput,
   candidates: readonly string[],
 ): { field: string; value: string } | null {
   for (const f of candidates) {
@@ -132,7 +138,7 @@ export type CoverageExclusionReason =
  * El estado solo se comprueba si el feed lo trae: es una salvaguarda extra, no un requisito.
  * Los tres condados son inequívocamente de Florida, así que el condado es el criterio.
  */
-export function coverageVerdict(listing: ResoListing): CoverageVerdict {
+export function coverageVerdict(listing: CoverageInput): CoverageVerdict {
   const estado = readCandidate(listing, STATE_FIELD_CANDIDATES);
   if (estado !== null && !ESTADOS_ACEPTADOS.has(estado.value)) {
     return { included: false, reason: "state_not_supported", detail: estado.value };
@@ -166,7 +172,7 @@ export function coverageVerdict(listing: ResoListing): CoverageVerdict {
   };
 }
 
-export function isWithinCoverage(listing: ResoListing): boolean {
+export function isWithinCoverage(listing: CoverageInput): boolean {
   return coverageVerdict(listing).included;
 }
 
@@ -176,13 +182,13 @@ export function isWithinCoverage(listing: ResoListing): boolean {
  * El conteo NO es decorativo: si `county_field_missing` domina, el nombre del campo está
  * mal y hay que correr el script de inspección. El worker lo registra en cada pasada.
  */
-export function partitionByCoverage(listings: ResoListing[]): {
-  included: ResoListing[];
-  excluded: Array<{ listing: ResoListing; reason: CoverageExclusionReason; detail?: string }>;
+export function partitionByCoverage<T extends CoverageInput = ResoListing>(listings: T[]): {
+  included: T[];
+  excluded: Array<{ listing: T; reason: CoverageExclusionReason; detail?: string }>;
   counts: Record<CoverageExclusionReason | "included", number>;
 } {
-  const included: ResoListing[] = [];
-  const excluded: Array<{ listing: ResoListing; reason: CoverageExclusionReason; detail?: string }> = [];
+  const included: T[] = [];
+  const excluded: Array<{ listing: T; reason: CoverageExclusionReason; detail?: string }> = [];
   const counts = {
     included: 0,
     county_field_missing: 0,
