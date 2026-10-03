@@ -7,6 +7,8 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { SITE_URL } from "@/lib/config";
 import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
+import { TurnstileWidget } from "@/components/turnstile-widget";
+import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
 import { StepShell } from "@/components/step-shell";
 import {
   Field,
@@ -361,7 +363,17 @@ export default async function ListingNewPage({
     // upgrade to a real account at the signing gate (step 7). If anonymous
     // sign-ins are unavailable, fall back to the sign-in redirect.
     if (!user) {
-      const { data: anon } = await supabase.auth.signInAnonymously();
+      // Anonymous sign-up is captcha-protected (Cloudflare Turnstile, verified
+      // by Supabase Auth). The widget sits in the step-1 form.
+      const { data: anon, error: anonError } =
+        await supabase.auth.signInAnonymously({
+          options: { captchaToken: captchaTokenFrom(formData) },
+        });
+      if (isCaptchaError(anonError)) {
+        redirect(
+          `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=captcha`,
+        );
+      }
       user = anon.user ?? null;
     }
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
@@ -1191,8 +1203,14 @@ export default async function ListingNewPage({
     const { error: resendError } = await supabase.auth.resend({
       type: "email_change",
       email: pending,
-      options: { emailRedirectTo },
+      options: { emailRedirectTo, captchaToken: captchaTokenFrom(formData) },
     });
+
+    // A failed bot check must not fall through to updateUser (which is not
+    // captcha-protected) — that would resend anyway and bypass Turnstile.
+    if (isCaptchaError(resendError)) {
+      redirect(`${back}&pending=1&cerror=captcha`);
+    }
 
     if (resendError) {
       const { error: updateError } = await supabase.auth.updateUser(
@@ -1249,7 +1267,9 @@ export default async function ListingNewPage({
   }
 
   const errorMessage =
-    sp.error === "required"
+    sp.error === "captcha"
+      ? t(lang).auth.errors.captchaFailed
+      : sp.error === "required"
       ? "All fields are required."
       : sp.error === "fl_only"
         ? copy.step1.flOnly
@@ -1356,6 +1376,9 @@ export default async function ListingNewPage({
               defaultLng={draft?.longitude ?? null}
               verifiedNote={copy.step1.verifiedNote}
             />
+            {/* Only a visitor without a session triggers the anonymous
+                sign-up in saveStep1 — that's the only call needing a token. */}
+            {!sessionUser && <TurnstileWidget lang={lang} />}
             <SubmitButton>{copy.nextLabel} →</SubmitButton>
           </form>
         </div>
@@ -2801,6 +2824,7 @@ export default async function ListingNewPage({
               registerAction={registerAccount}
               verifyAction={verifyEmailCode}
               resendAction={resendEmailCode}
+              lang={lang}
               draftId={draftId}
               pendingEmail={pendingEmail}
               resentAt={
@@ -2833,6 +2857,7 @@ export default async function ListingNewPage({
                 resendDone: copy.step7.gateResendDone,
                 errResendLimit: copy.step7.gateErrResendLimit,
                 errResendFailed: copy.step7.gateErrResendFailed,
+                errCaptcha: t(lang).auth.errors.captchaFailed,
                 errName: copy.step7.gateErrName,
                 errEmail: copy.step7.gateErrEmail,
                 errPassword: copy.step7.gateErrPassword,

@@ -125,6 +125,14 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   which asserts the environment gate first, so a preview cannot reach Bridge even if the
   variable were set there by mistake. The MIAMI agreement licenses the Data Feed for
   `lixtara.com` alone (Schedule B §1, §IX.J) — see ADR-0013.
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — public Cloudflare Turnstile site key. The widget
+  (`src/components/turnstile-widget.tsx`) renders in every captcha-protected auth form and
+  the token goes to Supabase Auth as `captchaToken`; Supabase verifies it (the Turnstile
+  SECRET lives only in the Supabase dashboard). Unset = no widget. Rollout order: deploy
+  the code first, THEN enable Turnstile in Supabase — the reverse breaks every sign-in.
+- `EMAIL_CODE_PEPPER` — server-only. HMAC key for the email verification codes of the
+  seller funnel gate (`email_verification_challenges.code_hmac`). That table, not Supabase's
+  OTP, validates those codes. Required once the Phase B gate ships.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 

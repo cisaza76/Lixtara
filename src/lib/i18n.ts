@@ -670,6 +670,7 @@ export const dictionaries = {
         invalidCredentials: "Email or password is incorrect.",
         emailNotConfirmed: "Please confirm your email before signing in.",
         passwordTooShort: "Password must be at least 8 characters.",
+        captchaFailed: "We couldn't verify you're human. Complete the security check and try again.",
         unexpected: "Something went wrong. Please try again.",
       },
       nav: {
@@ -2032,6 +2033,7 @@ export const dictionaries = {
         invalidCredentials: "Email o contraseña incorrectos.",
         emailNotConfirmed: "Por favor confirma tu email antes de iniciar sesión.",
         passwordTooShort: "La contraseña debe tener al menos 8 caracteres.",
+        captchaFailed: "No pudimos verificar que eres una persona. Completa la verificación de seguridad e intenta de nuevo.",
         unexpected: "Algo salió mal. Por favor intenta de nuevo.",
       },
       nav: {
