@@ -152,7 +152,7 @@ export default async function Home({
             <div className="relative w-full max-w-[380px] aspect-[4/5]">
               <div
                 aria-hidden
-                className="absolute -top-10 -right-10 w-48 h-48 z-0 opacity-30 pointer-events-none"
+                className="absolute -top-10 -right-4 sm:-right-10 w-48 h-48 z-0 opacity-30 pointer-events-none"
                 style={{
                   backgroundImage:
                     "radial-gradient(hsl(35 35% 53%) 1.5px, transparent 1.5px)",
