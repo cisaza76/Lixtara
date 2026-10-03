@@ -3,7 +3,7 @@
 // escribirlas — ver la migración 20260916140000.
 import { createService } from "@/lib/supabase/service";
 import type { NormalizedListing } from "@/lib/mls/feed-port";
-import type { SyncState, SyncStore } from "@/lib/mls/sync-run";
+import type { SyncPassPhase, SyncState, SyncStore } from "@/lib/mls/sync-run";
 
 export function createSupabaseSyncStore(): SyncStore {
   const db = createService();
@@ -12,7 +12,7 @@ export function createSupabaseSyncStore(): SyncStore {
     async readState(dataset: string): Promise<SyncState | null> {
       const { data, error } = await db
         .from("mls_sync_state")
-        .select("dataset,last_modification_ts,resume_cursor")
+        .select("dataset,last_modification_ts,resume_cursor,pass_started_at,pass_phase,removal_cursor")
         .eq("dataset", dataset)
         .maybeSingle();
       if (error) throw new Error(`no se pudo leer mls_sync_state: ${error.message}`);
@@ -20,7 +20,10 @@ export function createSupabaseSyncStore(): SyncStore {
       return {
         dataset: data.dataset,
         lastModificationTs: data.last_modification_ts,
+        passStartedAt: data.pass_started_at ?? null,
+        passPhase: (data.pass_phase === "removals" ? "removals" : "listings") as SyncPassPhase,
         resumeCursor: data.resume_cursor ?? null,
+        removalCursor: data.removal_cursor ?? null,
       };
     },
 
@@ -38,6 +41,18 @@ export function createSupabaseSyncStore(): SyncStore {
       return rows.length;
     },
 
+    async deleteListings(dataset, listingKeys): Promise<number> {
+      if (listingKeys.length === 0) return 0;
+      // RPC y no `.delete().in()`: una página de bajas trae hasta 2.000 claves, que no
+      // caben en la URL de PostgREST. La función suma también el total acumulado.
+      const { data, error } = await db.rpc("mls_delete_listings", {
+        p_dataset: dataset, p_keys: listingKeys,
+      });
+      // Lanza: una baja que no se aplica deja visible una ficha que ya no debe estarlo.
+      if (error) throw new Error(`no se pudieron borrar listings: ${error.message}`);
+      return typeof data === "number" ? data : 0;
+    },
+
     async commitCursor(dataset, lastModificationTs, recordsSeen): Promise<void> {
       const { error } = await db.from("mls_sync_state").upsert(
         {
@@ -45,6 +60,9 @@ export function createSupabaseSyncStore(): SyncStore {
           last_modification_ts: lastModificationTs,
           // Pasada completa: ya no hay dónde reanudar.
           resume_cursor: null,
+          removal_cursor: null,
+          pass_started_at: null,
+          pass_phase: "listings",
           last_run_at: new Date().toISOString(),
           last_run_status: "ok",
           last_error: null,
@@ -56,9 +74,16 @@ export function createSupabaseSyncStore(): SyncStore {
       if (error) throw new Error(`no se pudo avanzar el cursor: ${error.message}`);
     },
 
-    async saveResumeCursor(dataset, cursor): Promise<void> {
+    async saveProgress(dataset, p): Promise<void> {
       const { error } = await db.from("mls_sync_state").upsert(
-        { dataset, resume_cursor: cursor, updated_at: new Date().toISOString() },
+        {
+          dataset,
+          pass_started_at: p.passStartedAt,
+          pass_phase: p.passPhase,
+          resume_cursor: p.resumeCursor,
+          removal_cursor: p.removalCursor,
+          updated_at: new Date().toISOString(),
+        },
         { onConflict: "dataset" },
       );
       // Sí lanza: perder el cursor significa que la próxima pasada reempieza desde cero,

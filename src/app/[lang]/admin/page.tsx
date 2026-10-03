@@ -4,6 +4,11 @@ import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { SuccessBanner, ErrorBanner } from "@/components/auth-shell";
 import { sendListingApproved } from "@/lib/email";
+import { parseMlsNumber } from "@/lib/listing-mls-number";
+import {
+  ensureEnterMlsNumberTask,
+  mapMlsNumberWriteError,
+} from "@/lib/listing-mls-number.server";
 
 interface PendingListing {
   id: string;
@@ -149,17 +154,36 @@ export default async function AdminPage({
       redirect(`/${lang}/admin?error=not_authorized`);
     }
 
+    // Número de MLS opcional: normalmente la broker da de alta el listing en Matrix
+    // DESPUÉS de aprobarlo, así que si viene vacío se crea la tarea para anotarlo luego.
+    const rawMls = String(formData.get("mls_number") ?? "");
+    const mls = parseMlsNumber(rawMls);
+    if (!mls.ok && mls.reason === "invalid_format") {
+      redirect(`/${lang}/admin?error=mls_number_invalid`);
+    }
+
     const { data: prop, error } = await supabase
       .from("properties")
-      .update({ mls_status: "active" })
+      .update(mls.ok ? { mls_status: "active", mls_number: mls.value } : { mls_status: "active" })
       .eq("id", id)
       .eq("mls_status", "pending_approval")
       .select(
         "id,address_street,address_city,address_state,address_zip,owner_id",
       )
       .maybeSingle();
+    if (mapMlsNumberWriteError(error) === "taken") {
+      redirect(`/${lang}/admin?error=mls_number_taken`);
+    }
     if (error || !prop) {
       redirect(`/${lang}/admin?error=approve_failed`);
+    }
+
+    if (!mls.ok) {
+      await ensureEnterMlsNumberTask(
+        supabase,
+        prop.id,
+        `${prop.address_street}, ${prop.address_city}`,
+      );
     }
 
     // Notify seller (best-effort).
@@ -209,6 +233,16 @@ export default async function AdminPage({
         {sp.error === "approve_failed" && (
           <div className="mb-8">
             <ErrorBanner message={copy.approveFailed} />
+          </div>
+        )}
+        {sp.error === "mls_number_invalid" && (
+          <div className="mb-8">
+            <ErrorBanner message={copy.mlsNumberInvalid} />
+          </div>
+        )}
+        {sp.error === "mls_number_taken" && (
+          <div className="mb-8">
+            <ErrorBanner message={copy.mlsNumberTaken} />
           </div>
         )}
 
@@ -388,8 +422,28 @@ export default async function AdminPage({
                       >
                         Preview public page →
                       </Link>
-                      <form action={approveListing}>
+                      <form
+                        action={approveListing}
+                        className="flex flex-col gap-2 items-start lg:items-end"
+                      >
                         <input type="hidden" name="id" value={p.id} />
+                        <label className="flex flex-col gap-1 lg:items-end">
+                          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                            {copy.mlsNumberLabel}
+                          </span>
+                          <input
+                            name="mls_number"
+                            type="text"
+                            inputMode="text"
+                            autoComplete="off"
+                            spellCheck={false}
+                            placeholder="A11234567"
+                            className="w-40 border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink uppercase focus:outline-none focus:border-gold"
+                          />
+                          <span className="text-[10px] text-ink/50 max-w-[16rem] lg:text-right">
+                            {copy.mlsNumberHint}
+                          </span>
+                        </label>
                         <button
                           type="submit"
                           className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"

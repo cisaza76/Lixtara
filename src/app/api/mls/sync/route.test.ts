@@ -72,6 +72,23 @@ describe("puerta 2 · gate de entorno", () => {
     expect((await GET(pedir(`Bearer ${SECRET}`))).status).toBe(404);
   });
 
+  it("200 solo con MLS_SYNC_ENABLED, sin el flag viejo", async () => {
+    delete process.env.MLS_FEED_ENABLED;
+    process.env.MLS_SYNC_ENABLED = "true";
+    expect((await GET(pedir(`Bearer ${SECRET}`))).status).toBe(200);
+  });
+
+  it("404 si MLS_SYNC_ENABLED está definido y no es \"true\", aunque el viejo lo esté", async () => {
+    process.env.MLS_SYNC_ENABLED = "false";
+    expect((await GET(pedir(`Bearer ${SECRET}`))).status).toBe(404);
+  });
+
+  it("MLS_DISPLAY_ENABLED no abre la sincronización", async () => {
+    delete process.env.MLS_FEED_ENABLED;
+    process.env.MLS_DISPLAY_ENABLED = "true";
+    expect((await GET(pedir(`Bearer ${SECRET}`))).status).toBe(404);
+  });
+
   it("404 y no 403: fuera de producción la ruta no admite que existe", async () => {
     process.env.VERCEL_ENV = "development";
     const r = await GET(pedir(`Bearer ${SECRET}`));

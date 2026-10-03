@@ -22,6 +22,7 @@ import {
   listingAttribution,
   type ListingAttribution,
 } from "@/lib/mls/display-compliance";
+import { normalizeMlsNumber } from "@/lib/listing-mls-number";
 
 /** Lo que el feed aporta a una ficha pública. Proyección de `mls_listings`. */
 export interface MlsPublicRow {
@@ -140,10 +141,7 @@ export function mergePublicListings(
 /**
  * Normaliza un número de MLS para comparar. Anamaria lo teclea a mano desde Matrix, así
  * que puede traer espacios o mayúsculas distintas a las del feed; comparar en crudo
- * fallaría el cruce y la propiedad saldría duplicada.
+ * fallaría el cruce y la propiedad saldría duplicada. La definición vive junto al
+ * validador del panel de admin para que escribir y cruzar usen la MISMA regla.
  */
-export function normalizeMlsNumber(raw: string | null | undefined): string | null {
-  if (typeof raw !== "string") return null;
-  const limpio = raw.replace(/\s+/g, "").toUpperCase();
-  return limpio.length > 0 ? limpio : null;
-}
+export { normalizeMlsNumber };

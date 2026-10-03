@@ -1,11 +1,20 @@
 // Proveedor falso del feed. Lo usa cada test del worker y del cruce de deduplicación:
 // sin red, sin credenciales, determinista.
 //
-// Modela dos comportamientos que el adaptador real SÍ tiene y que son la fuente de los
-// errores difíciles: paginación con cursor, y devolver solo lo modificado después de
-// `since`. Un fake que ignorara ambos dejaría pasar exactamente los bugs que importan.
+// Modela los comportamientos que el adaptador real SÍ tiene y que son la fuente de los
+// errores difíciles: paginación con cursor, devolver solo lo modificado después de
+// `since`, y —sobre todo— el FILTRO DE ESTADO Y TIPO en la consulta. Sin ese filtro el
+// fake entregaría las fichas que pasan a Closed y escondería justo el bug que obliga a
+// tener la consulta de bajas: en el feed real, esas fichas dejan de llegar.
+//
+// `listings` se lee en cada llamada, así que un test puede mutar el arreglo entre
+// invocaciones para simular cambios de estado o borrados en el feed.
 import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
-import type { MlsFeedPage, MlsFeedProvider, ResoListing } from "@/lib/mls/feed-port";
+import type {
+  MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
+} from "@/lib/mls/feed-port";
+import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { SUPPORTED_PROPERTY_TYPES } from "@/lib/mls/coverage";
 
 export interface FakeFeedOptions {
   dataset?: string;
@@ -15,6 +24,18 @@ export interface FakeFeedOptions {
   failOnCall?: number;
 }
 
+/** El `$filter` positivo de estado + tipo que manda el adaptador real. */
+export function passesIngestFilter(l: { StandardStatus?: unknown; PropertyType?: unknown }): boolean {
+  return (PUBLICLY_DISPLAYABLE_STATUSES as readonly unknown[]).includes(l.StandardStatus) &&
+    (SUPPORTED_PROPERTY_TYPES as readonly unknown[]).includes(l.PropertyType);
+}
+
+const modificadoDespuésDe = (l: ResoListing, since: Date | null) => {
+  if (!since) return true;
+  const ts = l.ModificationTimestamp;
+  return typeof ts === "string" && new Date(ts) > since;
+};
+
 export function createFakeFeedProvider(
   listings: ResoListing[],
   opts: FakeFeedOptions = {},
@@ -22,32 +43,53 @@ export function createFakeFeedProvider(
   const pageSize = opts.pageSize ?? 2;
   let calls = 0;
 
-  // Orden ascendente por ModificationTimestamp: el contrato del puerto.
-  const ordenados = [...listings].sort((a, b) =>
+  // Orden ascendente por ModificationTimestamp, recalculado en cada llamada para ver las
+  // mutaciones del test.
+  const ordenados = () => [...listings].sort((a, b) =>
     String(a.ModificationTimestamp ?? "").localeCompare(String(b.ModificationTimestamp ?? "")),
   );
+
+  function paginar<T>(elegibles: T[], cursor: string | null): { pagina: T[]; nextCursor: string | null } {
+    calls += 1;
+    if (opts.failOnCall === calls) throw new Error("fallo inyectado del proveedor");
+    // El cursor es opaco para el llamador; aquí resulta ser un offset.
+    const offset = cursor ? Number.parseInt(cursor, 10) : 0;
+    const siguiente = offset + pageSize;
+    return {
+      pagina: elegibles.slice(offset, siguiente),
+      nextCursor: siguiente < elegibles.length ? String(siguiente) : null,
+    };
+  }
+
+  const proyectar = (l: ResoListing, campos: readonly string[]): ResoKeyRecord =>
+    Object.fromEntries(campos.filter((c) => c in l).map((c) => [c, l[c]])) as ResoKeyRecord;
 
   return {
     dataset: opts.dataset ?? "fake",
     callCount: () => calls,
+
     async fetchModifiedSince(since: Date | null, cursor: string | null): Promise<MlsFeedPage> {
-      calls += 1;
-      if (opts.failOnCall === calls) throw new Error("fallo inyectado del proveedor");
+      const { pagina, nextCursor } = paginar(
+        ordenados().filter((l) => passesIngestFilter(l) && modificadoDespuésDe(l, since)), cursor);
+      return { listings: pagina.map((l) => markAsMlsLicensed(l)), nextCursor };
+    },
 
-      // El cursor es opaco para el llamador; aquí resulta ser un offset.
-      const offset = cursor ? Number.parseInt(cursor, 10) : 0;
-
-      const elegibles = ordenados.filter((l) => {
-        if (!since) return true;
-        const ts = l.ModificationTimestamp;
-        return typeof ts === "string" && new Date(ts) > since;
-      });
-
-      const pagina = elegibles.slice(offset, offset + pageSize);
-      const siguiente = offset + pageSize;
+    async fetchRemovedKeysSince(since: Date, cursor: string | null): Promise<MlsKeyPage> {
+      const { pagina, nextCursor } = paginar(
+        ordenados().filter((l) => !passesIngestFilter(l) && modificadoDespuésDe(l, since)), cursor);
       return {
-        listings: pagina.map((l) => markAsMlsLicensed(l)),
-        nextCursor: siguiente < elegibles.length ? String(siguiente) : null,
+        keys: pagina.map((l) => markAsMlsLicensed(
+          proyectar(l, ["ListingKey", "StandardStatus", "PropertyType"]))),
+        nextCursor,
+      };
+    },
+
+    async fetchDisplayableKeys(cursor: string | null): Promise<MlsKeyPage> {
+      const { pagina, nextCursor } = paginar(ordenados().filter(passesIngestFilter), cursor);
+      return {
+        keys: pagina.map((l) => markAsMlsLicensed(proyectar(l,
+          ["ListingKey", "StandardStatus", "PropertyType", "CountyOrParish", "StateOrProvince"]))),
+        nextCursor,
       };
     },
   };
