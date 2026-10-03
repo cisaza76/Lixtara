@@ -8,11 +8,13 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   DEFAULT_TIER,
+  fillTierCopy,
   formatPrice,
+  type PricingTierId,
 } from "@/lib/pricing-tiers";
-import { PlanQuiz } from "@/components/plan-quiz";
+import { parseQuizPhoto, parseQuizValue } from "@/lib/plan-quiz";
+import { PlanQuiz, type QuizTierDetails } from "@/components/plan-quiz";
 import { SavingsSlider } from "@/components/savings-slider";
-import { SavingsCalculator } from "@/components/savings-calculator";
 import { InvestorClubVolume } from "@/components/investor-club-volume";
 import { RebateSlider } from "@/components/rebate-slider";
 
@@ -34,7 +36,6 @@ export default async function Home({
   const prCopy = t(lang).pricing;
   const quizCopy = t(lang).quiz;
   const savingsCopy = t(lang).savings;
-  const savingsCalcCopy = t(lang).savingsCalc;
   const investorClubCopy = t(lang).investorClub;
   const toursCopy = t(lang).tours;
   const rebateCopy = t(lang).rebate;
@@ -45,10 +46,15 @@ export default async function Home({
   // whether/when to reintroduce it. Copy, component, and admin page are kept.
   const SHOW_INVESTOR_CLUB = false;
 
-  const selectedValue =
-    sp.qv === "under" || sp.qv === "mid" || sp.qv === "over" ? sp.qv : null;
-  const selectedPhoto =
-    sp.qp === "self" || sp.qp === "pro" || sp.qp === "white" ? sp.qp : null;
+  const quizTier = (id: PricingTierId): QuizTierDetails => ({
+    name: prCopy.tiers[id].name,
+    tagline: prCopy.tiers[id].tagline,
+    features: prCopy.tiers[id].features.map((f) => fillTierCopy(f, id)),
+    notIncluded: prCopy.tiers[id].notIncluded,
+  });
+
+  const selectedValue = parseQuizValue(sp.qv);
+  const selectedPhoto = parseQuizPhoto(sp.qp);
 
   const visibleMetrics: Array<{ value: string; label: string }> = [];
   if (BROKER_STATS.salesVolume) {
@@ -314,19 +320,25 @@ export default async function Home({
             photoLabel={quizCopy.photoLabel}
             photoSelf={quizCopy.photoSelf}
             photoPro={quizCopy.photoPro}
-            photoWhite={quizCopy.photoWhite}
+            photoOwn={quizCopy.photoOwn}
             submitLabel={quizCopy.submit}
             resultLabel={quizCopy.resultLabel}
             ctaLabel={quizCopy.ctaLabel}
+            todayLabel={quizCopy.todayLabel}
+            atClosingLabel={quizCopy.atClosingLabel}
+            termLabel={quizCopy.termLabel}
+            includesLabel={quizCopy.includesLabel}
+            notIncludedLabel={quizCopy.notIncludedLabel}
+            notIncludedCommon={quizCopy.notIncludedCommon}
             whyByTier={{
               essentials: quizCopy.essentialsWhy,
               pro: quizCopy.proWhy,
               concierge: quizCopy.conciergeWhy,
             }}
-            tierNames={{
-              essentials: prCopy.tiers.essentials.name,
-              pro: prCopy.tiers.pro.name,
-              concierge: prCopy.tiers.concierge.name,
+            tiers={{
+              essentials: quizTier("essentials"),
+              pro: quizTier("pro"),
+              concierge: quizTier("concierge"),
             }}
             selectedValue={selectedValue}
             selectedPhoto={selectedPhoto}
@@ -354,39 +366,6 @@ export default async function Home({
               pro: prCopy.tiers.pro.name,
               concierge: prCopy.tiers.concierge.name,
             }}
-          />
-        </div>
-      </section>
-
-      <section
-        id="calculate-savings"
-        className="border-t border-gold-soft scroll-mt-20"
-      >
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
-          <SavingsCalculator
-            lang={lang}
-            eyebrow={savingsCalcCopy.eyebrow}
-            titleBefore={savingsCalcCopy.titleBefore}
-            titleAccent={savingsCalcCopy.titleAccent}
-            titleAfter={savingsCalcCopy.titleAfter}
-            body={savingsCalcCopy.body}
-            planLabel={savingsCalcCopy.planLabel}
-            priceLabel={savingsCalcCopy.priceLabel}
-            buyerCommissionLabel={savingsCalcCopy.buyerCommissionLabel}
-            buyerCommissionRecommended={savingsCalcCopy.buyerCommissionRecommended}
-            traditionalHeader={savingsCalcCopy.traditionalHeader}
-            lixtaraHeader={savingsCalcCopy.lixtaraHeader}
-            youSaveLabel={savingsCalcCopy.youSaveLabel}
-            ctaLabel={savingsCalcCopy.ctaLabel}
-            tierNames={{
-              essentials: prCopy.tiers.essentials.name,
-              pro: prCopy.tiers.pro.name,
-              concierge: prCopy.tiers.concierge.name,
-            }}
-            infoAriaLabel={savingsCalcCopy.infoAriaLabel}
-            tipTraditional={savingsCalcCopy.tipTraditional}
-            tipLixtara={savingsCalcCopy.tipLixtara}
-            tipYouSave={savingsCalcCopy.tipYouSave}
           />
         </div>
       </section>
@@ -467,7 +446,9 @@ export default async function Home({
                   </p>
 
                   <ul className="flex flex-col gap-3 text-sm leading-snug flex-1">
-                    {tCopy.features.map((feat) => (
+                    {tCopy.features.map((rawFeat) => {
+                      const feat = fillTierCopy(rawFeat, id);
+                      return (
                       <li key={feat} className="flex items-start gap-3">
                         <span
                           aria-hidden
@@ -481,7 +462,8 @@ export default async function Home({
                           {feat}
                         </span>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
 
                   <Link

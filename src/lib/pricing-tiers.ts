@@ -61,8 +61,69 @@ export function tierSavingsVsTraditional(
   tierId: PricingTierId,
   salePrice: number,
 ): number {
-  const traditional = salePrice * 0.06;
+  const traditional =
+    (salePrice *
+      (TRADITIONAL_COSTS.listingCommissionPct +
+        TRADITIONAL_COSTS.buyerCommissionPct)) /
+    100;
   return Math.max(0, traditional - tierTotalCost(tierId, salePrice));
+}
+
+export interface TierCostBreakdown {
+  /** due at listing — the Lixtara flat fee only */
+  upfront: number;
+  /** Lixtara listing-side commission, paid from proceeds only if the home sells */
+  sellerCommission: number;
+  /** buyer-agent commission the seller offers, paid from proceeds at closing */
+  buyerCommission: number;
+  /** sellerCommission + buyerCommission */
+  closing: number;
+  total: number;
+}
+
+// Cost of selling with a Lixtara tier, split by WHEN it is paid. Only the flat
+// fee is charged upfront (Stripe checkout); every commission comes out of the
+// sale proceeds at closing, so it is owed only if the property sells.
+export function tierCostBreakdown(
+  tierId: PricingTierId,
+  salePrice: number,
+  buyerCommissionPct: number,
+): TierCostBreakdown {
+  const t = PRICING_TIERS[tierId];
+  const sellerCommission = (salePrice * t.commissionPct) / 100;
+  const buyerCommission = (salePrice * buyerCommissionPct) / 100;
+  const closing = sellerCommission + buyerCommission;
+  return {
+    upfront: t.flatFee,
+    sellerCommission,
+    buyerCommission,
+    closing,
+    total: t.flatFee + closing,
+  };
+}
+
+// Fills tier placeholders in copy strings so dictionaries never hardcode
+// prices: {commissionPct}, {flatFee}, {termMonths}.
+export function fillTierCopy(text: string, tierId: PricingTierId): string {
+  const t = PRICING_TIERS[tierId];
+  return text
+    .replaceAll("{commissionPct}", String(t.commissionPct))
+    .replaceAll("{flatFee}", String(t.flatFee))
+    .replaceAll("{termMonths}", String(t.termMonths));
+}
+
+// Fills the per-tier commission placeholders used in comparison copy:
+// {essentials}, {pro}, {concierge} → that tier's commission %, and
+// {traditional} → the traditional listing-side commission %.
+export function fillCommissionCopy(text: string): string {
+  return text
+    .replaceAll("{essentials}", String(PRICING_TIERS.essentials.commissionPct))
+    .replaceAll("{pro}", String(PRICING_TIERS.pro.commissionPct))
+    .replaceAll("{concierge}", String(PRICING_TIERS.concierge.commissionPct))
+    .replaceAll(
+      "{traditional}",
+      String(TRADITIONAL_COSTS.listingCommissionPct),
+    );
 }
 
 export function formatPrice(amount: number): string {

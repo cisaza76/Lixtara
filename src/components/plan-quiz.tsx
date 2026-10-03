@@ -1,5 +1,19 @@
 import Link from "next/link";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
+import {
+  recommendTier,
+  type QuizPhoto,
+  type QuizValue,
+} from "@/lib/plan-quiz";
+
+export interface QuizTierDetails {
+  name: string;
+  tagline: string;
+  /** feature lines, tier placeholders already filled */
+  features: readonly string[];
+  /** what this tier does NOT include */
+  notIncluded: readonly string[];
+}
 
 interface PlanQuizProps {
   lang: string;
@@ -10,26 +24,20 @@ interface PlanQuizProps {
   photoLabel: string;
   photoSelf: string;
   photoPro: string;
-  photoWhite: string;
+  photoOwn: string;
   submitLabel: string;
   resultLabel: string;
   ctaLabel: string;
+  todayLabel: string;
+  atClosingLabel: string;
+  termLabel: string;
+  includesLabel: string;
+  notIncludedLabel: string;
+  notIncludedCommon: string;
   whyByTier: Record<PricingTierId, string>;
-  tierNames: Record<PricingTierId, string>;
-  selectedValue: string | null;
-  selectedPhoto: string | null;
-}
-
-function recommend(
-  valueBucket: string | null,
-  photoChoice: string | null,
-): PricingTierId | null {
-  if (!valueBucket || !photoChoice) return null;
-  if (photoChoice === "white") return "concierge";
-  if (photoChoice === "self") return "essentials";
-  if (valueBucket === "over") return "concierge";
-  if (valueBucket === "mid") return "pro";
-  return "pro";
+  tiers: Record<PricingTierId, QuizTierDetails>;
+  selectedValue: QuizValue | null;
+  selectedPhoto: QuizPhoto | null;
 }
 
 export function PlanQuiz({
@@ -41,16 +49,22 @@ export function PlanQuiz({
   photoLabel,
   photoSelf,
   photoPro,
-  photoWhite,
+  photoOwn,
   submitLabel,
   resultLabel,
   ctaLabel,
+  todayLabel,
+  atClosingLabel,
+  termLabel,
+  includesLabel,
+  notIncludedLabel,
+  notIncludedCommon,
   whyByTier,
-  tierNames,
+  tiers,
   selectedValue,
   selectedPhoto,
 }: PlanQuizProps) {
-  const recommended = recommend(selectedValue, selectedPhoto);
+  const recommended = recommendTier(selectedValue, selectedPhoto);
 
   return (
     <form
@@ -99,7 +113,7 @@ export function PlanQuiz({
             [
               { id: "self", label: photoSelf },
               { id: "pro", label: photoPro },
-              { id: "white", label: photoWhite },
+              { id: "own", label: photoOwn },
             ] as const
           ).map((opt) => (
             <label
@@ -140,22 +154,72 @@ export function PlanQuiz({
             <span className="text-[10px] uppercase tracking-[0.22em] text-ink/55">
               {resultLabel}
             </span>
-            <h3 className="font-display text-4xl text-ink leading-none">
-              {tierNames[recommended]}
-            </h3>
-            <div className="font-display italic text-2xl text-ink">
-              <span className="text-gold text-base align-top">$</span>
-              {PRICING_TIERS[recommended].flatFee}
-              <span className="text-xs uppercase tracking-[0.18em] text-ink/55 not-italic font-sans ml-2">
-                + {PRICING_TIERS[recommended].commissionPct}%
-              </span>
+            <div className="flex flex-col gap-1">
+              <h3 className="font-display text-4xl text-ink leading-none">
+                {tiers[recommended].name}
+              </h3>
+              <p className="text-sm text-ink/60">{tiers[recommended].tagline}</p>
             </div>
-            <p className="text-sm text-ink/70 leading-relaxed border-t border-gold-soft pt-4">
+            <dl className="grid grid-cols-2 gap-4 border-y border-gold-soft py-4">
+              <div className="flex flex-col gap-1">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {todayLabel}
+                </dt>
+                <dd className="font-display italic text-2xl text-ink leading-none">
+                  <span className="text-gold text-base align-top">$</span>
+                  {PRICING_TIERS[recommended].flatFee}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {atClosingLabel}
+                </dt>
+                <dd className="font-display italic text-2xl text-ink leading-none">
+                  {PRICING_TIERS[recommended].commissionPct}%
+                </dd>
+              </div>
+              <p className="col-span-2 text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                {termLabel}
+              </p>
+            </dl>
+            <p className="text-sm text-ink/70 leading-relaxed">
               {whyByTier[recommended]}
             </p>
+            <div className="flex flex-col gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                {includesLabel}
+              </span>
+              <ul className="flex flex-col gap-1.5 text-sm leading-snug">
+                {tiers[recommended].features.map((f) => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <span aria-hidden className="text-gold mt-0.5 leading-none">
+                      •
+                    </span>
+                    <span className="text-ink/80">{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
+                {notIncludedLabel}
+              </span>
+              <ul className="flex flex-col gap-1.5 text-sm leading-snug">
+                {[...tiers[recommended].notIncluded, notIncludedCommon].map(
+                  (f) => (
+                    <li key={f} className="flex items-start gap-2.5">
+                      <span aria-hidden className="text-ink/40 mt-0.5 leading-none">
+                        –
+                      </span>
+                      <span className="text-ink/60">{f}</span>
+                    </li>
+                  ),
+                )}
+              </ul>
+            </div>
             <Link
               href={`/${lang}/listing/new?suggested_tier=${recommended}`}
-              className="mt-auto inline-flex items-center justify-center px-6 py-3 border border-gold text-ink text-[11px] font-medium tracking-[0.2em] uppercase hover:bg-gold transition-colors"
+              className="mt-2 inline-flex items-center justify-center px-6 py-3 bg-ink text-ivory text-[11px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
             >
               {ctaLabel}
             </Link>

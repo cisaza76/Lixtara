@@ -2,9 +2,10 @@
 
 // Radical Transparency calculator — full per-tier cost breakdown:
 //   - Home value slider + buyer-agent commission selector (2 / 2.5 / 3 %)
-//   - UPFRONT costs: listing fee, your commission, professional photos,
-//     DocuSign contracts, subtotal
-//   - CLOSING costs: buyer-agent commission, subtotal
+//   - UPFRONT costs: listing fee, professional photos, DocuSign contracts,
+//     subtotal. On Lixtara this is ONLY the flat fee (what Stripe charges).
+//   - CLOSING costs: your (listing-side) commission + buyer-agent commission,
+//     subtotal — paid from sale proceeds, so only if the home sells
 //   - Total cost + you-save-vs-traditional + a dynamic key-insight callout
 //
 // The buyer-agent commission applies to BOTH columns (you offer it either way),
@@ -17,6 +18,8 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   TRADITIONAL_COSTS,
+  fillCommissionCopy,
+  tierCostBreakdown,
 } from "@/lib/pricing-tiers";
 import { InfoTip } from "@/components/info-tip";
 
@@ -27,6 +30,7 @@ interface SavingsCopy {
   youSelected: string;
   upfrontHeader: string;
   closingHeader: string;
+  upfrontLegend: string;
   lineListingFee: string;
   lineSellerCommission: string;
   linePhotos: string;
@@ -73,6 +77,7 @@ interface Column {
   docusign: number | null;
   upfront: number;
   buyer: number;
+  closing: number;
   /** the buyer-agent % shown for this column (traditional is fixed; tiers follow the slider) */
   buyerPctShown: number;
   total: number;
@@ -87,16 +92,17 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
   const [price, setPrice] = useState(500_000);
   const [buyerPct, setBuyerPct] = useState(3);
 
-  const buyerComm = price * (buyerPct / 100);
   // Traditional buyer-agent commission is the FIXED 3% benchmark — it must NOT
   // move with the slider. The slider only changes what YOU offer on Lixtara;
   // the traditional column stays put so the comparison is a stable comparable.
   const tradBuyerComm = price * (TRADITIONAL_COSTS.buyerCommissionPct / 100);
 
   const tradSellerComm = price * (TRADITIONAL_COSTS.listingCommissionPct / 100);
-  const tradUpfront =
-    tradSellerComm + TRADITIONAL_COSTS.photography + TRADITIONAL_COSTS.docContracts;
-  const tradTotal = tradUpfront + tradBuyerComm;
+  // A traditional agent's commission is also paid from proceeds at closing;
+  // only photo + document fees are out of pocket at listing.
+  const tradUpfront = TRADITIONAL_COSTS.photography + TRADITIONAL_COSTS.docContracts;
+  const tradClosing = tradSellerComm + tradBuyerComm;
+  const tradTotal = tradUpfront + tradClosing;
 
   const columns: Column[] = [
     {
@@ -111,30 +117,31 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
       docusign: TRADITIONAL_COSTS.docContracts,
       upfront: tradUpfront,
       buyer: tradBuyerComm,
+      closing: tradClosing,
       buyerPctShown: TRADITIONAL_COSTS.buyerCommissionPct,
       total: tradTotal,
       savings: 0,
     },
     ...TIER_ORDER.map((id): Column => {
       const tier = PRICING_TIERS[id];
-      const sellerComm = price * (tier.commissionPct / 100);
-      const upfront = tier.flatFee + sellerComm; // photos + docusign are $0
-      const total = upfront + buyerComm;
+      // photos + docusign are $0 on Lixtara, so upfront is the flat fee only
+      const cost = tierCostBreakdown(id, price, buyerPct);
       return {
         key: id,
         label: tierNames[id],
         isTraditional: false,
         listingFee: tier.flatFee,
-        sellerComm,
+        sellerComm: cost.sellerCommission,
         sellerPct: tier.commissionPct,
         photos: null,
         photosText: tier.includesPhotography ? copy.included : copy.photoDiy,
         docusign: null,
-        upfront,
-        buyer: buyerComm,
+        upfront: cost.upfront,
+        buyer: cost.buyerCommission,
+        closing: cost.closing,
         buyerPctShown: buyerPct,
-        total,
-        savings: tradTotal - total,
+        total: cost.total,
+        savings: tradTotal - cost.total,
       };
     }),
   ];
@@ -216,6 +223,10 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
       </div>
 
       {/* Comparison table */}
+      <div className="flex flex-col gap-3">
+      <p className="border-l-2 border-gold pl-3 text-xs text-ink/70 leading-relaxed">
+        {copy.upfrontLegend}
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm border border-gold-soft">
           <thead>
@@ -246,21 +257,6 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
               {columns.map((c) => (
                 <td key={c.key} className={moneyCell}>
                   {usd(c.listingFee)}
-                </td>
-              ))}
-            </tr>
-            <tr className="border-t border-gold-soft/60">
-              <td className={labelCell}>
-                {copy.lineSellerCommission}{" "}
-                <InfoTip
-                  label={copy.infoAriaLabel}
-                  text={copy.tipSellerCommission}
-                />
-              </td>
-              {columns.map((c) => (
-                <td key={c.key} className={moneyCell}>
-                  {usd(c.sellerComm)}
-                  <span className={pctTag}>({c.sellerPct}%)</span>
                 </td>
               ))}
             </tr>
@@ -317,6 +313,21 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
             </tr>
             <tr className="border-t border-gold-soft/60">
               <td className={labelCell}>
+                {copy.lineSellerCommission}{" "}
+                <InfoTip
+                  label={copy.infoAriaLabel}
+                  text={fillCommissionCopy(copy.tipSellerCommission)}
+                />
+              </td>
+              {columns.map((c) => (
+                <td key={c.key} className={moneyCell}>
+                  {usd(c.sellerComm)}
+                  <span className={pctTag}>({c.sellerPct}%)</span>
+                </td>
+              ))}
+            </tr>
+            <tr className="border-t border-gold-soft/60">
+              <td className={labelCell}>
                 {copy.lineBuyerCommission}{" "}
                 <InfoTip
                   label={copy.infoAriaLabel}
@@ -343,7 +354,7 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
               </td>
               {columns.map((c) => (
                 <td key={c.key} className="p-3 text-right text-ink font-medium">
-                  {usd(c.buyer)}
+                  {usd(c.closing)}
                 </td>
               ))}
             </tr>
@@ -384,6 +395,7 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
             </tr>
           </tbody>
         </table>
+      </div>
       </div>
 
       {/* Key insight */}

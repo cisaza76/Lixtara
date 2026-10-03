@@ -19,6 +19,7 @@ import {
 import {
   PRICING_TIERS,
   TIER_ORDER,
+  fillTierCopy,
   type PricingTierId,
 } from "@/lib/pricing-tiers";
 import {
@@ -1430,7 +1431,9 @@ export default async function ListingNewPage({
                               <span aria-hidden className="text-gold mt-0.5 leading-none">
                                 •
                               </span>
-                              <span className="text-ink/80">{f}</span>
+                              <span className="text-ink/80">
+                                {fillTierCopy(f, tierId)}
+                              </span>
                             </li>
                           ))}
                         </ul>
