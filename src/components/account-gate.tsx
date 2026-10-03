@@ -9,6 +9,7 @@
 // Framed as "secure your listing", not "sign up" — the value is already built.
 
 import { useEffect, useState } from "react";
+import { TurnstileWidget } from "@/components/turnstile-widget";
 
 interface AccountGateLabels {
   createEyebrow: string;
@@ -36,6 +37,7 @@ interface AccountGateLabels {
   resendDone: string;
   errResendLimit: string;
   errResendFailed: string;
+  errCaptcha: string;
   errName: string;
   errEmail: string;
   errPassword: string;
@@ -53,6 +55,7 @@ interface AccountGateProps {
   registerAction: (formData: FormData) => Promise<void>;
   verifyAction: (formData: FormData) => Promise<void>;
   resendAction: (formData: FormData) => Promise<void>;
+  lang: string;
   draftId: string;
   pendingEmail: string | null;
   error: string | null;
@@ -67,6 +70,7 @@ export function AccountGate({
   registerAction,
   verifyAction,
   resendAction,
+  lang,
   draftId,
   pendingEmail,
   error,
@@ -80,6 +84,7 @@ export function AccountGate({
         email={pendingEmail}
         verifyAction={verifyAction}
         resendAction={resendAction}
+        lang={lang}
         draftId={draftId}
         codeError={codeError}
         resentAt={resentAt}
@@ -239,6 +244,7 @@ function ConfirmEmail({
   email,
   verifyAction,
   resendAction,
+  lang,
   draftId,
   codeError,
   resentAt,
@@ -247,6 +253,7 @@ function ConfirmEmail({
   email: string;
   verifyAction: (formData: FormData) => Promise<void>;
   resendAction: (formData: FormData) => Promise<void>;
+  lang: string;
   draftId: string;
   codeError: string | null;
   resentAt: number | null;
@@ -280,7 +287,9 @@ function ConfirmEmail({
           ? labels.errResendLimit
           : codeError === "resend_failed"
             ? labels.errResendFailed
-            : null;
+            : codeError === "captcha"
+              ? labels.errCaptcha
+              : null;
 
   // Solo se anuncia el reenvío exitoso: si hubo error, manda el mensaje de error.
   const reenviado = Boolean(resentAt) && !codeError;
@@ -348,6 +357,9 @@ function ConfirmEmail({
           es válido en HTML; formNoValidate evita que el campo `required` del
           código bloquee el envío cuando justamente no se tiene el código. */}
       <div className="flex flex-col gap-2 border-t border-gold-soft pt-4">
+        {/* Token for the resend (captcha-protected in Supabase Auth). The
+            verify submit ignores it — /verify is not captcha-protected. */}
+        <TurnstileWidget lang={lang} />
         {reenviado && (
           <p role="status" className="text-sm text-ink/80">
             {labels.resendDone}{" "}

@@ -15,3 +15,13 @@ export const BROKERAGE_YEARS = 20;
 
 export const BROKER_OF_RECORD = BROKERAGE.brokerName;
 export const BROKER_OF_RECORD_LICENSE = BROKERAGE.brokerLicense;
+
+// ── CAN-SPAM sender identity (commercial email) ─────────────────────────────
+// OWNER: fill both before any marketing / funnel email can go out. While either
+// is empty, sendCommercialEmail() (src/lib/email.ts) refuses to send — the
+// check is in code (src/lib/email-compliance.ts), not just this comment.
+// - BROKERAGE_LEGAL_NAME: the registered legal entity name (as on Sunbiz/DBPR).
+// - BROKERAGE_POSTAL_ADDRESS: a valid physical postal address — street address,
+//   USPS-registered PO box, or a registered commercial mail receiving agency.
+export const BROKERAGE_LEGAL_NAME = "";
+export const BROKERAGE_POSTAL_ADDRESS = "";
