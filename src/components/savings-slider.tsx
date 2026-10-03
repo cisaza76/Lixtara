@@ -18,7 +18,6 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   TRADITIONAL_COSTS,
-  fillCommissionCopy,
   tierCostBreakdown,
 } from "@/lib/pricing-tiers";
 import { InfoTip } from "@/components/info-tip";
@@ -316,7 +315,7 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
                 {copy.lineSellerCommission}{" "}
                 <InfoTip
                   label={copy.infoAriaLabel}
-                  text={fillCommissionCopy(copy.tipSellerCommission)}
+                  text={copy.tipSellerCommission}
                 />
               </td>
               {columns.map((c) => (

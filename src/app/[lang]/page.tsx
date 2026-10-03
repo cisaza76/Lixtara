@@ -362,7 +362,12 @@ export default async function Home({
             {savingsCopy.body}
           </p>
           <SavingsSlider
-            copy={savingsCopy}
+            copy={{
+              ...savingsCopy,
+              tipSellerCommission: fillCommissionCopy(
+                savingsCopy.tipSellerCommission,
+              ),
+            }}
             tierNames={{
               essentials: prCopy.tiers.essentials.name,
               pro: prCopy.tiers.pro.name,
