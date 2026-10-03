@@ -55,6 +55,14 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   All new strings and identifiers use Lixtara. When porting from Lovable, rename `NEXXOS_*`
   → `LIXTARA_*` constants.
 
+### Brokerage & licenses
+- Legal name, brokerage license (CQ), broker of record and her license (BK), and the
+  registered address live in **one** module: `src/config/brokerage.ts` (verified in the FL
+  DBPR, 2026-09-27). Never hardcode a license number or the broker's name — import from
+  there (`brokerageLicenseLine(lang)` for footers/emails). `src/config/brokerage.test.ts`
+  fails on any other `CQ`/`BK`/`SL` number, on another spelling of the broker's name, and on
+  the old Nexxos Realty number.
+
 ### Pricing
 - Pricing tiers live in **one** module: `src/lib/pricing-tiers.ts`. Never hardcode
   `199`, `495`, `995` in components — import from there (and Stripe amounts derive from it).

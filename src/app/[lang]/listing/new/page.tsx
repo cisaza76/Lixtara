@@ -19,6 +19,8 @@ import {
 import {
   PRICING_TIERS,
   TIER_ORDER,
+  fillPricingCopy,
+  fillTierCopy,
   type PricingTierId,
 } from "@/lib/pricing-tiers";
 import {
@@ -1430,7 +1432,9 @@ export default async function ListingNewPage({
                               <span aria-hidden className="text-gold mt-0.5 leading-none">
                                 •
                               </span>
-                              <span className="text-ink/80">{f}</span>
+                              <span className="text-ink/80">
+                                {fillTierCopy(f, tierId)}
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -2060,7 +2064,7 @@ export default async function ListingNewPage({
                 {copy.step5.proIncludedTitle}
               </p>
               <p className="text-sm text-ink/80 leading-relaxed">
-                {copy.step5.proIncludedBody}
+                {fillPricingCopy(copy.step5.proIncludedBody)}
               </p>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/70 pt-2 border-t border-gold-soft">
                 {copy.step5.proPhotosOr}
@@ -2082,13 +2086,13 @@ export default async function ListingNewPage({
                 {copy.step5.photoAddon.title}
               </p>
               <p className="text-sm text-ink/80 leading-relaxed">
-                {copy.step5.photoAddon.body}
+                {fillPricingCopy(copy.step5.photoAddon.body)}
               </p>
               <div className="border-t border-gold-soft pt-3">
                 <PhotographyCheckoutButton
                   propertyId={draftId}
                   lang={lang}
-                  label={copy.step5.photoAddon.cta}
+                  label={fillPricingCopy(copy.step5.photoAddon.cta)}
                   labels={{
                     redirecting: copy.step5.photoAddon.redirecting,
                     failed: copy.step5.photoAddon.failed,

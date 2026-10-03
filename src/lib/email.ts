@@ -12,6 +12,7 @@
 // fail just because the email send did. We log errors instead.
 
 import { Resend } from "resend";
+import { BROKERAGE, brokerageLicenseLine } from "@/config/brokerage";
 
 let _client: Resend | null = null;
 function client(): Resend | null {
@@ -80,7 +81,8 @@ function shell(opts: { preheader: string; body: string }): string {
       </td></tr>
       <tr><td style="padding:32px;">${opts.body}</td></tr>
       <tr><td style="padding:20px 32px;border-top:1px solid #ece6d6;font-size:11px;color:#8a8268;line-height:1.6;">
-        Lixtara · Miami, Florida · Licensed Florida Brokerage · Lic #CQ1075352<br>
+        ${brokerageLicenseLine("en")}<br>
+        ${BROKERAGE.address}<br>
         <a href="https://lixtara.vercel.app" style="color:#a18943;text-decoration:none;">lixtara.com</a>
       </td></tr>
     </table>
