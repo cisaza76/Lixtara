@@ -42,6 +42,17 @@ export const TIER_ORDER: PricingTierId[] = ["essentials", "pro", "concierge"];
 
 export const DEFAULT_TIER: PricingTierId = "pro";
 
+// Home-value buckets for the "Find your plan" quiz (USD). The quiz only
+// RECOMMENDS a plan — the seller can still pick any plan on the listing form.
+// A seller who wants professional photos and whose home is worth more than
+// `conciergeMin` is pointed to Concierge; below it, to Pro.
+export const QUIZ_HOME_VALUE_THRESHOLDS = {
+  /** lower bound of the middle bucket */
+  midMin: 300_000,
+  /** above this, the quiz recommends Concierge (for pro-photo sellers) */
+  conciergeMin: 700_000,
+} as const;
+
 // Sale price used in illustrative copy (e.g. the FAQ cost comparison).
 export const EXAMPLE_SALE_PRICE = 500_000;
 
@@ -117,12 +128,17 @@ export function fillTierCopy(text: string, tierId: PricingTierId): string {
   );
 }
 
+function formatThousands(amount: number): string {
+  return `$${amount / 1000}K`;
+}
+
 // Fills catalog-wide placeholders so dictionaries never hardcode amounts:
 //   {photoAddonPrice}       → "$495"   (PHOTOGRAPHY_ADDON_PRICE)
 //   {proFlatFee}            → "$495"   {proCommissionPct} → "1"
 //   {exampleSalePrice}      → "$500,000"
 //   {traditionalExample}    → 6% (listing + buyer) of the example price
 //   {proTotalExample}       → Pro flat fee + Pro commission on the example price
+//   {quizMidMin} / {quizConciergeMin} → "$300K" / "$700K"
 export function fillPricingCopy(text: string): string {
   const traditionalPct =
     TRADITIONAL_COSTS.listingCommissionPct + TRADITIONAL_COSTS.buyerCommissionPct;
@@ -138,6 +154,11 @@ export function fillPricingCopy(text: string): string {
     .replaceAll(
       "{proTotalExample}",
       formatPrice(tierTotalCost("pro", EXAMPLE_SALE_PRICE)),
+    )
+    .replaceAll("{quizMidMin}", formatThousands(QUIZ_HOME_VALUE_THRESHOLDS.midMin))
+    .replaceAll(
+      "{quizConciergeMin}",
+      formatThousands(QUIZ_HOME_VALUE_THRESHOLDS.conciergeMin),
     );
 }
 

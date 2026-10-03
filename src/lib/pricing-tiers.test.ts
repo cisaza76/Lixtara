@@ -11,6 +11,7 @@ import {
   fillTierCopy,
   fillCommissionCopy,
   fillPricingCopy,
+  QUIZ_HOME_VALUE_THRESHOLDS,
 } from "@/lib/pricing-tiers";
 
 describe("PRICING_TIERS catalog", () => {
@@ -133,6 +134,13 @@ describe("fillPricingCopy", () => {
         "up to {traditionalExample} on a {exampleSalePrice} home; {proFlatFee} flat plus {proCommissionPct}% ({proTotalExample} total)",
       ),
     ).toBe("up to $30,000 on a $500,000 home; $495 flat plus 1% ($5,495 total)");
+  });
+
+  it("formats the quiz home-value thresholds", () => {
+    expect(QUIZ_HOME_VALUE_THRESHOLDS.conciergeMin).toBe(700_000);
+    expect(fillPricingCopy("{quizMidMin} – {quizConciergeMin}")).toBe(
+      "$300K – $700K",
+    );
   });
 
   it("is applied by fillTierCopy too (tier features mention the add-on value)", () => {

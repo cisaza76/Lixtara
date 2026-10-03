@@ -316,9 +316,9 @@ export default async function Home({
           <PlanQuiz
             lang={lang}
             valueLabel={quizCopy.valueLabel}
-            valueUnder={quizCopy.valueUnder}
-            valueMid={quizCopy.valueMid}
-            valueOver={quizCopy.valueOver}
+            valueUnder={fillPricingCopy(quizCopy.valueUnder)}
+            valueMid={fillPricingCopy(quizCopy.valueMid)}
+            valueOver={fillPricingCopy(quizCopy.valueOver)}
             photoLabel={quizCopy.photoLabel}
             photoSelf={quizCopy.photoSelf}
             photoPro={quizCopy.photoPro}

@@ -25,6 +25,9 @@ export function parseQuizPhoto(v: string | undefined): QuizPhoto | null {
 // Sellers who shoot (or already have) their own photos fit Essentials.
 // Sellers who want a professional shoot fit Pro, or Concierge for higher-value
 // homes where premium photos + drone and dedicated broker support pay back.
+// "over" means above QUIZ_HOME_VALUE_THRESHOLDS.conciergeMin (pricing-tiers.ts).
+// This is only a recommendation: the CTA pre-selects the tier via
+// ?suggested_tier=, and the seller can still pick any plan in listing step 2.
 export function recommendTier(
   value: QuizValue | null,
   photo: QuizPhoto | null,
