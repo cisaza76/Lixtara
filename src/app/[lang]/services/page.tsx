@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { isLocale, t } from "@/lib/i18n";
+import { fillPricingCopy } from "@/lib/pricing-tiers";
 
 export default async function ServicesPage({
   params,
@@ -42,7 +43,7 @@ export default async function ServicesPage({
                 {item.name}
               </p>
               <p className="mb-4 font-display text-2xl italic text-gold">
-                {item.price}
+                {fillPricingCopy(item.price)}
               </p>
               <p className="flex-1 text-sm leading-relaxed text-ink/70">
                 {item.body}

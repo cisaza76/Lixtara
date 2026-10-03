@@ -140,7 +140,7 @@ export const dictionaries = {
           features: [
             "Full home.com listing (Florida)",
             "Syndication to 100+ sites (Zillow, Realtor.com, Redfin)",
-            "Professional photography ($495 value, included)",
+            "Professional photography ({photoAddonPrice} value, included)",
             "Broker compliance & strategy call (30 min)",
             "Priority home.com listing (within 48h)",
             "Enhanced home.com description review",
@@ -422,7 +422,7 @@ export const dictionaries = {
         title: "Add photos.",
         body: "Upload at least 10 high-quality photos. JPG, PNG, or WebP, max 10MB each.",
         proIncludedTitle: "✓ Professional Photography Included",
-        proIncludedBody: "Your plan includes a professional photo session ($495 value). We'll reach out within 24 hours after your listing is approved to schedule the shoot. For now, upload at least 5 phone photos so your listing is ready to review. Phone photos are temporary — pro photos replace them.",
+        proIncludedBody: "Your plan includes a professional photo session ({photoAddonPrice} value). We'll reach out within 24 hours after your listing is approved to schedule the shoot. For now, upload at least 5 phone photos so your listing is ready to review. Phone photos are temporary — pro photos replace them.",
         proPhotosOr: "OR upload your own photos below:",
         ownershipTitle: "📷 Photo Ownership Disclaimer",
         ownershipIntro: "By uploading these photos, I confirm that:",
@@ -508,8 +508,8 @@ export const dictionaries = {
         photosOptionalPro: "Your plan includes professional photography, so uploading photos here is optional — you can continue without them and our photographer will handle it.",
         photoAddon: {
           title: "Add professional photography",
-          body: "Your Essentials plan doesn't include professional photos. Add a professional listing photoshoot for $495 — included free on Pro and Concierge.",
-          cta: "Add photography — $495",
+          body: "Your Essentials plan doesn't include professional photos. Add a professional listing photoshoot for {photoAddonPrice} — included free on Pro and Concierge.",
+          cta: "Add photography — {photoAddonPrice}",
           redirecting: "Redirecting to checkout…",
           failed: "Something went wrong. Please try again.",
         },
@@ -932,7 +932,7 @@ export const dictionaries = {
       items: [
         {
           name: "Professional photography",
-          price: "$495",
+          price: "{photoAddonPrice}",
           body: "A professional listing photoshoot — included free on Pro and Concierge, or add it to any listing.",
           cta: "Add in your listing",
         },
@@ -1345,7 +1345,7 @@ export const dictionaries = {
         },
         {
           q: "How is Lixtara different from a traditional 6% agent?",
-          a: "A traditional agent charges 5–6% commission ($30,000 on a $500K home). Lixtara's Pro tier charges $495 flat plus 1% ($5,495 total on a $500K home). Same home.com exposure, same licensed broker support — you keep the difference.",
+          a: "A traditional agent charges 5–6% commission (up to {traditionalExample} on a {exampleSalePrice} home). Lixtara's Pro tier charges {proFlatFee} flat plus {proCommissionPct}% ({proTotalExample} total on a {exampleSalePrice} home). Same home.com exposure, same licensed broker support — you keep the difference.",
         },
         {
           q: "Which tier should I pick?",
@@ -1503,7 +1503,7 @@ export const dictionaries = {
           features: [
             "Listing completo en home.com (Florida)",
             "Sindicación a 100+ sitios (Zillow, Realtor.com, Redfin)",
-            "Fotografía profesional (valor $495, incluida)",
+            "Fotografía profesional (valor {photoAddonPrice}, incluida)",
             "Strategy call con broker (30 min)",
             "Listing home.com prioritario (en 48h)",
             "Revisión enhanced de la descripción en home.com",
@@ -1785,7 +1785,7 @@ export const dictionaries = {
         title: "Agrega fotos.",
         body: "Sube al menos 10 fotos de buena calidad. JPG, PNG o WebP, máximo 10MB cada una.",
         proIncludedTitle: "✓ Fotografía Profesional Incluida",
-        proIncludedBody: "Tu plan incluye una sesión de fotografía profesional (valor $495). Te contactaremos dentro de 24 horas después que tu listado sea aprobado para agendar la sesión. Por ahora, sube al menos 5 fotos con celular para que tu listado esté listo para review. Las fotos de celular son temporales — las pro las reemplazan.",
+        proIncludedBody: "Tu plan incluye una sesión de fotografía profesional (valor {photoAddonPrice}). Te contactaremos dentro de 24 horas después que tu listado sea aprobado para agendar la sesión. Por ahora, sube al menos 5 fotos con celular para que tu listado esté listo para review. Las fotos de celular son temporales — las pro las reemplazan.",
         proPhotosOr: "O sube tus propias fotos abajo:",
         ownershipTitle: "📷 Disclaimer de Propiedad de Fotos",
         ownershipIntro: "Al subir estas fotos, confirmo que:",
@@ -1871,8 +1871,8 @@ export const dictionaries = {
         photosOptionalPro: "Tu plan incluye fotografía profesional, así que subir fotos acá es opcional — podés continuar sin ellas y nuestro fotógrafo se encarga.",
         photoAddon: {
           title: "Agrega fotografía profesional",
-          body: "Tu plan Essentials no incluye fotos profesionales. Agrega una sesión profesional para tu listing por $495 — incluida gratis en Pro y Concierge.",
-          cta: "Agregar fotografía — $495",
+          body: "Tu plan Essentials no incluye fotos profesionales. Agrega una sesión profesional para tu listing por {photoAddonPrice} — incluida gratis en Pro y Concierge.",
+          cta: "Agregar fotografía — {photoAddonPrice}",
           redirecting: "Redirigiendo al pago…",
           failed: "Algo salió mal. Intenta de nuevo.",
         },
@@ -2295,7 +2295,7 @@ export const dictionaries = {
       items: [
         {
           name: "Fotografía profesional",
-          price: "$495",
+          price: "{photoAddonPrice}",
           body: "Una sesión profesional para tu listing — incluida gratis en Pro y Concierge, o agrégala a cualquier listing.",
           cta: "Agregar en tu listing",
         },
@@ -2708,7 +2708,7 @@ export const dictionaries = {
         },
         {
           q: "¿En qué se diferencia Lixtara de un agente tradicional del 6%?",
-          a: "Un agente tradicional cobra 5–6% de comisión ($30,000 en una casa de $500K). El tier Pro de Lixtara cobra $495 fijo más 1% ($5,495 total en una casa de $500K). Misma exposición en home.com, mismo respaldo de broker licenciado — la diferencia te la quedas tú.",
+          a: "Un agente tradicional cobra 5–6% de comisión (hasta {traditionalExample} en una casa de {exampleSalePrice}). El plan Pro de Lixtara cobra {proFlatFee} fijo más {proCommissionPct}% ({proTotalExample} en total en una casa de {exampleSalePrice}). Misma exposición en home.com, mismo respaldo de broker licenciado — la diferencia te la quedas tú.",
         },
         {
           q: "¿Qué tier debería elegir?",

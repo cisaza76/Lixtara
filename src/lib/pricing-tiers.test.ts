@@ -10,6 +10,7 @@ import {
   tierCostBreakdown,
   fillTierCopy,
   fillCommissionCopy,
+  fillPricingCopy,
 } from "@/lib/pricing-tiers";
 
 describe("PRICING_TIERS catalog", () => {
@@ -116,5 +117,27 @@ describe("copy placeholders", () => {
     expect(
       fillCommissionCopy("{essentials} / {pro} / {concierge} vs {traditional}"),
     ).toBe("0.5 / 1 / 1.5 vs 3");
+  });
+});
+
+describe("fillPricingCopy", () => {
+  it("fills the photography add-on price from PHOTOGRAPHY_ADDON_PRICE", () => {
+    expect(fillPricingCopy("Add photography — {photoAddonPrice}")).toBe(
+      "Add photography — $495",
+    );
+  });
+
+  it("derives the FAQ cost example from the Pro tier and the traditional 6%", () => {
+    expect(
+      fillPricingCopy(
+        "up to {traditionalExample} on a {exampleSalePrice} home; {proFlatFee} flat plus {proCommissionPct}% ({proTotalExample} total)",
+      ),
+    ).toBe("up to $30,000 on a $500,000 home; $495 flat plus 1% ($5,495 total)");
+  });
+
+  it("is applied by fillTierCopy too (tier features mention the add-on value)", () => {
+    expect(fillTierCopy("Photos ({photoAddonPrice} value)", "pro")).toBe(
+      "Photos ($495 value)",
+    );
   });
 });

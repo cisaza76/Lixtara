@@ -9,6 +9,7 @@ import {
   TIER_ORDER,
   DEFAULT_TIER,
   fillCommissionCopy,
+  fillPricingCopy,
   fillTierCopy,
   formatPrice,
   type PricingTierId,
@@ -676,7 +677,7 @@ export default async function Home({
                   {item.q}
                 </dt>
                 <dd className="md:col-span-7 text-sm lg:text-base leading-relaxed text-ink/70">
-                  {item.a}
+                  {fillPricingCopy(item.a)}
                 </dd>
               </div>
             ))}

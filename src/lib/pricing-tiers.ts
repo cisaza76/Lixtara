@@ -42,6 +42,9 @@ export const TIER_ORDER: PricingTierId[] = ["essentials", "pro", "concierge"];
 
 export const DEFAULT_TIER: PricingTierId = "pro";
 
+// Sale price used in illustrative copy (e.g. the FAQ cost comparison).
+export const EXAMPLE_SALE_PRICE = 500_000;
+
 export function getTier(
   id: PricingTierId | string | null | undefined,
 ): PricingTier {
@@ -106,10 +109,36 @@ export function tierCostBreakdown(
 // prices: {commissionPct}, {flatFee}, {termMonths}.
 export function fillTierCopy(text: string, tierId: PricingTierId): string {
   const t = PRICING_TIERS[tierId];
+  return fillPricingCopy(
+    text
+      .replaceAll("{commissionPct}", String(t.commissionPct))
+      .replaceAll("{flatFee}", String(t.flatFee))
+      .replaceAll("{termMonths}", String(t.termMonths)),
+  );
+}
+
+// Fills catalog-wide placeholders so dictionaries never hardcode amounts:
+//   {photoAddonPrice}       → "$495"   (PHOTOGRAPHY_ADDON_PRICE)
+//   {proFlatFee}            → "$495"   {proCommissionPct} → "1"
+//   {exampleSalePrice}      → "$500,000"
+//   {traditionalExample}    → 6% (listing + buyer) of the example price
+//   {proTotalExample}       → Pro flat fee + Pro commission on the example price
+export function fillPricingCopy(text: string): string {
+  const traditionalPct =
+    TRADITIONAL_COSTS.listingCommissionPct + TRADITIONAL_COSTS.buyerCommissionPct;
   return text
-    .replaceAll("{commissionPct}", String(t.commissionPct))
-    .replaceAll("{flatFee}", String(t.flatFee))
-    .replaceAll("{termMonths}", String(t.termMonths));
+    .replaceAll("{photoAddonPrice}", formatPrice(PHOTOGRAPHY_ADDON_PRICE))
+    .replaceAll("{proFlatFee}", formatPrice(PRICING_TIERS.pro.flatFee))
+    .replaceAll("{proCommissionPct}", String(PRICING_TIERS.pro.commissionPct))
+    .replaceAll("{exampleSalePrice}", formatPrice(EXAMPLE_SALE_PRICE))
+    .replaceAll(
+      "{traditionalExample}",
+      formatPrice((EXAMPLE_SALE_PRICE * traditionalPct) / 100),
+    )
+    .replaceAll(
+      "{proTotalExample}",
+      formatPrice(tierTotalCost("pro", EXAMPLE_SALE_PRICE)),
+    );
 }
 
 // Fills the per-tier commission placeholders used in comparison copy:
