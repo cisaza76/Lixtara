@@ -15,3 +15,13 @@ export const BROKERAGE_YEARS = 20;
 // personal one). She IS named in the Terms of Service as the principal broker
 // of record — that is a Florida Statute 475 disclosure, not branding.
 export const BROKER_OF_RECORD = "AnaMaria Velasquez";
+
+// ── CAN-SPAM sender identity (commercial email) ─────────────────────────────
+// OWNER: fill both before any marketing / funnel email can go out. While either
+// is empty, sendCommercialEmail() (src/lib/email.ts) refuses to send — the
+// check is in code (src/lib/email-compliance.ts), not just this comment.
+// - BROKERAGE_LEGAL_NAME: the registered legal entity name (as on Sunbiz/DBPR).
+// - BROKERAGE_POSTAL_ADDRESS: a valid physical postal address — street address,
+//   USPS-registered PO box, or a registered commercial mail receiving agency.
+export const BROKERAGE_LEGAL_NAME = "";
+export const BROKERAGE_POSTAL_ADDRESS = "";

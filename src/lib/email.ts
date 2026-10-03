@@ -12,6 +12,12 @@
 // fail just because the email send did. We log errors instead.
 
 import { Resend } from "resend";
+import {
+  COMMERCIAL_SENDER,
+  canSpamFooter,
+  type CanSpamMissing,
+  type CommercialSenderIdentity,
+} from "@/lib/email-compliance";
 
 let _client: Resend | null = null;
 function client(): Resend | null {
@@ -32,6 +38,8 @@ interface SendInput {
   from?: string;
   /** UX 5C — provider-side dedup: identical key ⇒ Resend sends at most once. */
   idempotencyKey?: string;
+  /** Extra MIME headers (e.g. List-Unsubscribe for commercial email). */
+  headers?: Record<string, string>;
 }
 
 async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -50,6 +58,7 @@ async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error
         subject: input.subject,
         html: input.html,
         text: input.text,
+        ...(input.headers ? { headers: input.headers } : {}),
       },
       input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
     );
@@ -266,4 +275,50 @@ export async function sendListingVideoTerminal(input: {
   idempotencyKey: string;
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   return send(input);
+}
+
+// ─── Commercial email (CAN-SPAM) ─────────────────────────────────────
+
+export interface CommercialEmailInput {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  lang: Lang;
+  /** https URL that opts this recipient out in one step (no login). */
+  unsubscribeUrl: string;
+  idempotencyKey?: string;
+}
+
+/**
+ * The ONLY way to send funnel / abandonment / marketing email. Appends the
+ * CAN-SPAM footer (legal name, physical postal address, unsubscribe link) and
+ * List-Unsubscribe / List-Unsubscribe-Post headers (RFC 8058 one-click — the
+ * unsubscribe URL must therefore also accept a POST). If the sender identity in src/lib/broker.ts is
+ * incomplete or the unsubscribe URL is invalid, it does NOT send: it logs and
+ * returns { ok: false, error: "can_spam_incomplete" }. Never throws.
+ */
+export async function sendCommercialEmail(
+  input: CommercialEmailInput,
+  identity: CommercialSenderIdentity = COMMERCIAL_SENDER,
+): Promise<{ ok: boolean; id?: string; error?: string; missing?: CanSpamMissing[] }> {
+  const footer = canSpamFooter(input.unsubscribeUrl, input.lang, identity);
+  if (!footer.ok) {
+    console.error("email: commercial send blocked — CAN-SPAM footer incomplete", {
+      missing: footer.missing,
+      subject: input.subject,
+    });
+    return { ok: false, error: "can_spam_incomplete", missing: footer.missing };
+  }
+  return send({
+    to: input.to,
+    subject: input.subject,
+    html: input.html + footer.html,
+    text: input.text + footer.text,
+    idempotencyKey: input.idempotencyKey,
+    headers: {
+      "List-Unsubscribe": `<${input.unsubscribeUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  });
 }
