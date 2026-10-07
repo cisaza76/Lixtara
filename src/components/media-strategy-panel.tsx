@@ -84,7 +84,7 @@ export function MediaStrategyPanel({
             <ol className="mt-1 list-decimal pl-5">
               {payload.selectedShots.map((s) => (
                 <li key={s.photoId}>
-                  {s.roomType} — {s.suggestedMotion}
+                  {s.roomType}: {s.suggestedMotion}
                 </li>
               ))}
             </ol>

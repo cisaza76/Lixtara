@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   const limited = await enforceLimit(
     apiLimiter("agreement:sync", 60, "1 h"),
     `u:${user.id}`,
-    { label: "agreement:sync", message: "Too many status checks — wait a moment." },
+    { label: "agreement:sync", message: "Too many status checks. Please wait a moment." },
   );
   if (limited) return limited;
 

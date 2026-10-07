@@ -5,7 +5,7 @@ import { LegalDocument } from "@/components/legal-document";
 import { termsDoc } from "@/lib/legal/terms";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Lixtara",
+  title: "Terms of Service | Lixtara",
 };
 
 export default async function TermsPage({

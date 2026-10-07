@@ -28,9 +28,9 @@ const STATUSES = [
   "cancelled",
 ] as const;
 const SLOTS: Record<string, string> = {
-  morning: "Morning (8–11)",
-  afternoon: "Afternoon (12–3)",
-  evening: "Evening (4–7)",
+  morning: "Morning (8 to 11)",
+  afternoon: "Afternoon (12 to 3)",
+  evening: "Evening (4 to 7)",
 };
 
 function serviceClient() {

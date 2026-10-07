@@ -233,7 +233,7 @@ export default async function PropertyDetailPage({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={ph.url}
-                    alt={`${street} — photo ${i + 1}`}
+                    alt={`${street}, photo ${i + 1}`}
                     className="h-full w-full object-cover transition-transform duration-[600ms] ease-out group-hover/photo:scale-[1.05]"
                   />
                   {ph.is_staged && (
@@ -462,7 +462,7 @@ export default async function PropertyDetailPage({
             <div className="flex flex-col gap-3 border-t border-gold-soft pt-5 text-[11px] leading-relaxed text-ink/75">
               {[
                 {
-                  text: `${BROKERAGE_NAME} — ${copy.trustLicensed}`,
+                  text: `${BROKERAGE_NAME} · ${copy.trustLicensed}`,
                   icon: (
                     <path d="M12 22s7-3.5 7-9V5.5L12 3 5 5.5V13c0 5.5 7 9 7 9zM9 12l2 2 4-4" />
                   ),

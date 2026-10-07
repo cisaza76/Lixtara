@@ -62,7 +62,7 @@ export async function createTierCheckoutSession(
           currency: "usd",
           unit_amount: amountCents,
           product_data: {
-            name: `Lixtara ${tierDisplayName(input.tier)} listing — flat fee`,
+            name: `Lixtara ${tierDisplayName(input.tier)} listing (flat fee)`,
             description: `${tier.termMonths}-month listing term · +${tier.commissionPct}% Lixtara commission at closing.`,
           },
         },
@@ -112,7 +112,7 @@ export async function createConsultationCheckoutSession(
         price_data: {
           currency: "usd",
           unit_amount: p.amount * 100,
-          product_data: { name: `Lixtara — ${p.name}` },
+          product_data: { name: `Lixtara ${p.name}` },
         },
       },
     ],
@@ -155,7 +155,7 @@ export async function createPhotographyCheckoutSession(
           currency: "usd",
           unit_amount: PHOTOGRAPHY_ADDON_PRICE * 100,
           product_data: {
-            name: "Lixtara — Professional photography",
+            name: "Lixtara professional photography",
             description: "Professional listing photography add-on.",
           },
         },
@@ -200,7 +200,7 @@ export async function createStagingOverageCheckoutSession(
           currency: "usd",
           unit_amount: STAGING_OVERAGE_PRICE * 100,
           product_data: {
-            name: "Lixtara — AI virtual staging (extra room)",
+            name: "Lixtara AI virtual staging (extra room)",
             description: "One additional AI-staged photo beyond your free quota.",
           },
         },

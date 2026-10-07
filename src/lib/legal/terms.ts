@@ -43,7 +43,7 @@ export const termsDoc: LegalContent = {
         heading: "4. Brokerage Relationship and Florida Real Estate Disclosures",
         body: [
           "Lixtara operates as a licensed Florida real estate brokerage (Florida license CQ1075352). Our principal broker of record oversees the brokerage activities conducted through the Services in accordance with Florida real estate law.",
-          "The specific brokerage relationship between you and Lixtara — including the nature, scope, and duties of that relationship — is established and governed by the listing agreement and any related disclosures that you sign. These Terms do not by themselves create a brokerage, agency, or fiduciary relationship. Any agency or representation obligations arise only under, and are limited by, the signed listing agreement and applicable Florida real estate law and disclosure requirements.",
+          "The specific brokerage relationship between you and Lixtara (including the nature, scope, and duties of that relationship) is established and governed by the listing agreement and any related disclosures that you sign. These Terms do not by themselves create a brokerage, agency, or fiduciary relationship. Any agency or representation obligations arise only under, and are limited by, the signed listing agreement and applicable Florida real estate law and disclosure requirements.",
           "Lixtara does not guarantee any result. We make no promise or guarantee that your property will sell, that it will attract any offer, or that any sale will close at a particular price, on particular terms, or within any particular period of time. Real estate outcomes depend on many factors outside our control, including market conditions, pricing, property condition, and buyer behavior.",
           "Fair Housing. Lixtara is committed to the principles of equal housing opportunity. You agree that your listing and your conduct through the Services will comply with the federal Fair Housing Act and the Florida Fair Housing Act and all other applicable anti-discrimination laws. You may not discriminate, or state any preference, limitation, or discrimination, on the basis of race, color, religion, sex, disability, familial status, national origin, or any other protected class.",
         ],
@@ -74,7 +74,7 @@ export const termsDoc: LegalContent = {
         heading: "6. Plans, Fees, Commissions, and Payments",
         body: [
           "Lixtara offers three plans. Each plan consists of a flat, one-time fee plus a low seller-side commission that becomes payable only if and when your property sells. Each plan carries a listing term of 24 months.",
-          "The plan tiers are: Essentials — $199 flat fee plus a 0.5% seller-side commission on sale; Pro — $495 flat fee plus a 1% seller-side commission on sale; and Concierge — $995 flat fee plus a 1.5% seller-side commission on sale. The flat fee for each plan is one-time. The seller-side commission is owed only if the property sells. The cooperating buyer-agent commission described in Section 4 is selected separately by you and is in addition to these amounts.",
+          "The plan tiers are: Essentials: $199 flat fee plus a 0.5% seller-side commission on sale; Pro: $495 flat fee plus a 1% seller-side commission on sale; and Concierge: $995 flat fee plus a 1.5% seller-side commission on sale. The flat fee for each plan is one-time. The seller-side commission is owed only if the property sells. The cooperating buyer-agent commission described in Section 4 is selected separately by you and is in addition to these amounts.",
           "The flat plan fee is non-refundable. Except where a refund is required by applicable law, all fees paid to Lixtara are non-refundable, and we do not provide refunds or credits for partially used terms, unused features, or listings that do not result in a sale.",
           "Optional add-ons, such as professional photography and AI virtual staging, may be available for an additional charge that will be disclosed to you before you purchase them. Add-on fees are also non-refundable except where required by law.",
           "Payments are processed through our third-party payment processor, Stripe. By submitting payment information, you authorize us and Stripe to charge the applicable amounts. Lixtara does not store your full card number; payment card data is handled by Stripe under its terms. You are responsible for any taxes that apply to your purchase, other than taxes on Lixtara's net income.",
@@ -174,7 +174,7 @@ export const termsDoc: LegalContent = {
         body: [
           "These Terms apply while you use the Services. You may stop using the Services at any time. You may close your account by contacting us at support@lixtara.com, subject to any obligations that survive under a signed listing agreement, including a 24-month listing term and any commission obligations.",
           "We may suspend or terminate your access to the Services, in whole or in part, at any time if we reasonably believe you have violated these Terms or applicable law, if needed to protect the Services or other users, or as otherwise permitted by law. Where reasonable and lawful, we will provide notice.",
-          "Termination of your account does not by itself terminate a signed listing agreement, which is governed by its own terms. Sections of these Terms that by their nature should survive termination — including provisions on fees already incurred, intellectual property, disclaimers, limitation of liability, indemnification, dispute resolution, and governing law — will survive.",
+          "Termination of your account does not by itself terminate a signed listing agreement, which is governed by its own terms. Sections of these Terms that by their nature should survive termination (including provisions on fees already incurred, intellectual property, disclaimers, limitation of liability, indemnification, dispute resolution, and governing law) will survive.",
         ],
       },
       {
@@ -215,7 +215,7 @@ export const termsDoc: LegalContent = {
         heading: "21. Contact Us",
         body: [
           "If you have questions about these Terms or the Services, please contact us:",
-          "Lixtara — Lixtara, Miami, Florida, United States. Mailing address: Miami, Florida, United States.",
+          "Lixtara: Lixtara, Miami, Florida, United States. Mailing address: Miami, Florida, United States.",
           "Legal: legal@lixtara.com. Support: support@lixtara.com.",
           "Licensed Florida real estate brokerage. Brokerage license number: CQ1075352. Principal broker of record: Anamaria Velasquez.",
         ],
@@ -264,7 +264,7 @@ export const termsDoc: LegalContent = {
         heading: "4. Relación de Correduría y Divulgaciones Inmobiliarias de Florida",
         body: [
           "Lixtara opera como una correduría de bienes raíces licenciada en Florida (licencia de Florida CQ1075352). Nuestra corredora principal a cargo supervisa las actividades de correduría realizadas a través de los Servicios de conformidad con la ley inmobiliaria de Florida.",
-          "La relación de correduría específica entre usted y Lixtara —incluyendo la naturaleza, el alcance y los deberes de esa relación— se establece y se rige por el acuerdo de publicación y cualquier divulgación relacionada que usted firme. Estos Términos no crean por sí mismos una relación de correduría, de agencia ni fiduciaria. Cualquier obligación de agencia o representación surge únicamente bajo, y está limitada por, el acuerdo de publicación firmado y la ley inmobiliaria de Florida y los requisitos de divulgación aplicables.",
+          "La relación de correduría específica entre usted y Lixtara (incluyendo la naturaleza, el alcance y los deberes de esa relación) se establece y se rige por el acuerdo de publicación y cualquier divulgación relacionada que usted firme. Estos Términos no crean por sí mismos una relación de correduría, de agencia ni fiduciaria. Cualquier obligación de agencia o representación surge únicamente bajo, y está limitada por, el acuerdo de publicación firmado y la ley inmobiliaria de Florida y los requisitos de divulgación aplicables.",
           "Lixtara no garantiza ningún resultado. No prometemos ni garantizamos que su propiedad se venderá, que atraerá alguna oferta, ni que alguna venta se cerrará a un precio determinado, en condiciones determinadas o dentro de un período de tiempo determinado. Los resultados inmobiliarios dependen de muchos factores fuera de nuestro control, incluidas las condiciones del mercado, el precio, el estado de la propiedad y el comportamiento del comprador.",
           "Vivienda Justa. Lixtara está comprometida con los principios de igualdad de oportunidades en la vivienda. Usted acepta que su publicación y su conducta a través de los Servicios cumplirán con la Ley Federal de Vivienda Justa y la Ley de Vivienda Justa de Florida y todas las demás leyes antidiscriminatorias aplicables. No podrá discriminar, ni expresar preferencia, limitación o discriminación alguna, por motivos de raza, color, religión, sexo, discapacidad, estado familiar, origen nacional o cualquier otra clase protegida.",
         ],
@@ -295,7 +295,7 @@ export const termsDoc: LegalContent = {
         heading: "6. Planes, Tarifas, Comisiones y Pagos",
         body: [
           "Lixtara ofrece tres planes. Cada plan consiste en una tarifa fija de pago único más una baja comisión del lado del vendedor que se vuelve pagadera únicamente si su propiedad se vende y cuando se venda. Cada plan tiene un plazo de publicación de 24 meses.",
-          "Los niveles de los planes son: Essentials — tarifa fija de $199 más una comisión del lado del vendedor del 0.5% sobre la venta; Pro — tarifa fija de $495 más una comisión del lado del vendedor del 1% sobre la venta; y Concierge — tarifa fija de $995 más una comisión del lado del vendedor del 1.5% sobre la venta. La tarifa fija de cada plan es de pago único. La comisión del lado del vendedor se adeuda únicamente si la propiedad se vende. La comisión cooperante al agente del comprador descrita en la Sección 4 la selecciona usted por separado y es adicional a estos montos.",
+          "Los niveles de los planes son: Essentials: tarifa fija de $199 más una comisión del lado del vendedor del 0.5% sobre la venta; Pro: tarifa fija de $495 más una comisión del lado del vendedor del 1% sobre la venta; y Concierge: tarifa fija de $995 más una comisión del lado del vendedor del 1.5% sobre la venta. La tarifa fija de cada plan es de pago único. La comisión del lado del vendedor se adeuda únicamente si la propiedad se vende. La comisión cooperante al agente del comprador descrita en la Sección 4 la selecciona usted por separado y es adicional a estos montos.",
           "La tarifa fija del plan no es reembolsable. Salvo cuando la ley aplicable exija un reembolso, todas las tarifas pagadas a Lixtara no son reembolsables, y no otorgamos reembolsos ni créditos por plazos utilizados parcialmente, funciones no utilizadas o publicaciones que no resulten en una venta.",
           "Los servicios adicionales opcionales, como la fotografía profesional y el home staging virtual con IA, pueden estar disponibles por un cargo adicional que se le informará antes de que los compre. Las tarifas de los servicios adicionales tampoco son reembolsables, salvo cuando la ley lo exija.",
           "Los pagos se procesan a través de nuestro procesador de pagos externo, Stripe. Al enviar información de pago, usted nos autoriza a nosotros y a Stripe a cobrar los montos correspondientes. Lixtara no almacena el número completo de su tarjeta; los datos de la tarjeta de pago son manejados por Stripe bajo sus propios términos. Usted es responsable de cualquier impuesto que aplique a su compra, salvo los impuestos sobre los ingresos netos de Lixtara.",
@@ -395,7 +395,7 @@ export const termsDoc: LegalContent = {
         body: [
           "Estos Términos se aplican mientras usted utilice los Servicios. Usted puede dejar de usar los Servicios en cualquier momento. Puede cerrar su cuenta comunicándose con nosotros a support@lixtara.com, sujeto a cualquier obligación que subsista bajo un acuerdo de publicación firmado, incluido un plazo de publicación de 24 meses y cualquier obligación de comisión.",
           "Podemos suspender o cancelar su acceso a los Servicios, en su totalidad o en parte, en cualquier momento si razonablemente creemos que ha violado estos Términos o la ley aplicable, si es necesario para proteger los Servicios u otros usuarios, o según lo permita la ley. Cuando sea razonable y lícito, le proporcionaremos aviso.",
-          "La terminación de su cuenta no termina por sí misma un acuerdo de publicación firmado, el cual se rige por sus propios términos. Las secciones de estos Términos que por su naturaleza deban subsistir tras la terminación —incluidas las disposiciones sobre tarifas ya incurridas, propiedad intelectual, renuncias de garantías, limitación de responsabilidad, indemnización, resolución de disputas y ley aplicable— subsistirán.",
+          "La terminación de su cuenta no termina por sí misma un acuerdo de publicación firmado, el cual se rige por sus propios términos. Las secciones de estos Términos que por su naturaleza deban subsistir tras la terminación (incluidas las disposiciones sobre tarifas ya incurridas, propiedad intelectual, renuncias de garantías, limitación de responsabilidad, indemnización, resolución de disputas y ley aplicable) subsistirán.",
         ],
       },
       {
@@ -436,7 +436,7 @@ export const termsDoc: LegalContent = {
         heading: "21. Contáctenos",
         body: [
           "Si tiene preguntas sobre estos Términos o los Servicios, comuníquese con nosotros:",
-          "Lixtara — Lixtara, Miami, Florida, Estados Unidos. Dirección postal: Miami, Florida, United States.",
+          "Lixtara: Lixtara, Miami, Florida, Estados Unidos. Dirección postal: Miami, Florida, United States.",
           "Legal: legal@lixtara.com. Soporte: support@lixtara.com.",
           "Correduría de bienes raíces licenciada en Florida. Número de licencia de correduría: CQ1075352. Corredora principal a cargo: Anamaria Velasquez.",
         ],

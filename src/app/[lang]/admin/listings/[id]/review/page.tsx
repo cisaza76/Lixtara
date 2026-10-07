@@ -422,7 +422,7 @@ export default async function ListingReviewPage({
         )}
         {!agreementSigned && (
           <p className="text-xs text-amber-700">
-            ⚠️ Seller hasn&apos;t completed the listing agreement — approving is
+            ⚠️ Seller hasn&apos;t completed the listing agreement. Approving is
             not advisable until it&apos;s signed.
           </p>
         )}

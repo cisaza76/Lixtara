@@ -168,7 +168,7 @@ export function AddressAutocomplete({
         if (!places?.Autocomplete) {
           setStatus("error");
           setErrorMessage(
-            "Places library failed to load — check that Places API is enabled and your domain is allowlisted on the Google Maps key.",
+            "Places library failed to load. Check that Places API is enabled and your domain is allowlisted on the Google Maps key.",
           );
           return;
         }
@@ -189,7 +189,7 @@ export function AddressAutocomplete({
           console.error("[AddressAutocomplete] init failed", initErr);
           setStatus("error");
           setErrorMessage(
-            "Places Autocomplete init threw — likely Places API not enabled or HTTP referrer not allowlisted.",
+            "Places Autocomplete failed to start. Places API is probably not enabled, or the HTTP referrer is not allowlisted.",
           );
           return;
         }
@@ -251,7 +251,7 @@ export function AddressAutocomplete({
           required
           defaultValue={defaultStreet}
           autoComplete="address-line1"
-          placeholder="Start typing — pick from Google's suggestions"
+          placeholder="Start typing and pick from Google's suggestions"
           className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
         />
         <span
@@ -266,9 +266,9 @@ export function AddressAutocomplete({
           }`}
         >
           {status === "loading" && "Maps: loading…"}
-          {status === "ready" && !verified && "Maps: ready — start typing"}
+          {status === "ready" && !verified && "Maps ready. Start typing."}
           {status === "ready" && verified && `✓ ${verifiedNote ?? "Verified"}`}
-          {status === "error" && `Maps error — type manually. (${errorMessage})`}
+          {status === "error" && `Maps error. Type the address manually. (${errorMessage})`}
         </span>
       </label>
 

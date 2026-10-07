@@ -171,7 +171,7 @@ export async function POST(req: Request) {
     .insert({
       property_id: photo.property_id,
       url: pub.publicUrl,
-      caption: `Virtually staged — ${style}`,
+      caption: `Virtually staged (${style})`,
       is_staged: true,
       original_photo_id: photo.id,
       // Auto-approve in the POC — admin moderation page exists but is

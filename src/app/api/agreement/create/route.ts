@@ -268,7 +268,7 @@ export async function POST(req: Request) {
           lockbox_authorized: lockboxIncluded,
           buyer_commission_ack: true,
         },
-        emailSubject: "Lixtara listing agreement — please sign",
+        emailSubject: "Please sign your Lixtara listing agreement",
       });
       envelopeId = created.envelopeId;
 

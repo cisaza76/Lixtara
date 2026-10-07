@@ -196,7 +196,7 @@ export async function createEnvelopeFromTemplate(
   const body = {
     templateId: input.templateId,
     status: "sent",
-    emailSubject: input.emailSubject ?? "Lixtara listing agreement — please sign",
+    emailSubject: input.emailSubject ?? "Please sign your Lixtara listing agreement",
     templateRoles: [
       {
         email: input.signerEmail,

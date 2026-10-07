@@ -43,7 +43,7 @@ export const cookiesDoc: LegalContent = {
         ],
         sub: [
           {
-            heading: "3.1 Strictly Necessary — Authentication & Session",
+            heading: "3.1 Strictly Necessary: Authentication & Session",
             body: [
               "These cookies are essential for the platform to work. They are set by our authentication provider (Supabase Auth) to keep sellers and buyers signed in, maintain a secure session, and protect the listing and transaction flows.",
               "Without these cookies, you would not be able to sign in or complete core actions such as creating or managing a listing.",
@@ -103,9 +103,9 @@ export const cookiesDoc: LegalContent = {
           "These third-party cookies are generally only relevant when you actually use the corresponding feature.",
         ],
         bullets: [
-          "Stripe — when you complete a payment or checkout.",
-          "DocuSign — when you review or sign documents electronically.",
-          "Mapbox and Google Maps — when maps are displayed or used.",
+          "Stripe: when you complete a payment or checkout.",
+          "DocuSign: when you review or sign documents electronically.",
+          "Mapbox and Google Maps: when maps are displayed or used.",
         ],
       },
       {
@@ -116,8 +116,8 @@ export const cookiesDoc: LegalContent = {
           "The exact lifespan of third-party cookies is determined by the providers that set them.",
         ],
         bullets: [
-          "Session cookies — deleted when you close your browser.",
-          "Persistent cookies — remain for a set period or until you clear them.",
+          "Session cookies: deleted when you close your browser.",
+          "Persistent cookies: remain for a set period or until you clear them.",
         ],
       },
       {
@@ -206,7 +206,7 @@ export const cookiesDoc: LegalContent = {
         ],
         sub: [
           {
-            heading: "3.1 Estrictamente Necesarias — Autenticación y Sesión",
+            heading: "3.1 Estrictamente Necesarias: Autenticación y Sesión",
             body: [
               "Estas cookies son esenciales para que la plataforma funcione. Las establece nuestro proveedor de autenticación (Supabase Auth) para mantener a vendedores y compradores con la sesión iniciada, conservar una sesión segura y proteger los flujos de publicación y de transacciones.",
               "Sin estas cookies, no podría iniciar sesión ni completar acciones esenciales como crear o gestionar una publicación.",
@@ -266,9 +266,9 @@ export const cookiesDoc: LegalContent = {
           "Estas cookies de terceros suelen ser relevantes únicamente cuando usted utiliza efectivamente la función correspondiente.",
         ],
         bullets: [
-          "Stripe — cuando realiza un pago o un proceso de pago (checkout).",
-          "DocuSign — cuando revisa o firma documentos electrónicamente.",
-          "Mapbox y Google Maps — cuando se muestran o utilizan mapas.",
+          "Stripe: cuando realiza un pago o un proceso de pago (checkout).",
+          "DocuSign: cuando revisa o firma documentos electrónicamente.",
+          "Mapbox y Google Maps: cuando se muestran o utilizan mapas.",
         ],
       },
       {
@@ -279,8 +279,8 @@ export const cookiesDoc: LegalContent = {
           "La duración exacta de las cookies de terceros la determinan los proveedores que las establecen.",
         ],
         bullets: [
-          "Cookies de sesión — se eliminan cuando cierra su navegador.",
-          "Cookies persistentes — permanecen durante un período determinado o hasta que las borre.",
+          "Cookies de sesión: se eliminan cuando cierra su navegador.",
+          "Cookies persistentes: permanecen durante un período determinado o hasta que las borre.",
         ],
       },
       {

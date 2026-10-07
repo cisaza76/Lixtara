@@ -44,12 +44,12 @@ export async function improveListingDescription(
   const { text } = await generateText({
     model: anthropic(COPY_MODEL),
     system:
-      "You are a senior real estate copywriter for Florida listings. Improve descriptions to be 100-180 words, professional and warm but never cheesy. Keep every specific fact provided (square footage, bedrooms, year built, neighborhood, list price). Avoid clichés like 'must see', 'won't last', 'gem', 'opportunity of a lifetime'. Write in third person. Reply with ONLY the improved description text — no preamble, no quotes around it, no notes.",
+      "You are a senior real estate copywriter for Florida listings. Improve descriptions to be 100-180 words, professional and warm but never cheesy. Keep every specific fact provided (square footage, bedrooms, year built, neighborhood, list price). Avoid clichés like 'must see', 'won't last', 'gem', 'opportunity of a lifetime'. Write in third person. Write like a person: never use em dashes or en dashes; use commas, periods or colons instead. Reply with ONLY the improved description text: no preamble, no quotes around it, no notes.",
     prompt: `Property facts: ${factsLine}\n\nCurrent description draft:\n"""${description}"""\n\nReturn the improved description only.`,
     maxOutputTokens: 600,
   });
 
-  return text.trim();
+  return withoutDashes(text.trim());
 }
 
 /**
@@ -62,9 +62,21 @@ export async function improveShowingInstructions(
   const { text } = await generateText({
     model: anthropic(COPY_MODEL),
     system:
-      "You polish showing instructions for Florida property listings sent to buyer's agents. Keep it under 240 characters, professional, concise, action-oriented. Preserve every specific detail the seller included (phone numbers, lockbox codes, time windows, contact persons). No clichés. Reply with ONLY the improved text — no preamble, no quotes around it.",
+      "You polish showing instructions for Florida property listings sent to buyer's agents. Keep it under 240 characters, professional, concise, action-oriented. Preserve every specific detail the seller included (phone numbers, lockbox codes, time windows, contact persons). No clichés. Never use em dashes or en dashes; use commas, periods or colons instead. Reply with ONLY the improved text: no preamble, no quotes around it.",
     prompt: `Current showing instructions draft:\n"""${current}"""\n\nReturn the improved text only.`,
     maxOutputTokens: 200,
   });
-  return text.trim();
+  return withoutDashes(text.trim());
+}
+
+/**
+ * Site copy never shows em/en dashes (owner rule, 2026-10-07). If the model
+ * writes one anyway: a number range becomes "to", anything else a comma.
+ */
+export function withoutDashes(text: string): string {
+  return text
+    .replace(/(\d)\s*[–—]\s*(\d)/g, "$1 to $2")
+    .replace(/\s*[–—]\s*/g, ", ")
+    .replace(/,\s*,/g, ",")
+    .replace(/,\s*([.!?:;])/g, "$1");
 }
