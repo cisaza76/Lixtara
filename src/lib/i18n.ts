@@ -371,6 +371,7 @@ export const dictionaries = {
         boolGroupLabel: "Sale conditions",
         appliancesTitle: "Appliances included",
         appliancesBody: "Check the appliances that stay with the home. These are written into your sale contract as included personal property.",
+        appliancesMarkAll: "Mark all",
         appliances: {
           refrigerator: "Refrigerator",
           range_oven: "Range / oven",
@@ -1771,6 +1772,7 @@ export const dictionaries = {
         boolGroupLabel: "Condiciones de venta",
         appliancesTitle: "Electrodomésticos incluidos",
         appliancesBody: "Marca los electrodomésticos que quedan con la casa. Se incluyen en tu contrato de venta como propiedad personal incluida.",
+        appliancesMarkAll: "Marcar todos",
         appliances: {
           refrigerator: "Refrigerador",
           range_oven: "Estufa / horno",

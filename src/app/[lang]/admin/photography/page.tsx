@@ -1,5 +1,6 @@
+import { assertStaff } from "@/lib/admin-auth";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -95,23 +96,10 @@ export default async function AdminPhotographyPage({
     }
   }
 
-  async function assertStaff() {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
-    const [{ data: a }, { data: b }] = await Promise.all([
-      supabase.rpc("has_role", { _role: "admin" }),
-      supabase.rpc("has_role", { _role: "broker" }),
-    ]);
-    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
-    return supabase;
-  }
 
   async function assignPhotographer(formData: FormData) {
     "use server";
-    const sb = await assertStaff();
+    const sb = await assertStaff(lang);
     const id = String(formData.get("id") ?? "");
     await sb
       .from("photography_orders")
@@ -129,7 +117,7 @@ export default async function AdminPhotographyPage({
 
   async function markCompleted(formData: FormData) {
     "use server";
-    const sb = await assertStaff();
+    const sb = await assertStaff(lang);
     await sb
       .from("photography_orders")
       .update({
@@ -143,7 +131,7 @@ export default async function AdminPhotographyPage({
 
   async function cancelOrder(formData: FormData) {
     "use server";
-    const sb = await assertStaff();
+    const sb = await assertStaff(lang);
     await sb
       .from("photography_orders")
       .update({ status: "cancelled", updated_at: new Date().toISOString() })

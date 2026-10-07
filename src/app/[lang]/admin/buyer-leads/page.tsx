@@ -1,5 +1,6 @@
+import { assertStaff } from "@/lib/admin-auth";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -73,23 +74,10 @@ export default async function AdminBuyerLeadsPage({
   const agents = (agentRows ?? []) as Array<{ id: string; name: string }>;
   const agentName = new Map(agents.map((a) => [a.id, a.name]));
 
-  async function assertStaff() {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
-    const [{ data: a }, { data: b }] = await Promise.all([
-      supabase.rpc("has_role", { _role: "admin" }),
-      supabase.rpc("has_role", { _role: "broker" }),
-    ]);
-    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
-    return supabase;
-  }
 
   async function assignAgent(formData: FormData) {
     "use server";
-    const sb = await assertStaff();
+    const sb = await assertStaff(lang);
     const agentId = String(formData.get("assigned_agent_id") ?? "");
     await sb
       .from("buyer_leads")
@@ -106,7 +94,7 @@ export default async function AdminBuyerLeadsPage({
     "use server";
     const next = String(formData.get("status") ?? "");
     if (!(STATUSES as readonly string[]).includes(next)) return;
-    const sb = await assertStaff();
+    const sb = await assertStaff(lang);
     await sb
       .from("buyer_leads")
       .update({

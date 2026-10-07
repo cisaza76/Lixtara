@@ -54,6 +54,7 @@ import { PhotographyCheckoutButton } from "@/components/photography-checkout-but
 import { PhotoUploader } from "@/components/photo-uploader";
 import { OccupancySection } from "@/components/occupancy-section";
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
+import { CheckAllToggle } from "@/components/check-all-toggle";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
@@ -2089,6 +2090,7 @@ export default async function ListingNewPage({
                 <p className="text-xs text-ink/55 leading-relaxed">
                   {copy.step3.appliancesBody}
                 </p>
+                <CheckAllToggle name="appliances" label={copy.step3.appliancesMarkAll} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                   {APPLIANCE_KEYS.map((key) => (
                     <label
