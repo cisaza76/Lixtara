@@ -325,7 +325,7 @@ export default async function RootLayout({
                   {closingCopy.sameNote}
                 </p>
               </div>
-              <ul className="md:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6 text-sm text-ink/80 leading-snug">
+              <ul className="md:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6 text-sm text-ink/80 leading-snug">
                 <li className="flex items-start gap-2.5">
                   <span aria-hidden className="text-gold mt-1 leading-none">•</span>
                   <span>{closingCopy.titleInsurance}</span>
@@ -351,14 +351,6 @@ export default async function RootLayout({
                   <span>{closingCopy.transferTax}</span>
                 </li>
               </ul>
-              <div className="md:col-span-2 flex md:justify-end items-start">
-                <Link
-                  href={`/${lang}/closing-costs`}
-                  className="text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
-                >
-                  {closingCopy.learnMore}
-                </Link>
-              </div>
             </div>
 
             <div className="mt-10 pt-6 border-t border-gold-soft flex flex-col md:flex-row md:items-center justify-between gap-3 text-[10px] uppercase tracking-[0.18em] text-ink/50">
