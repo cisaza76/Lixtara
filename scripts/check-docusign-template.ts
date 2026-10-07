@@ -65,7 +65,7 @@ try {
   // .env.local optional — vars may come from the shell.
 }
 
-import { getAccessToken } from "../src/lib/docusign";
+import { getAccessToken, LIXTARA_BROKER_ROLE } from "../src/lib/docusign";
 
 // The labels POST /api/agreement/create currently sends. Order matches the
 // route handler so the diff at the bottom is easy to scan.
@@ -149,6 +149,7 @@ interface TabsResponse {
 interface Recipient {
   recipientId: string;
   roleName?: string;
+  routingOrder?: string;
   name?: string;
   email?: string;
   tabs?: TabsResponse;
@@ -241,6 +242,18 @@ async function main() {
         console.log(`    [radioGroup] groupName="${label}"`);
       }
     }
+  }
+
+  // #137 f: la broker de Lixtara contrafirma después del vendedor.
+  console.log("\n=== Lixtara broker role (#137 f) ===");
+  const brokerRole = allRecipients.find((r) => r.roleName === LIXTARA_BROKER_ROLE.listingAgreement);
+  if (!brokerRole) {
+    console.log(`✗ MISSING role "${LIXTARA_BROKER_ROLE.listingAgreement}" — add it as Needs to Sign, routing order 2`);
+  } else {
+    console.log(
+      `${brokerRole.routingOrder === "2" ? "✓" : "✗"} role "${brokerRole.roleName}" routingOrder=${brokerRole.routingOrder ?? "?"} (expected 2)` +
+        (brokerRole.email ? `  ⚠ template has a fixed email (${brokerRole.email}); leave it empty — the code fills it` : ""),
+    );
   }
 
   console.log("\n=== Coverage vs route handler ===");
