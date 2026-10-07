@@ -156,7 +156,11 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   the code first, THEN enable Turnstile in Supabase — the reverse breaks every sign-in.
 - `EMAIL_CODE_PEPPER` — server-only. HMAC key for the email verification codes of the
   seller funnel gate (`email_verification_challenges.code_hmac`). That table, not Supabase's
-  OTP, validates those codes. Required once the Phase B gate ships.
+  OTP, validates those codes. It is also the switch for the step-1 email gate of
+  `/listing/new` (`src/lib/listing-email-gate*.ts`): unset = the flow runs as before
+  (anonymous until step 7); set = the seller confirms their email with a 6-digit code
+  right after the address, and the broker can send a "continue your listing" magic link
+  from `/admin/seller-leads` (sellers can request one at `/listing/continue`).
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 

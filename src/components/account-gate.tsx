@@ -58,6 +58,8 @@ interface AccountGateProps {
   lang: string;
   draftId: string;
   pendingEmail: string | null;
+  /** Email already confirmed at step 1: shown read-only, no new code. */
+  knownEmail?: string | null;
   error: string | null;
   codeError: string | null;
   /** Epoch en segundos del último reenvío, propagado por la URL para que el
@@ -73,6 +75,7 @@ export function AccountGate({
   lang,
   draftId,
   pendingEmail,
+  knownEmail = null,
   error,
   codeError,
   resentAt,
@@ -96,6 +99,7 @@ export function AccountGate({
     <CreateAccount
       registerAction={registerAction}
       draftId={draftId}
+      knownEmail={knownEmail}
       error={error}
       labels={labels}
     />
@@ -122,11 +126,13 @@ function errorMessage(error: string | null, labels: AccountGateLabels): string |
 function CreateAccount({
   registerAction,
   draftId,
+  knownEmail,
   error,
   labels,
 }: {
   registerAction: (formData: FormData) => Promise<void>;
   draftId: string;
+  knownEmail: string | null;
   error: string | null;
   labels: AccountGateLabels;
 }) {
@@ -195,14 +201,23 @@ function CreateAccount({
         <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
           {labels.emailLabel}
         </span>
-        <input
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          inputMode="email"
-          className="bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 text-base text-ink"
-        />
+        {knownEmail ? (
+          <>
+            <input type="hidden" name="email" value={knownEmail} />
+            <span className="px-4 py-3 text-base text-ink/80 border-2 border-gold-soft/60 bg-ivory-strong/40">
+              {knownEmail}
+            </span>
+          </>
+        ) : (
+          <input
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            inputMode="email"
+            className="bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 text-base text-ink"
+          />
+        )}
       </label>
 
       <label className="flex flex-col gap-2">
