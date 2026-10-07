@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   BROKERAGE,
+  BROKER_SIGNER_EMAIL,
+  brokerSigner,
   brokerageLicenseLine,
   brokerageLicenseLineShort,
 } from "./brokerage";
@@ -82,5 +84,19 @@ describe("el repo no contiene licencias incorrectas", () => {
       }
     }
     expect(malos).toEqual([]);
+  });
+});
+
+describe("firmante broker en DocuSign (#137 f)", () => {
+  it("si está configurado, es un buzón personal válido (no genérico compartido)", () => {
+    if (BROKER_SIGNER_EMAIL === null) {
+      expect(brokerSigner()).toBeNull(); // pendiente: ningún acuerdo sale sin su firma
+      return;
+    }
+    expect(BROKER_SIGNER_EMAIL).toMatch(/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i);
+    expect(BROKER_SIGNER_EMAIL.split("@")[0].toLowerCase()).not.toMatch(
+      /^(info|admin|contact|contacto|hello|hola|support|soporte|office|team|sales|ventas|broker|brokers|noreply|no-reply)$/,
+    );
+    expect(brokerSigner()).toEqual({ name: BROKERAGE.brokerName, email: BROKER_SIGNER_EMAIL });
   });
 });

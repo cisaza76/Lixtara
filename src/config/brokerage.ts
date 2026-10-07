@@ -20,6 +20,23 @@ export const BROKERAGE = {
   address: "181 Vera Ct, Miami, FL 33143",
 } as const;
 
+/**
+ * Email con el que la broker de Lixtara firma CADA acuerdo en DocuSign (#137 f). Decisión
+ * del owner (2026-09-28): firma Anamaria con un buzón PROPIO — solo ella lo controla, con
+ * verificación en dos pasos, idealmente en el dominio lixtara.com; nunca uno genérico
+ * compartido (DocuSign atribuye la firma a quien controla el email).
+ *
+ * PENDIENTE: el owner debe proveerlo. Mientras sea null, NINGÚN acuerdo se crea: la
+ * creación del sobre falla antes de llamar a DocuSign (un acuerdo con una sola firma no
+ * tiene validez como listing agreement).
+ */
+export const BROKER_SIGNER_EMAIL: string | null = null;
+
+/** Firmante broker de Lixtara: nombre del DBPR + email de firma, o null si falta el email. */
+export function brokerSigner(): { name: string; email: string } | null {
+  return BROKER_SIGNER_EMAIL ? { name: BROKERAGE.brokerName, email: BROKER_SIGNER_EMAIL } : null;
+}
+
 /** Vencimientos según el DBPR (2026-09-27). Revisar antes de cada fecha. */
 export const LICENSE_EXPIRATIONS = {
   brokerageLicense: "2028-09-30",
