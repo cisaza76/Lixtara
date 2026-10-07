@@ -1,5 +1,6 @@
+import { assertStaff } from "@/lib/admin-auth";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -80,23 +81,10 @@ export default async function AdminReferralsPage({
     }
   }
 
-  async function assertStaff() {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
-    const [{ data: a }, { data: b }] = await Promise.all([
-      supabase.rpc("has_role", { _role: "admin" }),
-      supabase.rpc("has_role", { _role: "broker" }),
-    ]);
-    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
-    return supabase;
-  }
 
   async function markPaid(formData: FormData) {
     "use server";
-    const sb = await assertStaff();
+    const sb = await assertStaff(lang);
     await sb
       .from("referrals")
       .update({ reward_paid: true, updated_at: new Date().toISOString() })
@@ -108,7 +96,7 @@ export default async function AdminReferralsPage({
     "use server";
     const next = String(formData.get("status") ?? "");
     if (!["pending", "sent", "signed_up", "closed"].includes(next)) return;
-    const sb = await assertStaff();
+    const sb = await assertStaff(lang);
     await sb
       .from("referrals")
       .update({ status: next, updated_at: new Date().toISOString() })

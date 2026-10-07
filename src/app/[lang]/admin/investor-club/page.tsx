@@ -1,5 +1,6 @@
+import { assertStaffWithUser } from "@/lib/admin-auth";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -47,23 +48,10 @@ export default async function AdminInvestorClubPage({
   const { data } = await query;
   const members = (data ?? []) as Member[];
 
-  async function assertStaff() {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
-    const [{ data: a }, { data: b }] = await Promise.all([
-      supabase.rpc("has_role", { _role: "admin" }),
-      supabase.rpc("has_role", { _role: "broker" }),
-    ]);
-    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
-    return { sb: supabase, userId: user.id };
-  }
 
   async function approve(formData: FormData) {
     "use server";
-    const { sb, userId } = await assertStaff();
+    const { sb, userId } = await assertStaffWithUser(lang);
     await sb
       .from("investor_club_members")
       .update({
@@ -80,7 +68,7 @@ export default async function AdminInvestorClubPage({
 
   async function reject(formData: FormData) {
     "use server";
-    const { sb } = await assertStaff();
+    const { sb } = await assertStaffWithUser(lang);
     await sb
       .from("investor_club_members")
       .update({

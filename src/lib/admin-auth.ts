@@ -34,3 +34,31 @@ export async function requireAdminOrBroker(lang: Locale): Promise<{
 
   return { pendingTasks: count ?? 0 };
 }
+
+/**
+ * Role check for admin SERVER ACTIONS (they are callable on their own, so each
+ * one re-checks). Returns the session client and the user id.
+ *
+ * Lives here, at module scope, on purpose: a helper declared inside a page and
+ * called from its server actions gets captured by them, and Next.js cannot
+ * serialize a function into an action's bound arguments. That crashed the
+ * admin pages with "Functions cannot be passed directly to Client Components".
+ */
+export async function assertStaffWithUser(lang: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(`/${lang}/sign-in?next=/admin`);
+  const [{ data: a }, { data: b }] = await Promise.all([
+    supabase.rpc("has_role", { _role: "admin" }),
+    supabase.rpc("has_role", { _role: "broker" }),
+  ]);
+  if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
+  return { sb: supabase, userId: user.id };
+}
+
+/** Same check, returning only the session client. */
+export async function assertStaff(lang: string) {
+  return (await assertStaffWithUser(lang)).sb;
+}

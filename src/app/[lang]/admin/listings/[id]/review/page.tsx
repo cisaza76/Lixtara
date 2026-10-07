@@ -65,6 +65,63 @@ function field(label: string, value: string | number | null | undefined) {
   );
 }
 
+// Module scope on purpose: a plain function declared inside the page and
+// called from its server actions gets captured by them, and Next.js cannot
+// serialize a function into the action's bound arguments ("Functions cannot be
+// passed directly to Client Components"), which crashed the review page.
+async function transition(
+  lang: string,
+  id: string,
+  shortAddress: string,
+  newStatus: string,
+  actionType: string,
+  note: string | null,
+  mlsNumber: string | null = null,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(`/${lang}/sign-in?next=/admin`);
+  const [{ data: a }, { data: b }] = await Promise.all([
+    supabase.rpc("has_role", { _role: "admin" }),
+    supabase.rpc("has_role", { _role: "broker" }),
+  ]);
+  if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
+
+  const { error: updateError } = await supabase
+    .from("properties")
+    .update(mlsNumber ? { mls_status: newStatus, mls_number: mlsNumber } : { mls_status: newStatus })
+    .eq("id", id);
+  if (mlsNumber && updateError) {
+    // Con número, la aprobación va en la MISMA escritura: si el número choca, no se
+    // aprueba nada y se avisa.
+    redirect(`/${lang}/admin/listings/${id}/review?error=${mapMlsNumberWriteError(updateError)}`);
+  }
+
+  if (newStatus === "active" && !mlsNumber) {
+    await ensureEnterMlsNumberTask(supabase, id, shortAddress);
+  }
+
+  if (newStatus === "active" || newStatus === "withdrawn") {
+    await supabase
+      .from("broker_tasks")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("property_id", id)
+      .eq("task_type", "approve_listing")
+      .eq("status", "pending");
+  }
+
+  await supabase.from("activity_log").insert({
+    user_id: user.id,
+    property_id: id,
+    action_type: actionType,
+    description: note ?? `Listing → ${newStatus}`,
+  });
+
+  redirect(`/${lang}/admin/listings/${id}/review?done=${actionType}`);
+}
+
 export default async function ListingReviewPage({
   params,
   searchParams,
@@ -119,56 +176,6 @@ export default async function ListingReviewPage({
     failed: "Could not save the MLS number. Try again.",
   };
 
-  async function transition(
-    newStatus: string,
-    actionType: string,
-    note: string | null,
-    mlsNumber: string | null = null,
-  ) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
-    const [{ data: a }, { data: b }] = await Promise.all([
-      supabase.rpc("has_role", { _role: "admin" }),
-      supabase.rpc("has_role", { _role: "broker" }),
-    ]);
-    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
-
-    const { error: updateError } = await supabase
-      .from("properties")
-      .update(mlsNumber ? { mls_status: newStatus, mls_number: mlsNumber } : { mls_status: newStatus })
-      .eq("id", id);
-    if (mlsNumber && updateError) {
-      // Con número, la aprobación va en la MISMA escritura: si el número choca, no se
-      // aprueba nada y se avisa.
-      redirect(`/${lang}/admin/listings/${id}/review?error=${mapMlsNumberWriteError(updateError)}`);
-    }
-
-    if (newStatus === "active" && !mlsNumber) {
-      await ensureEnterMlsNumberTask(supabase, id, shortAddress);
-    }
-
-    if (newStatus === "active" || newStatus === "withdrawn") {
-      await supabase
-        .from("broker_tasks")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("property_id", id)
-        .eq("task_type", "approve_listing")
-        .eq("status", "pending");
-    }
-
-    await supabase.from("activity_log").insert({
-      user_id: user.id,
-      property_id: id,
-      action_type: actionType,
-      description: note ?? `Listing → ${newStatus}`,
-    });
-
-    redirect(`/${lang}/admin/listings/${id}/review?done=${actionType}`);
-  }
-
   async function approve(formData: FormData) {
     "use server";
     // Opcional: si aún no está en Matrix se deja vacío y queda la tarea enter_mls_number.
@@ -176,7 +183,7 @@ export default async function ListingReviewPage({
     if (!mls.ok && mls.reason === "invalid_format") {
       redirect(`/${lang}/admin/listings/${id}/review?error=invalid_format`);
     }
-    await transition("active", "listing_approved", null, mls.ok ? mls.value : null);
+    await transition(lang, id, shortAddress, "active", "listing_approved", null, mls.ok ? mls.value : null);
   }
   async function saveMlsNumber(formData: FormData) {
     "use server";
@@ -204,12 +211,12 @@ export default async function ListingReviewPage({
   }
   async function reject() {
     "use server";
-    await transition("withdrawn", "listing_rejected", null);
+    await transition(lang, id, shortAddress, "withdrawn", "listing_rejected", null);
   }
   async function requestChanges(formData: FormData) {
     "use server";
     const note = String(formData.get("note") ?? "").slice(0, 1000).trim();
-    await transition("draft", "listing_changes_requested", note || null);
+    await transition(lang, id, shortAddress, "draft", "listing_changes_requested", note || null);
   }
 
   const fullAddress = `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`;
