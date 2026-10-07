@@ -5,7 +5,7 @@ import { LegalDocument } from "@/components/legal-document";
 import { cookiesDoc } from "@/lib/legal/cookies";
 
 export const metadata: Metadata = {
-  title: "Cookie Policy — Lixtara",
+  title: "Cookie Policy | Lixtara",
 };
 
 export default async function CookiesPage({

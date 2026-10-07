@@ -183,7 +183,7 @@ export default async function AdminConsultationsPage({
                 <div className="flex flex-col gap-1">
                   <p className="font-display text-lg text-ink">
                     {s.service_type.replace(/_/g, " ")}
-                    {s.topic ? ` — ${s.topic}` : ""}
+                    {s.topic ? `: ${s.topic}` : ""}
                   </p>
                   <p className="text-xs text-ink/60">
                     {userName.get(s.user_id) ?? s.user_id.slice(0, 8)}

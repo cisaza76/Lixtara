@@ -59,7 +59,7 @@ export default async function ConsultationsPage({
               {copy.bestValueEyebrow}
             </p>
             <h2 className="font-display text-3xl text-ink">
-              {copy.bestValueTitle} — {usd(BEST_VALUE.price)}
+              {copy.bestValueTitle}: {usd(BEST_VALUE.price)}
             </h2>
             <p className="text-sm text-ink/70">
               {copy.bestValueDesc

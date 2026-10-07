@@ -1,12 +1,27 @@
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { isLocale, t } from "@/lib/i18n";
+import { isLocale, t, type Locale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createService } from "@/lib/supabase/service";
 import { SITE_URL } from "@/lib/config";
 import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
+import { ListingEmailCode } from "@/components/listing-email-code";
+import {
+  cleanCodeInput,
+  isCodeFormat,
+  isValidEmail,
+  normalizeEmail,
+} from "@/lib/listing-email-gate";
+import {
+  emailTakenByAnotherUser,
+  pendingChallengeEmail,
+  recordLeadStep,
+  startEmailChallenge,
+  verifyEmailChallenge,
+} from "@/lib/listing-email-gate.server";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
 import { StepShell } from "@/components/step-shell";
@@ -133,10 +148,14 @@ export default async function ListingNewPage({
     resent?: string;
     cerror?: string;
     verified?: string;
+    gerror?: string;
+    gresent?: string;
+    change?: string;
   }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  const locale: Locale = lang;
 
   // Deferred registration: the listing flow runs on an anonymous Supabase
   // session (created lazily in saveStep1). We do NOT force sign-in here — the
@@ -148,13 +167,33 @@ export default async function ListingNewPage({
   // A real (email-bearing) account is required to sign. Anonymous users — and
   // users mid email-confirmation (email pending in new_email) — are gated at
   // step 7. A confirmed email is the signal that registration is complete.
-  const needsAccount = !sessionUser?.email;
+  // Sellers who confirmed their email at step 1 still owe a name and a
+  // password at step 7 (`account_pending`), but no second email code.
+  const accountPending = sessionUser?.user_metadata?.account_pending === true;
+  const needsAccount = !sessionUser?.email || accountPending;
   const pendingEmail = (sessionUser?.new_email as string | undefined) ?? null;
 
   const sp = await searchParams;
   const step = clampStep(Number.parseInt(sp.step ?? "1", 10) || 1);
   const draftId = sp.id ?? null;
   const copy = t(lang).listingForm;
+
+  // Step-1 email gate (Phase B). Off until EMAIL_CODE_PEPPER is set, so the
+  // flow keeps working exactly as before in any environment without it.
+  const emailGateOn = Boolean(process.env.EMAIL_CODE_PEPPER);
+  const needsGateEmail = emailGateOn && !sessionUser?.email;
+  // The gate is the first thing after the address: no step 2+ without a
+  // confirmed email, so we can always reach the seller with a magic link.
+  if (needsGateEmail && sessionUser && draftId && step >= 2) {
+    redirect(`/${lang}/listing/new?step=1&id=${draftId}`);
+  }
+  const gateCodeEmail =
+    needsGateEmail && sessionUser && draftId && step === 1 && sp.change !== "1"
+      ? await pendingChallengeEmail(sessionUser.id)
+      : null;
+  if (emailGateOn && sessionUser?.email && draftId && step >= 2) {
+    await recordLeadStep(sessionUser.id, draftId, step);
+  }
 
   let draft: Draft | null = null;
   let photos: Array<{
@@ -340,6 +379,29 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=fl_only`);
     }
 
+    // Email gate: only asked while the session has no confirmed email.
+    const gateOn = Boolean(process.env.EMAIL_CODE_PEPPER);
+    const {
+      data: { user: currentUser },
+    } = await (await createClient()).auth.getUser();
+    const askEmail = gateOn && !currentUser?.email;
+    const gateEmail = normalizeEmail(formData.get("email"));
+    if (askEmail) {
+      if (!isValidEmail(gateEmail)) {
+        redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email`);
+      }
+      if (await emailTakenByAnotherUser(gateEmail, currentUser?.id ?? null)) {
+        redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email_exists`);
+      }
+    }
+    // After saving the address: send the code, or go straight to step 2.
+    const continueTo = async (propertyId: string, uid: string): Promise<never> => {
+      if (!askEmail) redirect(`/${lang}/listing/new?id=${propertyId}&step=2`);
+      const sent = await startEmailChallenge({ userId: uid, email: gateEmail, lang: locale });
+      const err = sent === "sent" ? "" : sent === "limit" ? "&gerror=limit" : "&gerror=send";
+      redirect(`/${lang}/listing/new?step=1&id=${propertyId}${err}`);
+    };
+
     // Geocoding is BEST-EFFORT only — it drops a map pin, it NEVER gates the
     // seller's progress. Google Maps can be unavailable (referrer-restricted
     // key, quota, network) and a real seller must always be able to type their
@@ -398,7 +460,7 @@ export default async function ListingNewPage({
       if (error) {
         redirect(`/${lang}/listing/new?step=1&id=${id}&error=save_failed`);
       }
-      redirect(`/${lang}/listing/new?id=${id}&step=2`);
+      await continueTo(id, user.id);
     }
 
     const suggestedTierRaw = String(formData.get("suggested_tier") ?? "");
@@ -427,7 +489,48 @@ export default async function ListingNewPage({
     if (error || !created) {
       redirect(`/${lang}/listing/new?step=1&error=save_failed`);
     }
-    redirect(`/${lang}/listing/new?id=${created.id}&step=2`);
+    await continueTo(created.id, user.id);
+  }
+
+  // Step 1 email code: confirm, or resend.
+  async function verifyGateCode(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    const back = `/${lang}/listing/new?step=1&id=${id}`;
+    const code = cleanCodeInput(formData.get("code"));
+    if (!isCodeFormat(code)) redirect(`${back}&gerror=format`);
+
+    const {
+      data: { user },
+    } = await (await createClient()).auth.getUser();
+    if (!user) redirect(`/${lang}/listing/continue`);
+
+    const result = await verifyEmailChallenge({
+      userId: user.id,
+      code,
+      lang: locale,
+      propertyId: id,
+    });
+    if (result !== "verified") redirect(`${back}&gerror=${result}`);
+    redirect(`/${lang}/listing/new?id=${id}&step=2`);
+  }
+
+  async function resendGateCode(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    const back = `/${lang}/listing/new?step=1&id=${id}`;
+    const {
+      data: { user },
+    } = await (await createClient()).auth.getUser();
+    if (!user) redirect(`/${lang}/listing/continue`);
+    const email = await pendingChallengeEmail(user.id);
+    if (!email) redirect(`${back}&change=1`);
+    const sent = await startEmailChallenge({ userId: user.id, email, lang: locale });
+    if (sent === "limit") redirect(`${back}&gerror=limit`);
+    if (sent !== "sent") redirect(`${back}&gerror=send`);
+    redirect(`${back}&gresent=1`);
   }
 
   async function saveStep2(formData: FormData) {
@@ -1119,7 +1222,6 @@ export default async function ListingNewPage({
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
     const back = `/${lang}/listing/new?step=7&id=${id}`;
     if (!firstName || !lastName) redirect(`${back}&aerror=name`);
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) redirect(`${back}&aerror=email`);
     if (password.length < 8) redirect(`${back}&aerror=password`);
 
     const supabase = await createClient();
@@ -1127,6 +1229,30 @@ export default async function ListingNewPage({
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    // Email already confirmed with the step-1 code: no second code, just set
+    // the name and password on the same account.
+    if (user.email && user.user_metadata?.account_pending === true) {
+      const svc = createService();
+      const { error: pwError } = await svc.auth.admin.updateUserById(user.id, {
+        password,
+        user_metadata: {
+          first_name: firstName,
+          last_name: lastName,
+          account_pending: false,
+        },
+      });
+      if (pwError) redirect(`${back}&aerror=failed`);
+      await svc
+        .from("users")
+        .upsert(
+          { id: user.id, email: user.email, first_name: firstName, last_name: lastName },
+          { onConflict: "id" },
+        );
+      redirect(back);
+    }
+
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) redirect(`${back}&aerror=email`);
 
     const { error } = await supabase.auth.updateUser(
       {
@@ -1271,6 +1397,10 @@ export default async function ListingNewPage({
   const errorMessage =
     sp.error === "captcha"
       ? t(lang).auth.errors.captchaFailed
+      : sp.error === "email"
+      ? copy.step1.emailInvalid
+      : sp.error === "email_exists"
+      ? copy.step1.emailExists
       : sp.error === "required"
       ? "All fields are required."
       : sp.error === "fl_only"
@@ -1282,7 +1412,7 @@ export default async function ListingNewPage({
           : sp.error === "invalid_type"
             ? "Pick a property type."
             : sp.error === "invalid_beds"
-              ? "Bedrooms must be 0–30."
+              ? "Bedrooms must be between 0 and 30."
               : sp.error === "invalid_baths"
                 ? "Bathrooms must be a number greater than 0 (e.g. 2 or 2.5)."
                 : sp.error === "invalid_sqft"
@@ -1308,7 +1438,7 @@ export default async function ListingNewPage({
                                     : sp.error === "rights_required"
                                       ? copy.step5.ownershipRequired
                                       : sp.error === "invalid_parking"
-                                        ? "Parking spaces must be 0–50."
+                                        ? "Parking spaces must be between 0 and 50."
                                         : sp.error === "invalid_hoa"
                                           ? "HOA fee must be a non-negative dollar amount."
                                           : sp.error === "invalid_tax"
@@ -1356,6 +1486,27 @@ export default async function ListingNewPage({
             </p>
           </div>
           {errorMessage && <ErrorBanner message={errorMessage} />}
+          {sp.error === "email_exists" && (
+            <Link
+              href={`/${lang}/sign-in?next=/listing/new`}
+              className="self-start text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+            >
+              {copy.step1.emailSignIn} →
+            </Link>
+          )}
+          {gateCodeEmail && draftId ? (
+            <ListingEmailCode
+              email={gateCodeEmail}
+              draftId={draftId}
+              verifyAction={verifyGateCode}
+              resendAction={resendGateCode}
+              changeEmailHref={`/${lang}/listing/new?step=1&id=${draftId}&change=1`}
+              signInHref={`/${lang}/sign-in?next=/listing/new`}
+              error={typeof sp.gerror === "string" ? sp.gerror : null}
+              resent={sp.gresent === "1"}
+              labels={copy.step1.emailCode}
+            />
+          ) : (
           <form action={saveStep1} className="flex flex-col gap-6">
             {draftId && <input type="hidden" name="id" value={draftId} />}
             {sp.suggested_tier && (
@@ -1378,11 +1529,30 @@ export default async function ListingNewPage({
               defaultLng={draft?.longitude ?? null}
               verifiedNote={copy.step1.verifiedNote}
             />
+            {needsGateEmail && (
+              <Field
+                label={copy.step1.emailLabel}
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                help={copy.step1.emailHelp}
+              />
+            )}
             {/* Only a visitor without a session triggers the anonymous
-                sign-up in saveStep1 — that's the only call needing a token. */}
+                sign-up in saveStep1; that's the only call needing a token. */}
             {!sessionUser && <TurnstileWidget lang={lang} />}
             <SubmitButton>{copy.nextLabel} →</SubmitButton>
+            {!sessionUser && (
+              <Link
+                href={`/${lang}/listing/continue`}
+                className="self-start text-sm text-ink/60 underline underline-offset-4 hover:text-gold transition-colors"
+              >
+                {copy.step1.continueExisting}
+              </Link>
+            )}
           </form>
+          )}
         </div>
       )}
 
@@ -1587,7 +1757,8 @@ export default async function ListingNewPage({
                     </div>
                     <span className="text-xs text-ink/60">
                       {copy.step3.compsRangeLabel}: ${" "}
-                      {draft.price_estimate_low.toLocaleString()} – $
+                      {draft.price_estimate_low.toLocaleString()}{" "}
+                      {lang === "es" ? "a" : "to"} $
                       {draft.price_estimate_high.toLocaleString()}
                     </span>
                   </div>
@@ -2568,7 +2739,7 @@ export default async function ListingNewPage({
                               )
                               .replace(
                                 "{range}",
-                                `${draft.price_estimate_low.toLocaleString()}–${draft.price_estimate_high.toLocaleString()}`,
+                                `${draft.price_estimate_low.toLocaleString()} ${lang === "es" ? "a" : "to"} $${draft.price_estimate_high.toLocaleString()}`,
                               )
                           : copy.step6.compsNone}
                       </div>
@@ -2831,6 +3002,7 @@ export default async function ListingNewPage({
               lang={lang}
               draftId={draftId}
               pendingEmail={pendingEmail}
+              knownEmail={accountPending ? (sessionUser?.email ?? null) : null}
               resentAt={
                 typeof sp.resent === "string" ? Number.parseInt(sp.resent, 10) : null
               }

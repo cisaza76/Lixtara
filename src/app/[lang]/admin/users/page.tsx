@@ -119,12 +119,12 @@ export default async function AdminUsersPage({
       )}
       {sp.error === "no_service" && (
         <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
-          Service key not configured — role changes are unavailable.
+          Service key not configured, so role changes are unavailable.
         </div>
       )}
       {!svc && (
         <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Service key not configured — the user directory can&apos;t be loaded.
+          Service key not configured, so the user directory can&apos;t be loaded.
         </div>
       )}
 

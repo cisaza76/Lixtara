@@ -26,7 +26,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Lixtara — Florida real estate, licensed brokerage",
+  title: "Lixtara | Florida real estate, licensed brokerage",
   description:
     "Sell your Florida home with a licensed brokerage. Full MLS exposure. You keep more equity.",
 };

@@ -40,7 +40,7 @@ export async function ensureEnterMlsNumberTask(
   const { error } = await supabase.from("broker_tasks").insert({
     property_id: propertyId,
     task_type: ENTER_MLS_NUMBER_TASK,
-    title: `Enter MLS number — ${address}`,
+    title: `Enter MLS number: ${address}`,
     description:
       "After entering this listing in Matrix, record its MLS number on the listing's " +
       "review page. Without it, /properties can show the listing twice (ours + the IDX feed).",

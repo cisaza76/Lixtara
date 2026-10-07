@@ -5,7 +5,7 @@ import { LegalDocument } from "@/components/legal-document";
 import { dmcaDoc } from "@/lib/legal/dmca";
 
 export const metadata: Metadata = {
-  title: "Copyright & DMCA Policy — Lixtara",
+  title: "Copyright & DMCA Policy | Lixtara",
 };
 
 export default async function DmcaPage({

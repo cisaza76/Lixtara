@@ -125,8 +125,8 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
   const isEs = lang === "es";
   const tierName = input.tier.charAt(0).toUpperCase() + input.tier.slice(1);
   const subject = isEs
-    ? `Pago recibido — listing ${tierName} de Lixtara`
-    : `Payment received — your ${tierName} Lixtara listing`;
+    ? `Pago recibido por tu listing ${tierName} de Lixtara`
+    : `Payment received for your ${tierName} Lixtara listing`;
 
   const body = isEs
     ? `
@@ -167,8 +167,8 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
   const lang = input.lang ?? "en";
   const isEs = lang === "es";
   const subject = isEs
-    ? `Acuerdo de listing firmado — Lixtara`
-    : `Listing agreement signed — Lixtara`;
+    ? `Tu acuerdo de listing con Lixtara está firmado`
+    : `Your Lixtara listing agreement is signed`;
 
   const body = isEs
     ? `
@@ -203,8 +203,8 @@ export async function sendListingApproved(input: ListingApprovedInput) {
   const lang = input.lang ?? "en";
   const isEs = lang === "es";
   const subject = isEs
-    ? `🎉 Tu listing está en vivo en MLS — Lixtara`
-    : `🎉 Your listing is live on MLS — Lixtara`;
+    ? `🎉 Tu listing de Lixtara está en vivo en MLS`
+    : `🎉 Your Lixtara listing is live on MLS`;
 
   const body = isEs
     ? `
@@ -242,7 +242,7 @@ export interface BrokerNewPendingInput {
 
 export async function sendBrokerNewPending(input: BrokerNewPendingInput) {
   const tierName = input.tier.charAt(0).toUpperCase() + input.tier.slice(1);
-  const subject = `New listing pending review — ${input.propertyAddress}`;
+  const subject = `New listing pending review: ${input.propertyAddress}`;
 
   const body = `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">New listing for broker review</p>
@@ -277,6 +277,62 @@ export async function sendListingVideoTerminal(input: {
   idempotencyKey: string;
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   return send(input);
+}
+
+// ─── Listing email gate (step 1) ─────────────────────────────────────
+// Transactional: the seller asked for both (they typed their email to start a
+// listing, or asked for a link to continue it), so no CAN-SPAM footer.
+
+export async function sendListingEmailCode(input: {
+  to: string;
+  lang: Lang;
+  code: string;
+  minutes: number;
+}) {
+  const isEs = input.lang === "es";
+  const subject = isEs
+    ? `Tu código de Lixtara: ${input.code}`
+    : `Your Lixtara code: ${input.code}`;
+  const intro = isEs
+    ? "Usa este código para confirmar tu email y seguir con tu listing."
+    : "Use this code to confirm your email and keep going with your listing.";
+  const expiry = isEs
+    ? `Vence en ${input.minutes} minutos. Si no fuiste tú, ignora este correo.`
+    : `It expires in ${input.minutes} minutes. If this wasn't you, you can ignore this email.`;
+  const body = `
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;margin:0 0 16px;">${intro}</p>
+    <p style="font-family:Georgia,serif;font-size:34px;letter-spacing:0.3em;color:#1c1c1c;margin:0 0 16px;">${input.code}</p>
+    <p style="font-size:13px;line-height:1.7;color:#8a8268;">${expiry}</p>
+  `;
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: intro, body }),
+    text: `${intro}\n\n${input.code}\n\n${expiry}`,
+  });
+}
+
+export async function sendListingResumeLink(input: { to: string; lang: Lang; url: string }) {
+  const isEs = input.lang === "es";
+  const subject = isEs ? "Continúa tu listing en Lixtara" : "Continue your Lixtara listing";
+  const intro = isEs
+    ? "Tu listing te está esperando. Este link inicia tu sesión y te lleva al paso donde quedaste."
+    : "Your listing is waiting for you. This link signs you in and takes you to the step where you left off.";
+  const note = isEs
+    ? "El link funciona una sola vez. Si no lo pediste, ignora este correo."
+    : "The link works only once. If you didn't ask for it, you can ignore this email.";
+  const body = `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">${subject}</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${intro}</p>
+    ${button(input.url, isEs ? "Continuar mi listing" : "Continue my listing")}
+    <p style="font-size:13px;line-height:1.7;color:#8a8268;">${note}</p>
+  `;
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: intro, body }),
+    text: `${intro}\n\n${input.url}\n\n${note}`,
+  });
 }
 
 // ─── Commercial email (CAN-SPAM) ─────────────────────────────────────

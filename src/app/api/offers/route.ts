@@ -134,7 +134,7 @@ export async function POST(req: Request) {
         const address = `${property.address_street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
         const origin =
           process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
-        const subject = `New offer on ${property.address_street} — $${amount.toLocaleString()}`;
+        const subject = `New $${amount.toLocaleString()} offer on ${property.address_street}`;
         await resend.emails.send({
           from: "Lixtara <onboarding@resend.dev>",
           to: overrideTo,

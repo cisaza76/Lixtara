@@ -5,7 +5,7 @@ import { LegalDocument } from "@/components/legal-document";
 import { privacyDoc } from "@/lib/legal/privacy";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Lixtara",
+  title: "Privacy Policy | Lixtara",
 };
 
 export default async function PrivacyPage({

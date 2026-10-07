@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   const limited = await enforceLimit(
     apiLimiter("checkout:consultation", 20, "1 h"),
     `u:${user.id}`,
-    { label: "checkout:consultation", message: "Too many attempts — wait a moment." },
+    { label: "checkout:consultation", message: "Too many attempts. Please wait a moment." },
   );
   if (limited) return limited;
 

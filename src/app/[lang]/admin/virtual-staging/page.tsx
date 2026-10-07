@@ -110,7 +110,7 @@ export default async function AdminVirtualStagingPage({
 
       {!svc ? (
         <p className="text-sm text-amber-700 italic">
-          Service key not configured — staged photos can&apos;t be loaded.
+          Service key not configured, so staged photos can&apos;t be loaded.
         </p>
       ) : staged.length === 0 ? (
         <p className="text-sm text-ink/55 italic">

@@ -121,7 +121,7 @@ export default async function AdminBuyerLeadsPage({
   const budget = (lo: number | null, hi: number | null) => {
     if (lo == null && hi == null) return "—";
     const f = (n: number | null) => (n != null ? `$${n.toLocaleString()}` : "?");
-    return `${f(lo)} – ${f(hi)}`;
+    return `${f(lo)} to ${f(hi)}`;
   };
 
   return (
@@ -207,7 +207,7 @@ export default async function AdminBuyerLeadsPage({
                     defaultValue={l.assigned_agent_id ?? ""}
                     className="border border-gold-soft bg-ivory px-2 py-1.5 text-sm text-ink focus:outline-none focus:border-gold"
                   >
-                    <option value="">— assign agent —</option>
+                    <option value="">Assign agent</option>
                     {agents.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name}

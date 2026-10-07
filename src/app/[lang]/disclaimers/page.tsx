@@ -5,7 +5,7 @@ import { LegalDocument } from "@/components/legal-document";
 import { disclaimersDoc } from "@/lib/legal/disclaimers";
 
 export const metadata: Metadata = {
-  title: "Disclaimers — Lixtara",
+  title: "Disclaimers | Lixtara",
 };
 
 export default async function DisclaimersPage({
