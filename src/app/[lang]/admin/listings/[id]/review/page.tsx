@@ -9,6 +9,8 @@ import {
   mapMlsNumberWriteError,
   saveListingMlsNumber,
 } from "@/lib/listing-mls-number.server";
+import { describeChanges, type ChangeSet } from "@/lib/listing-requests";
+import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
 
 interface Property {
   id: string;
@@ -36,6 +38,14 @@ interface Property {
   tenant_notes: string | null;
   legal_description: string | null;
   buyer_agent_commission: number | null;
+}
+
+interface SellerRequest {
+  id: string;
+  kind: "change" | "withdrawal";
+  changes: ChangeSet;
+  reason: string | null;
+  created_at: string;
 }
 
 interface Photo {
@@ -102,6 +112,15 @@ export default async function ListingReviewPage({
       .maybeSingle(),
   ]);
   const photos = (photoRows ?? []) as Photo[];
+
+  // Solicitudes pendientes del vendedor (#134, #136): se aplican solo al aprobarlas aquí.
+  const { data: requestRows } = await supabase
+    .from("listing_requests")
+    .select("id,kind,changes,reason,created_at")
+    .eq("property_id", id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  const sellerRequests = (requestRows ?? []) as SellerRequest[];
   const agreement = (agreementRow ?? null) as Agreement | null;
 
   // ── Broker actions (admin/broker gated). The Lovable workflow statuses
@@ -117,6 +136,9 @@ export default async function ListingReviewPage({
     empty: "Enter the MLS number.",
     taken: "That MLS number is already on another listing.",
     failed: "Could not save the MLS number. Try again.",
+    matrix_required: "Confirm you already made this change in Matrix.",
+    not_pending: "That request was already handled.",
+    apply_failed: "Could not apply the request to the listing. Try again.",
   };
 
   async function transition(
@@ -202,6 +224,41 @@ export default async function ListingReviewPage({
         : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
     );
   }
+  // Solicitud del vendedor: Matrix primero, luego aprobar (se aplica) o rechazar (#134, #136).
+  async function reviewSellerRequest(formData: FormData) {
+    "use server";
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
+    const [{ data: a }, { data: b }] = await Promise.all([
+      supabase.rpc("has_role", { _role: "admin" }),
+      supabase.rpc("has_role", { _role: "broker" }),
+    ]);
+    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
+
+    const requestId = String(formData.get("request_id") ?? "");
+    const decision = String(formData.get("decision") ?? "");
+    const note = String(formData.get("note") ?? "").slice(0, 2000).trim() || null;
+    if (!requestId || (decision !== "approve" && decision !== "reject")) {
+      redirect(`/${lang}/admin/listings/${id}/review`);
+    }
+    if (decision === "approve" && formData.get("matrix_done") !== "1") {
+      redirect(`/${lang}/admin/listings/${id}/review?error=matrix_required`);
+    }
+    const args = { requestId, propertyId: id, reviewerId: user.id, note };
+    const r =
+      decision === "approve"
+        ? await approveListingRequest(supabase, args)
+        : await rejectListingRequest(supabase, args);
+    redirect(
+      r.ok
+        ? `/${lang}/admin/listings/${id}/review?done=seller_request_${decision === "approve" ? "approved" : "rejected"}`
+        : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
+    );
+  }
+
   async function reject() {
     "use server";
     await transition("withdrawn", "listing_rejected", null);
@@ -245,6 +302,66 @@ export default async function ListingReviewPage({
         <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
           {MLS_ERRORS[sp.error]} Nothing was changed.
         </div>
+      )}
+
+      {sellerRequests.length > 0 && (
+        <section className="border border-gold bg-gold/5 p-6 flex flex-col gap-5">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
+            Seller requests ({sellerRequests.length})
+          </span>
+          <p className="text-sm text-ink/75">
+            Make the change in Matrix first. Approving applies it on lixtara.com; nothing is
+            published before that.
+          </p>
+          {sellerRequests.map((r) => (
+            <form
+              key={r.id}
+              action={reviewSellerRequest}
+              className="border-t border-gold-soft pt-4 flex flex-col gap-3"
+            >
+              <input type="hidden" name="request_id" value={r.id} />
+              <p className="text-sm text-ink">
+                <strong>{r.kind === "change" ? "Change" : "Withdrawal"}</strong>
+                <span className="text-ink/55"> · {new Date(r.created_at).toLocaleDateString("en-US")}</span>
+              </p>
+              {r.kind === "change" ? (
+                <p className="text-sm text-ink/80 font-mono break-words">{describeChanges(r.changes)}</p>
+              ) : (
+                <p className="text-sm text-ink/80">Take this listing off the market (→ withdrawn).</p>
+              )}
+              {r.reason && <p className="text-sm text-ink/70 italic">“{r.reason}”</p>}
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input type="checkbox" name="matrix_done" value="1" />
+                {r.kind === "change" ? "Already updated in Matrix" : "Already withdrawn in Matrix"}
+              </label>
+              <textarea
+                name="note"
+                rows={2}
+                maxLength={2000}
+                placeholder="Note to the seller (optional)"
+                className="w-full border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink"
+              />
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  name="decision"
+                  value="approve"
+                  className="inline-flex items-center px-5 py-2.5 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
+                >
+                  Approve &amp; apply
+                </button>
+                <button
+                  type="submit"
+                  name="decision"
+                  value="reject"
+                  className="inline-flex items-center px-5 py-2.5 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.22em] uppercase hover:border-gold transition-colors"
+                >
+                  Reject
+                </button>
+              </div>
+            </form>
+          ))}
+        </section>
       )}
 
       {/* MLS number — anotado a mano desde Matrix; evita que /properties muestre el

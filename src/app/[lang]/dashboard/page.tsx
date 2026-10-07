@@ -15,6 +15,8 @@ import type { StrategyPayload } from "@/lib/media-intelligence/types";
 import { ListingVideoPanel } from "@/components/listing-video-panel";
 import { SourceVideoSection } from "@/components/source-video-section";
 import { resolveVisibleVideoListings } from "@/lib/creative-studio/video-access-guard";
+import { canRequest } from "@/lib/listing-requests";
+import { REQUESTS_COPY } from "@/lib/listing-requests-copy";
 
 interface ListingRow {
   id: string;
@@ -599,6 +601,15 @@ export default async function DashboardPage({
                       isDraft ? copy.continueListingButton : copy.viewListingButton
                     }
                   />
+                  {/* Listing ya enviado: los cambios y el retiro pasan por la broker (#134, #136). */}
+                  {!isDraft && (canRequest("change", l.mls_status) || canRequest("withdrawal", l.mls_status)) && (
+                    <Link
+                      href={`/${lang}/dashboard/listings/${l.id}/requests`}
+                      className="self-start text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+                    >
+                      {REQUESTS_COPY[lang as Locale].dashboardLink}
+                    </Link>
+                  )}
                   {mediaAgentEnabled && (
                     <MediaStrategyPanel
                       propertyId={l.id}

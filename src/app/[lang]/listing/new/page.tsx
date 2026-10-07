@@ -225,6 +225,13 @@ export default async function ListingNewPage({
       .maybeSingle();
     draft = (data as Draft | null) ?? null;
 
+    // Ya enviado (pagado, activo, bajo contrato…): sus campos clave no se editan aquí —
+    // el guard de la base los rechaza — sino por solicitud a la broker (#136). Fotos
+    // (paso 5) y cuenta / pago / acuerdo (7–8) siguen disponibles.
+    if (draft && draft.mls_status !== "draft" && [1, 2, 3, 4, 6].includes(step)) {
+      redirect(`/${lang}/dashboard/listings/${draftId}/requests`);
+    }
+
     // Step 3 auto-fetch: Miami-Dade autofill (if zip is Miami-Dade + fields
     // still placeholders) + Rentcast comps (if not fetched yet). Runs server-
     // side on entry to Step 3 so the form pre-populates with real data + the

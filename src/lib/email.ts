@@ -265,6 +265,50 @@ export async function sendBrokerNewPending(input: BrokerNewPendingInput) {
 }
 
 
+// ---- #134 / #136 — solicitud del vendedor sobre un listing ya enviado -----------------
+export interface BrokerListingRequestInput {
+  to: string;
+  kind: "change" | "withdrawal";
+  propertyAddress: string;
+  /** Resumen "campo: antes → después" (cambio) o null (retiro). */
+  summary: string | null;
+  reason: string | null;
+  reviewUrl: string;
+  /** Una notificación por solicitud aunque el endpoint se reintente. */
+  requestId: string;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+export async function sendBrokerListingRequest(input: BrokerListingRequestInput) {
+  const isChange = input.kind === "change";
+  const subject = isChange
+    ? `Listing change request — ${input.propertyAddress}`
+    : `Withdrawal request — ${input.propertyAddress}`;
+  const lead = isChange
+    ? "A seller asked to change an active listing. Update Matrix first, then approve the request — it is not published until you do."
+    : "A seller asked to withdraw their listing. Withdraw it in Matrix first, then approve the request.";
+  const body = `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">${isChange ? "Listing change request" : "Withdrawal request"}</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${lead}</p>
+    <p style="font-size:13px;line-height:1.7;color:#1c1c1c;"><strong>Address:</strong> ${escapeHtml(input.propertyAddress)}</p>
+    ${input.summary ? `<p style="font-size:13px;line-height:1.7;color:#1c1c1c;"><strong>Changes:</strong> ${escapeHtml(input.summary)}</p>` : ""}
+    ${input.reason ? `<p style="font-size:13px;line-height:1.7;color:#1c1c1c;"><strong>Reason:</strong> <em>${escapeHtml(input.reason)}</em></p>` : ""}
+    ${button(input.reviewUrl, "Open the listing review →")}
+  `;
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: subject, body }),
+    text: [subject, lead, `Address: ${input.propertyAddress}`, input.summary ? `Changes: ${input.summary}` : null, input.reason ? `Reason: ${input.reason}` : null, input.reviewUrl]
+      .filter(Boolean)
+      .join("\n"),
+    idempotencyKey: `listing-request:${input.requestId}`,
+  });
+}
+
 // ---- UX 5C — listing-video terminal notification ------------------------------------
 // Fire-and-forget like every sender here (NEVER throws). `idempotencyKey` makes the
 // send at-most-once per (job, outcome) at the PROVIDER — retries/reconciliation of the

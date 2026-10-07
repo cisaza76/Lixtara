@@ -81,6 +81,12 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   dates, `mls_number`, `owner_id`, `is_test` and `pricing_tier` after draft are broker/admin
   or `service_role` only. A new seller-editable column must be added to that list (a test
   fails otherwise). Every `mls_status` change is logged in `property_status_history`.
+- Once a listing is no longer a draft, the seller writes only
+  `properties_seller_post_draft_columns()` (migration `20261007170000`: contact preference,
+  photo-rights confirmation, internal comps). Key fields and withdrawal go through
+  `listing_requests` (`POST /api/listings/[id]/change-request` and `/withdrawal-request`):
+  the broker updates Matrix, approves on `/admin/listings/[id]/review`, and only then is the
+  change applied. Verified with `pnpm db-check:listing-requests`.
 
 ### Test data
 - Tests run in **preview**, not production. If something must be tested in production,
