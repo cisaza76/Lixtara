@@ -897,8 +897,6 @@ export const dictionaries = {
       cta: "Contact about this listing",
       ctaCaption: "Through Lixtara · Licensed Florida brokerage",
       demoBadge: "Demo listing",
-      notFoundTitle: "Listing not found",
-      notFoundBody: "This property is no longer active or never existed.",
       tourEyebrow: "3D walkthrough",
       tourLoading: "Loading 3D scene…",
       tourFailed: "Couldn't load the 3D tour.",
@@ -1134,7 +1132,6 @@ export const dictionaries = {
       escrow: "Escrow / closing-agent fee",
       transferTax: "Documentary stamp / transfer tax",
       sameNote: "Identical regardless of who lists your home.",
-      learnMore: "View the full closing-cost breakdown →",
     },
     loui: {
       openLabel: "Open Loui chat",
@@ -2265,8 +2262,6 @@ export const dictionaries = {
       cta: "Contactar sobre este listing",
       ctaCaption: "A través de Lixtara · Correduría licenciada en Florida",
       demoBadge: "Listing demo",
-      notFoundTitle: "Listing no encontrado",
-      notFoundBody: "Esta propiedad ya no está activa o nunca existió.",
       tourEyebrow: "Tour 3D",
       tourLoading: "Cargando escena 3D…",
       tourFailed: "No pudimos cargar el tour 3D.",
@@ -2502,7 +2497,6 @@ export const dictionaries = {
       escrow: "Fee de escrow / closing agent",
       transferTax: "Documentary stamp / impuesto de transferencia",
       sameNote: "Idéntico independientemente de quién liste tu casa.",
-      learnMore: "Ver el desglose completo de closing costs →",
     },
     loui: {
       openLabel: "Abrir chat Loui",
