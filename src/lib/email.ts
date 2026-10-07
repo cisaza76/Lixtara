@@ -1,10 +1,13 @@
 // Transactional email wrapper around Resend.
 //
-// Test mode posture (until lixtara.com is verified in Resend):
-//   - from = onboarding@resend.dev (Resend's no-DNS sender)
-//   - to   = EMAIL_DEV_OVERRIDE_TO when set, otherwise the real recipient
-// Set EMAIL_DEV_OVERRIDE_TO to your own email to receive everything for
-// debugging. Remove the env var once you're on a verified domain.
+// Sender:
+//   - from     = EMAIL_FROM (e.g. "Lixtara <hola@lixtara.com>", a sender on the
+//                lixtara.com domain verified in Resend). Unset = Resend's test
+//                sender onboarding@resend.dev, which only delivers to the Resend
+//                account owner, so real customers get nothing.
+//   - reply-to = EMAIL_REPLY_TO when set (a real inbox for replies).
+//   - to       = EMAIL_DEV_OVERRIDE_TO when set (debugging), otherwise the real
+//                recipient. Never set it in Production.
 //
 // All public helpers (sendPaymentReceipt, sendAgreementSigned, etc.) are
 // fire-and-forget from the caller's perspective — they NEVER throw. The
@@ -28,7 +31,16 @@ function client(): Resend | null {
   return _client;
 }
 
-const DEFAULT_FROM = "Lixtara <onboarding@resend.dev>";
+const TEST_FROM = "Lixtara <onboarding@resend.dev>";
+
+/** Sender for every Lixtara email (see header). */
+export function emailFrom(): string {
+  return process.env.EMAIL_FROM?.trim() || TEST_FROM;
+}
+
+function emailReplyTo(): string | undefined {
+  return process.env.EMAIL_REPLY_TO?.trim() || undefined;
+}
 
 interface SendInput {
   to: string;
@@ -54,7 +66,8 @@ async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error
   try {
     const { data, error } = await c.emails.send(
       {
-        from: input.from ?? DEFAULT_FROM,
+        from: input.from ?? emailFrom(),
+        ...(emailReplyTo() ? { replyTo: emailReplyTo() } : {}),
         to,
         subject: input.subject,
         html: input.html,
@@ -92,7 +105,7 @@ function shell(opts: { preheader: string; body: string }): string {
       <tr><td style="padding:20px 32px;border-top:1px solid #ece6d6;font-size:11px;color:#8a8268;line-height:1.6;">
         ${brokerageLicenseLine("en")}<br>
         ${BROKERAGE.address}<br>
-        <a href="https://lixtara.vercel.app" style="color:#a18943;text-decoration:none;">lixtara.com</a>
+        <a href="https://lixtara.com" style="color:#a18943;text-decoration:none;">lixtara.com</a>
       </td></tr>
     </table>
   </td></tr>

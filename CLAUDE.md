@@ -161,6 +161,11 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   (anonymous until step 7); set = the seller confirms their email with a 6-digit code
   right after the address, and the broker can send a "continue your listing" magic link
   from `/admin/seller-leads` (sellers can request one at `/listing/continue`).
+- `EMAIL_FROM` / `EMAIL_REPLY_TO` — server-only. Sender (`"Lixtara <…@lixtara.com>"`, a
+  sender on the domain verified in Resend) and reply-to inbox for every email
+  (`src/lib/email.ts#emailFrom`). Unset `EMAIL_FROM` = Resend's test sender
+  `onboarding@resend.dev`, which only delivers to the Resend account owner.
+  `EMAIL_DEV_OVERRIDE_TO` reroutes all mail to one address (debug only, never Production).
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 

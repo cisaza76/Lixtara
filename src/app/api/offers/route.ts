@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
+import { emailFrom } from "@/lib/email";
 
 const VALID_FINANCING = new Set([
   "cash",
@@ -136,7 +137,8 @@ export async function POST(req: Request) {
           process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
         const subject = `New $${amount.toLocaleString()} offer on ${property.address_street}`;
         await resend.emails.send({
-          from: "Lixtara <onboarding@resend.dev>",
+          from: emailFrom(),
+          ...(process.env.EMAIL_REPLY_TO ? { replyTo: process.env.EMAIL_REPLY_TO } : {}),
           to: overrideTo,
           subject,
           html: `<p>You received a new offer.</p>
