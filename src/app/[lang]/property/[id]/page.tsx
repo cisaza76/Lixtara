@@ -30,24 +30,10 @@ export default async function PropertyDetailPage({
   const copy = t(lang).property;
   const property = await getPropertyById(id);
 
-  if (!property) {
-    return (
-      <main className="bg-background text-foreground flex-1 flex items-center justify-center px-6 py-32">
-        <div className="max-w-md text-center flex flex-col items-center gap-6">
-          <h1 className="font-display text-4xl text-ink font-normal">
-            {copy.notFoundTitle}
-          </h1>
-          <p className="text-base text-ink/70">{copy.notFoundBody}</p>
-          <Link
-            href={`/${lang}/properties`}
-            className="text-[10px] uppercase tracking-[0.22em] text-gold"
-          >
-            {copy.backToListings}
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  // Soft 404 → 404 real (#135). notFound() renderiza ./not-found.tsx con status 404 y
+  // <meta name="robots" content="noindex">, sin datos del listing. Los retirados/vencidos/
+  // cerrados no llegan aquí: el proxy responde 410 antes.
+  if (!property) notFound();
 
   const street = cleanDemoPrefix(property.address_street);
   const fullAddress = `${street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
