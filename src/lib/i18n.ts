@@ -40,7 +40,7 @@ export const dictionaries = {
         },
         {
           headline: "Licensed brokerage on your side",
-          body: "Anamaria and her FL-licensed team handle contracts, disclosures, and the legal mechanics. You're never alone.",
+          body: "{brokerFirstName} and her FL-licensed team handle contracts, disclosures, and the legal mechanics. You're never alone.",
         },
         {
           headline: "On the MLS and every major site",
@@ -502,7 +502,7 @@ export const dictionaries = {
         stagingStep1: "Upload a photo of an empty or sparsely furnished room (any space: bedroom, living room, kitchen, dining, bath, office, or outdoor).",
         stagingStep2: "Our AI furnishes it virtually with photoreal, on-style furniture in seconds, with modern, minimalist, traditional, or warm options.",
         stagingStep3: "Use the staged image alongside your originals. No listing rules are broken, because the original photo is always preserved and labeled.",
-        stagingPricing: "First 3 rooms free for every listing, then $5 per room. Available after you publish from the Edit Listing page.",
+        stagingPricing: "First 5 rooms free for every listing, then $5 per room. Available after you publish from the Edit Listing page.",
         photoReorderHint: "Drag photos to reorder. The first one (primary) is what shows on listing cards.",
         tourTitle: "🎥 3D Walkthrough Tour (Pro + Concierge)",
         tourBody: "Upload a 60 to 120 second phone walkthrough of your home. We convert it into an interactive 3D tour buyers can navigate from any browser, typically ready within an hour.",
@@ -624,7 +624,6 @@ export const dictionaries = {
         emptyToImprove: "Write a few sentences first, then improve.",
       },
       placeholderStep: "This step is coming next. Finish Step 1 first.",
-      placeholderStepLater: "We'll wire this step up in F2.1.",
       step7: {
         title: "Sign your listing agreement.",
         body: "DocuSign opens in a secure window for you to review and sign the listing agreement with Lixtara. Once signed, you'll come right back here to continue.",
@@ -1288,7 +1287,7 @@ export const dictionaries = {
       examplePlatinumLabel: "Platinum cost",
       exampleSavingsLabel: "Savings vs standard",
       perDealLabel: "per deal",
-      tenDealsLabel: "10 deals",
+      tenDealsLabel: "deals",
       applyCta: "Apply for investor club →",
       footerNote: "Discount applies to the flat-fee + seller-side commission portion of every Lixtara listing. Buyer-agent compensation is excluded.",
       tableTier: "Tier",
@@ -1548,7 +1547,7 @@ export const dictionaries = {
       items: [
         {
           q: "What is Lixtara?",
-          a: "Lixtara is a licensed Florida flat-fee real estate brokerage (Lic #CQ1075352). You sell your home for a flat fee plus a low commission paid only if it sells. Your listing goes on the MLS and reaches Zillow, Realtor.com, Redfin, Trulia and 100+ other sites, with a licensed broker behind you and without the traditional 6%.",
+          a: "Lixtara is a licensed Florida flat-fee real estate brokerage (Lic #{brokerageLicense}). You sell your home for a flat fee plus a low commission paid only if it sells. Your listing goes on the MLS and reaches Zillow, Realtor.com, Redfin, Trulia and 100+ other sites, with a licensed broker behind you and without the traditional 6%.",
         },
         {
           q: "How is Lixtara different from a traditional 6% agent?",
@@ -1560,7 +1559,7 @@ export const dictionaries = {
         },
         {
           q: "Is Lixtara a licensed brokerage?",
-          a: "Yes. Lixtara is a licensed Florida real estate brokerage (Lic #CQ1075352). All transactions are supervised by our licensed broker-of-record in compliance with Florida Statute 475 and FAR/BAR contracts.",
+          a: "Yes. Lixtara is a licensed Florida real estate brokerage (Lic #{brokerageLicense}). All transactions are supervised by our licensed broker-of-record in compliance with Florida Statute 475 and FAR/BAR contracts.",
         },
         {
           q: "What about the buyer's agent commission?",
@@ -1621,7 +1620,7 @@ export const dictionaries = {
         },
         {
           headline: "Una inmobiliaria licenciada a tu lado",
-          body: "Anamaria y su equipo licenciado en Florida manejan los contratos, las divulgaciones y todo el proceso legal. Nunca estás solo.",
+          body: "{brokerFirstName} y su equipo licenciado en Florida manejan los contratos, las divulgaciones y todo el proceso legal. Nunca estás solo.",
         },
         {
           headline: "En el MLS y en todos los sitios principales",
@@ -2083,7 +2082,7 @@ export const dictionaries = {
         stagingStep1: "Sube una foto de un cuarto vacío o con pocos muebles (cualquier espacio: habitación, sala, cocina, comedor, baño, oficina o exterior).",
         stagingStep2: "Nuestra IA lo amueblará virtualmente con muebles fotorrealistas en segundos, con opciones modernas, minimalistas, tradicionales o cálidas.",
         stagingStep3: "Usa la imagen amueblada junto a las originales. No rompes reglas de publicación, porque la foto original siempre se conserva y se etiqueta.",
-        stagingPricing: "Las primeras 3 habitaciones son gratis en cada listado; después, $5 por habitación. Disponible después de publicar, desde la página Editar listado.",
+        stagingPricing: "Las primeras 5 habitaciones son gratis en cada listado; después, $5 por habitación. Disponible después de publicar, desde la página Editar listado.",
         photoReorderHint: "Arrastra fotos para reordenar. La primera (principal) es la que aparece en las tarjetas del listado.",
         tourTitle: "🎥 Tour 3D Interactivo (Pro + Concierge)",
         tourBody: "Sube un video recorrido de 60 a 120 segundos grabado con tu celular. Lo convertimos en un tour 3D interactivo que los compradores recorren desde cualquier navegador, normalmente listo en una hora.",
@@ -2205,7 +2204,6 @@ export const dictionaries = {
         emptyToImprove: "Escribe unas frases primero, luego mejora.",
       },
       placeholderStep: "Este paso viene a continuación. Completa el Paso 1 primero.",
-      placeholderStepLater: "Conectaremos este paso en F2.1.",
       step7: {
         title: "Firma tu acuerdo de listado.",
         body: "DocuSign abre una ventana segura para que revises y firmes el acuerdo de listado con Lixtara. Cuando firmes, vuelves directo acá para continuar.",
@@ -2298,7 +2296,7 @@ export const dictionaries = {
         radioMissing: "Elige una de estas opciones.",
         selectMissing: "Selecciona una opción de la lista.",
         fileMissing: "Elige al menos un archivo.",
-        email: "Ingresa un email válido.",
+        email: "Ingresa un correo válido.",
         pattern: "Usa el formato solicitado.",
         tooShort: "Usa al menos {min} caracteres.",
         number: "Ingresa un número válido.",
@@ -2480,7 +2478,7 @@ export const dictionaries = {
       ownPropertyNotice: "Este es tu propio listado. Los compradores envían sus ofertas aquí.",
       requireAmount: "Ingresa el monto de tu oferta.",
       requireFinancing: "Elige un tipo de financiamiento.",
-      errNotActive: "Este listing no está recibiendo ofertas en este momento.",
+      errNotActive: "Esta propiedad no está recibiendo ofertas en este momento.",
       errSignedOut: "Tu sesión terminó. Inicia sesión de nuevo para enviar tu oferta.",
     },
     save: {
@@ -2869,7 +2867,7 @@ export const dictionaries = {
       examplePlatinumLabel: "Costo Platinum",
       exampleSavingsLabel: "Ahorro frente al estándar",
       perDealLabel: "por operación",
-      tenDealsLabel: "10 operaciones",
+      tenDealsLabel: "operaciones",
       applyCta: "Postúlate al Club de Inversionistas →",
       footerNote: "El descuento aplica sobre la tarifa fija + la comisión del lado vendedor de cada listado de Lixtara. La comisión del agente comprador queda excluida.",
       tableTier: "Nivel",
@@ -3129,7 +3127,7 @@ export const dictionaries = {
       items: [
         {
           q: "¿Qué es Lixtara?",
-          a: "Lixtara es una inmobiliaria licenciada de tarifa fija en Florida (Lic #CQ1075352). Vendes tu casa con una tarifa fija más una comisión baja que solo pagas si se vende. Tu listado se publica en el MLS y llega a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios, con un broker licenciado respaldándote y sin el 6% tradicional.",
+          a: "Lixtara es una inmobiliaria licenciada de tarifa fija en Florida (Lic #{brokerageLicense}). Vendes tu casa con una tarifa fija más una comisión baja que solo pagas si se vende. Tu listado se publica en el MLS y llega a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios, con un broker licenciado respaldándote y sin el 6% tradicional.",
         },
         {
           q: "¿En qué se diferencia Lixtara de un agente tradicional del 6%?",
@@ -3141,7 +3139,7 @@ export const dictionaries = {
         },
         {
           q: "¿Lixtara es una inmobiliaria licenciada?",
-          a: "Sí. Lixtara es una inmobiliaria licenciada en Florida (Lic #CQ1075352). Todas las transacciones son supervisadas por nuestro broker principal licenciado, en cumplimiento con el Estatuto 475 de Florida y los contratos FAR/BAR.",
+          a: "Sí. Lixtara es una inmobiliaria licenciada en Florida (Lic #{brokerageLicense}). Todas las transacciones son supervisadas por nuestro broker principal licenciado, en cumplimiento con el Estatuto 475 de Florida y los contratos FAR/BAR.",
         },
         {
           q: "¿Y la comisión del agente del comprador?",
@@ -3158,15 +3156,15 @@ export const dictionaries = {
       ],
     },
     meta: {
-      siteTitle: "Lixtara | Bienes raíces en Florida, brokerage licenciada",
-      siteDescription: "Vende tu casa en Florida con una brokerage licenciada. Exposición completa en el MLS. Te quedas con más equity.",
+      siteTitle: "Lixtara | Bienes raíces en Florida, inmobiliaria licenciada",
+      siteDescription: "Vende tu casa en Florida con una inmobiliaria licenciada. Exposición completa en el MLS. Te quedas con más patrimonio.",
     },
     notFound: {
       eyebrow: "Error 404",
       title: "No encontramos esta página.",
       body: "Puede que el enlace esté roto o que la página se haya movido. Te ayudamos a volver.",
       homeCta: "Volver al inicio",
-      listingsCta: "Ver listings en Florida",
+      listingsCta: "Ver propiedades en Florida",
     },
   },
 } as const;

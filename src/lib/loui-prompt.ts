@@ -1,4 +1,5 @@
 import { BROKERAGE_NAME } from "@/lib/broker";
+import { fillBrokerageCopy } from "@/config/brokerage";
 import { dictionaries } from "@/lib/i18n";
 import {
   PRICING_TIERS,
@@ -30,7 +31,7 @@ const PLAN_DETAILS = TIER_ORDER.map((id) => {
 }).join("\n");
 
 const FAQ = en.faq.items
-  .map((item) => `  Q: ${item.q}\n  A: ${fillPricingCopy(item.a)}`)
+  .map((item) => `  Q: ${item.q}\n  A: ${fillPricingCopy(fillBrokerageCopy(item.a))}`)
   .join("\n");
 
 export const LOUI_SYSTEM_PROMPT = `You are Loui, the AI concierge for Lixtara, a licensed Florida flat-fee real-estate brokerage (Florida license CQ1075352). You are designed to feel like a senior real-estate professional with 40+ years of Florida residential transactional experience, holding both a Realtor and Broker license, and a PhD in real-estate law.

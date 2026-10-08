@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { BROKER_LICENSE, BROKERAGE_NAME } from "@/lib/broker";
+import { fillBrokerageCopy } from "@/config/brokerage";
 import { BROKER_STATS } from "@/lib/broker-stats";
 import {
   PRICING_TIERS,
@@ -208,7 +209,7 @@ export default async function Home({
                 <h3 className="text-base font-semibold text-ink leading-snug">
                   {p.headline}
                 </h3>
-                <p className="text-sm leading-relaxed text-ink/70">{p.body}</p>
+                <p className="text-sm leading-relaxed text-ink/70">{fillBrokerageCopy(p.body)}</p>
               </div>
             ))}
           </div>
@@ -685,7 +686,7 @@ export default async function Home({
                   {item.q}
                 </dt>
                 <dd className="md:col-span-7 text-sm lg:text-base leading-relaxed text-ink/70">
-                  {fillPricingCopy(item.a)}
+                  {fillPricingCopy(fillBrokerageCopy(item.a))}
                 </dd>
               </div>
             ))}

@@ -8,23 +8,11 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
-import {
-  getEnvelopeSigners,
-  getEnvelopeStatus,
-  mapEnvelopeStatus,
-  sellerHasSigned,
-} from "@/lib/docusign";
+import { refreshAgreement } from "@/lib/agreement-refresh";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 
 export const maxDuration = 30;
 
-function serviceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) return null;
-  return createServiceClient(url, key, { auth: { persistSession: false } });
-}
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -57,53 +45,14 @@ export async function POST(req: Request) {
   // agreement.
   const { data: agreement } = await supabase
     .from("agreements")
-    .select("id, envelope_id, status")
+    .select("id, envelope_id, status, property_id")
     .eq("property_id", propertyId)
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!agreement?.envelope_id) {
-    return NextResponse.json({ status: agreement?.status ?? "none" });
-  }
-  // Already terminal — don't bother DocuSign.
-  if (agreement.status === "completed" || agreement.status === "signed") {
-    return NextResponse.json({ status: agreement.status });
-  }
+  if (!agreement) return NextResponse.json({ status: "none" });
 
-  let mapped: string = agreement.status;
-  let signedAt: string | null = null;
-  try {
-    const fresh = await getEnvelopeStatus(agreement.envelope_id);
-    mapped = mapEnvelopeStatus(fresh.status);
-    if (fresh.completedDateTime) signedAt = fresh.completedDateTime;
-    // The envelope stays "sent"/"delivered" until EVERY signer is done (the
-    // template may route a broker countersignature after the seller). What
-    // unlocks the seller's next step is THEIR signature.
-    if (mapped === "sent" || mapped === "delivered" || mapped === "pending") {
-      const signers = await getEnvelopeSigners(agreement.envelope_id);
-      if (sellerHasSigned(signers, propertyId)) mapped = "signed";
-    }
-  } catch (e) {
-    console.error("agreement sync: DocuSign fetch failed", e);
-    return NextResponse.json({ status: agreement.status, synced: false });
-  }
-
-  // Status flips go through the service-role client (the owner has no UPDATE
-  // RLS policy on agreements — by design, flips are server-controlled).
-  if (mapped !== agreement.status) {
-    const sc = serviceClient();
-    if (sc) {
-      const update: Record<string, unknown> = {
-        status: mapped,
-        updated_at: new Date().toISOString(),
-      };
-      if (mapped === "completed" || mapped === "signed") {
-        update.signed_at = signedAt ?? new Date().toISOString();
-      }
-      await sc.from("agreements").update(update).eq("id", agreement.id);
-    }
-  }
-
-  return NextResponse.json({ status: mapped });
+  const status = await refreshAgreement(agreement);
+  return NextResponse.json({ status });
 }
