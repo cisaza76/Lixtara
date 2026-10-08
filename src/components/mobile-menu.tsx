@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, Globe, LayoutDashboard, LogOut } from "lucide-react";
+import { Menu, X, Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 
 interface Props {
   lang: string;
@@ -21,6 +21,7 @@ interface Props {
   auth: {
     greetingPrefix: string;
     dashboard: string;
+    account: string;
     signOut: string;
     signIn: string;
   };
@@ -95,6 +96,12 @@ export function MobileMenu({
                     className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70"
                   >
                     <LayoutDashboard className="w-4 h-4" /> {auth.dashboard}
+                  </Link>
+                  <Link
+                    href={`/${lang}/account`}
+                    className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70"
+                  >
+                    <UserRound className="w-4 h-4" /> {auth.account}
                   </Link>
                   <form action={`/${lang}/auth/sign-out`} method="POST">
                     <button

@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
 import { CookieNotice } from "@/components/cookie-notice";
 import { MobileMenu } from "@/components/mobile-menu";
-import { Globe, LayoutDashboard, LogOut } from "lucide-react";
+import { Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import "../globals.css";
 
 const inter = Inter({
@@ -145,6 +145,14 @@ export default async function RootLayout({
                       <LayoutDashboard className="w-4 h-4" />
                       <span className="hidden lg:inline">{authNavCopy.dashboard}</span>
                     </Link>
+                    <Link
+                      href={`/${lang}/account`}
+                      title={authNavCopy.account}
+                      className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70 hover:text-gold transition-colors"
+                    >
+                      <UserRound className="w-4 h-4" />
+                      <span className="hidden lg:inline">{authNavCopy.account}</span>
+                    </Link>
                     <form action={`/${lang}/auth/sign-out`} method="POST">
                       <button
                         type="submit"
@@ -193,6 +201,7 @@ export default async function RootLayout({
               auth={{
                 greetingPrefix: authNavCopy.greetingPrefix,
                 dashboard: authNavCopy.dashboard,
+                account: authNavCopy.account,
                 signOut: authNavCopy.signOut,
                 signIn: authNavCopy.signIn,
               }}
