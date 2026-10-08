@@ -25,11 +25,15 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Lixtara | Florida real estate, licensed brokerage",
-  description:
-    "Sell your Florida home with a licensed brokerage. Full MLS exposure. You keep more equity.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  const meta = t(isLocale(lang) ? lang : "en").meta;
+  return { title: meta.siteTitle, description: meta.siteDescription };
+}
 
 export function generateStaticParams() {
   return locales.map((lang) => ({ lang }));
@@ -129,7 +133,7 @@ export default async function RootLayout({
               <div className="flex items-center gap-4 border-l border-gold-soft pl-5">
                 <Link
                   href={`/${altLang}`}
-                  aria-label="Switch language"
+                  aria-label={navCopy.switchLanguage}
                   className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55 hover:text-gold transition-colors"
                 >
                   <Globe className="w-4 h-4" />
@@ -206,6 +210,9 @@ export default async function RootLayout({
                 signIn: authNavCopy.signIn,
               }}
               cta={navCopy.cta}
+              switchLanguageLabel={navCopy.switchLanguage}
+              openMenuLabel={navCopy.openMenu}
+              closeMenuLabel={navCopy.closeMenu}
             />
           </nav>
         </header>
@@ -390,12 +397,19 @@ export default async function RootLayout({
           suggestions={[...louiCopy.suggestions]}
           toolNotice={louiCopy.toolNotice}
           disclaimer={louiCopy.disclaimer}
+          youLabel={louiCopy.youLabel}
+          assistantLabel={louiCopy.assistantLabel}
+          errorRateLimit={louiCopy.errorRateLimit}
+          errorTooLong={louiCopy.errorTooLong}
+          errorGeneric={louiCopy.errorGeneric}
+          lang={lang}
         />
         <CookieNotice
           lang={lang}
           message={t(lang).cookieNotice.message}
           learnMore={t(lang).cookieNotice.learnMore}
           accept={t(lang).cookieNotice.accept}
+          regionLabel={t(lang).cookieNotice.regionLabel}
         />
       </body>
     </html>

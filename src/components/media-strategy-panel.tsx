@@ -18,7 +18,20 @@ interface Copy {
   disclosure: string;
   tooFewPhotos: string;
   failed: string;
+  roomTypes: Record<string, string>;
+  deliverableKinds: Record<string, string>;
+  motions: Record<string, string>;
 }
+
+// `suggestedMotion` se guarda como texto en inglés (src/lib/media-intelligence/select.ts,
+// MOTION_BY_ROOM). Se traduce al mostrarlo; un texto desconocido se muestra tal cual.
+const MOTION_KEYS: Record<string, string> = {
+  "slow push-in on the entrance": "entrancePushIn",
+  "gentle dolly across the living space": "livingDolly",
+  "smooth pan along the counters": "counterPan",
+  "slow reveal of the lot": "lotReveal",
+  "subtle push-in": "subtlePushIn",
+};
 
 export function MediaStrategyPanel({
   propertyId,
@@ -84,7 +97,8 @@ export function MediaStrategyPanel({
             <ol className="mt-1 list-decimal pl-5">
               {payload.selectedShots.map((s) => (
                 <li key={s.photoId}>
-                  {s.roomType}: {s.suggestedMotion}
+                  {copy.roomTypes[s.roomType] ?? s.roomType}:{" "}
+                  {copy.motions[MOTION_KEYS[s.suggestedMotion] ?? ""] ?? s.suggestedMotion}
                 </li>
               ))}
             </ol>
@@ -96,7 +110,7 @@ export function MediaStrategyPanel({
               {payload.deliverables.map((d) => (
                 <li key={d.id} className="rounded-lg border border-neutral-200 p-3">
                   <div className="flex items-center justify-between">
-                    <span>{d.kind} · {d.aspect}</span>
+                    <span>{copy.deliverableKinds[d.kind] ?? d.kind} · {d.aspect}</span>
                     <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
                       {copy.mockBadge}
                     </span>

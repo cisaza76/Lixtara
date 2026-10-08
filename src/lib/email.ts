@@ -88,10 +88,14 @@ async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error
   }
 }
 
+type Lang = "en" | "es";
+
 // ─── Shared HTML wrapper ─────────────────────────────────────────────
 
-function shell(opts: { preheader: string; body: string }): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lixtara</title></head>
+function shell(opts: { preheader: string; body: string; lang?: Lang }): string {
+  const lang = opts.lang ?? "en";
+  const tagline = lang === "es" ? "Brokerage en Florida" : "Florida brokerage";
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lixtara</title></head>
 <body style="margin:0;padding:0;background:#f4f1ec;font-family:'Helvetica Neue',Arial,sans-serif;color:#1c1c1c;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${opts.preheader}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ec;">
@@ -99,11 +103,11 @@ function shell(opts: { preheader: string; body: string }): string {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border:1px solid #d8d1c0;">
       <tr><td style="padding:28px 32px;border-bottom:1px solid #ece6d6;">
         <span style="font-family:Georgia,serif;font-style:italic;font-size:28px;color:#1c1c1c;letter-spacing:-0.02em;">Lixtara</span>
-        <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.22em;color:#8a8268;margin-left:14px;">Florida brokerage</span>
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.22em;color:#8a8268;margin-left:14px;">${tagline}</span>
       </td></tr>
       <tr><td style="padding:32px;">${opts.body}</td></tr>
       <tr><td style="padding:20px 32px;border-top:1px solid #ece6d6;font-size:11px;color:#8a8268;line-height:1.6;">
-        ${brokerageLicenseLine("en")}<br>
+        ${brokerageLicenseLine(lang)}<br>
         ${BROKERAGE.address}<br>
         <a href="https://lixtara.com" style="color:#a18943;text-decoration:none;">lixtara.com</a>
       </td></tr>
@@ -120,8 +124,6 @@ function button(href: string, label: string): string {
 }
 
 // ─── Public helpers ──────────────────────────────────────────────────
-
-type Lang = "en" | "es";
 
 export interface PaymentReceiptInput {
   to: string;
@@ -164,7 +166,7 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: isEs ? "Tu pago llegó" : "Payment confirmed", body }),
+    html: shell({ preheader: isEs ? "Tu pago llegó" : "Payment confirmed", body, lang }),
     text,
   });
 }
@@ -198,7 +200,7 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: isEs ? "Acuerdo firmado" : "Agreement signed", body }),
+    html: shell({ preheader: isEs ? "Acuerdo firmado" : "Agreement signed", body, lang }),
     text: isEs
       ? `Tu acuerdo de listing está firmado. Continúa al pago: ${input.paymentUrl}`
       : `Your listing agreement is signed. Continue to payment: ${input.paymentUrl}`,
@@ -224,7 +226,7 @@ export async function sendListingApproved(input: ListingApprovedInput) {
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">¡Tu listing está activo! 🎉</p>
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Nuestro broker aprobó tu listing de <strong>${input.propertyAddress}</strong>. Acaba de sincronizarse con MLS y debería aparecer en Zillow, Realtor.com, Redfin y Trulia en las próximas horas.</p>
     ${button(input.listingUrl, "Ver mi listing")}
-    <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Próximos pasos: las solicitudes de visitas e ofertas que reciban los buyers van a aparecer en tu dashboard. Te notificamos por email cada una.</p>
+    <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Próximos pasos: las solicitudes de visita y las ofertas de los compradores van a aparecer en tu dashboard. Te avisamos por email de cada una.</p>
   `
     : `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Your listing is live! 🎉</p>
@@ -236,7 +238,7 @@ export async function sendListingApproved(input: ListingApprovedInput) {
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: isEs ? "Tu listing está en vivo" : "Your listing is live", body }),
+    html: shell({ preheader: isEs ? "Tu listing está en vivo" : "Your listing is live", body, lang }),
     text: isEs
       ? `Tu listing en ${input.propertyAddress} está activo en MLS. ${input.listingUrl}`
       : `Your listing at ${input.propertyAddress} is live on MLS. ${input.listingUrl}`,
@@ -320,7 +322,7 @@ export async function sendListingEmailCode(input: {
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: intro, body }),
+    html: shell({ preheader: intro, body, lang: input.lang }),
     text: `${intro}\n\n${input.code}\n\n${expiry}`,
   });
 }
@@ -343,7 +345,7 @@ export async function sendListingResumeLink(input: { to: string; lang: Lang; url
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: intro, body }),
+    html: shell({ preheader: intro, body, lang: input.lang }),
     text: `${intro}\n\n${input.url}\n\n${note}`,
   });
 }

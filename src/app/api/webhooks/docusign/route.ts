@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getEnvelopeStatus, mapEnvelopeStatus } from "@/lib/docusign";
 import { sendAgreementSigned } from "@/lib/email";
+import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -104,10 +105,13 @@ export async function POST(req: Request) {
         if (sellerEmail) {
           const origin =
             process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
+          // Idioma del vendedor si lo conocemos (seller_leads.locale); si no, inglés.
+          const sellerLang = (await lookupRecipientLang(prop.owner_id)) ?? "en";
           await sendAgreementSigned({
             to: sellerEmail,
+            lang: sellerLang,
             propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
-            paymentUrl: `${origin}/en/listing/new?id=${agreement.property_id}&step=8`,
+            paymentUrl: `${origin}/${sellerLang}/listing/new?id=${agreement.property_id}&step=8`,
           });
         }
       }

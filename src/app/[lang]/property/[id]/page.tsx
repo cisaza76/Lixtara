@@ -233,7 +233,7 @@ export default async function PropertyDetailPage({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={ph.url}
-                    alt={`${street}, photo ${i + 1}`}
+                    alt={copy.photoAlt.replace("{street}", street).replace("{n}", String(i + 1))}
                     className="h-full w-full object-cover transition-transform duration-[600ms] ease-out group-hover/photo:scale-[1.05]"
                   />
                   {ph.is_staged && (
@@ -432,13 +432,13 @@ export default async function PropertyDetailPage({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={mapUrl}
-                    alt={`Map of ${fullAddress}`}
+                    alt={copy.mapAlt.replace("{address}", fullAddress)}
                     className="w-full h-full object-cover"
                   />
                 </div>
               ) : (
                 <div className="aspect-[3/2] bg-ivory-strong flex items-center justify-center text-[10px] uppercase tracking-[0.18em] text-ink/40">
-                  Location unavailable
+                  {copy.locationUnavailable}
                 </div>
               )}
               <div className="flex flex-col gap-1 text-sm leading-relaxed text-ink">

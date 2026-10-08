@@ -61,6 +61,8 @@ export default async function PropertiesPage({
                   bedsShort: copy.card.bedsShort,
                   bathsShort: copy.card.bathsShort,
                   sqftSuffix: copy.card.sqftSuffix,
+                  noPhoto: copy.card.noPhoto,
+                  demo: copy.card.demo,
                 }}
               />
             ))}

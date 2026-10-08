@@ -16,7 +16,12 @@ interface Props {
   defaultZip?: string;
   defaultLat?: number | null;
   defaultLng?: number | null;
-  verifiedNote?: string;
+  verifiedNote: string;
+  /** Page language: Google Places suggestions follow it, not the browser's. */
+  language: string;
+  mapsLoadingLabel: string;
+  mapsReadyLabel: string;
+  mapsErrorLabel: string;
 }
 
 interface AddressComponents {
@@ -73,7 +78,7 @@ function extractComponents(
 // to Google's inline bootstrap loader. The previous code combined the two
 // and produced "TypeError: window.google.maps.importLibrary is not a
 // function" in production.
-function loadGoogleMaps(apiKey: string): Promise<void> {
+function loadGoogleMaps(apiKey: string, language: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") {
       reject(new Error("not browser"));
@@ -104,7 +109,8 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
     script.id = SCRIPT_ID;
     script.src =
       `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}` +
-      `&libraries=places&v=weekly&loading=async&callback=__lixtaraMapsInit`;
+      `&libraries=places&v=weekly&loading=async&callback=__lixtaraMapsInit` +
+      `&language=${encodeURIComponent(language)}`;
     script.async = true;
     script.defer = true;
     script.onerror = () =>
@@ -127,6 +133,10 @@ export function AddressAutocomplete({
   defaultLat = null,
   defaultLng = null,
   verifiedNote,
+  language,
+  mapsLoadingLabel,
+  mapsReadyLabel,
+  mapsErrorLabel,
 }: Props) {
   const streetInputRef = useRef<HTMLInputElement | null>(null);
   const cityInputRef = useRef<HTMLInputElement | null>(null);
@@ -145,6 +155,10 @@ export function AddressAutocomplete({
   const [errorMessage, setErrorMessage] = useState<string | null>(() =>
     mapsApiKey ? null : "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY missing.",
   );
+  // Shown to the seller as a localized notice; the English diagnostic stays here.
+  useEffect(() => {
+    if (errorMessage) console.warn("[AddressAutocomplete]", errorMessage);
+  }, [errorMessage]);
   const [verified, setVerified] = useState<boolean>(
     defaultLat !== null && defaultLng !== null,
   );
@@ -157,7 +171,7 @@ export function AddressAutocomplete({
 
     let autocomplete: google.maps.places.Autocomplete | null = null;
 
-    loadGoogleMaps(apiKey)
+    loadGoogleMaps(apiKey, language)
       .then(() => {
         if (!streetInputRef.current) {
           setStatus("error");
@@ -225,7 +239,7 @@ export function AddressAutocomplete({
         setStatus("error");
         setErrorMessage(err.message);
       });
-  }, []);
+  }, [language]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -267,10 +281,11 @@ export function AddressAutocomplete({
                 : "text-ink/40"
           }`}
         >
-          {status === "loading" && "Maps: loading…"}
-          {status === "ready" && !verified && "Maps ready. Start typing."}
-          {status === "ready" && verified && `✓ ${verifiedNote ?? "Verified"}`}
-          {status === "error" && `Maps error. Type the address manually. (${errorMessage})`}
+          {status === "loading" && mapsLoadingLabel}
+          {status === "ready" && !verified && mapsReadyLabel}
+          {status === "ready" && verified && `✓ ${verifiedNote}`}
+          {/* The technical cause (English, for us) goes to the console only. */}
+          {status === "error" && mapsErrorLabel}
         </span>
       </label>
 

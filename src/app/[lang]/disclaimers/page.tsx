@@ -4,9 +4,16 @@ import { isLocale, type Locale } from "@/lib/i18n";
 import { LegalDocument } from "@/components/legal-document";
 import { disclaimersDoc } from "@/lib/legal/disclaimers";
 
-export const metadata: Metadata = {
-  title: "Disclaimers | Lixtara",
-};
+// El título de la pestaña sale del propio documento, en el idioma de la página.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  const doc = disclaimersDoc[isLocale(lang) ? lang : "en"];
+  return { title: `${doc.title} | Lixtara` };
+}
 
 export default async function DisclaimersPage({
   params,

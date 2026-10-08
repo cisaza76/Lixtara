@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { emailFrom } from "@/lib/email";
+import { lookupRecipientLang } from "@/lib/email-recipient-lang";
+import { t } from "@/lib/i18n";
 
 const VALID_FINANCING = new Set([
   "cash",
@@ -135,19 +137,38 @@ export async function POST(req: Request) {
         const address = `${property.address_street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
         const origin =
           process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
-        const subject = `New $${amount.toLocaleString()} offer on ${property.address_street}`;
+        // Idioma del vendedor si lo conocemos (seller_leads.locale); si no, inglés.
+        const lang = (await lookupRecipientLang(property.owner_id)) ?? "en";
+        const isEs = lang === "es";
+        const offerCopy = t(lang).offer;
+        const financingLabel =
+          ({
+            cash: offerCopy.financingCash,
+            conventional: offerCopy.financingConventional,
+            fha: offerCopy.financingFha,
+            va: offerCopy.financingVa,
+            other: offerCopy.financingOther,
+          } as Record<string, string>)[financing] ?? financing;
+        const amountText = `$${amount.toLocaleString("en-US")}`;
+        const dashboardUrl = `${origin}/${lang}/dashboard`;
+        const subject = isEs
+          ? `Nueva oferta de ${amountText} por ${property.address_street}`
+          : `New ${amountText} offer on ${property.address_street}`;
+        const l = isEs
+          ? { intro: "Recibiste una nueva oferta.", address: "Dirección", offer: "Oferta", financing: "Financiamiento", cta: "Abrir mi dashboard →", textIntro: "Nueva oferta recibida para", textMessage: "Mensaje" }
+          : { intro: "You received a new offer.", address: "Address", offer: "Offer", financing: "Financing", cta: "Open your dashboard →", textIntro: "New offer received for", textMessage: "Message" };
         await resend.emails.send({
           from: emailFrom(),
           ...(process.env.EMAIL_REPLY_TO ? { replyTo: process.env.EMAIL_REPLY_TO } : {}),
           to: overrideTo,
           subject,
-          html: `<p>You received a new offer.</p>
-                 <p><strong>Address:</strong> ${address}<br>
-                    <strong>Offer:</strong> $${amount.toLocaleString()}<br>
-                    <strong>Financing:</strong> ${financing}</p>
+          html: `<p>${l.intro}</p>
+                 <p><strong>${l.address}:</strong> ${address}<br>
+                    <strong>${l.offer}:</strong> ${amountText}<br>
+                    <strong>${l.financing}:</strong> ${financingLabel}</p>
                  ${message ? `<p><em>"${message.replace(/</g, "&lt;")}"</em></p>` : ""}
-                 <p><a href="${origin}/en/dashboard">Open your dashboard →</a></p>`,
-          text: `New offer received for ${address}: $${amount.toLocaleString()} (${financing}).${message ? `\n\nMessage: ${message}` : ""}\n\n${origin}/en/dashboard`,
+                 <p><a href="${dashboardUrl}">${l.cta}</a></p>`,
+          text: `${l.textIntro} ${address}: ${amountText} (${financingLabel}).${message ? `\n\n${l.textMessage}: ${message}` : ""}\n\n${dashboardUrl}`,
         });
       }
     }

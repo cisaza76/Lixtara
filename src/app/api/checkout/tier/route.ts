@@ -95,6 +95,7 @@ export async function POST(req: Request) {
   const tier = property.pricing_tier as PricingTierId;
   try {
     const { sessionId, url } = await createTierCheckoutSession({
+      lang,
       tier,
       propertyId,
       userId: user.id,

@@ -3,9 +3,33 @@
 // App Router global error boundary (P1 pre-Gate-5): reports render-tree crashes that would
 // otherwise be invisible, then shows a minimal, brand-neutral recovery screen. Next.js
 // requires this component to render its own <html>/<body>. Kept intentionally static (no
-// i18n dictionaries — the error may have originated in them).
+// i18n dictionaries — the error may have originated in them). The language is read from
+// the URL's first segment (/en or /es), so the copy below is inline and bilingual.
 import * as Sentry from "@sentry/nextjs";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+
+const COPY = {
+  en: {
+    title: "Something went wrong",
+    body: "The error has been reported. Please try again.",
+    retry: "Try again",
+  },
+  es: {
+    title: "Algo salió mal",
+    body: "Ya reportamos el error. Inténtalo de nuevo.",
+    retry: "Intentar de nuevo",
+  },
+} as const;
+
+type ErrorLang = keyof typeof COPY;
+
+function readLangFromPath(): ErrorLang {
+  return window.location.pathname.split("/")[1] === "es" ? "es" : "en";
+}
+
+function noopSubscribe() {
+  return () => {};
+}
 
 export default function GlobalError({
   error,
@@ -18,8 +42,11 @@ export default function GlobalError({
     Sentry.captureException(error);
   }, [error]);
 
+  const lang = useSyncExternalStore<ErrorLang>(noopSubscribe, readLangFromPath, () => "en");
+  const copy = COPY[lang];
+
   return (
-    <html lang="en">
+    <html lang={lang}>
       <body
         style={{
           margin: 0,
@@ -39,10 +66,10 @@ export default function GlobalError({
             Lixtara
           </p>
           <h1 style={{ fontWeight: 400, fontSize: 28, margin: "0.5rem 0 1rem" }}>
-            Something went wrong
+            {copy.title}
           </h1>
           <p style={{ fontSize: 14, opacity: 0.7, marginBottom: "1.5rem" }}>
-            The error has been reported. Please try again.
+            {copy.body}
           </p>
           <button
             onClick={() => reset()}
@@ -57,7 +84,7 @@ export default function GlobalError({
               cursor: "pointer",
             }}
           >
-            Try again
+            {copy.retry}
           </button>
         </div>
       </body>

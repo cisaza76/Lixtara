@@ -67,7 +67,7 @@ export default async function Home({
   }
   if (BROKER_STATS.yearsExperience) {
     visibleMetrics.push({
-      value: `${BROKER_STATS.yearsExperience} Yrs`,
+      value: `${BROKER_STATS.yearsExperience} ${copy.metricYearsUnit}`,
       label: copy.metricYearsLabel,
     });
   }
@@ -163,7 +163,7 @@ export default async function Home({
 
               <Image
                 src="/hero-dusk.jpg"
-                alt="Florida home at dusk with warm interior lights, palms, and a still pool"
+                alt={copy.imageAlt}
                 fill
                 priority
                 sizes="(min-width: 1024px) 380px, 80vw"
@@ -628,6 +628,9 @@ export default async function Home({
             discountGold={investorClubCopy.discountGold}
             discountPlatinum={investorClubCopy.discountPlatinum}
             footerNote={investorClubCopy.footerNote}
+            tableTier={investorClubCopy.tableTier}
+            tableDiscount={investorClubCopy.tableDiscount}
+            tableTotal={investorClubCopy.tableTotal}
           />
 
           <div className="mt-10 lg:mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">

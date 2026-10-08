@@ -13,6 +13,7 @@ import type Stripe from "stripe";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { verifyWebhookSignature } from "@/lib/stripe";
 import { sendPaymentReceipt, sendBrokerNewPending } from "@/lib/email";
+import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { claimWebhookEvent } from "@/lib/webhook-dedup";
 import { grantStagingCredits } from "@/lib/staging-credits";
 import { isPricingTierId } from "@/lib/pricing-tiers";
@@ -176,12 +177,15 @@ async function fulfillCheckout(
             .trim() || sellerEmail || "Seller";
 
         if (sellerEmail) {
+          // Idioma del vendedor si lo conocemos (seller_leads.locale); si no, inglés.
+          const sellerLang = (await lookupRecipientLang(prop.owner_id)) ?? "en";
           await sendPaymentReceipt({
             to: sellerEmail,
+            lang: sellerLang,
             amount,
             tier,
             propertyAddress: address,
-            dashboardUrl: `${origin}/en/dashboard`,
+            dashboardUrl: `${origin}/${sellerLang}/dashboard`,
           });
         }
         // Notify the broker queue (Camilo while in test mode).

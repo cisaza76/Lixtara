@@ -50,8 +50,9 @@ export function ConsultationCheckoutButton({
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !data.url) throw new Error(data.error ?? "no_url");
       window.location.href = data.url;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : labels.failed);
+    } catch {
+      // Nunca el código crudo de la API (p. ej. "no_url"): siempre el texto localizado.
+      setError(labels.failed);
       setSubmitting(false);
     }
   }
@@ -67,7 +68,7 @@ export function ConsultationCheckoutButton({
         {submitting ? labels.redirecting : label}
       </button>
       {error && (
-        <p className="text-xs italic text-red-700 font-mono break-all">{error}</p>
+        <p className="text-xs italic text-red-700">{error}</p>
       )}
     </div>
   );
