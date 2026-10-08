@@ -1571,6 +1571,7 @@ export default async function ListingNewPage({
             )}
             <AddressAutocomplete
               streetLabel={copy.step1.streetLabel}
+              streetPlaceholder={copy.step1.streetPlaceholder}
               unitLabel={copy.step1.unitLabel}
               cityLabel={copy.step1.cityLabel}
               stateLabel={copy.step1.stateLabel}
@@ -1587,7 +1588,10 @@ export default async function ListingNewPage({
                 label={copy.step1.emailLabel}
                 name="email"
                 type="email"
-                autoComplete="email"
+                // Its own autofill section: with plain "email", picking the
+                // browser suggestion also filled the street/city/ZIP with the
+                // seller's saved home address, overwriting the property's.
+                autoComplete="section-seller email"
                 required
                 help={copy.step1.emailHelp}
               />
