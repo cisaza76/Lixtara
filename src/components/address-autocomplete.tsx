@@ -5,6 +5,7 @@ import { Field } from "@/components/auth-shell";
 
 interface Props {
   streetLabel: string;
+  streetPlaceholder: string;
   unitLabel: string;
   cityLabel: string;
   stateLabel: string;
@@ -114,6 +115,7 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
 
 export function AddressAutocomplete({
   streetLabel,
+  streetPlaceholder,
   unitLabel,
   cityLabel,
   stateLabel,
@@ -250,8 +252,8 @@ export function AddressAutocomplete({
           type="text"
           required
           defaultValue={defaultStreet}
-          autoComplete="address-line1"
-          placeholder="Start typing and pick from Google's suggestions"
+          autoComplete="section-property address-line1"
+          placeholder={streetPlaceholder}
           className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
         />
         <span
@@ -281,7 +283,7 @@ export function AddressAutocomplete({
             name="unit"
             type="text"
             defaultValue={defaultUnit}
-            autoComplete="address-line2"
+            autoComplete="section-property address-line2"
             placeholder="4502"
             className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
           />
@@ -296,7 +298,7 @@ export function AddressAutocomplete({
             type="text"
             required
             defaultValue={defaultCity}
-            autoComplete="address-level2"
+            autoComplete="section-property address-level2"
             className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
           />
         </label>
@@ -306,7 +308,7 @@ export function AddressAutocomplete({
           label={stateLabel}
           name="state"
           defaultValue="FL"
-          autoComplete="address-level1"
+          autoComplete="section-property address-level1"
         />
         <label className="flex flex-col gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
@@ -318,7 +320,7 @@ export function AddressAutocomplete({
             type="text"
             required
             defaultValue={defaultZip}
-            autoComplete="postal-code"
+            autoComplete="section-property postal-code"
             className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
           />
         </label>

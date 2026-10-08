@@ -14,6 +14,7 @@ interface ListingRow {
   list_price: number | null;
   mls_status: string;
   pricing_tier: string | null;
+  created_at: string;
 }
 
 const STATUSES = [
@@ -38,6 +39,19 @@ const STATUS_BADGE: Record<string, string> = {
   withdrawn: "border-red-300 bg-red-50 text-red-800",
 };
 
+// Miami time, so the broker reads the same clock the seller lived.
+const CREATED_DATE = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
+const CREATED_TIME = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 export default async function AdminListingsPage({
   params,
   searchParams,
@@ -60,7 +74,7 @@ export default async function AdminListingsPage({
   let query = supabase
     .from("properties")
     .select(
-      "id,address_street,address_city,address_state,bedrooms,bathrooms,sqft,list_price,mls_status,pricing_tier",
+      "id,address_street,address_city,address_state,bedrooms,bathrooms,sqft,list_price,mls_status,pricing_tier,created_at",
     )
     .order("updated_at", { ascending: false })
     .limit(200);
@@ -146,6 +160,7 @@ export default async function AdminListingsPage({
                 <th className="py-3 pr-4">Price</th>
                 <th className="py-3 pr-4">Status</th>
                 <th className="py-3 pr-4">Tier</th>
+                <th className="py-3 pr-4">Created (ET)</th>
                 <th className="py-3" />
               </tr>
             </thead>
@@ -179,6 +194,12 @@ export default async function AdminListingsPage({
                       ? l.pricing_tier.charAt(0).toUpperCase() +
                         l.pricing_tier.slice(1)
                       : "—"}
+                  </td>
+                  <td className="py-3 pr-4 text-xs text-ink/70 whitespace-nowrap">
+                    {CREATED_DATE.format(new Date(l.created_at))}
+                    <span className="block text-ink/50">
+                      {CREATED_TIME.format(new Date(l.created_at))}
+                    </span>
                   </td>
                   <td className="py-3">
                     <Link
