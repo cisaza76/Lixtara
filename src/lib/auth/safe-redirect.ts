@@ -27,3 +27,11 @@ export function safeNextPath(next: string | null | undefined, origin: string, fa
   if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return fallback;
   return path;
 }
+
+// Post-login destinations are often passed without a locale (`?next=/account`,
+// `?next=/listing/new`). The proxy sends unprefixed paths to the DEFAULT locale,
+// so a Spanish user would land on the English page. Keep the user's language.
+export function withLocale(path: string, lang: string): string {
+  if (/^\/(en|es)(\/|$|\?|#)/.test(path)) return path;
+  return `/${lang}${path === "/" ? "" : path}`;
+}
