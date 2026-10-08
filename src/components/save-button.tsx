@@ -44,8 +44,9 @@ export function SaveButton({
         throw new Error(willSave ? labels.saveFailed : labels.removeFailed);
       }
       setSaved(willSave);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "error");
+    } catch {
+      // Nunca el mensaje crudo (p. ej. "Failed to fetch"): siempre el texto localizado.
+      setError(willSave ? labels.saveFailed : labels.removeFailed);
     } finally {
       setSubmitting(false);
     }

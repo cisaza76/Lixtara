@@ -47,6 +47,8 @@ interface OfferFormProps {
     ownPropertyNotice: string;
     requireAmount: string;
     requireFinancing: string;
+    errNotActive: string;
+    errSignedOut: string;
   };
 }
 
@@ -163,7 +165,17 @@ export function OfferForm({
       setStatus("success");
     } catch (e) {
       setStatus("error");
-      setError(e instanceof Error ? e.message : labels.failedNotice);
+      // La API responde con códigos (p. ej. "property_not_active"); al usuario se le
+      // muestra siempre un texto en su idioma, nunca el código.
+      const code = e instanceof Error ? e.message : "";
+      const byCode: Record<string, string> = {
+        not_authenticated: labels.errSignedOut,
+        property_not_active: labels.errNotActive,
+        cannot_offer_on_own_property: labels.ownPropertyNotice,
+        invalid_amount: labels.requireAmount,
+        invalid_financing: labels.requireFinancing,
+      };
+      setError(byCode[code] ?? labels.failedNotice);
     }
   }
 
@@ -300,7 +312,7 @@ export function OfferForm({
         </label>
 
         {error && (
-          <p className="text-xs italic text-red-700 font-mono break-all">{error}</p>
+          <p className="text-xs italic text-red-700">{error}</p>
         )}
 
         <button

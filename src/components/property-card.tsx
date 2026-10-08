@@ -9,6 +9,8 @@ export interface PropertyCardLabels {
   bedsShort: string;
   bathsShort: string;
   sqftSuffix: string;
+  noPhoto: string;
+  demo: string;
 }
 
 interface Props {
@@ -70,7 +72,7 @@ export function PropertyCard({ lang, property: p, labels, isDemo, priority }: Pr
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-[0.18em] text-ink/30">
-            No photo
+            {labels.noPhoto}
           </div>
         )}
         {/* hover scrim for depth */}
@@ -81,7 +83,7 @@ export function PropertyCard({ lang, property: p, labels, isDemo, priority }: Pr
             isDemo ? "bg-ink text-ivory" : "bg-ivory/95 text-ink"
           }`}
         >
-          {isDemo ? "Demo" : labels.forSale}
+          {isDemo ? labels.demo : labels.forSale}
         </span>
       </div>
 

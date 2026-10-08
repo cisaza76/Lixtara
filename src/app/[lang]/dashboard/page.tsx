@@ -322,6 +322,9 @@ export default async function DashboardPage({
     }
   }
   const buyerCopy = t(lang).dashboardBuyer;
+  // Estado de la oferta tal como lo guarda la DB → texto en el idioma de la página.
+  const offerStatusText = (status: string): string =>
+    (buyerCopy.offerStatuses as Record<string, string>)[status] ?? status;
   const hasBuyerActivity = offers.length > 0 || savedIds.length > 0;
 
   // Portfolio metrics (derived from the listings already fetched — no extra query).
@@ -569,7 +572,7 @@ export default async function DashboardPage({
                 };
 
               const tierText = tier
-                ? `${copy.tierLabel}: ${tierId.charAt(0).toUpperCase() + tierId.slice(1)}`
+                ? `${copy.tierLabel}: ${t(lang).pricing.tiers[tierId as PricingTierId].name}`
                 : undefined;
 
               return (
@@ -676,7 +679,7 @@ export default async function DashboardPage({
                                   : "border-gold-soft bg-ivory-strong/40 text-ink/70"
                             }`}
                           >
-                            {o.status}
+                            {offerStatusText(o.status)}
                           </span>
                         </td>
                       </tr>
@@ -738,7 +741,7 @@ export default async function DashboardPage({
                                       : "border-gold-soft bg-ivory-strong/40 text-ink/70"
                                 }`}
                               >
-                                {o.status}
+                                {offerStatusText(o.status)}
                               </span>
                             </td>
                             <td className="py-3 text-xs">

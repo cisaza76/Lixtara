@@ -5,6 +5,7 @@ import { AuthShell, Field, SubmitButton, ErrorBanner, SuccessBanner } from "@/co
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { isValidEmail, normalizeEmail } from "@/lib/listing-email-gate";
 import { sendResumeLink } from "@/lib/listing-email-gate.server";
+import { LocalizedValidation } from "@/components/localized-validation";
 
 // "Continue my listing": a seller who lost their session (closed the tab,
 // changed device) asks for a magic link back to their draft. Only emails that
@@ -57,6 +58,8 @@ export default async function ContinueListingPage({
       titleAccent={copy.titleAccent}
       titleAfter={copy.titleAfter}
     >
+      {/* Browser validation bubbles in the page's language, not the browser's. */}
+      <LocalizedValidation labels={t(lang).listingForm.validation} />
       <p className="text-base leading-relaxed text-ink/70">{copy.body}</p>
       {error && <ErrorBanner message={error} />}
       {sp.sent === "1" ? (

@@ -68,6 +68,7 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
   try {
     const { sessionId, url } = await createPhotographyCheckoutSession({
+      lang,
       propertyId,
       userId: user.id,
       userEmail: user.email,

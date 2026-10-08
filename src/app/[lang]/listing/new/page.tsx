@@ -61,6 +61,7 @@ import { PaymentStatusPoller } from "@/components/payment-status-poller";
 import { DashboardRedirect } from "@/components/dashboard-redirect";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
+import { LocalizedValidation } from "@/components/localized-validation";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -1455,25 +1456,25 @@ export default async function ListingNewPage({
       : sp.error === "email_exists"
       ? copy.step1.emailExists
       : sp.error === "required"
-      ? "All fields are required."
+      ? copy.stepErrors.required
       : sp.error === "fl_only"
         ? copy.step1.flOnly
         : sp.error === "address_invalid"
           ? copy.step1.addressInvalid
         : sp.error === "invalid"
-          ? "Please check the values."
+          ? copy.stepErrors.invalid
           : sp.error === "invalid_type"
-            ? "Pick a property type."
+            ? copy.stepErrors.invalidType
             : sp.error === "invalid_beds"
-              ? "Bedrooms must be between 0 and 30."
+              ? copy.stepErrors.invalidBeds
               : sp.error === "invalid_baths"
-                ? "Bathrooms must be a number greater than 0 (e.g. 2 or 2.5)."
+                ? copy.stepErrors.invalidBaths
                 : sp.error === "invalid_sqft"
-                  ? "Square feet must be greater than 0."
+                  ? copy.stepErrors.invalidSqft
                   : sp.error === "invalid_year"
-                    ? "Year built must be 1800 to current year + 2."
+                    ? copy.stepErrors.invalidYear
                     : sp.error === "invalid_price"
-                      ? "List price must be greater than 0 (in USD, no commas)."
+                      ? copy.stepErrors.invalidPrice
                       : sp.error === "empty_improve"
                         ? copy.step4.emptyToImprove
                         : sp.error === "improve_failed"
@@ -1485,17 +1486,17 @@ export default async function ListingNewPage({
                               : sp.error === "no_files"
                                 ? copy.step5.invalidFormat
                                 : sp.error === "save_failed"
-                                  ? "Could not save. Please try again."
+                                  ? copy.stepErrors.saveFailed
                                   : sp.error === "no_estimate"
-                                    ? "No price estimate available yet."
+                                    ? copy.stepErrors.noEstimate
                                     : sp.error === "rights_required"
                                       ? copy.step5.ownershipRequired
                                       : sp.error === "invalid_parking"
-                                        ? "Parking spaces must be between 0 and 50."
+                                        ? copy.stepErrors.invalidParking
                                         : sp.error === "invalid_hoa"
-                                          ? "HOA fee must be a non-negative dollar amount."
+                                          ? copy.stepErrors.invalidHoa
                                           : sp.error === "invalid_tax"
-                                            ? "Property tax must be a non-negative dollar amount."
+                                            ? copy.stepErrors.invalidTax
                                             : sp.error === "buyer_commission_required" ||
                                                 sp.error === "invalid_buyer_commission"
                                               ? copy.step6.buyerCommissionRequired
@@ -1527,6 +1528,8 @@ export default async function ListingNewPage({
       stepLabel={copy.stepLabel}
       ofLabel={copy.ofLabel}
     >
+      {/* Browser validation bubbles in the page's language, not the browser's. */}
+      <LocalizedValidation labels={copy.validation} />
       {/* ─── Step 1: Address ─── */}
       {step === 1 && (
         <div className="flex flex-col gap-8">
@@ -1582,6 +1585,10 @@ export default async function ListingNewPage({
               defaultLat={draft?.latitude ?? null}
               defaultLng={draft?.longitude ?? null}
               verifiedNote={copy.step1.verifiedNote}
+              language={lang}
+              mapsLoadingLabel={copy.step1.mapsLoading}
+              mapsReadyLabel={copy.step1.mapsReady}
+              mapsErrorLabel={copy.step1.mapsError}
             />
             {needsGateEmail && (
               <Field
@@ -1873,8 +1880,10 @@ export default async function ListingNewPage({
                           </div>
                           <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.12em] text-ink/55 flex-wrap">
                             <span>
-                              {c.bedrooms}bd · {c.bathrooms}ba ·{" "}
-                              {c.squareFootage.toLocaleString()}sqft
+                              {copy.step3.compsSpecs
+                                .replace("{beds}", String(c.bedrooms))
+                                .replace("{baths}", String(c.bathrooms))
+                                .replace("{sqft}", c.squareFootage.toLocaleString())}
                             </span>
                             <span className="text-gold-soft">·</span>
                             <span>
@@ -2053,7 +2062,7 @@ export default async function ListingNewPage({
                     defaultValue={draft?.flood_zone ?? ""}
                     className="bg-ivory border-2 border-gold-soft px-4 py-3 text-base text-ink focus:outline-none focus:border-gold"
                   >
-                    <option value="">—</option>
+                    <option value="">{copy.step3.notSpecifiedOption}</option>
                     <option value="X">{copy.step3.floodZoneOptionX}</option>
                     <option value="AE">{copy.step3.floodZoneOptionAE}</option>
                     <option value="VE">{copy.step3.floodZoneOptionVE}</option>
@@ -2100,6 +2109,7 @@ export default async function ListingNewPage({
                   coopDifficult: copy.step3.coopDifficult,
                   tenantNotesLabel: copy.step3.tenantNotesLabel,
                   tenantNotesPlaceholder: copy.step3.tenantNotesPlaceholder,
+                  notSpecifiedOption: copy.step3.notSpecifiedOption,
                 }}
               />
 
@@ -2296,9 +2306,11 @@ export default async function ListingNewPage({
           {errorMessage && <ErrorBanner message={errorMessage} />}
           {sp.uploaded && (
             <SuccessBanner
-              message={`Uploaded ${sp.uploaded} ${
-                Number(sp.uploaded) === 1 ? "photo" : "photos"
-              }.`}
+              message={
+                Number(sp.uploaded) === 1
+                  ? copy.step5.uploadedNoticeOne
+                  : copy.step5.uploadedNotice.replace("{n}", String(sp.uploaded))
+              }
             />
           )}
           {sp.deleted === "1" && (
@@ -2364,6 +2376,15 @@ export default async function ListingNewPage({
               invalidFormat: copy.step5.invalidFormat,
               genericError: copy.step5.uploadFailed,
               partialFail: copy.step5.photoPartialFail,
+              chooseFiles: copy.step5.chooseFiles,
+              noFilesChosen: copy.step5.noFilesChosen,
+              filesChosen: copy.step5.filesChosen,
+              fileChosenOne: copy.step5.fileChosenOne,
+              noFilesPicked: copy.step5.noFilesPicked,
+              notAuthenticated: copy.step5.notAuthenticated,
+              tooLarge: copy.step5.uploadTooLarge,
+              reasonTooLarge: copy.step5.uploadReasonTooLarge,
+              reasonGeneric: copy.step5.uploadReasonGeneric,
             }}
           />
 
@@ -2426,6 +2447,8 @@ export default async function ListingNewPage({
                   livingGenerating: copy.step5.living.generating,
                   livingFailed: copy.step5.living.failed,
                   livingView: copy.step5.living.view,
+                  stagingRateLimited: copy.step5.stagingRateLimited,
+                  livingRateLimited: copy.step5.living.rateLimited,
                 }}
               />
             )}
@@ -2553,7 +2576,7 @@ export default async function ListingNewPage({
                       </span>
                       {draft.latitude && draft.longitude && (
                         <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45 mt-1">
-                          ✓ Verified · {draft.latitude.toFixed(4)},{" "}
+                          ✓ {copy.step6.addressVerified} · {draft.latitude.toFixed(4)},{" "}
                           {draft.longitude.toFixed(4)}
                         </span>
                       )}
@@ -2609,18 +2632,22 @@ export default async function ListingNewPage({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                       <div className="flex flex-col">
                         <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                          Type
+                          {copy.step6.typeLabel}
                         </span>
                         <span className="text-ink">
-                          {draft.property_type.replace("_", " ")}
+                          {(copy.step3.types as Record<string, string>)[
+                            draft.property_type
+                          ] ?? draft.property_type.replace("_", " ")}
                         </span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                          Beds / Baths
+                          {copy.step6.bedsBathsLabel}
                         </span>
                         <span className="text-ink">
-                          {draft.bedrooms} bd / {draft.bathrooms} ba
+                          {copy.step6.bedsBathsValue
+                            .replace("{beds}", String(draft.bedrooms))
+                            .replace("{baths}", String(draft.bathrooms))}
                         </span>
                       </div>
                       <div className="flex flex-col">
@@ -2631,7 +2658,11 @@ export default async function ListingNewPage({
                           {draft.sqft.toLocaleString()}
                           {draft.lot_size && (
                             <span className="text-ink/55 text-xs ml-1">
-                              · lot {draft.lot_size.toLocaleString()}
+                              ·{" "}
+                              {copy.step6.lotValue.replace(
+                                "{n}",
+                                draft.lot_size.toLocaleString(),
+                              )}
                             </span>
                           )}
                         </span>
@@ -2652,20 +2683,42 @@ export default async function ListingNewPage({
                         draft.as_is_sale) && (
                         <div className="col-span-2 sm:col-span-4 border-t border-gold-soft pt-3 mt-1 flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink/75">
                           {draft.parking_spaces != null && (
-                            <span>🚗 {draft.parking_spaces} parking</span>
+                            <span>
+                              🚗{" "}
+                              {copy.step6.parkingValue.replace(
+                                "{n}",
+                                String(draft.parking_spaces),
+                              )}
+                            </span>
                           )}
                           {draft.hoa_fee != null && (
                             <span>
-                              🏢 HOA ${draft.hoa_fee.toLocaleString()}/mo
+                              🏢{" "}
+                              {copy.step6.hoaValue.replace(
+                                "{amount}",
+                                draft.hoa_fee.toLocaleString(),
+                              )}
                             </span>
                           )}
                           {draft.tax_annual_amount != null && (
                             <span>
-                              🧾 Tax ${draft.tax_annual_amount.toLocaleString()}/yr
+                              🧾{" "}
+                              {copy.step6.taxValue.replace(
+                                "{amount}",
+                                draft.tax_annual_amount.toLocaleString(),
+                              )}
                             </span>
                           )}
                           {draft.flood_zone && (
-                            <span>🌊 Flood zone {draft.flood_zone}</span>
+                            <span>
+                              🌊{" "}
+                              {draft.flood_zone === "UNKNOWN"
+                                ? copy.step6.floodZoneUnknown
+                                : copy.step6.floodZoneValue.replace(
+                                    "{zone}",
+                                    draft.flood_zone,
+                                  )}
+                            </span>
                           )}
                           {draft.occupancy_status && (
                             <span>
@@ -2677,9 +2730,9 @@ export default async function ListingNewPage({
                                   : copy.step3.occupancyTenant}
                             </span>
                           )}
-                          {draft.has_pool && <span>🏊 Pool</span>}
-                          {draft.cash_only && <span>💵 Cash only</span>}
-                          {draft.as_is_sale && <span>📋 As-is</span>}
+                          {draft.has_pool && <span>🏊 {copy.step6.poolTag}</span>}
+                          {draft.cash_only && <span>💵 {copy.step6.cashOnlyTag}</span>}
+                          {draft.as_is_sale && <span>📋 {copy.step6.asIsTag}</span>}
                         </div>
                       )}
                       {draft.appliances && draft.appliances.length > 0 && (
@@ -2744,7 +2797,7 @@ export default async function ListingNewPage({
                           .replace(
                             "{primary}",
                             primaryPhoto
-                              ? "set"
+                              ? copy.step6.primarySet
                               : copy.step6.primaryNone,
                           )}
                       </p>
@@ -3308,7 +3361,7 @@ export default async function ListingNewPage({
                       {copy.step8.tierLabel}
                     </span>
                     <span className="font-display text-xl text-ink">
-                      {tierId.charAt(0).toUpperCase() + tierId.slice(1)}
+                      {t(lang).pricing.tiers[tierId].name}
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between gap-4 border-t border-gold-soft pt-3">

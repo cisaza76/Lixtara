@@ -24,6 +24,8 @@ export interface OccupancyLabels {
   coopDifficult: string;
   tenantNotesLabel: string;
   tenantNotesPlaceholder: string;
+  /** Empty option of the occupancy select (no selection yet). */
+  notSpecifiedOption: string;
 }
 
 interface Props {
@@ -69,7 +71,7 @@ export function OccupancySection({
           onChange={(e) => setOccupancy(e.target.value as Occupancy)}
           className={fieldClass}
         >
-          <option value="">—</option>
+          <option value="">{L.notSpecifiedOption}</option>
           <option value="vacant">{L.occupancyVacant}</option>
           <option value="owner_occupied">{L.occupancyOwner}</option>
           <option value="tenant_occupied">{L.occupancyTenant}</option>

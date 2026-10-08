@@ -50,7 +50,7 @@ export function RebateSlider({
         </div>
         <input
           type="range"
-          aria-label="Purchase price"
+          aria-label={priceLabel}
           aria-valuetext={`$${price.toLocaleString("en-US")}`}
           min={200_000}
           max={5_000_000}

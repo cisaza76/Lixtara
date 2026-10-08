@@ -25,6 +25,10 @@ interface InvestorClubVolumeProps {
   discountGold: string;
   discountPlatinum: string;
   footerNote: string;
+  tableTier: string;
+  tableDiscount: string;
+  /** "{deals}" is replaced with the example's number of deals. */
+  tableTotal: string;
 }
 
 function formatUSD(n: number): string {
@@ -69,13 +73,13 @@ export function InvestorClubVolume(props: InvestorClubVolumeProps) {
           <thead className="bg-ivory-strong/40">
             <tr>
               <th className="text-left p-4 text-[10px] uppercase tracking-[0.18em] text-ink/55 font-semibold">
-                Tier
+                {props.tableTier}
               </th>
               <th className="text-left p-4 text-[10px] uppercase tracking-[0.18em] text-ink/55 font-semibold">
-                Discount
+                {props.tableDiscount}
               </th>
               <th className="text-right p-4 text-[10px] uppercase tracking-[0.18em] text-ink/55 font-semibold">
-                Total ({deals} × $400K Pro)
+                {props.tableTotal.replace("{deals}", String(deals))}
               </th>
               <th className="text-right p-4 text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
                 {props.exampleSavingsLabel}

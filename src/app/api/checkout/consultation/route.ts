@@ -46,6 +46,7 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
   try {
     const { url } = await createConsultationCheckoutSession({
+      lang,
       product,
       userId: user.id,
       userEmail: user.email,
