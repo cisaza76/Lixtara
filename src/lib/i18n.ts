@@ -220,6 +220,13 @@ export const dictionaries = {
       validityNote: "Consultation hours are valid for 90 days from purchase.",
     },
     listingForm: {
+      foreignDraft: {
+        title: "This listing belongs to another account.",
+        body: "You're signed in as",
+        howTo: "Only the seller who created this listing can continue it and sign its agreement. Sign out and sign in with the seller's account, or use a private window.",
+        adminReview: "Open in admin review",
+        signOut: "Sign out",
+      },
       resume: {
         eyebrow: "Continue your listing",
         titleBefore: "Pick up where you ",
@@ -1621,6 +1628,13 @@ export const dictionaries = {
       validityNote: "Las horas de consulta son válidas por 90 días desde la compra.",
     },
     listingForm: {
+      foreignDraft: {
+        title: "Este listing pertenece a otra cuenta.",
+        body: "Tienes la sesión iniciada como",
+        howTo: "Solo el vendedor que creó este listing puede continuarlo y firmar su acuerdo. Cierra sesión y entra con la cuenta del vendedor, o usa una ventana privada.",
+        adminReview: "Abrir en la revisión del admin",
+        signOut: "Cerrar sesión",
+      },
       resume: {
         eyebrow: "Continúa tu listing",
         titleBefore: "Sigue donde ",
