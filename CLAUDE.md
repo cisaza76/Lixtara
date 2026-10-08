@@ -66,7 +66,7 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 ### Pricing
 - Pricing tiers live in **one** module: `src/lib/pricing-tiers.ts`. Never hardcode
   `199`, `495`, `995` in components — import from there (and Stripe amounts derive from it).
-- Virtual staging: `FREE_QUOTA = 3`, `PRICE_PER_ROOM = 500` cents, hard cap 30 rooms.
+- Virtual staging: `STAGING_FREE_QUOTA = 5` free actions per listing, then `STAGING_OVERAGE_PRICE = 5` USD each (`src/lib/staging.ts`), hard cap 30 rooms.
 - Buyer rebate: `LIXTARA_BUYER_FEE_PCT = 0.5`, `REBATE_CAP = 50_000`.
 
 ### Auth & RLS

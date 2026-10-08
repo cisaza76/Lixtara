@@ -12,9 +12,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { getEnvelopeStatus, mapEnvelopeStatus } from "@/lib/docusign";
-import { sendAgreementSigned } from "@/lib/email";
-import { lookupRecipientLang } from "@/lib/email-recipient-lang";
+import { refreshAgreement } from "@/lib/agreement-refresh";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -56,69 +54,18 @@ export async function POST(req: Request) {
   const supabase = serviceClient();
   const { data: agreement } = await supabase
     .from("agreements")
-    .select("id, property_id")
+    .select("id, property_id, envelope_id, status")
     .eq("envelope_id", envelopeId)
     .maybeSingle();
+
   if (!agreement) {
     // Unknown envelope (could be from another env). Ack so DocuSign stops
     // retrying.
     return NextResponse.json({ ok: true, note: "unknown_envelope" });
   }
 
-  // Re-fetch from DocuSign as canonical source — anti-spoofing.
-  let statusStr = "pending";
-  let signedAt: string | null = null;
-  try {
-    const fresh = await getEnvelopeStatus(envelopeId);
-    statusStr = fresh.status;
-    if (fresh.completedDateTime) signedAt = fresh.completedDateTime;
-  } catch (e) {
-    console.error("docusign envelope re-fetch failed:", e);
-    return NextResponse.json({ ok: false, error: "fetch_failed" }, { status: 200 });
-  }
-
-  const ourStatus = mapEnvelopeStatus(statusStr);
-  const update: Record<string, unknown> = {
-    status: ourStatus,
-    updated_at: new Date().toISOString(),
-  };
-  if (ourStatus === "completed" || ourStatus === "signed") {
-    update.signed_at = signedAt ?? new Date().toISOString();
-  }
-  await supabase.from("agreements").update(update).eq("id", agreement.id);
-
-  // Notify seller on signed/completed.
-  if (ourStatus === "signed" || ourStatus === "completed") {
-    try {
-      const { data: prop } = await supabase
-        .from("properties")
-        .select(
-          "address_street,address_city,address_state,address_zip,owner_id",
-        )
-        .eq("id", agreement.property_id)
-        .maybeSingle();
-      if (prop) {
-        const { data: sellerAuth } = await supabase.auth.admin.getUserById(
-          prop.owner_id,
-        );
-        const sellerEmail = sellerAuth.user?.email;
-        if (sellerEmail) {
-          const origin =
-            process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
-          // Idioma del vendedor si lo conocemos (seller_leads.locale); si no, inglés.
-          const sellerLang = (await lookupRecipientLang(prop.owner_id)) ?? "en";
-          await sendAgreementSigned({
-            to: sellerEmail,
-            lang: sellerLang,
-            propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
-            paymentUrl: `${origin}/${sellerLang}/listing/new?id=${agreement.property_id}&step=8`,
-          });
-        }
-      }
-    } catch (e) {
-      console.error("docusign webhook email failed:", e);
-    }
-  }
-
-  return NextResponse.json({ ok: true, status: ourStatus });
+  // DocuSign is re-queried inside refreshAgreement (anti-spoofing), which also
+  // sends the "agreement signed" email exactly once.
+  const status = await refreshAgreement(agreement);
+  return NextResponse.json({ ok: true, status });
 }

@@ -5,6 +5,11 @@ import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import { assertStaffWithUser } from "@/lib/admin-auth";
+import {
+  isFinalAgreementStatus,
+  refreshAgreement,
+  type AgreementRef,
+} from "@/lib/agreement-refresh";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
 import {
   ensureEnterMlsNumberTask,
@@ -161,14 +166,23 @@ export default async function ListingReviewPage({
       .order("display_order", { ascending: true }),
     svc
       .from("agreements")
-      .select("status,signer_name,signer_email,signed_at")
+      .select("id,envelope_id,property_id,status,signer_name,signer_email,signed_at")
       .eq("property_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
   const photos = (photoRows ?? []) as Photo[];
-  const agreement = (agreementRow ?? null) as Agreement | null;
+  const agreement = (agreementRow ?? null) as (Agreement & AgreementRef) | null;
+  // Live status: the stored one lags until the seller's page or a DocuSign
+  // webhook refreshes it, so refresh it here too.
+  if (agreement && !isFinalAgreementStatus(agreement.status)) {
+    const live = await refreshAgreement(agreement);
+    if (live !== agreement.status) {
+      agreement.status = live as Agreement["status"];
+      if (live === "signed" || live === "completed") agreement.signed_at ??= new Date().toISOString();
+    }
+  }
 
   // ── Broker actions (admin/broker gated). The Lovable workflow statuses
   // (rejected / changes_requested / awaiting_broker_signature) don't exist in

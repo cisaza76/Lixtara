@@ -84,3 +84,21 @@ describe("el repo no contiene licencias incorrectas", () => {
     expect(malos).toEqual([]);
   });
 });
+
+describe("fillBrokerageCopy", () => {
+  it("fills license and broker first name from the config, never hardcoded", async () => {
+    const { fillBrokerageCopy, BROKERAGE } = await import("@/config/brokerage");
+    expect(fillBrokerageCopy("Lic #{brokerageLicense} · {brokerFirstName}")).toBe(
+      `Lic #${BROKERAGE.brokerageLicense} · ${BROKERAGE.brokerName.split(" ")[0]}`,
+    );
+  });
+  it("leaves no brokerage placeholder unfilled in the FAQ and value props", async () => {
+    const { fillBrokerageCopy } = await import("@/config/brokerage");
+    const { dictionaries } = await import("@/lib/i18n");
+    for (const lang of ["en", "es"] as const) {
+      const d = dictionaries[lang];
+      const texts = [...d.faq.items.map((i) => i.a), ...d.valueProps.props.map((p) => p.body)];
+      for (const s of texts) expect(fillBrokerageCopy(s)).not.toMatch(/\{broker/);
+    }
+  });
+});
