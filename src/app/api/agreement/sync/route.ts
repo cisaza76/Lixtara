@@ -9,7 +9,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { getEnvelopeStatus, mapEnvelopeStatus } from "@/lib/docusign";
+import {
+  getEnvelopeSigners,
+  getEnvelopeStatus,
+  mapEnvelopeStatus,
+  sellerHasSigned,
+} from "@/lib/docusign";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 
 export const maxDuration = 30;
@@ -72,6 +77,13 @@ export async function POST(req: Request) {
     const fresh = await getEnvelopeStatus(agreement.envelope_id);
     mapped = mapEnvelopeStatus(fresh.status);
     if (fresh.completedDateTime) signedAt = fresh.completedDateTime;
+    // The envelope stays "sent"/"delivered" until EVERY signer is done (the
+    // template may route a broker countersignature after the seller). What
+    // unlocks the seller's next step is THEIR signature.
+    if (mapped === "sent" || mapped === "delivered" || mapped === "pending") {
+      const signers = await getEnvelopeSigners(agreement.envelope_id);
+      if (sellerHasSigned(signers, propertyId)) mapped = "signed";
+    }
   } catch (e) {
     console.error("agreement sync: DocuSign fetch failed", e);
     return NextResponse.json({ status: agreement.status, synced: false });

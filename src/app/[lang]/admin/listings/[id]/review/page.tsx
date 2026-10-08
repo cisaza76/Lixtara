@@ -3,6 +3,8 @@ import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { createService } from "@/lib/supabase/service";
+import { assertStaffWithUser } from "@/lib/admin-auth";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
 import {
   ensureEnterMlsNumberTask,
@@ -144,13 +146,20 @@ export default async function ListingReviewPage({
   if (!property) notFound();
   const prop = property as Property;
 
+  // property_photos and agreements have no admin/broker SELECT policy (only the
+  // owner, and the public for ACTIVE listings' photos), so with the session
+  // client the review page always showed "no photos" and "no agreement on
+  // file" for drafts. Re-check the role here (page data loads in parallel with
+  // the admin layout's guard), then read both with the secret key.
+  await assertStaffWithUser(lang);
+  const svc = createService();
   const [{ data: photoRows }, { data: agreementRow }] = await Promise.all([
-    supabase
+    svc
       .from("property_photos")
       .select("id,url,is_primary,display_order")
       .eq("property_id", id)
       .order("display_order", { ascending: true }),
-    supabase
+    svc
       .from("agreements")
       .select("status,signer_name,signer_email,signed_at")
       .eq("property_id", id)
