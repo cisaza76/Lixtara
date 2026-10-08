@@ -86,6 +86,7 @@ type OccupancyStatus = "vacant" | "owner_occupied" | "tenant_occupied";
 
 interface Draft {
   id: string;
+  owner_id: string;
   address_street: string;
   address_city: string;
   address_state: string;
@@ -220,11 +221,62 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,appliances",
+        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,appliances",
       )
       .eq("id", draftId)
       .maybeSingle();
     draft = (data as Draft | null) ?? null;
+
+    // Admins and brokers can READ every draft (RLS), so a staff session could
+    // walk a seller's listing all the way to step 7 and only then fail with
+    // property_not_found_or_not_yours. Stop here and say why instead.
+    if (draft && sessionUser && draft.owner_id !== sessionUser.id) {
+      const [{ data: isAdmin }, { data: isBroker }] = await Promise.all([
+        supabase.rpc("has_role", { _role: "admin" }),
+        supabase.rpc("has_role", { _role: "broker" }),
+      ]);
+      const isStaff = isAdmin === true || isBroker === true;
+      const notice = copy.foreignDraft;
+      return (
+        <StepShell
+          stepNumber={step}
+          totalSteps={TOTAL_STEPS}
+          stepNames={copy.stepNames}
+          eyebrow={copy.eyebrow}
+          titleBefore={copy.titleBefore}
+          titleAccent={copy.titleAccent}
+          titleAfter={copy.titleAfter}
+          stepLabel={copy.stepLabel}
+          ofLabel={copy.ofLabel}
+        >
+          <div className="flex flex-col gap-5 border border-gold bg-gold/5 p-6 lg:p-8">
+            <h2 className="font-display text-2xl text-ink font-normal">{notice.title}</h2>
+            <p className="text-base leading-relaxed text-ink/75">
+              {notice.body} <span className="font-semibold text-ink">{sessionUser.email}</span>.{" "}
+              {notice.howTo}
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              {isStaff && (
+                <Link
+                  href={`/${lang}/admin/listings/${draft.id}/review`}
+                  className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+                >
+                  {notice.adminReview} →
+                </Link>
+              )}
+              <form action={`/${lang}/auth/sign-out`} method="post">
+                <button
+                  type="submit"
+                  className="text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+                >
+                  {notice.signOut}
+                </button>
+              </form>
+            </div>
+          </div>
+        </StepShell>
+      );
+    }
 
     // Step 3 auto-fetch: Miami-Dade autofill (if zip is Miami-Dade + fields
     // still placeholders) + Rentcast comps (if not fetched yet). Runs server-
