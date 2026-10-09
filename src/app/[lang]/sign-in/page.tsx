@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL } from "@/lib/config";
-import { safeNextPath, withLocale } from "@/lib/auth/safe-redirect";
+import { postSignInPath, safeNextPath } from "@/lib/auth/safe-redirect";
+import { isStaff } from "@/lib/admin-auth";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
 import {
@@ -67,7 +68,7 @@ export default async function SignInPage({
       redirect(`/${lang}/sign-in?error=${key}`);
     }
 
-    redirect(withLocale(next, lang));
+    redirect(postSignInPath(next, lang, await isStaff(supabase)));
   }
 
   return (

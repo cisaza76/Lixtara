@@ -1,8 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { isLocale, t, type Locale } from "@/lib/i18n";
 import { requireUser } from "@/lib/auth";
+import { isStaff } from "@/lib/admin-auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice, PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import {
@@ -127,6 +128,8 @@ export default async function DashboardPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) notFound();
+  // Staff have no seller dashboard — the admin panel is their home.
+  if (await isStaff(supabase)) redirect(`/${lang}/admin`);
 
   // Listings owned by the user. RLS already gates by owner, but be explicit.
   const { data: listingRows } = await supabase
