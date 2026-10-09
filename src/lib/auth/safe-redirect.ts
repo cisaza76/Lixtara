@@ -35,3 +35,14 @@ export function withLocale(path: string, lang: string): string {
   if (/^\/(en|es)(\/|$|\?|#)/.test(path)) return path;
   return `/${lang}${path === "/" ? "" : path}`;
 }
+
+// Staff (admin/broker) who sign in without a specific destination land on the admin
+// panel, not the public home page. An explicit `next` (e.g. a deep link into /admin or
+// a property) is still honored.
+export function postSignInPath(next: string, lang: string, staff: boolean): string {
+  const path = withLocale(next, lang);
+  if (!staff) return path;
+  const bare = path.replace(/[?#].*$/, "").replace(/\/$/, "");
+  if (bare === `/${lang}` || bare === `/${lang}/dashboard`) return `/${lang}/admin`;
+  return path;
+}
