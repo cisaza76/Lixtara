@@ -391,6 +391,21 @@ select count(*) filter (where search_fields_at is null) as pendientes,
   from public.mls_listings;
 ```
 
+**Aplicado el 2026-10-10/11** (relleno completo: 50.836 filas; condados solo
+`miamidade` 19.986 · `broward` 17.386 · `palmbeach` 13.464). 6.523 fichas traían
+`BathroomsTotalInteger` en null → `20261011130000_mls_bathrooms_fallback` usa
+`BathroomsFull + BathroomsHalf`; tras aplicarla, recalcular solo esas:
+
+```sql
+with t as (update public.mls_listings set payload = payload
+            where bathrooms is null returning 1)
+select count(*) as recalculadas from t;
+```
+
+> **No correr rellenos en el minuto :23.** El 2026-10-10 a las 23:23 UTC el upsert del sync
+> chocó con una tanda de 10.000 que tenía las filas bloqueadas y superó el
+> `statement_timeout`. Desde entonces el sync escribe en tandas de 50 (`UPSERT_CHUNK`).
+
 Tope anti-scraping: 24 por página, máximo 20 páginas (`MAX_PAGE` en
 `src/lib/property-search.ts`); más allá hay que acotar la búsqueda.
 
