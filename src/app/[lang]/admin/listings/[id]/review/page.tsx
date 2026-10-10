@@ -317,6 +317,12 @@ export default async function ListingReviewPage({
           Enter it after the listing is live in Matrix. Saving it closes the
           &ldquo;Enter MLS number&rdquo; task.
         </p>
+        <Link
+          href={`/${lang}/admin/listings/${id}/matrix`}
+          className="self-start inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
+        >
+          Matrix input sheet →
+        </Link>
       </section>
 
       {/* Listing data */}
