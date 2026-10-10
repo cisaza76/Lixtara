@@ -359,6 +359,24 @@ select p.id, p.address_street, p.mls_number
 
 La segunda consulta debería salir vacía; cada fila es un listing que saldría **duplicado**.
 
+## 3.2b · Filtros y paginación de `/properties`
+
+Construidos el 2026-10-11 (PR "property search filters + pagination"). Requieren la
+migración `20261011120000_mls_listings_search_columns` (columnas generadas `bedrooms`,
+`bathrooms`, `living_area`, `county_key` + índices). Sin ella, el lector público falla y
+`/properties` queda sin feed (fail-soft): **aplicarla antes de encender la exhibición.**
+
+```sql
+select county_key, count(*) from public.mls_listings group by 1 order by 2 desc;
+-- solo miamidade, broward, palmbeach (ningún null)
+select count(*) filter (where bedrooms is null) as sin_cuartos,
+       count(*) filter (where bathrooms is null) as sin_banos, count(*) as total
+  from public.mls_listings;
+```
+
+Tope anti-scraping: 24 por página, máximo 20 páginas (`MAX_PAGE` en
+`src/lib/property-search.ts`); más allá hay que acotar la búsqueda.
+
 ## 3.3 · Encender la exhibición
 
 ```bash
