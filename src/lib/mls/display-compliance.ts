@@ -152,7 +152,7 @@ export const MAX_REFRESH_INTERVAL_HOURS = 24;
 export const MAX_WITHDRAWAL_LATENCY_HOURS = 24;
 
 /**
- * El cron corre cada 6 horas, así que el peor caso de latencia de retirada son 6 horas
+ * El cron corre cada hora, así que el peor caso de latencia de retirada es 1 hora
  * frente a las 24 permitidas. Este chequeo existe para que cambiar el cron a un intervalo
  * que incumpla rompa un test, en vez de pasar inadvertido.
  */

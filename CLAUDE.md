@@ -142,7 +142,9 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 - `MLS_BRIDGE_DATASET` — server-only. Código del dataset en Bridge (`miamire` para
   MIAMI Association of REALTORS®). No es secreto, pero sí server-only: nombra el feed.
 - `MLS_SYNC_BUDGET_MS` / `MLS_SYNC_MAX_PAGES` — server-only, opcionales (50.000 ms / 200).
-  Presupuesto de una invocación del cron `/api/mls/sync`, que corre cada 6 h (`23 */6 * * *`).
+  Presupuesto de una invocación del cron `/api/mls/sync`, que corre cada hora (`23 * * * *`).
+  Era cada 6 h hasta el 2026-10-10: una invocación de ~50 s no alcanzaba los ~4.250
+  cambios de 6 h.
   El mínimo contractual de refresco son 24 h (Schedule A §5) — ver ADR-0013.
 - `MLS_BRIDGE_SERVER_TOKEN` — server-only Bridge Interactive server token. **Production
   only.** Never `NEXT_PUBLIC_`-prefixed. Obtainable only via `requireMlsServerToken()`,
