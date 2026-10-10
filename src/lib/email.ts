@@ -22,6 +22,7 @@ import {
   type CanSpamMissing,
   type CommercialSenderIdentity,
 } from "@/lib/email-compliance";
+import { escapeHtml } from "@/lib/contact-form";
 
 let _client: Resend | null = null;
 function client(): Resend | null {
@@ -53,6 +54,8 @@ interface SendInput {
   idempotencyKey?: string;
   /** Extra MIME headers (e.g. List-Unsubscribe for commercial email). */
   headers?: Record<string, string>;
+  /** Overrides EMAIL_REPLY_TO (e.g. the visitor who wrote via /contact). */
+  replyTo?: string;
 }
 
 async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -67,7 +70,7 @@ async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error
     const { data, error } = await c.emails.send(
       {
         from: input.from ?? emailFrom(),
-        ...(emailReplyTo() ? { replyTo: emailReplyTo() } : {}),
+        ...((input.replyTo ?? emailReplyTo()) ? { replyTo: input.replyTo ?? emailReplyTo() } : {}),
         to,
         subject: input.subject,
         html: input.html,
@@ -393,5 +396,50 @@ export async function sendCommercialEmail(
       "List-Unsubscribe": `<${input.unsubscribeUrl}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     },
+  });
+}
+
+// ─── Contact form (/contact) ─────────────────────────────────────────
+// Internal notification to the brokerage inbox; reply-to is the visitor so
+// answering the email answers them. All visitor input is HTML-escaped.
+
+export async function sendContactMessage(input: {
+  to: string;
+  lang: Lang;
+  name: string;
+  email: string;
+  phone: string;
+  topic: string;
+  message: string;
+  pageUrl: string;
+}) {
+  const e = escapeHtml;
+  const subject = `Contact form: ${input.name} (${input.topic})`;
+  const rows: [string, string][] = [
+    ["Name", input.name],
+    ["Email", input.email],
+    ["Phone", input.phone || "—"],
+    ["Topic", input.topic],
+    ["Language", input.lang],
+  ];
+  const body = `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">New message from lixtara.com</p>
+    <table cellpadding="0" cellspacing="0" style="margin:16px 0;font-size:13px;color:#1c1c1c;">
+      ${rows
+        .map(
+          ([k, v]) =>
+            `<tr><td style="padding:4px 16px 4px 0;color:#8a8268;text-transform:uppercase;font-size:10px;letter-spacing:0.18em;">${k}</td><td style="padding:4px 0;">${e(v)}</td></tr>`,
+        )
+        .join("")}
+    </table>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;white-space:pre-wrap;">${e(input.message)}</p>
+    <p style="font-size:12px;color:#8a8268;">Reply to this email to answer ${e(input.name)} directly.</p>
+  `;
+  return send({
+    to: input.to,
+    replyTo: input.email,
+    subject,
+    html: shell({ preheader: subject, body }),
+    text: `${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\n${input.message}\n\n${input.pageUrl}`,
   });
 }
