@@ -87,7 +87,7 @@ export default async function ContactPage({
           <p className="text-lg leading-relaxed text-ink/70">{copy.intro}</p>
           <ContactActions
             lang={lang}
-            whatsappHref={whatsappHref(copy.whatsappPrefill)}
+            whatsappHref={whatsappHref()}
             telHref={telHref()}
             whatsappLabel={copy.whatsappCta}
             callLabel={copy.callCta}
