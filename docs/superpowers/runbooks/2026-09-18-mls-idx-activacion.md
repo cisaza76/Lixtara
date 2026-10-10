@@ -361,15 +361,32 @@ La segunda consulta debería salir vacía; cada fila es un listing que saldría 
 
 ## 3.2b · Filtros y paginación de `/properties`
 
-Construidos el 2026-10-11 (PR "property search filters + pagination"). Requieren la
-migración `20261011120000_mls_listings_search_columns` (columnas generadas `bedrooms`,
-`bathrooms`, `living_area`, `county_key` + índices). Sin ella, el lector público falla y
+Construidos el 2026-10-11 (PR #160). Requieren la migración
+`20261011120000_mls_listings_search_columns`: columnas `bedrooms`, `bathrooms`,
+`living_area`, `county_key` (+ `search_fields_at`), un trigger que las calcula desde
+`payload` en cada escritura del sync, e índices. Sin ella, el lector público falla y
 `/properties` queda sin feed (fail-soft): **aplicarla antes de encender la exhibición.**
+
+> **2026-10-11:** la primera versión usaba columnas `GENERATED ... STORED`; el ALTER
+> reescribe la tabla en una sola sentencia y superó el límite de tiempo del SQL Editor
+> ("upstream timeout"), así que se revirtió entero. La versión actual no reescribe nada.
+
+**Relleno de las filas existentes**, en tandas. Repetir hasta que diga *0 rows*
+(~11 veces con ~50.000 fichas):
+
+```sql
+update public.mls_listings set payload = payload
+ where listing_key in (select listing_key from public.mls_listings
+                        where search_fields_at is null limit 5000);
+```
+
+Verificación:
 
 ```sql
 select county_key, count(*) from public.mls_listings group by 1 order by 2 desc;
 -- solo miamidade, broward, palmbeach (ningún null)
-select count(*) filter (where bedrooms is null) as sin_cuartos,
+select count(*) filter (where search_fields_at is null) as pendientes,
+       count(*) filter (where bedrooms is null) as sin_cuartos,
        count(*) filter (where bathrooms is null) as sin_banos, count(*) as total
   from public.mls_listings;
 ```
