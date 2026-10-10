@@ -4,8 +4,9 @@ import { locales } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { localeAlternates } from "@/lib/seo";
 
-// Public, indexable pages. /about and /contact are left out while they show "Coming soon".
+// Public, indexable pages. /about is left out while it shows "Coming soon".
 const STATIC_PATHS = [
+  "/contact",
   "",
   "/properties",
   "/services",

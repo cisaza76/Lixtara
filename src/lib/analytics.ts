@@ -21,7 +21,10 @@ export type AnalyticsEvent =
   | ListingStepEvent
   | { event: "email_verified"; method: "listing_gate" | "account"; lang: string }
   | { event: "loui_open"; lang: string }
-  | { event: "loui_message_sent"; message_index: number; lang: string };
+  | { event: "loui_message_sent"; message_index: number; lang: string }
+  | { event: "contact_form_submitted"; topic: string; lang: string }
+  | { event: "whatsapp_click"; location: string; lang: string }
+  | { event: "phone_click"; location: string; lang: string };
 
 /** Event for viewing step `step` (1-based) of /listing/new. Step names are stable English slugs. */
 export function listingStepEvent(step: number, lang: string): ListingStepEvent {
