@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Inter, Playfair_Display } from "next/font/google";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { SITE_URL } from "@/lib/config";
+import { localeAlternates, PATHNAME_HEADER } from "@/lib/seo";
 import { isLocale, locales, t, type Locale } from "@/lib/i18n";
 import { BROKERAGE_LOCATION } from "@/lib/broker";
 import { brokerageLicenseLine, brokerageLicenseLineShort } from "@/config/brokerage";
@@ -32,7 +35,13 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { lang } = await params;
   const meta = t(isLocale(lang) ? lang : "en").meta;
-  return { title: meta.siteTitle, description: meta.siteDescription };
+  const pathname = (await headers()).get(PATHNAME_HEADER) ?? `/${lang}`;
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: meta.siteTitle,
+    description: meta.siteDescription,
+    alternates: localeAlternates(pathname, SITE_URL),
+  };
 }
 
 export function generateStaticParams() {

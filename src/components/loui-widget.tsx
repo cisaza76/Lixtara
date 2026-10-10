@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState } from "react";
+import { track } from "@/lib/analytics";
 
 interface LouiWidgetProps {
   openLabel: string;
@@ -89,6 +90,11 @@ export function LouiWidget({
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
     setInput("");
+    track({
+      event: "loui_message_sent",
+      message_index: messages.filter((m) => m.role === "user").length + 1,
+      lang,
+    });
     void sendMessage({ text: trimmed });
   }
 
@@ -98,7 +104,10 @@ export function LouiWidget({
       <button
         type="button"
         aria-label={open ? closeLabel : openLabel}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) track({ event: "loui_open", lang });
+          setOpen(!open);
+        }}
         className="fixed z-50 bottom-6 right-6 lg:bottom-8 lg:right-8 w-14 h-14 rounded-full bg-ink text-ivory shadow-xl flex items-center justify-center hover:bg-ink/90 transition-colors"
       >
         {open ? (
