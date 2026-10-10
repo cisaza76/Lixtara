@@ -39,6 +39,12 @@ export interface MlsPublicRow {
   list_office_email: string | null;
   list_agent_phone: string | null;
   list_agent_email: string | null;
+  /**
+   * `payload->Media` del RESO (arreglo de fotos). Sin tipar a propósito: viene tal cual del
+   * proveedor y `primaryMlsPhotoUrl` lo valida. Opcional para que las proyecciones viejas
+   * sigan valiendo.
+   */
+  media?: unknown;
 }
 
 /** Lo mínimo que el cruce necesita de un listing propio. */
@@ -55,8 +61,47 @@ export interface MlsPublicListing {
   listPrice: number | null;
   city: string | null;
   postalCode: string | null;
+  /**
+   * Foto principal por HOT-LINK al CDN del MLS: la URL del feed, sin descargarla ni
+   * guardarla (§ III.B.9; purga trivial bajo § VI.C). null = sin foto utilizable.
+   */
+  photoUrl: string | null;
+  photoAlt: string;
   /** Schedule A §9. Nunca null para una ficha de tercero. */
   attribution: ListingAttribution;
+}
+
+/**
+ * Foto principal de una ficha a partir de `payload->Media`.
+ *
+ * Elige el elemento con menor `Order` entre los que son foto (`MediaCategory` "Photo", o
+ * sin categoría) y traen una `MediaURL` https. Todo lo demás —documentos, videos, URLs
+ * http o con forma rara— se ignora: mejor el recuadro vacío que una imagen rota o mixta.
+ */
+export function primaryMlsPhotoUrl(media: unknown): string | null {
+  if (!Array.isArray(media)) return null;
+  let bestUrl: string | null = null;
+  let bestOrder = Infinity;
+  for (const m of media) {
+    if (typeof m !== "object" || m === null) continue;
+    const item = m as Record<string, unknown>;
+    const category = item.MediaCategory;
+    if (typeof category === "string" && category.toLowerCase() !== "photo") continue;
+    const url = item.MediaURL;
+    if (typeof url !== "string" || !/^https:\/\/[^\s"'<>]+$/i.test(url)) continue;
+    const order = typeof item.Order === "number" && Number.isFinite(item.Order) ? item.Order : Infinity;
+    // Estricto: ante el mismo Order gana el primero del arreglo.
+    if (bestUrl === null || order < bestOrder) {
+      bestUrl = url;
+      bestOrder = order;
+    }
+  }
+  return bestUrl;
+}
+
+function photoAlt(city: string | null, lang: Locale): string {
+  if (lang === "es") return city ? `Propiedad en venta en ${city}` : "Propiedad en venta";
+  return city ? `Home for sale in ${city}` : "Home for sale";
 }
 
 export type DedupeReason = "own_listing" | "not_displayable" | "withdrawn";
@@ -119,6 +164,8 @@ export function mergePublicListings(
       listPrice: row.list_price,
       city: row.city,
       postalCode: row.postal_code,
+      photoUrl: primaryMlsPhotoUrl(row.media),
+      photoAlt: photoAlt(row.city, lang),
       attribution: listingAttribution(
         {
           listOfficeName: row.list_office_name,
