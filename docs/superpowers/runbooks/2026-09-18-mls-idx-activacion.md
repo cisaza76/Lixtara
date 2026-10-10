@@ -1,7 +1,7 @@
 # Runbook — Activación del feed IDX de MIAMI
 
-**Fecha:** 2026-09-18 · **Revisado:** 2026-09-26 (activación en 3 fases) · **Estado:** listo
-para ejecutar, **no ejecutado**
+**Fecha:** 2026-09-18 · **Revisado:** 2026-09-26 (activación en 3 fases) · **Estado:** Fase 1
+**ejecutada el 2026-10-10** (50.836 fichas, reconciliación ok, exhibición apagada)
 **Dataset:** `miamire` — Miami Association of REALTORS® · acceso **APROBADO** y verificado
 **PRs:** #129 (adaptador, worker, lectura pública) · #130 (convergencia) · #131 (solo
 residencial) · PR de bloqueos de activación (bajas + reconciliación, `mls_number`,
@@ -160,6 +160,11 @@ que salga `"completed": true` — tres veces, aproximadamente.
 | `completed` | `true` al final | `false` → ver abajo |
 | `needsAttention` | `false` | `true` → ver el log estructurado |
 
+> **Medido el 2026-10-10:** la carga inicial necesitó ~14 invocaciones, no 3; tras las dos
+> primeras cada una bajó solo 2.000–4.500 fichas. Por eso el cron pasó de cada 6 h a cada
+> hora: con ~4.250 cambios cada 6 h, una sola invocación cada 6 h podía quedarse atrás.
+> `records_seen` solo se escribe al completar una pasada y cuenta la última invocación.
+
 ### Pasada incompleta no es un fallo
 
 `completed: false` con `stoppedBy: "time_budget"` o `"max_pages"` es el diseño: la pasada
@@ -261,7 +266,7 @@ select last_reconciliation_at, last_reconciliation_status, last_reconciliation_d
 
 | Cron | Horario (UTC) | Qué hace |
 |---|---|---|
-| `/api/mls/sync` | `23 */6 * * *` — 4 veces al día | fichas modificadas + **bajas** |
+| `/api/mls/sync` | `23 * * * *` — cada hora (era cada 6 h hasta el 2026-10-10) | fichas modificadas + **bajas** |
 | `/api/mls/reconcile` | `7,22,37,52 8-10 * * *` — 12 intentos en la ventana 08–10 UTC | una reconciliación al día; cada intento continúa el anterior o no hace nada (`not_due`) |
 
 Plan de Vercel del proyecto: **Pro** (verificado 2026-09-26), que permite crons con

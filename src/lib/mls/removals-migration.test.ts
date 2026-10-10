@@ -37,9 +37,9 @@ describe("vercel.json — crons del MLS", () => {
     Array<{ path: string; schedule: string }>;
   const de = (p: string) => crons.find((c) => c.path === p)?.schedule;
 
-  it("la sincronización corre cada 6 h (≤ 24 h del contrato)", () => {
-    expect(de("/api/mls/sync")).toBe("23 */6 * * *");
-    expect(syncIntervalMeetsContract(6)).toBe(true);
+  it("la sincronización corre cada hora (≤ 24 h del contrato)", () => {
+    expect(de("/api/mls/sync")).toBe("23 * * * *");
+    expect(syncIntervalMeetsContract(1)).toBe(true);
   });
 
   it("la reconciliación tiene su propia tarea, varias veces en una ventana nocturna", () => {
