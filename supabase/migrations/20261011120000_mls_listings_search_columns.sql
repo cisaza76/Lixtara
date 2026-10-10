@@ -16,8 +16,8 @@
 -- Las expresiones son defensivas: un valor que no es número (o un condado vacío) da NULL,
 -- nunca un error. Un error aquí haría fallar el upsert de la página entera del sync.
 --
--- `county_key` normaliza igual que `normalizeGeoName` (src/lib/mls/coverage.ts) pero sin
--- espacios: "Miami-Dade" / "MIAMI DADE COUNTY" → "miamidade". Los valores aceptados por
+-- `county_key`: minúsculas sin espacios, guiones, puntos ni la palabra "county":
+-- "Miami-Dade" / "MIAMI DADE COUNTY" → "miamidade". Los valores aceptados por
 -- el filtro viven en src/lib/property-search.ts.
 --
 -- Idempotente. Aplicar SOLO con sign-off del owner.
@@ -29,27 +29,29 @@ alter table public.mls_listings
   add column if not exists county_key text,
   add column if not exists search_fields_at timestamptz;
 
+-- SIN `$$` ni corchetes a propósito: el owner aplica esto pegándolo en el SQL Editor, y la
+-- versión con `$$ ... $$` y una expresión regular con corchetes llegó alterada al copiarla
+-- desde el chat (2026-10-11: "syntax error at or near end"). El cuerpo va entre comillas
+-- simples (las internas, dobladas) y el condado se normaliza con replace().
 create or replace function public.mls_listings_search_fields()
   returns trigger
   language plpgsql
   set search_path = public, pg_temp
-as $$
+as '
 begin
-  new.bedrooms := case when jsonb_typeof(new.payload->'BedroomsTotal') = 'number'
-    then floor((new.payload->>'BedroomsTotal')::numeric)::integer end;
-  new.bathrooms := case when jsonb_typeof(new.payload->'BathroomsTotalInteger') = 'number'
-    then floor((new.payload->>'BathroomsTotalInteger')::numeric)::integer end;
-  new.living_area := case when jsonb_typeof(new.payload->'LivingArea') = 'number'
-    then round((new.payload->>'LivingArea')::numeric)::integer end;
-  new.county_key := nullif(
-    regexp_replace(
-      regexp_replace(lower(coalesce(new.payload->>'CountyOrParish', '')), '[^a-z]', '', 'g'),
-      'county$', ''),
-    '');
+  new.bedrooms := case when jsonb_typeof(new.payload->''BedroomsTotal'') = ''number''
+    then floor((new.payload->>''BedroomsTotal'')::numeric)::integer end;
+  new.bathrooms := case when jsonb_typeof(new.payload->''BathroomsTotalInteger'') = ''number''
+    then floor((new.payload->>''BathroomsTotalInteger'')::numeric)::integer end;
+  new.living_area := case when jsonb_typeof(new.payload->''LivingArea'') = ''number''
+    then round((new.payload->>''LivingArea'')::numeric)::integer end;
+  new.county_key := nullif(replace(replace(replace(replace(
+    lower(coalesce(new.payload->>''CountyOrParish'', '''')),
+    '' '', ''''), ''-'', ''''), ''.'', ''''), ''county'', ''''), '''');
   new.search_fields_at := now();
   return new;
 end;
-$$;
+';
 
 -- Solo la usa el trigger. Supabase concede EXECUTE a anon/authenticated por defecto.
 revoke all on function public.mls_listings_search_fields() from public, anon, authenticated;
