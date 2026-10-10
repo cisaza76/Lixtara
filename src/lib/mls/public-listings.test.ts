@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mergePublicListings, normalizeMlsNumber, type MlsPublicRow, type OwnListingRef } from "./public-listings";
+import { mergePublicListings, normalizeMlsNumber, primaryMlsPhotoUrl, type MlsPublicRow, type OwnListingRef } from "./public-listings";
 
 const fila = (over: Partial<MlsPublicRow> & { listing_id: string }): MlsPublicRow => ({
   listing_key: `K_${over.listing_id}`,
@@ -146,5 +146,47 @@ describe("casos límite", () => {
       [fila({ listing_id: "A1" }), fila({ listing_id: "A2" })], "en");
     expect(r.mlsListings).toHaveLength(0);
     expect(r.suppressed).toHaveLength(2);
+  });
+});
+
+describe("foto principal (hot-link)", () => {
+  const foto = (url: string, extra: Record<string, unknown> = {}) => ({ MediaURL: url, ...extra });
+
+  it("elige la de menor Order, aunque no venga primera", () => {
+    expect(primaryMlsPhotoUrl([
+      foto("https://cdn.test/b.jpg", { Order: 2 }),
+      foto("https://cdn.test/a.jpg", { Order: 1 }),
+    ])).toBe("https://cdn.test/a.jpg");
+  });
+
+  it("sin Order, gana la primera del arreglo", () => {
+    expect(primaryMlsPhotoUrl([foto("https://cdn.test/1.jpg"), foto("https://cdn.test/2.jpg")]))
+      .toBe("https://cdn.test/1.jpg");
+  });
+
+  it("ignora documentos, videos y URLs que no son https", () => {
+    expect(primaryMlsPhotoUrl([
+      foto("https://cdn.test/plano.pdf", { Order: 0, MediaCategory: "Document" }),
+      foto("http://cdn.test/inseguro.jpg", { Order: 1 }),
+      foto("javascript:alert(1)", { Order: 2 }),
+      foto("https://cdn.test/ok.jpg", { Order: 3, MediaCategory: "Photo" }),
+    ])).toBe("https://cdn.test/ok.jpg");
+  });
+
+  it("null cuando no hay nada utilizable", () => {
+    for (const m of [undefined, null, "x", [], [{}], [{ MediaURL: 5 }]]) {
+      expect(primaryMlsPhotoUrl(m)).toBeNull();
+    }
+  });
+
+  it("llega a la ficha pública, con alt en el idioma de la página", () => {
+    const row = fila({ listing_id: "A1", media: [foto("https://cdn.test/a.jpg")] });
+    const en = mergePublicListings([], [row], "en").mlsListings[0];
+    expect(en.photoUrl).toBe("https://cdn.test/a.jpg");
+    expect(en.photoAlt).toBe("Home for sale in Miami");
+    expect(mergePublicListings([], [row], "es").mlsListings[0].photoAlt)
+      .toBe("Propiedad en venta en Miami");
+    expect(mergePublicListings([], [fila({ listing_id: "A2" })], "en").mlsListings[0].photoUrl)
+      .toBeNull();
   });
 });

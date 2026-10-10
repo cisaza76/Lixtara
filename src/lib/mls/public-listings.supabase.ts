@@ -23,7 +23,10 @@ import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
 const COLUMNAS =
   "listing_key,listing_id,mls_status,withdrawn_at,list_price,city,postal_code," +
   "list_office_name,list_agent_name,list_office_phone,list_office_email," +
-  "list_agent_phone,list_agent_email";
+  "list_agent_phone,list_agent_email," +
+  // Solo el arreglo de fotos, no el payload entero: es lo único del payload que pinta la
+  // tarjeta. Las URLs se usan por hot-link; nada se descarga.
+  "media:payload->Media";
 
 export interface PublicMlsResult {
   listings: MlsPublicListing[];

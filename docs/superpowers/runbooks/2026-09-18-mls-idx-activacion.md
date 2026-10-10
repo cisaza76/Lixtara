@@ -301,6 +301,13 @@ select split_part(split_part(payload->'Media'->0->>'MediaURL', '://', 2), '/', 1
   from public.mls_listings group by 1 order by 2 desc;
 ```
 
+> **C construido el 2026-10-10** (PR "MLS photos by hot-link"): `primaryMlsPhotoUrl` en
+> `src/lib/mls/public-listings.ts` elige la de menor `Order` entre `MediaCategory` "Photo"
+> (o sin categoría) con `MediaURL` https; la tarjeta la pinta con `<img>` simple
+> (`photo-hotlink.test.ts` prohíbe next/image y nuevos `remotePatterns`). Las consultas de
+> arriba siguen siendo la verificación previa a la Fase 3: si los nombres de campo no son
+> `MediaURL` / `Order` / `MediaCategory`, ajustar la función antes de encender la exhibición.
+
 Con eso se construye C (en su propio PR): foto principal por hot-link al CDN del MLS (sin
 descargar ni guardar), imagen de reemplazo si no hay, `loading="lazy"` y dimensiones fijas,
 revisado a 375 px. **Recordatorio § III.B.4:** ninguna imagen del feed puede pasar por
