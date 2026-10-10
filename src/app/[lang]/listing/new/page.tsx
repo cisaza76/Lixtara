@@ -59,6 +59,7 @@ import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
 import { DashboardRedirect } from "@/components/dashboard-redirect";
+import { ListingFunnelEvents } from "@/components/listing-funnel-events";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
 import { LocalizedValidation } from "@/components/localized-validation";
@@ -567,7 +568,7 @@ export default async function ListingNewPage({
       propertyId: id,
     });
     if (result !== "verified") redirect(`${back}&gerror=${result}`);
-    redirect(`/${lang}/listing/new?id=${id}&step=2`);
+    redirect(`/${lang}/listing/new?id=${id}&step=2&ev=email_verified_gate`);
   }
 
   async function resendGateCode(formData: FormData) {
@@ -1445,7 +1446,7 @@ export default async function ListingNewPage({
     }
     if (!verified) redirect(`${back}&pending=1&cerror=invalid`);
 
-    redirect(`${back}&verified=1`);
+    redirect(`${back}&verified=1&ev=email_verified_account`);
   }
 
   const errorMessage =
@@ -1528,6 +1529,7 @@ export default async function ListingNewPage({
       stepLabel={copy.stepLabel}
       ofLabel={copy.ofLabel}
     >
+      <ListingFunnelEvents step={step} lang={lang} />
       {/* Browser validation bubbles in the page's language, not the browser's. */}
       <LocalizedValidation labels={copy.validation} />
       {/* ─── Step 1: Address ─── */}
