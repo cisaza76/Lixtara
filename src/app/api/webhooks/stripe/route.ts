@@ -17,6 +17,7 @@ import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { claimWebhookEvent } from "@/lib/webhook-dedup";
 import { grantStagingCredits } from "@/lib/staging-credits";
 import { isPricingTierId } from "@/lib/pricing-tiers";
+import { recordServerEvent } from "@/lib/analytics.server";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -146,6 +147,12 @@ async function fulfillCheckout(
       )
       .eq("id", propertyId)
       .eq("mls_status", "draft");
+
+    // Evento comercial verificable (embudo vendedor), solo en nuestros logs. Nunca bloquea.
+    recordServerEvent({
+      event: "seller_plan_purchased",
+      props: { tier: paidTier && isPricingTierId(paidTier) ? paidTier : "unknown" },
+    });
 
     // Best-effort emails — never block the webhook on email failure.
     try {

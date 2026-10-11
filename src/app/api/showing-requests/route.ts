@@ -15,6 +15,7 @@ import { SITE_URL } from "@/lib/config";
 import { createService } from "@/lib/supabase/service";
 import { apiLimiter, clientIp, enforceLimit } from "@/lib/ratelimit";
 import { sendBrokerShowingRequest, sendShowingRequestReceived } from "@/lib/email";
+import { recordServerEvent } from "@/lib/analytics.server";
 import { CONSENT_VERSION, parseShowingRequest, respondByIso } from "@/lib/buyer-leads";
 import {
   canUseShowingRequests,
@@ -61,6 +62,10 @@ export async function POST(req: Request): Promise<Response> {
     const brokerId = await ensureBrokerOfRecord(svc);
     const lead = await insertShowingLead(svc, data, brokerId);
     const exclusive = lead.status === "cancelled";
+    recordServerEvent({
+      event: "buyer_lead_created",
+      props: { source: "showing_request", target: data.target.kind, exclusive },
+    });
 
     // Acuerdo exclusivo con otro broker: el lead queda registrado (cancelado, con motivo)
     // y no se notifica a la broker ni se promete contacto.

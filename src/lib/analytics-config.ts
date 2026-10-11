@@ -1,0 +1,82 @@
+// Configuración de analítica (decisión del owner, 2026-10-11):
+//   - GA4 vía Google Tag Manager → marketing y adquisición.
+//   - PostHog → producto: embudos, abandono, cohortes, feature flags.
+// Ninguna de las dos se carga sin el CONSENTIMIENTO del visitante (banner), y sin sus
+// variables de entorno no se carga nada: el sitio queda exactamente como antes.
+//
+// PURO: sin I/O. Lo lee el layout (servidor) y pasa el resultado al banner (cliente).
+
+export const CONSENT_COOKIE = "lx_consent";
+export type ConsentChoice = "granted" | "denied";
+/** Un año: después se vuelve a preguntar. */
+export const CONSENT_MAX_AGE_S = 365 * 24 * 60 * 60;
+
+export interface AnalyticsConfig {
+  gtmId: string | null;
+  posthogKey: string | null;
+  posthogHost: string;
+  /** true solo si las DOS herramientas están configuradas (entonces hay que pedir consentimiento). */
+  enabled: boolean;
+}
+
+const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
+
+/** Valores con forma inválida se ignoran: mejor no cargar nada que cargar algo raro. */
+export function analyticsConfig(env: {
+  NEXT_PUBLIC_GTM_ID?: string;
+  NEXT_PUBLIC_POSTHOG_KEY?: string;
+  NEXT_PUBLIC_POSTHOG_HOST?: string;
+}): AnalyticsConfig {
+  const gtm = env.NEXT_PUBLIC_GTM_ID?.trim() ?? "";
+  const key = env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? "";
+  const host = env.NEXT_PUBLIC_POSTHOG_HOST?.trim() ?? "";
+  const gtmId = /^GTM-[A-Z0-9]{4,12}$/.test(gtm) ? gtm : null;
+  const posthogKey = /^phc_[A-Za-z0-9]{20,64}$/.test(key) ? key : null;
+  const posthogHost = /^https:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(host) ? host : DEFAULT_POSTHOG_HOST;
+  // TODO O NADA: hacen falta las DOS herramientas bien configuradas. Una variable suelta (o
+  // con forma inválida) no activa nada: ni banner, ni carga, ni la política con analítica.
+  if (gtmId === null || posthogKey === null) {
+    return { gtmId: null, posthogKey: null, posthogHost, enabled: false };
+  }
+  return { gtmId, posthogKey, posthogHost, enabled: true };
+}
+
+/** Lee la elección guardada de un `document.cookie`. null = aún no eligió. */
+export function readConsent(cookieHeader: string): ConsentChoice | null {
+  const m = cookieHeader.match(new RegExp(`(?:^|;\\s*)${CONSENT_COOKIE}=(granted|denied)(?:;|$)`));
+  return m ? (m[1] as ConsentChoice) : null;
+}
+
+/**
+ * URL sin parámetros ni fragmento: los filtros de búsqueda no son datos personales, pero
+ * así ninguna herramienta recibe nada que no necesite (y nunca un identificador de ficha).
+ */
+export function sanitizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Páginas donde la analítica NO corre: el panel de staff (sus URLs llevan ids de leads y
+ * de propiedades, y no es audiencia de marketing ni de producto).
+ */
+export function isAnalyticsExcludedPath(pathname: string): boolean {
+  return /^\/(en|es)\/admin(\/|$)/.test(pathname);
+}
+
+/**
+ * Lo que PostHog recibe en cada evento: URLs y referrers sin parámetros ni fragmento, y sin
+ * el título de la página (puede nombrar una propiedad). Se usa como `sanitize_properties`.
+ */
+export function sanitizePosthogProperties(props: Record<string, unknown>): Record<string, unknown> {
+  for (const k of ["$current_url", "$referrer", "$initial_referrer", "$initial_current_url"]) {
+    if (typeof props[k] === "string" && props[k] !== "$direct") props[k] = sanitizeUrl(props[k] as string) || "$direct";
+  }
+  delete props.title;
+  delete props.$title;
+  return props;
+}

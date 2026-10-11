@@ -7,6 +7,8 @@ import { MlsListingCard } from "@/components/mls-listing-card";
 import { MlsDisclosures } from "@/components/mls-disclosures";
 import { PropertySearchForm } from "@/components/property-search-form";
 import { PaginationNav } from "@/components/pagination-nav";
+import { TrackOnMount } from "@/components/analytics-events";
+import { resultsBucket } from "@/lib/analytics";
 import {
   MAX_PAGE,
   PAGE_SIZE,
@@ -64,6 +66,21 @@ export default async function PropertiesPage({
         </div>
 
         <PropertySearchForm lang={lang} search={search} labels={copy.filters} />
+        {/* Solo qué filtros se usaron y un cubo de resultados: nada de fichas ni zips. */}
+        <TrackOnMount
+          event={{
+            event: "property_search",
+            lang,
+            page: search.page,
+            sort: search.sort,
+            has_price: search.minPrice !== null || search.maxPrice !== null,
+            has_beds: search.beds !== null,
+            has_baths: search.baths !== null,
+            county: search.county,
+            has_zip: search.zip !== null,
+            results_bucket: resultsBucket(total),
+          }}
+        />
 
         {mls.limited && (
           <p role="status" className="mb-10 border border-gold-soft bg-gold/5 px-4 py-3 text-sm text-ink/80">

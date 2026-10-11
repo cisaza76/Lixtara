@@ -11,6 +11,8 @@ import { brokerageLicenseLine, brokerageLicenseLineShort } from "@/config/broker
 import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
 import { CookieNotice } from "@/components/cookie-notice";
+import { AnalyticsConsent, CookieSettingsLink } from "@/components/analytics-consent";
+import { analyticsConfig } from "@/lib/analytics-config";
 import { MobileMenu } from "@/components/mobile-menu";
 import { Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import "../globals.css";
@@ -61,6 +63,13 @@ export default async function RootLayout({
   const navCopy = t(lang).nav;
   const authNavCopy = t(lang).auth.nav;
   const footerCopy = t(lang).footer;
+  // Variables NEXT_PUBLIC_ escritas literalmente para que Next las incruste en el build.
+  const analytics = analyticsConfig({
+    NEXT_PUBLIC_GTM_ID: process.env.NEXT_PUBLIC_GTM_ID,
+    NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  });
+  const cookieCopy = t(lang).cookieNotice;
   const louiCopy = t(lang).loui;
   const closingCopy = t(lang).closingCosts;
   const altLang: Locale = lang === "en" ? "es" : "en";
@@ -323,6 +332,11 @@ export default async function RootLayout({
                 >
                   {footerCopy.links.cookies}
                 </Link>
+                {analytics.enabled && (
+                  <span className="text-sm text-ink/70 hover:text-gold transition-colors text-left">
+                    <CookieSettingsLink label={cookieCopy.settings} />
+                  </span>
+                )}
                 <Link
                   href={`/${lang}/disclaimers`}
                   className="text-sm text-ink/70 hover:text-gold transition-colors"
@@ -413,13 +427,31 @@ export default async function RootLayout({
           errorGeneric={louiCopy.errorGeneric}
           lang={lang}
         />
-        <CookieNotice
-          lang={lang}
-          message={t(lang).cookieNotice.message}
-          learnMore={t(lang).cookieNotice.learnMore}
-          accept={t(lang).cookieNotice.accept}
-          regionLabel={t(lang).cookieNotice.regionLabel}
-        />
+        {/* Con analítica configurada: banner de consentimiento (nada se carga sin aceptar).
+            Sin ella: el aviso informativo de siempre (solo cookies esenciales). */}
+        {analytics.enabled ? (
+          <AnalyticsConsent
+            lang={lang}
+            gtmId={analytics.gtmId}
+            posthogKey={analytics.posthogKey}
+            posthogHost={analytics.posthogHost}
+            labels={{
+              message: cookieCopy.consentMessage,
+              learnMore: cookieCopy.learnMore,
+              accept: cookieCopy.consentAccept,
+              reject: cookieCopy.consentReject,
+              regionLabel: cookieCopy.regionLabel,
+            }}
+          />
+        ) : (
+          <CookieNotice
+            lang={lang}
+            message={cookieCopy.message}
+            learnMore={cookieCopy.learnMore}
+            accept={cookieCopy.accept}
+            regionLabel={cookieCopy.regionLabel}
+          />
+        )}
       </body>
     </html>
   );

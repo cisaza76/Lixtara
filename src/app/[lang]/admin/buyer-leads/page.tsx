@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { assertStaff, assertStaffWithUser } from "@/lib/admin-auth";
+import { recordServerEvent } from "@/lib/analytics.server";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
@@ -235,6 +236,7 @@ export default async function AdminBuyerLeadsPage({
       }
       redirect(back(lang, id, `&error=${why}`));
     }
+    recordServerEvent({ event: "buyer_lead_status_changed", props: { from: lead.status, to: next } });
     revalidatePath(`/${lang}/admin/buyer-leads`);
     redirect(back(lang, id, "&done=status"));
   }
@@ -279,6 +281,7 @@ export default async function AdminBuyerLeadsPage({
       if (why !== "failed") await logRejected({ leadId: id, userId, from: null, attempted, reason: `db:${why}` });
       redirect(back(lang, id, `&error=${why}`));
     }
+    recordServerEvent({ event: "buyer_agreement_recorded", props: { type } });
     revalidatePath(`/${lang}/admin/buyer-leads`);
     redirect(back(lang, id, "&done=agreement"));
   }
