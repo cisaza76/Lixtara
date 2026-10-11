@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  runMlsSync, syncNeedsAttention, type SyncStore, type SyncState, type SyncProgress,
+  CURSOR_OVERLAP_MS, runMlsSync, syncNeedsAttention, type SyncStore, type SyncState, type SyncProgress,
 } from "./sync-run";
 import { createFakeFeedProvider, makeResoListing } from "./feed-port.fake";
 import type { NormalizedListing } from "./feed-port";
@@ -406,3 +406,86 @@ describe("el cursor avanza al inicio de la PASADA, no de la última invocación"
     expect(commits[0].ts).toBe(new Date(t1).toISOString());
   });
 });
+
+describe("incremental: altas, cambios y bajas, con solapamiento de 5 minutos (2026-10-11)", () => {
+  const T_CURSOR = "2026-10-11T12:00:00.000Z";
+  const ficha = (key: string, over: Record<string, unknown> = {}) =>
+    makeResoListing({
+      ListingKey: key, CountyOrParish: "Broward", StateOrProvince: "FL",
+      ModificationTimestamp: "2026-10-11T12:30:00Z", ...over,
+    } as never);
+  const correr = (feed: ReturnType<typeof ficha>[], store: SyncStore) => {
+    const provider = createFakeFeedProvider(feed, { pageSize: 10 });
+    const pedidos: Array<{ fase: string; desde: string | null }> = [];
+    const espiado = {
+      ...provider,
+      fetchModifiedSince: (since: Date | null, cursor: string | null) => {
+        pedidos.push({ fase: "listings", desde: since?.toISOString() ?? null });
+        return provider.fetchModifiedSince(since, cursor);
+      },
+      fetchRemovedKeysSince: (since: Date, cursor: string | null) => {
+        pedidos.push({ fase: "removals", desde: since.toISOString() });
+        return provider.fetchRemovedKeysSince(since, cursor);
+      },
+    };
+    return {
+      pedidos,
+      run: runMlsSync({
+        provider: espiado, store, now: () => Date.parse("2026-10-11T13:00:00Z"),
+        timeBudgetMs: 60_000, maxPages: 100,
+      }),
+    };
+  };
+
+  it("ambas fases piden desde el cursor MENOS el solapamiento", async () => {
+    const { store } = createFakeStore(estadoVacío("fake", T_CURSOR));
+    const { pedidos, run } = correr([ficha("a")], store);
+    await run;
+    const esperado = new Date(Date.parse(T_CURSOR) - CURSOR_OVERLAP_MS).toISOString();
+    expect(CURSOR_OVERLAP_MS).toBe(5 * 60_000);
+    expect(pedidos).toEqual([
+      { fase: "listings", desde: esperado },
+      { fase: "removals", desde: esperado },
+    ]);
+  });
+
+  it("un cambio 2 minutos antes del cursor (desfase de reloj) NO se pierde", async () => {
+    const { store, filas } = createFakeStore(estadoVacío("fake", T_CURSOR));
+    const { run } = correr([ficha("borde", { ModificationTimestamp: "2026-10-11T11:58:00Z" })], store);
+    await run;
+    expect(filas.has("borde")).toBe(true);
+  });
+
+  it("alta, cambio de precio y cambio de estado entre estados ingeridos se aplican", async () => {
+    const { store, filas } = createFakeStore(estadoVacío("fake", T_CURSOR));
+    const { run } = correr([
+      ficha("nueva", { ListPrice: 500_000 }),
+      ficha("rebajada", { ListPrice: 450_000 }),
+      ficha("pendiente", { StandardStatus: "Pending" }),
+    ], store);
+    const r = await run;
+    expect(r.completed).toBe(true);
+    expect(filas.get("nueva")?.list_price).toBe(500_000);
+    expect(filas.get("rebajada")?.list_price).toBe(450_000);
+    // Se guarda con su estado nuevo; la exhibición (solo Active) ya no la muestra.
+    expect(filas.get("pendiente")?.mls_status).toBe("Pending");
+  });
+
+  it("un cambio a Closed dentro del solapamiento se borra", async () => {
+    const f = createFakeStore(estadoVacío("fake", T_CURSOR));
+    await f.store.upsertListings([{ listing_key: "vendida" } as never]);
+    const { run } = correr([ficha("vendida", { StandardStatus: "Closed", ModificationTimestamp: "2026-10-11T11:57:00Z" })], f.store);
+    const r = await run;
+    expect(r.removed).toBe(1);
+    expect(f.filas.has("vendida")).toBe(false);
+  });
+
+  it("repetir fichas por el solapamiento es inocuo (upsert por clave)", async () => {
+    const { store, filas } = createFakeStore(estadoVacío("fake", T_CURSOR));
+    const feed = [ficha("x", { ModificationTimestamp: "2026-10-11T11:59:00Z" })];
+    await correr(feed, store).run;
+    await correr(feed, store).run;
+    expect(filas.size).toBe(1);
+  });
+});
+
