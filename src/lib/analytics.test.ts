@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// El módulo lee la configuración al cargar: estas pruebas usan un build CONFIGURADO (las dos
+// variables), salvo la que verifica justamente lo contrario.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_GTM_ID = "GTM-ABC1234";
+  process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_" + "a".repeat(40);
+});
 import {
   LISTING_STEP_SLUGS, disableAnalytics, enableAnalytics, listingStepEvent, resultsBucket, track,
 } from "@/lib/analytics";
@@ -60,8 +67,8 @@ describe("track: nada sale sin consentimiento", () => {
 describe("configuración", () => {
   it("sin variables no hay analítica; con formas válidas sí", () => {
     expect(analyticsConfig({}).enabled).toBe(false);
-    expect(analyticsConfig({ NEXT_PUBLIC_GTM_ID: "GTM-ABC1234" })).toMatchObject({ gtmId: "GTM-ABC1234", enabled: true });
-    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: "phc_" + "a".repeat(40) }).posthogKey).not.toBeNull();
+    expect(analyticsConfig({ NEXT_PUBLIC_GTM_ID: "GTM-ABC1234", NEXT_PUBLIC_POSTHOG_KEY: "phc_" + "a".repeat(40) }))
+      .toMatchObject({ gtmId: "GTM-ABC1234", posthogKey: "phc_" + "a".repeat(40), enabled: true });
   });
 
   it("valores con forma inválida se ignoran", () => {
@@ -102,6 +109,42 @@ describe("lo que recibe PostHog", () => {
   });
 });
 
+describe("todo o nada: variables parciales no activan nada", () => {
+  const gtm = "GTM-ABC1234";
+  const key = "phc_" + "a".repeat(40);
+  it("hace falta GTM y PostHog, ambos con forma válida", () => {
+    expect(analyticsConfig({ NEXT_PUBLIC_GTM_ID: gtm, NEXT_PUBLIC_POSTHOG_KEY: key }).enabled).toBe(true);
+    for (const env of [
+      {},
+      { NEXT_PUBLIC_GTM_ID: gtm },
+      { NEXT_PUBLIC_POSTHOG_KEY: key },
+      { NEXT_PUBLIC_GTM_ID: gtm, NEXT_PUBLIC_POSTHOG_KEY: "phc_short" },
+      { NEXT_PUBLIC_GTM_ID: "G-12345", NEXT_PUBLIC_POSTHOG_KEY: key },
+      { NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com" },
+    ]) {
+      expect(analyticsConfig(env), JSON.stringify(env)).toEqual({
+        gtmId: null, posthogKey: null, posthogHost: expect.any(String), enabled: false,
+      });
+    }
+  });
+
+  it("en un build sin las dos variables, track() no hace nada aunque haya cookie 'granted' y alguien llame enableAnalytics", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GTM_ID", gtm);
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
+    vi.resetModules();
+    const fresh = await import("@/lib/analytics");
+    const w = globalThis as unknown as { window?: unknown; document?: unknown };
+    w.window = { location: { pathname: "/en" } };
+    w.document = { cookie: "lx_consent=granted" };
+    const capture = vi.fn();
+    fresh.enableAnalytics({ capture });
+    fresh.track({ event: "loui_open", lang: "en" });
+    expect((w.window as Window).dataLayer).toBeUndefined();
+    expect(capture).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+});
+
 describe("eventos de servidor: se quedan en nuestra infraestructura", () => {
   it("una línea JSON en los logs, sin identificadores, y ningún envío externo", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -118,6 +161,15 @@ describe("eventos de servidor: se quedan en nuestra infraestructura", () => {
     });
     expect(Object.keys(line).sort()).toEqual(["at", "environment", "event", "name", "props"]);
     fetchSpy.mockRestore();
+  });
+
+  it("un texto libre colado por error se registra como 'invalid'", () => {
+    const log = vi.fn();
+    recordServerEvent(
+      { event: "buyer_lead_status_changed", props: { from: "received", to: "Juan Pérez juan@x.com" } },
+      { log, env: {} },
+    );
+    expect(JSON.parse(log.mock.calls[0][0] as string).props).toEqual({ from: "received", to: "invalid" });
   });
 
   it("nunca lanza", () => {
@@ -137,7 +189,13 @@ describe("consentimiento antes de que monte el banner, retención y staff", () =
     w.document = { cookie };
   }
 
+  const configured = () => {
+    vi.stubEnv("NEXT_PUBLIC_GTM_ID", "GTM-ABC1234");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_" + "a".repeat(40));
+  };
+
   it("con la cookie 'granted' de una visita anterior, un evento temprano no se pierde y PostHog lo recibe al cargar", async () => {
+    configured();
     vi.resetModules();
     const fresh = await import("@/lib/analytics");
     page("/en/properties", "lx_consent=granted");
@@ -148,7 +206,12 @@ describe("consentimiento antes de que monte el banner, retención y staff", () =
     expect(capture).toHaveBeenCalledWith("loui_open", { lang: "en" });
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("con la cookie 'denied' o sin elección, nada", async () => {
+    configured();
     for (const cookie of ["lx_consent=denied", ""]) {
       vi.resetModules();
       const fresh = await import("@/lib/analytics");

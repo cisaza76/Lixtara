@@ -1,7 +1,7 @@
 # Runbook · Analítica: GA4 (vía GTM) + PostHog
 
 **Estado:** código listo y apagado.
-- Sin variables de entorno no se carga nada y queda el aviso de cookies de siempre.
+- **Todo o nada:** si falta `NEXT_PUBLIC_GTM_ID` o `NEXT_PUBLIC_POSTHOG_KEY`, o alguna tiene una forma inválida, no se carga nada, `track()` no hace nada y queda el aviso de cookies de siempre. Una variable suelta no activa nada.
 - Activar = crear las cuentas + poner las variables en Vercel (Production) + redeploy, **con autorización del owner**.
 
 **Decisión del owner (2026-10-11):**

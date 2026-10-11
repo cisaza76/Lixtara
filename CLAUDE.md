@@ -175,8 +175,9 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   `onboarding@resend.dev`, which only delivers to the Resend account owner.
   `EMAIL_DEV_OVERRIDE_TO` reroutes all mail to one address (debug only, never Production).
 - `NEXT_PUBLIC_GTM_ID` / `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` — public, Production
-  only. GA4 via Google Tag Manager (marketing) and PostHog (product). Unset = nothing loads and the
-  informational cookie notice stays. Set = consent banner; nothing loads before "Accept"; PostHog
+  only. GA4 via Google Tag Manager (marketing) and PostHog (product). **All or nothing:** unless BOTH
+  `NEXT_PUBLIC_GTM_ID` and `NEXT_PUBLIC_POSTHOG_KEY` are set with a valid shape, nothing loads, `track()` is a
+  no-op and the informational cookie notice stays. Both set = consent banner; nothing loads before "Accept"; PostHog
   without autocapture or session replay; URLs without query strings; the cookie policy switches to
   its analytics variant. Event catalog and setup: `docs/superpowers/runbooks/2026-10-11-analitica.md`.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via

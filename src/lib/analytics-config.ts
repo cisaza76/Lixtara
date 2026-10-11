@@ -15,7 +15,7 @@ export interface AnalyticsConfig {
   gtmId: string | null;
   posthogKey: string | null;
   posthogHost: string;
-  /** true si hay al menos una herramienta configurada (entonces hay que pedir consentimiento). */
+  /** true solo si las DOS herramientas están configuradas (entonces hay que pedir consentimiento). */
   enabled: boolean;
 }
 
@@ -33,7 +33,12 @@ export function analyticsConfig(env: {
   const gtmId = /^GTM-[A-Z0-9]{4,12}$/.test(gtm) ? gtm : null;
   const posthogKey = /^phc_[A-Za-z0-9]{20,64}$/.test(key) ? key : null;
   const posthogHost = /^https:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(host) ? host : DEFAULT_POSTHOG_HOST;
-  return { gtmId, posthogKey, posthogHost, enabled: gtmId !== null || posthogKey !== null };
+  // TODO O NADA: hacen falta las DOS herramientas bien configuradas. Una variable suelta (o
+  // con forma inválida) no activa nada: ni banner, ni carga, ni la política con analítica.
+  if (gtmId === null || posthogKey === null) {
+    return { gtmId: null, posthogKey: null, posthogHost, enabled: false };
+  }
+  return { gtmId, posthogKey, posthogHost, enabled: true };
 }
 
 /** Lee la elección guardada de un `document.cookie`. null = aún no eligió. */

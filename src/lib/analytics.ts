@@ -11,7 +11,7 @@
 // publicado) no salen de aquí: se emiten desde el servidor, a partir de cambios de estado
 // verificables (src/lib/analytics.server.ts).
 
-import { isAnalyticsExcludedPath, readConsent } from "@/lib/analytics-config";
+import { analyticsConfig, isAnalyticsExcludedPath, readConsent } from "@/lib/analytics-config";
 
 export const LISTING_STEP_SLUGS = [
   "address",
@@ -104,7 +104,17 @@ export function analyticsEnabled(): boolean {
   return consentState === true;
 }
 
+// ¿Este build tiene la analítica configurada? Variables NEXT_PUBLIC_ escritas literalmente
+// para que Next las incruste. Sin las dos, track() no hace nada, aunque quede una cookie de
+// consentimiento de una activación anterior.
+const CONFIGURED = analyticsConfig({
+  NEXT_PUBLIC_GTM_ID: process.env.NEXT_PUBLIC_GTM_ID,
+  NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+  NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+}).enabled;
+
 function granted(): boolean {
+  if (!CONFIGURED) return false;
   if (consentState !== null) return consentState;
   try {
     return readConsent(document.cookie) === "granted";

@@ -18,6 +18,16 @@ export type ServerEvent =
   | { event: "seller_plan_purchased"; props: { tier: string } }
   | { event: "listing_published"; props: Record<string, never> };
 
+// Barrera final: solo códigos de lista cerrada (minúsculas, dígitos, guion bajo) y
+// booleanos. Cualquier otra cosa (un texto libre colado por error) se registra "invalid".
+function safeProps(props: Record<string, unknown>): Record<string, string | boolean> {
+  const out: Record<string, string | boolean> = {};
+  for (const [k, v] of Object.entries(props)) {
+    out[k] = typeof v === "boolean" ? v : typeof v === "string" && /^[a-z0-9_]{1,40}$/.test(v) ? v : "invalid";
+  }
+  return out;
+}
+
 export function recordServerEvent(
   e: ServerEvent,
   deps: { log?: (line: string) => void; env?: Record<string, string | undefined> } = {},
@@ -28,7 +38,7 @@ export function recordServerEvent(
       JSON.stringify({
         event: "lx_server_event",
         name: e.event,
-        props: e.props,
+        props: safeProps(e.props),
         environment: env.VERCEL_ENV ?? "development",
         at: new Date().toISOString(),
       }),
