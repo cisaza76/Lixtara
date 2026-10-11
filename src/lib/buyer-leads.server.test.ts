@@ -50,7 +50,7 @@ describe("resolveTarget", () => {
     await resolveTarget(svc, { kind: "mls", listingKey: "K1" }, { host: "lixtara.com", staff: true });
     expect(calls).toEqual(expect.arrayContaining([
       ["mls_listings", "is", ["withdrawn_at", null]],
-      ["mls_listings", "in", ["mls_status", ["Active", "Active Under Contract", "Pending", "Coming Soon"]]],
+      ["mls_listings", "in", ["mls_status", ["Active"]]],
     ]));
   });
 

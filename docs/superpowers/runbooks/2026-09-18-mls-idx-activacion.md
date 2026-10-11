@@ -436,24 +436,52 @@ ni "ahorro"; los listings propios aparecen una sola vez.
 
 ---
 
-## Interruptores de emergencia
+## Interruptores de emergencia: apagar la exhibición de inmediato
+
+**Cuándo apagar SIN esperar autorización** (decisión del owner, 2026-10-11): basta cualquiera de estos motivos.
+
+| Motivo | Señal |
+|---|---|
+| **Scraping** | Muchas líneas `mls_scrape_suspect` de la misma etiqueta `client`, o de muchas etiquetas a la vez, en los logs de Vercel |
+| **Sync caído o atrasado** | `last_run_status = failed` dos veces seguidas, o `last_modification_ts` con más de 12 h (el contrato exige retirar lo vendido o retirado en 24 h) |
+| **Reconciliación** | `last_reconciliation_status = aborted` o sin cerrar en más de 30 h |
+| **Incumplimiento IDX** | Una ficha sin atribución "courtesy of", sin los avisos SEFMLS, con un estado distinto de Active, o visible en un dominio que no sea lixtara.com |
+| **Pedido de MIAMI** | Cualquier aviso de MIAMI o de Bridge |
+
+**Apagar (dashboard de Vercel, unos 2 minutos):**
+1. Vercel → proyecto lixtara → **Settings → Environment Variables** → `MLS_DISPLAY_ENABLED` (Production) → **Edit** → valor `false`, o **Delete**. Cualquier valor distinto de `true` cierra la exhibición (fail-closed). Si la variable está definida, aunque esté vacía, manda sobre el flag viejo `MLS_FEED_ENABLED`.
+2. **Deployments** → el último de Production → **⋯ → Redeploy**. Las variables solo se aplican con un deploy nuevo.
+3. **Verificar:** `curl -s https://lixtara.com/en/properties | grep -c "courtesy of"` → **0**.
+4. Avisar al owner y anotar la hora y el motivo.
+
+La sincronización sigue corriendo: los datos se mantienen frescos para volver a encender. Si el problema es del sync, apagar también `MLS_SYNC_ENABLED` de la misma forma. ⚠️ Con el sync apagado, la exhibición debe quedar apagada: a las 24 h las fichas vendidas o retiradas incumplirían el Schedule A.
 
 ```bash
-# Dejar de PUBLICAR (la sincronización sigue; los datos se mantienen al día):
+# Equivalente por CLI
 vercel env rm MLS_DISPLAY_ENABLED production && vercel --prod
-
-# Dejar de SINCRONIZAR (y de reconciliar):
 vercel env rm MLS_SYNC_ENABLED production && vercel --prod
 ```
 
-Ambos son fail-closed. ⚠️ Apagar **solo** la sincronización con la exhibición encendida deja
-la página mostrando datos que envejecen: a las 24 h las fichas vendidas o retiradas
-incumplen Schedule A. Si la sincronización va a estar apagada más de unas horas, apagar
-también la exhibición.
+Los datos ingeridos siguen en la tabla. Para purgarlos (§ VI.C, al terminar el acuerdo) está
+`docs/superpowers/runbooks/rollback-20260916140000_mls_idx_feed.sql`, con la advertencia de que
+`DROP` no alcanza los backups PITR de Supabase.
 
-Los datos ingeridos siguen en la tabla. Para purgarlos —§ VI.C al terminar el acuerdo— está
-`docs/superpowers/runbooks/rollback-20260916140000_mls_idx_feed.sql`, con la advertencia de
-que `DROP` no alcanza los backups PITR de Supabase.
+## Anti-scraping: qué protege y qué no (2026-10-11)
+
+- **Límite centralizado (Upstash):** 60 vistas cada 5 minutos y 300 al día por cliente (`src/lib/mls/scrape-guard.ts`). El cliente se identifica con un HMAC diario de la IP; ni Upstash ni los logs ven la IP.
+- **Respaldo en memoria cuando Upstash falla:** es una **protección PARCIAL, no equivalente** al límite centralizado.
+  - Cada instancia de Vercel cuenta por su lado: con N instancias, un scraper puede llegar hasta N veces el tope.
+  - Las instancias nuevas empiezan en cero.
+  - Frena a un scraper insistente desde una IP, pero no sustituye a Upstash.
+- **Monitoreo:** buscar `mls_rate_limit_degraded` en los logs de Vercel (como máximo una línea por minuto por instancia).
+  - Si aparece de forma sostenida, revisar Upstash (Vercel → Storage → `lixtara-ratelimit`).
+  - Si coincide con `mls_scrape_suspect`, considerar el apagado de arriba.
+- **Retención de logs:** 24 h en el plan Pro (sin Observability Plus). Si hace falta más historial para una investigación, se necesita un Log Drain. Hoy no hay ninguno.
+- **Fuera de alcance por ahora:** Vercel BotID, que se evaluará con tráfico real (decisión del owner).
+
+## Estados que se muestran (2026-10-11)
+
+**Solo `Active`** (`PUBLIC_DISPLAY_STATUSES`, decisión del owner). El texto firmado (§II.E.1) dice "only active". *Active Under Contract*, *Pending* y *Coming Soon* se siguen sincronizando (`INGESTED_STATUSES`) pero **no se publican** hasta que MIAMI confirme por escrito que están autorizados. El filtro se aplica en el servidor dos veces: en la consulta a la base y en la fusión, antes de renderizar.
 
 ---
 

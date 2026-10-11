@@ -13,7 +13,7 @@ import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
 import type {
   MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
 } from "@/lib/mls/feed-port";
-import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { INGESTED_STATUSES } from "@/lib/mls/display-compliance";
 import { SUPPORTED_PROPERTY_TYPES } from "@/lib/mls/coverage";
 
 /** VERIFICADO: base de la Web API v2 de Bridge. */
@@ -226,7 +226,7 @@ export function buildDisplayableKeysUrl(dataset: string, pageSize: number): stri
 
 /** Negación del filtro de estado: ningún estado mostrable (incluye StandardStatus null). */
 export function nonDisplayableStatusFilter(): string {
-  return `(${PUBLICLY_DISPLAYABLE_STATUSES.map((s) => `StandardStatus ne '${s}'`).join(" and ")})`;
+  return `(${INGESTED_STATUSES.map((s) => `StandardStatus ne '${s}'`).join(" and ")})`;
 }
 
 /** Negación del filtro de tipo: ningún tipo ingerible (incluye PropertyType null). */
@@ -269,7 +269,7 @@ export function ingestablePropertyTypeFilter(): string {
 }
 
 export function ingestableStatusFilter(): string {
-  return PUBLICLY_DISPLAYABLE_STATUSES
+  return INGESTED_STATUSES
     .map((s) => `StandardStatus eq '${s}'`)
     .join(" or ")
     .replace(/^(.*)$/, "($1)");

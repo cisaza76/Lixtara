@@ -94,7 +94,7 @@ export interface MlsFeedProvider {
 
   /**
    * Claves de fichas modificadas DESPUÉS de `since` que YA NO se pueden mostrar: estado
-   * fuera de PUBLICLY_DISPLAYABLE_STATUSES o tipo fuera de SUPPORTED_PROPERTY_TYPES.
+   * fuera de INGESTED_STATUSES o tipo fuera de SUPPORTED_PROPERTY_TYPES.
    *
    * Existe porque `fetchModifiedSince` filtra por estado y tipo: una ficha que pasa a
    * Closed / Expired / Withdrawn deja de llegar por ahí y quedaría guardada como

@@ -16,7 +16,7 @@ import { CONTACT } from "@/config/contact";
 import { createClient } from "@/lib/supabase/server";
 import { isStaff } from "@/lib/admin-auth";
 import { mlsDisplayDecision, readMlsGateEnv } from "@/lib/mls/environment-gate";
-import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { PUBLIC_DISPLAY_STATUSES } from "@/lib/mls/display-compliance";
 import {
   CONSENT_VERSION,
   initialStatusFor,
@@ -109,7 +109,7 @@ export async function resolveTarget(
     .select("listing_key,listing_id,city")
     .eq("listing_key", target.listingKey)
     .is("withdrawn_at", null)
-    .in("mls_status", [...PUBLICLY_DISPLAYABLE_STATUSES])
+    .in("mls_status", [...PUBLIC_DISPLAY_STATUSES])
     .maybeSingle();
   if (!data) return null;
   // Para la broker: número de MLS y ciudad. La dirección completa se consulta en Matrix o en

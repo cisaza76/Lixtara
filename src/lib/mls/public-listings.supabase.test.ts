@@ -28,6 +28,14 @@ const createService = vi.fn(() => {
   return { from: () => q };
 });
 vi.mock("@/lib/supabase/service", () => ({ createService: () => createService() }));
+const limiter = { limited: false };
+vi.mock("@/lib/mls/scrape-guard", () => ({
+  clientIp: () => "1.2.3.4",
+  checkMlsView: async () =>
+    limiter.limited
+      ? { outcome: "limited", degraded: false, tag: "t", window: "5m" }
+      : { outcome: "ok", degraded: false, tag: "t" },
+}));
 
 import { getPublicMlsListings } from "./public-listings.supabase";
 import { parsePropertySearch } from "@/lib/property-search";
@@ -36,6 +44,7 @@ const env = { ...process.env };
 beforeEach(() => {
   createService.mockClear();
   llamadas.length = 0;
+  limiter.limited = false;
   hostActual.value = "lixtara.com";
   for (const k of ["MLS_FEED_ENABLED", "MLS_SYNC_ENABLED", "MLS_DISPLAY_ENABLED"]) delete process.env[k];
   process.env.VERCEL_ENV = "production";
@@ -98,6 +107,8 @@ describe("filtros y paginación del lector público", () => {
       ["eq", ["county_key", "broward"]],
       ["eq", ["postal_code", "33301"]],
       ["order", ["list_price", { ascending: true, nullsFirst: false }]],
+      // Solo Active, filtrado en la BASE (antes de que nada llegue al navegador).
+      ["in", ["mls_status", ["Active"]]],
       ["range", [48, 71]],
     ]));
     expect(JSON.stringify(llamadas.filter(([m]) => m !== "select"))).not.toContain("payload");
@@ -112,3 +123,21 @@ describe("filtros y paginación del lector público", () => {
     expect(llamadas.some(([m]) => m === "gte" || m === "lte" || m === "eq")).toBe(false);
   });
 });
+
+describe("anti-scraping (Schedule A §1)", () => {
+  beforeEach(() => { process.env.MLS_DISPLAY_ENABLED = "true"; });
+
+  it("pasado el tope por IP, la página sale sin fichas del feed y sin tocar la base", async () => {
+    limiter.limited = true;
+    const r = await getPublicMlsListings([], "en");
+    expect(r).toEqual({ listings: [], enabled: true, total: 0, limited: true });
+    expect(createService).not.toHaveBeenCalled();
+  });
+
+  it("dentro del tope, normal", async () => {
+    const r = await getPublicMlsListings([], "en");
+    expect(r.limited).toBeUndefined();
+    expect(r.listings).toHaveLength(1);
+  });
+});
+

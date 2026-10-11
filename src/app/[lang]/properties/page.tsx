@@ -65,6 +65,12 @@ export default async function PropertiesPage({
 
         <PropertySearchForm lang={lang} search={search} labels={copy.filters} />
 
+        {mls.limited && (
+          <p role="status" className="mb-10 border border-gold-soft bg-gold/5 px-4 py-3 text-sm text-ink/80">
+            {copy.rateLimited}
+          </p>
+        )}
+
         {total === 0 ? (
           <p className="text-lg text-ink/70 leading-relaxed max-w-xl">
             {hasActiveFilters(search) ? copy.filters.noResults : copy.emptyState}

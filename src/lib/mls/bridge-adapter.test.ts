@@ -5,7 +5,7 @@ import {
   ingestablePropertyTypeFilter, buildRemovedKeysUrl, buildDisplayableKeysUrl,
   nonDisplayableStatusFilter, nonIngestablePropertyTypeFilter, BRIDGE_REPLICATION_MAX_TOP,
 } from "./bridge-adapter";
-import { PUBLICLY_DISPLAYABLE_STATUSES } from "./display-compliance";
+import { INGESTED_STATUSES } from "./display-compliance";
 import { makeResoListing } from "./feed-port.fake";
 
 const TOKEN = "tok_de_prueba";
@@ -55,7 +55,7 @@ describe("buildReplicationUrl", () => {
     // al buscador público. Descargarlas para descartarlas es derroche y difícil de
     // defender bajo § III.B.9, que solo autoriza descargar para exhibir.
     const f = ingestableStatusFilter();
-    for (const s of PUBLICLY_DISPLAYABLE_STATUSES) expect(f).toContain(`'${s}'`);
+    for (const s of INGESTED_STATUSES) expect(f).toContain(`'${s}'`);
     expect(f).not.toContain("Closed");
     expect(new URL(buildReplicationUrl("mia", null, 200)).searchParams.get("$filter")).toContain("StandardStatus");
   });
@@ -178,7 +178,7 @@ describe("consulta de bajas del incremental", () => {
   it("filtra por ModificationTimestamp Y (estado NO mostrable O tipo NO ingerible) con `ne`", () => {
     const f = url().searchParams.get("$filter") ?? "";
     expect(f.startsWith("ModificationTimestamp gt 2026-09-20T00:00:00.000Z and (")).toBe(true);
-    for (const s of PUBLICLY_DISPLAYABLE_STATUSES) expect(f).toContain(`StandardStatus ne '${s}'`);
+    for (const s of INGESTED_STATUSES) expect(f).toContain(`StandardStatus ne '${s}'`);
     expect(f).toContain("PropertyType ne 'Residential'");
     expect(f).toContain(") or (");
     // Negación explícita con `ne`: nada de `eq` que la invierta por accidente.
