@@ -164,13 +164,17 @@ export const NEEDS_TO_SELL_OPTIONS = ["yes", "no", "maybe"] as const;
 export type NeedsToSell = (typeof NEEDS_TO_SELL_OPTIONS)[number];
 
 /**
- * Versión del texto de consentimiento que vio el comprador. Los textos definitivos (TCPA /
- * Florida Telemarketing Act) están pendientes del abogado: cuando cambien, sube la versión.
+ * Versión del texto de consentimiento que vio el comprador. Identifica el texto EXACTO
+ * (y por tanto su alcance) en `showingRequest.consentContact` / `consentMarketing` de
+ * src/lib/i18n.ts. Cada cambio de esos textos sube la versión. Los definitivos (TCPA /
+ * Florida Telemarketing Act) están pendientes del abogado.
+ *   draft-1 · 2026-10-10 · primer borrador.
+ *   draft-2 · 2026-10-11 · el operativo excluye marketing, llamadas automáticas y SMS.
  */
-export const CONSENT_VERSION = "2026-10-draft-1";
+export const CONSENT_VERSION = "2026-10-draft-2";
 
-/** Plazo de primera respuesta. Pendiente de validar con la broker antes de publicarlo. */
-export const RESPONSE_SLA_HOURS = 24;
+// Sin plazo de respuesta prometido: el SLA no está confirmado con la broker (decisión del
+// owner, 2026-10-11). Ni el formulario ni los emails al comprador mencionan horas.
 
 export type ShowingTarget =
   | { kind: "mls"; listingKey: string }
@@ -201,7 +205,22 @@ export type ShowingRequestError =
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LISTING_KEY_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^\+?[0-9 ()./-]{7,25}$/;
+/**
+ * Teléfono OPCIONAL, normalizado a E.164 cuando viene:
+ *   - con "+": 8 a 15 dígitos (cualquier país).
+ *   - sin "+": 10 dígitos (EE. UU.) → +1…, u 11 que empiezan por 1 → +1….
+ * Separadores comunes (espacios, guiones, puntos, paréntesis) se ignoran. Dar un teléfono
+ * NO autoriza marketing, llamadas automáticas ni SMS: eso es `consent_marketing`.
+ */
+export function normalizePhone(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!/^\+?[0-9 ().-]+$/.test(trimmed)) return null;
+  const digits = trimmed.replace(/\D/g, "");
+  if (trimmed.startsWith("+")) return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return null;
+}
 
 const truthy = (v: string | null | undefined) => v === "true" || v === "on" || v === "1";
 
@@ -242,7 +261,8 @@ export function parseShowingRequest(
     return { ok: false, error: "too_long" };
   }
   if (!EMAIL_RE.test(email)) return { ok: false, error: "email" };
-  if (phone && !PHONE_RE.test(phone)) return { ok: false, error: "phone" };
+  const normalizedPhone = phone ? normalizePhone(phone) : null;
+  if (phone && !normalizedPhone) return { ok: false, error: "phone" };
   if (!truthy(get("consent_contact"))) return { ok: false, error: "consent" };
 
   return {
@@ -251,7 +271,7 @@ export function parseShowingRequest(
       target,
       fullName,
       email,
-      phone: phone || null,
+      phone: normalizedPhone,
       preferredTimes: preferredTimes || null,
       message: message || null,
       otherAgentStatus: otherAgent as OtherAgentStatus,

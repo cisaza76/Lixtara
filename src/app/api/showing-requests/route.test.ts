@@ -70,7 +70,12 @@ describe("POST /api/showing-requests", () => {
     expect(await res.json()).toEqual({ ok: true, exclusive: false });
     expect(insertShowingLead).toHaveBeenCalledTimes(1);
     expect(sendBroker).toHaveBeenCalledTimes(1);
-    expect(sendBuyer).toHaveBeenCalledWith(expect.objectContaining({ ownAddress: null, responseHours: 24 }));
+    expect(sendBuyer).toHaveBeenCalledWith(expect.objectContaining({ ownAddress: null }));
+    // Sin plazo prometido al comprador: el SLA no está confirmado con la broker.
+    expect((sendBuyer.mock.calls as unknown[][])[0][0]).not.toHaveProperty("responseHours");
+    expect(sendBroker).toHaveBeenCalledWith(expect.objectContaining({
+      consentMarketing: false, consentVersion: "2026-10-draft-2",
+    }));
   });
 
   it("acuerdo exclusivo con otro broker → registrado, sin emails", async () => {

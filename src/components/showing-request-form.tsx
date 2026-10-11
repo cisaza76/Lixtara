@@ -5,7 +5,6 @@
 // canUseShowingRequests en src/lib/buyer-leads.server.ts. La ruta repite el control.
 
 import { useState } from "react";
-import { RESPONSE_SLA_HOURS } from "@/lib/buyer-leads";
 import type { t } from "@/lib/i18n";
 
 type Widen<T> = { [K in keyof T]: T[K] extends string ? string : Widen<T[K]> };
@@ -79,7 +78,7 @@ export function ShowingRequestForm({
           <>
             <p className="font-display text-xl text-ink">{labels.successTitle}</p>
             <p className="text-sm text-ink/75">
-              {labels.successBody.replace("{hours}", String(RESPONSE_SLA_HOURS))}
+              {labels.successBody}
             </p>
           </>
         ) : (

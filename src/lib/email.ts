@@ -459,6 +459,8 @@ export async function sendBrokerShowingRequest(input: {
   message: string | null;
   otherAgentStatus: string;
   needsToSell: string | null;
+  consentMarketing: boolean;
+  consentVersion: string;
   lang: Lang;
   adminUrl: string;
 }) {
@@ -468,10 +470,13 @@ export async function sendBrokerShowingRequest(input: {
     ["Property", input.target],
     ["Buyer", input.buyerName],
     ["Email", input.buyerEmail],
-    ["Phone", input.buyerPhone || "—"],
+    ["Phone", input.buyerPhone || "Not provided: contact by email"],
     ["Preferred times", input.preferredTimes || "—"],
     ["Other agent", input.otherAgentStatus],
     ["Needs to sell first", input.needsToSell || "—"],
+    // Lo que el comprador autorizó, para no llamar ni escribir fuera de ese alcance.
+    ["Consent", `Contact about this request by email or phone (no marketing, automated calls or texts) · text ${input.consentVersion}`],
+    ["Marketing consent", input.consentMarketing ? "Yes" : "No: do not send marketing, automated calls or texts"],
     ["Language", input.lang],
   ];
   const body = `
@@ -503,7 +508,6 @@ export async function sendShowingRequestReceived(input: {
   buyerName: string;
   /** Solo para listings propios; null para fichas del feed IDX. */
   ownAddress: string | null;
-  responseHours: number;
 }) {
   const isEs = input.lang === "es";
   const broker = BROKERAGE.brokerName.split(" ")[0];
@@ -513,12 +517,12 @@ export async function sendShowingRequestReceived(input: {
   const lines = isEs
     ? [
         `Hola ${input.buyerName}, gracias por tu interés${interest}.`,
-        `${broker}, nuestra broker licenciada, te contactará dentro de ${input.responseHours} horas para coordinar.`,
+        `${broker}, nuestra broker licenciada, te contactará para coordinar.`,
         "Tu visita no está confirmada hasta que ella la confirme contigo.",
       ]
     : [
         `Hi ${input.buyerName}, thanks for your interest${interest}.`,
-        `${broker}, our licensed broker, will contact you within ${input.responseHours} hours to coordinate.`,
+        `${broker}, our licensed broker, will contact you to coordinate.`,
         "Your showing is not confirmed until she confirms it with you.",
       ];
   const body = lines
