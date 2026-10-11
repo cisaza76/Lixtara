@@ -37,6 +37,16 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
 };
 
 /**
+ * Estados del embudo de mayo de 2026 (commit d5f9865): new → contacted → qualified →
+ * assigned (a un agente aliado) → closed (OPERACIÓN CERRADA) / lost. Las filas viejas los
+ * conservan (`source = 'legacy'`); no se convierten solos porque cambiaría su significado.
+ */
+export const LEGACY_ONLY_STATUSES = ["new", "qualified", "assigned", "closed", "lost"] as const;
+
+/** Reclasificación manual de una fila histórica: solo hacia el inicio del embudo. */
+const LEGACY_TARGETS: readonly LeadStatus[] = ["received", "contact_pending", "contacted", "cancelled"];
+
+/**
  * Transiciones permitidas. Flexibles donde la operación real lo es (la coordinación de la
  * visita puede empezar antes de la firma), estrictas donde hay una obligación: ningún
  * camino lleva a "confirmada" o "completada" sin pasar por la regla de acuerdo.
@@ -53,8 +63,13 @@ const TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
   cancelled: ["contact_pending"],
 };
 
-export function nextStatuses(from: LeadStatus): readonly LeadStatus[] {
-  return TRANSITIONS[from] ?? [];
+export function isLegacyOnlyStatus(v: unknown): boolean {
+  return typeof v === "string" && (LEGACY_ONLY_STATUSES as readonly string[]).includes(v);
+}
+
+export function nextStatuses(from: string): readonly LeadStatus[] {
+  if (isLegacyOnlyStatus(from)) return LEGACY_TARGETS;
+  return isLeadStatus(from) ? TRANSITIONS[from] : [];
 }
 
 export function isLeadStatus(v: unknown): v is LeadStatus {
@@ -80,34 +95,63 @@ export const AGREEMENT_TYPE_LABELS: Record<AgreementType, string> = {
   showing_agreement: "Showing agreement",
   exclusive_buyer_brokerage: "Exclusive buyer brokerage agreement",
   other_written: "Other written agreement",
-  not_required: "Not required (reason required)",
+  not_required: "Not required (catalog reason, own listings only)",
+};
+
+/**
+ * Catálogo CERRADO de motivos para `not_required`, pendiente de validación del abogado.
+ * Solo aplica a listings PROPIOS de Lixtara: en fichas de otros brokers siempre hace falta
+ * un acuerdo escrito. Ampliarlo exige cambiar también la migración (la base lo aplica).
+ */
+export const AGREEMENT_EXCEPTION_CODES = [
+  "open_house_seller_side",
+  "unrepresented_buyer_own_listing",
+] as const;
+export type AgreementExceptionCode = (typeof AGREEMENT_EXCEPTION_CODES)[number];
+
+export const AGREEMENT_EXCEPTION_LABELS: Record<AgreementExceptionCode, string> = {
+  open_house_seller_side: "Open house of a Lixtara listing, hosted for the seller",
+  unrepresented_buyer_own_listing: "Unrepresented buyer on a Lixtara listing (seller side only)",
 };
 
 export interface AgreementRecord {
   agreement_type: string | null;
   agreement_recorded_at: string | null;
-  agreement_exception_reason: string | null;
+  agreement_exception_code: string | null;
+  property_id: string | null;
 }
 
-/** Misma regla que `buyer_leads_agreement_before_showing` en la base. */
+/** Misma regla que las restricciones de la base (exception_rule + before_showing). */
 export function agreementRequirementMet(a: AgreementRecord): boolean {
   if (!a.agreement_recorded_at || !a.agreement_type) return false;
+  if (!(AGREEMENT_TYPES as readonly string[]).includes(a.agreement_type)) return false;
   if (a.agreement_type === "not_required") {
-    return (a.agreement_exception_reason ?? "").trim().length > 0;
+    return (
+      (AGREEMENT_EXCEPTION_CODES as readonly string[]).includes(a.agreement_exception_code ?? "") &&
+      !!a.property_id
+    );
   }
-  return (AGREEMENT_TYPES as readonly string[]).includes(a.agreement_type);
+  return true;
 }
 
-export type TransitionError = "invalid_status" | "invalid_transition" | "agreement_missing";
+export type TransitionError =
+  | "invalid_status"
+  | "invalid_transition"
+  | "agreement_missing"
+  | "signed_needs_written";
 
 export function checkTransition(
   lead: AgreementRecord & { status: string },
   next: string,
 ): { ok: true; status: LeadStatus } | { ok: false; error: TransitionError } {
-  if (!isLeadStatus(next) || !isLeadStatus(lead.status)) return { ok: false, error: "invalid_status" };
+  if (!isLeadStatus(next)) return { ok: false, error: "invalid_status" };
+  if (!isLeadStatus(lead.status) && !isLegacyOnlyStatus(lead.status)) return { ok: false, error: "invalid_status" };
   if (!nextStatuses(lead.status).includes(next)) return { ok: false, error: "invalid_transition" };
   if (AGREEMENT_REQUIRED_STATUSES.includes(next) && !agreementRequirementMet(lead)) {
     return { ok: false, error: "agreement_missing" };
+  }
+  if (next === "agreement_signed" && lead.agreement_type === "not_required") {
+    return { ok: false, error: "signed_needs_written" };
   }
   return { ok: true, status: next };
 }

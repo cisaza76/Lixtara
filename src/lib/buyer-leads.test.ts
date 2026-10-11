@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  AGREEMENT_EXCEPTION_CODES,
   AGREEMENT_REQUIRED_STATUSES,
   AGREEMENT_TYPES,
+  LEGACY_ONLY_STATUSES,
   LEAD_STATUSES,
   NEEDS_TO_SELL_OPTIONS,
   OTHER_AGENT_OPTIONS,
@@ -33,16 +35,28 @@ const form = (over: Record<string, string> = {}) => {
   return (k: string) => all[k];
 };
 
-const noAgreement = { agreement_type: null, agreement_recorded_at: null, agreement_exception_reason: null };
+const noAgreement = {
+  agreement_type: null, agreement_recorded_at: null, agreement_exception_code: null, property_id: null,
+};
 const withAgreement = {
   agreement_type: "showing_agreement",
   agreement_recorded_at: "2026-10-11T10:00:00Z",
-  agreement_exception_reason: null,
+  agreement_exception_code: null,
+  property_id: null,
 };
+const exception = (code: string | null, property_id: string | null) => ({
+  agreement_type: "not_required",
+  agreement_recorded_at: "2026-10-11T10:00:00Z",
+  agreement_exception_code: code,
+  property_id,
+});
 
 describe("estados: código y base coinciden", () => {
   it("cada estado, tipo de acuerdo y opción del formulario existe en la migración", () => {
-    for (const v of [...LEAD_STATUSES, ...AGREEMENT_TYPES, ...OTHER_AGENT_OPTIONS, ...NEEDS_TO_SELL_OPTIONS]) {
+    for (const v of [
+      ...LEAD_STATUSES, ...LEGACY_ONLY_STATUSES, ...AGREEMENT_TYPES, ...AGREEMENT_EXCEPTION_CODES,
+      ...OTHER_AGENT_OPTIONS, ...NEEDS_TO_SELL_OPTIONS,
+    ]) {
       expect(sql, v).toContain(`'${v}'`);
     }
   });
@@ -67,10 +81,26 @@ describe("regla dura: sin acuerdo registrado no hay visita confirmada", () => {
       .toEqual({ ok: true, status: "showing_confirmed" });
   });
 
-  it("`not_required` exige un motivo escrito", () => {
-    const base = { agreement_type: "not_required", agreement_recorded_at: "2026-10-11T10:00:00Z" };
-    expect(agreementRequirementMet({ ...base, agreement_exception_reason: "  " })).toBe(false);
-    expect(agreementRequirementMet({ ...base, agreement_exception_reason: "Open house, seller side" })).toBe(true);
+  it("`not_required`: solo con motivo de catálogo y solo en listings propios", () => {
+    expect(agreementRequirementMet(exception(null, "p1"))).toBe(false);
+    expect(agreementRequirementMet(exception("cualquier texto libre", "p1"))).toBe(false);
+    expect(agreementRequirementMet(exception("open_house_seller_side", null))).toBe(false);
+    expect(agreementRequirementMet(exception("open_house_seller_side", "p1"))).toBe(true);
+    expect(agreementRequirementMet(exception("unrepresented_buyer_own_listing", "p1"))).toBe(true);
+  });
+
+  it("'acuerdo firmado' no acepta una excepción", () => {
+    expect(checkTransition({ status: "contacted", ...exception("open_house_seller_side", "p1") }, "agreement_signed"))
+      .toEqual({ ok: false, error: "signed_needs_written" });
+    expect(checkTransition({ status: "showing_coordinating", ...exception("open_house_seller_side", "p1") }, "showing_confirmed"))
+      .toEqual({ ok: true, status: "showing_confirmed" });
+  });
+
+  it("la base aplica el catálogo, el listing propio y el rol de broker", () => {
+    expect(sql).toMatch(/buyer_leads_exception_rule check \(\s*case when agreement_type = 'not_required'\s*then agreement_exception_code is not null and property_id is not null/);
+    expect(sql).toMatch(/buyer_leads_signed_is_written/);
+    expect(sql).toMatch(/has_role\(''broker''\)/);
+    expect(sql).toMatch(/before insert or update on public\.buyer_leads/);
   });
 
   it("ningún estado alcanza 'completada' sin pasar por 'confirmada'", () => {
@@ -84,6 +114,15 @@ describe("regla dura: sin acuerdo registrado no hay visita confirmada", () => {
     expect(checkTransition({ status: "received", ...noAgreement }, "hacked"))
       .toEqual({ ok: false, error: "invalid_status" });
     expect(nextStatuses("completed")).toEqual([]);
+  });
+
+  it("filas históricas: conservan su estado y solo se reclasifican a mano al inicio del embudo", () => {
+    expect(nextStatuses("closed")).toEqual(["received", "contact_pending", "contacted", "cancelled"]);
+    expect(checkTransition({ status: "closed", ...withAgreement }, "completed"))
+      .toEqual({ ok: false, error: "invalid_transition" });
+    expect(checkTransition({ status: "lost", ...noAgreement }, "cancelled")).toEqual({ ok: true, status: "cancelled" });
+    // La migración no las transforma: no hay ningún UPDATE de `status`.
+    expect(sql).not.toMatch(/update public\.buyer_leads\s+set status/i);
   });
 });
 
@@ -143,9 +182,11 @@ describe("migración: segura para pegar y sin escrituras públicas", () => {
     expect(sql).toMatch(/alter table public\.buyer_lead_events enable row level security/i);
   });
 
-  it("no crea políticas para anon ni de INSERT sobre buyer_leads", () => {
+  it("no crea políticas sobre buyer_leads, elimina la del comprador y no concede nada a anon", () => {
     expect(sql).not.toMatch(/create policy[^;]*on public\.buyer_leads[^;]*/i);
+    expect(sql).toMatch(/drop policy if exists "buyer leads own" on public\.buyer_leads/i);
     expect(sql).not.toMatch(/\bto anon\b/i);
+    expect(sql).not.toMatch(/\bgrant\b/i);
   });
 
   it("retira la lectura pública de agent_partners", () => {

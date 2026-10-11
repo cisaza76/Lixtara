@@ -6,13 +6,14 @@ import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import {
+  AGREEMENT_EXCEPTION_CODES,
+  AGREEMENT_EXCEPTION_LABELS,
   AGREEMENT_TYPES,
   AGREEMENT_TYPE_LABELS,
   LEAD_STATUS_LABELS,
   checkTransition,
   isLeadStatus,
   nextStatuses,
-  type LeadStatus,
 } from "@/lib/buyer-leads";
 
 // Cola de la broker para los compradores. La tecnología trae la solicitud; una Realtor
@@ -25,6 +26,7 @@ interface Lead {
   created_at: string;
   source: string;
   status: string;
+  legacy_status: string | null;
   full_name: string | null;
   email: string | null;
   phone: string | null;
@@ -43,7 +45,8 @@ interface Lead {
   agreement_type: string | null;
   agreement_recorded_at: string | null;
   agreement_reference: string | null;
-  agreement_exception_reason: string | null;
+  agreement_exception_code: string | null;
+  agreement_note: string | null;
   cancel_reason: string | null;
   notes: string | null;
   budget_min: number | null;
@@ -63,7 +66,7 @@ interface LeadEvent {
 }
 
 const LEAD_COLUMNS =
-  "id,created_at,source,status,full_name,email,phone,lang,listing_key,property_id,preferred_times,message,other_agent_status,needs_to_sell,consent_contact_at,consent_marketing_at,consent_version,assigned_agent_id,handled_by_agent_id,agreement_type,agreement_recorded_at,agreement_reference,agreement_exception_reason,cancel_reason,notes,budget_min,budget_max,financing_type,timeline";
+  "id,created_at,source,status,legacy_status,full_name,email,phone,lang,listing_key,property_id,preferred_times,message,other_agent_status,needs_to_sell,consent_contact_at,consent_marketing_at,consent_version,assigned_agent_id,handled_by_agent_id,agreement_type,agreement_recorded_at,agreement_reference,agreement_exception_code,agreement_note,cancel_reason,notes,budget_min,budget_max,financing_type,timeline";
 
 const VIEWS = ["open", "all", "completed", "cancelled"] as const;
 type View = (typeof VIEWS)[number];
@@ -72,9 +75,13 @@ const ERRORS: Record<string, string> = {
   invalid_status: "Unknown status.",
   invalid_transition: "That status change is not allowed from the current status.",
   agreement_missing:
-    "Record the written agreement (or 'not required' with a reason) before marking the agreement as signed or the showing as confirmed or completed.",
+    "Record the written agreement before marking the agreement as signed or the showing as confirmed or completed.",
+  signed_needs_written: "'Agreement signed' requires a written agreement, not an exception.",
   reason_required: "A reason is required.",
   invalid_agreement: "Choose an agreement type.",
+  exception_required:
+    "'Not required' needs a reason from the list, and it only applies to Lixtara's own listings. Listings of other brokers always need a written agreement.",
+  broker_only: "Only the licensed broker can record buyer agreements.",
   failed: "Could not save. Try again.",
 };
 
@@ -98,7 +105,7 @@ async function readLeadForTransition(lang: string, id: string) {
   const sb = await assertStaff(lang);
   const { data } = await sb
     .from("buyer_leads")
-    .select("id,status,agreement_type,agreement_recorded_at,agreement_exception_reason")
+    .select("id,status,property_id,agreement_type,agreement_recorded_at,agreement_exception_code")
     .eq("id", id)
     .maybeSingle();
   return { sb, lead: data };
@@ -195,22 +202,32 @@ export default async function AdminBuyerLeadsPage({
     "use server";
     const id = String(formData.get("id") ?? "");
     const type = String(formData.get("agreement_type") ?? "");
+    const code = String(formData.get("agreement_exception_code") ?? "");
     const reference = String(formData.get("agreement_reference") ?? "").trim().slice(0, 300);
-    const reason = String(formData.get("agreement_exception_reason") ?? "").trim().slice(0, 500);
+    const note = String(formData.get("agreement_note") ?? "").trim().slice(0, 500);
     if (!(AGREEMENT_TYPES as readonly string[]).includes(type)) redirect(back(lang, id, "&error=invalid_agreement"));
-    if (type === "not_required" && !reason) redirect(back(lang, id, "&error=reason_required"));
+    const isException = type === "not_required";
+    if (isException && !(AGREEMENT_EXCEPTION_CODES as readonly string[]).includes(code)) {
+      redirect(back(lang, id, "&error=exception_required"));
+    }
     const sb = await assertStaff(lang);
+    // La base aplica las reglas de verdad: catálogo + solo listings propios (23514) y solo
+    // el rol `broker` puede registrar el acuerdo (42501).
     const { error } = await sb
       .from("buyer_leads")
       .update({
         agreement_type: type,
+        agreement_exception_code: isException ? code : null,
         agreement_reference: reference || null,
-        agreement_exception_reason: type === "not_required" ? reason : null,
+        agreement_note: note || null,
         agreement_recorded_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
-    if (error) redirect(back(lang, id, "&error=failed"));
+    if (error) {
+      const why = error.code === "42501" ? "broker_only" : error.code === "23514" ? "exception_required" : "failed";
+      redirect(back(lang, id, `&error=${why}`));
+    }
     revalidatePath(`/${lang}/admin/buyer-leads`);
     redirect(back(lang, id, "&done=agreement"));
   }
@@ -296,7 +313,8 @@ export default async function AdminBuyerLeadsPage({
       ) : (
         <ul className="flex flex-col gap-5">
           {leads.map((l) => {
-            const status: LeadStatus | null = isLeadStatus(l.status) ? l.status : null;
+            const statusLabel = isLeadStatus(l.status) ? LEAD_STATUS_LABELS[l.status] : `Legacy: ${l.status}`;
+            const moves = nextStatuses(l.status);
             const target = l.property_id
               ? ownLabel.get(l.property_id) ?? "Lixtara listing (no longer active)"
               : l.listing_key
@@ -321,10 +339,11 @@ export default async function AdminBuyerLeadsPage({
                     </p>
                     <p className="text-[11px] text-ink/50">
                       {l.source.replace("_", " ")} · received {fmtDate(l.created_at)}
+                      {l.legacy_status ? ` · legacy status: ${l.legacy_status} (pre-2026-10 pipeline)` : ""}
                     </p>
                   </div>
                   <span className="text-[9px] uppercase tracking-[0.18em] px-2.5 py-1 border border-gold-soft bg-ivory-strong/40 text-ink/80">
-                    {status ? LEAD_STATUS_LABELS[status] : l.status}
+                    {statusLabel}
                   </span>
                 </div>
 
@@ -356,10 +375,10 @@ export default async function AdminBuyerLeadsPage({
 
                 {/* Acuerdo */}
                 <div className="border-t border-gold-soft pt-3 flex flex-col gap-2">
-                  <p className={small}>Written agreement</p>
+                  <p className={small}>Written agreement · recorded only by the licensed broker</p>
                   <p className="text-sm text-ink/80">
                     {l.agreement_type
-                      ? `${AGREEMENT_TYPE_LABELS[l.agreement_type as keyof typeof AGREEMENT_TYPE_LABELS] ?? l.agreement_type} · recorded ${fmtDate(l.agreement_recorded_at)}${l.agreement_reference ? ` · ref ${l.agreement_reference}` : ""}${l.agreement_exception_reason ? ` · reason: ${l.agreement_exception_reason}` : ""}`
+                      ? `${AGREEMENT_TYPE_LABELS[l.agreement_type as keyof typeof AGREEMENT_TYPE_LABELS] ?? l.agreement_type} · recorded ${fmtDate(l.agreement_recorded_at)}${l.agreement_reference ? ` · ref ${l.agreement_reference}` : ""}${l.agreement_exception_code ? ` · reason: ${AGREEMENT_EXCEPTION_LABELS[l.agreement_exception_code as keyof typeof AGREEMENT_EXCEPTION_LABELS] ?? l.agreement_exception_code}` : ""}${l.agreement_note ? ` · note: ${l.agreement_note}` : ""}`
                       : "Not recorded. Required before confirming a tour."}
                   </p>
                   <form action={recordAgreement} className="flex flex-wrap items-end gap-2">
@@ -371,7 +390,15 @@ export default async function AdminBuyerLeadsPage({
                       ))}
                     </select>
                     <input name="agreement_reference" placeholder="Reference (envelope, file)" maxLength={300} className={`${control} min-w-[180px]`} />
-                    <input name="agreement_exception_reason" placeholder="Reason (if not required)" maxLength={500} className={`${control} min-w-[180px] flex-1`} />
+                    {l.property_id && (
+                      <select name="agreement_exception_code" defaultValue={l.agreement_exception_code ?? ""} className={control}>
+                        <option value="">Exception reason (only if not required)</option>
+                        {AGREEMENT_EXCEPTION_CODES.map((c) => (
+                          <option key={c} value={c}>{AGREEMENT_EXCEPTION_LABELS[c]}</option>
+                        ))}
+                      </select>
+                    )}
+                    <input name="agreement_note" placeholder="Note (optional)" maxLength={500} className={`${control} min-w-[180px] flex-1`} />
                     <button type="submit" className={btn}>Record</button>
                   </form>
                 </div>
@@ -379,12 +406,12 @@ export default async function AdminBuyerLeadsPage({
                 {/* Estado */}
                 <div className="border-t border-gold-soft pt-3 flex flex-col gap-2">
                   <p className={small}>Status</p>
-                  {status && nextStatuses(status).length > 0 ? (
+                  {moves.length > 0 ? (
                     <form action={changeStatus} className="flex flex-wrap items-end gap-2">
                       <input type="hidden" name="id" value={l.id} />
                       <select name="status" defaultValue="" className={control} required>
                         <option value="" disabled>Move to…</option>
-                        {nextStatuses(status).map((s) => (
+                        {moves.map((s) => (
                           <option key={s} value={s}>{LEAD_STATUS_LABELS[s]}</option>
                         ))}
                       </select>
