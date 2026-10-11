@@ -15,7 +15,7 @@ import { SITE_URL } from "@/lib/config";
 import { createService } from "@/lib/supabase/service";
 import { apiLimiter, clientIp, enforceLimit } from "@/lib/ratelimit";
 import { sendBrokerShowingRequest, sendShowingRequestReceived } from "@/lib/email";
-import { CONSENT_VERSION, parseShowingRequest } from "@/lib/buyer-leads";
+import { CONSENT_VERSION, parseShowingRequest, respondByIso } from "@/lib/buyer-leads";
 import {
   canUseShowingRequests,
   ensureBrokerOfRecord,
@@ -78,6 +78,7 @@ export async function POST(req: Request): Promise<Response> {
           needsToSell: data.needsToSell,
           consentMarketing: data.consentMarketing,
           consentVersion: CONSENT_VERSION,
+          respondBy: respondByIso(lead.createdAt),
           lang: data.lang,
           adminUrl: `${SITE_URL}/en/admin/buyer-leads?lead=${lead.id}`,
         }),

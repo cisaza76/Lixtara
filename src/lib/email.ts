@@ -461,12 +461,18 @@ export async function sendBrokerShowingRequest(input: {
   needsToSell: string | null;
   consentMarketing: boolean;
   consentVersion: string;
+  /** Meta interna de primera respuesta (ISO). No es una promesa al comprador. */
+  respondBy: string;
   lang: Lang;
   adminUrl: string;
 }) {
   const e = escapeHtml;
   const subject = `New showing request: ${input.buyerName} (${input.target})`;
+  const respondBy = new Date(input.respondBy).toLocaleString("en-US", {
+    timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short",
+  });
   const rows: [string, string][] = [
+    ["Respond by", `${respondBy} ET (internal target; not promised to the buyer)`],
     ["Property", input.target],
     ["Buyer", input.buyerName],
     ["Email", input.buyerEmail],
