@@ -47,7 +47,9 @@ describe("buildReplicationUrl", () => {
 
   it("con `since` filtra por ModificationTimestamp en ISO", () => {
     const u = new URL(buildReplicationUrl("mia", new Date("2026-09-16T10:00:00Z"), 200));
-    expect(u.searchParams.get("$filter")).toContain("ModificationTimestamp gt 2026-09-16T10:00:00.000Z");
+    expect(u.searchParams.get("$filter")).toContain("BridgeModificationTimestamp gt 2026-09-16T10:00:00.000Z");
+    // El campo del MLS NO sirve para el incremental (docs de Bridge): no debe aparecer suelto.
+    expect(u.searchParams.get("$filter")).not.toMatch(/(^|[^e])ModificationTimestamp gt/);
   });
 
   it("filtra por estado en la consulta: el 92% del feed son Closed", () => {
@@ -64,7 +66,8 @@ describe("buildReplicationUrl", () => {
     const f = new URL(buildReplicationUrl("mia", new Date("2026-09-16T10:00:00Z"), 200))
       .searchParams.get("$filter") ?? "";
     expect(f).toContain("StandardStatus");
-    expect(f).toContain("ModificationTimestamp gt 2026-09-16T10:00:00.000Z");
+    expect(f).toContain("BridgeModificationTimestamp gt 2026-09-16T10:00:00.000Z");
+    expect(f).not.toMatch(/(^|[^e])ModificationTimestamp gt/);
     expect(f).toContain(" and ");
   });
 
@@ -177,7 +180,7 @@ describe("consulta de bajas del incremental", () => {
 
   it("filtra por ModificationTimestamp Y (estado NO mostrable O tipo NO ingerible) con `ne`", () => {
     const f = url().searchParams.get("$filter") ?? "";
-    expect(f.startsWith("ModificationTimestamp gt 2026-09-20T00:00:00.000Z and (")).toBe(true);
+    expect(f.startsWith("BridgeModificationTimestamp gt 2026-09-20T00:00:00.000Z and (")).toBe(true);
     for (const s of INGESTED_STATUSES) expect(f).toContain(`StandardStatus ne '${s}'`);
     expect(f).toContain("PropertyType ne 'Residential'");
     expect(f).toContain(") or (");

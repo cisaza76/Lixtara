@@ -34,6 +34,22 @@ export const BRIDGE_REPLICATION_PAGE_SIZE = 200;
  */
 export const BRIDGE_REPLICATION_MAX_TOP = 2000;
 
+/**
+ * Campo del filtro INCREMENTAL. Bridge (docs de la plataforma, "Dataset Replication"):
+ * "BridgeModificationTimestamp is the best field to use for incremental updates as it
+ * represents the last modification in the Bridge system; ModificationTimestamp is ingested
+ * directly from the MLS system and is not a consistent proxy". Filtrar por el del MLS
+ * puede perder cambios que Bridge aplica después.
+ *
+ * VERIFICADO contra `miamire` (2026-10-11, muestra de 1.000 fichas): presente en el 100 %;
+ * el más antiguo de Bridge es de 2026-06 cuando el del MLS es de 2025-07, o sea que Bridge
+ * sí modifica fichas después de la fecha del MLS.
+ *
+ * `modification_ts` (orden "más recientes" en /properties) sigue siendo la fecha del MLS:
+ * es la que tiene sentido para el comprador.
+ */
+export const INCREMENTAL_TIMESTAMP_FIELD = "BridgeModificationTimestamp";
+
 /** Campos de una consulta de bajas: lo justo para auditar por qué se borra. */
 export const REMOVED_KEYS_SELECT = ["ListingKey", "StandardStatus", "PropertyType"] as const;
 
@@ -155,8 +171,9 @@ export function createBridgeProvider(opts: BridgeAdapterOptions): MlsFeedProvide
  *
  * VERIFICADO contra la API real (2026-09-16, dataset `test`):
  *   - `/replication` responde 200 y pagina con `$next=` en el nextLink.
- *   - `$filter` sobre ModificationTimestamp FUNCIONA — es lo que hace posible el
- *     incremental.
+ *   - `$filter` por fecha de modificación FUNCIONA, y es lo que hace posible el
+ *     incremental. Desde 2026-10-11 el campo es `BridgeModificationTimestamp` (ver
+ *     INCREMENTAL_TIMESTAMP_FIELD).
  *   - **`$orderby` NO está soportado en este endpoint**: devuelve
  *     `400 "$orderby is not supported on this endpoint"`.
  *
@@ -175,7 +192,7 @@ export function buildReplicationUrl(
   url.searchParams.set("$top", String(pageSize));
 
   const clausulas = [ingestableStatusFilter(), ingestablePropertyTypeFilter()];
-  if (since) clausulas.push(`ModificationTimestamp gt ${since.toISOString()}`);
+  if (since) clausulas.push(`${INCREMENTAL_TIMESTAMP_FIELD} gt ${since.toISOString()}`);
   url.searchParams.set("$filter", clausulas.join(" and "));
 
   return url.toString();
@@ -202,7 +219,7 @@ export function buildRemovedKeysUrl(dataset: string, since: Date, pageSize: numb
   url.searchParams.set("$select", REMOVED_KEYS_SELECT.join(","));
   url.searchParams.set(
     "$filter",
-    `ModificationTimestamp gt ${since.toISOString()} and ` +
+    `${INCREMENTAL_TIMESTAMP_FIELD} gt ${since.toISOString()} and ` +
       `(${nonDisplayableStatusFilter()} or ${nonIngestablePropertyTypeFilter()})`,
   );
   return url.toString();
