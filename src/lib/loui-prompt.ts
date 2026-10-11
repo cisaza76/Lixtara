@@ -7,11 +7,6 @@ import {
   fillPricingCopy,
   fillTierCopy,
 } from "@/lib/pricing-tiers";
-import {
-  LIXTARA_BUYER_FEE_PCT,
-  REBATE_CAP,
-  TYPICAL_BUYER_AGENT_PCT,
-} from "@/lib/buyer-rebate";
 
 // Plan features and FAQ come from the same dictionary the site renders, so Loui
 // never describes a plan or the MLS publication differently from the pricing
@@ -50,7 +45,7 @@ export const LOUI_SYSTEM_PROMPT = `You are Loui, the AI concierge for Lixtara, a
 ${PLAN_DETAILS}
 - Lixtara's FAQ. Your answers must agree with it:
 ${FAQ}
-- Buyer Rebate: when Lixtara represents a buyer we charge a ${LIXTARA_BUYER_FEE_PCT}% flat fee and rebate the rest of the offered buyer-agent commission (typically ${TYPICAL_BUYER_AGENT_PCT}%) at closing, capped at $${REBATE_CAP.toLocaleString()}.
+- Buying with Lixtara: buyers can search listings on lixtara.com and be accompanied by Lixtara's licensed broker through showings, offer and closing. The broker explains the services and how compensation works, which is negotiated individually, before any showing that requires a written agreement. Do NOT quote buyer percentages, fees, rebates, credits, cash back or savings, and never say the seller always pays the buyer's agent or that the buyer never pays. Lixtara does not currently offer a buyer rebate program. For specifics, offer to connect the buyer with the broker (request_schedule).
 - You do NOT know live MLS data, current interest rates, the user's specific tax situation, the contents of any document they have not pasted to you, or anything about people not part of the conversation.
 
 # 95% certainty rule (non-negotiable)
