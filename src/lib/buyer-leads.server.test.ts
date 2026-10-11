@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("@/lib/admin-auth", () => ({ isStaff: async () => false }));
 
-import { ensureBrokerOfRecord, resolveTarget, showingRequestsPublic } from "./buyer-leads.server";
+import { ensureBrokerOfRecord, insertShowingLead, resolveTarget, showingRequestsPublic } from "./buyer-leads.server";
 
 /** Cliente falso: registra la tabla y los filtros; devuelve `result` por tabla. */
 function fakeSvc(results: Record<string, unknown>, inserts: unknown[] = []) {
@@ -38,15 +38,15 @@ describe("interruptor público", () => {
 describe("resolveTarget", () => {
   it("ficha MLS con la exhibición apagada: rechazada al público, aceptada al staff", async () => {
     process.env.VERCEL_ENV = "production";
-    const { svc } = fakeSvc({ mls_listings: { listing_key: "K1", listing_id: "A111" } });
+    const { svc } = fakeSvc({ mls_listings: { listing_key: "K1", listing_id: "A111", city: "Wellington" } });
     expect(await resolveTarget(svc, { kind: "mls", listingKey: "K1" }, { host: "lixtara.com", staff: false }))
       .toBeNull();
     expect(await resolveTarget(svc, { kind: "mls", listingKey: "K1" }, { host: "lixtara.com", staff: true }))
-      .toEqual({ label: "MLS #A111", ownAddress: null });
+      .toEqual({ label: "MLS #A111 · Wellington", ownAddress: null });
   });
 
   it("ficha MLS: solo estados mostrables y no retiradas", async () => {
-    const { svc, calls } = fakeSvc({ mls_listings: { listing_key: "K1", listing_id: "A111" } });
+    const { svc, calls } = fakeSvc({ mls_listings: { listing_key: "K1", listing_id: "A111", city: "Wellington" } });
     await resolveTarget(svc, { kind: "mls", listingKey: "K1" }, { host: "lixtara.com", staff: true });
     expect(calls).toEqual(expect.arrayContaining([
       ["mls_listings", "is", ["withdrawn_at", null]],
@@ -86,3 +86,22 @@ describe("ensureBrokerOfRecord", () => {
     });
   });
 });
+
+describe("insertShowingLead", () => {
+  it("lo RECIBE la broker; 'atendido por' queda vacío hasta que alguien lo toma", async () => {
+    const { svc, inserts } = fakeSvc({});
+    await insertShowingLead(svc, {
+      target: { kind: "mls", listingKey: "K1" }, fullName: "A", email: "a@b.co", phone: null,
+      preferredTimes: null, message: null, otherAgentStatus: "none", needsToSell: null,
+      consentMarketing: false, lang: "en",
+    }, "broker-1");
+    expect(inserts[0]).toMatchObject({
+      assigned_agent_id: "broker-1",
+      handled_by_agent_id: null,
+      consent_marketing_at: null,
+      consent_version: "2026-10-draft-2",
+      status: "received",
+    });
+  });
+});
+

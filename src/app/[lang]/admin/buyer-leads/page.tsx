@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { assertStaff } from "@/lib/admin-auth";
+import { assertStaff, assertStaffWithUser } from "@/lib/admin-auth";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
@@ -12,8 +12,11 @@ import {
   AGREEMENT_TYPE_LABELS,
   LEAD_STATUS_LABELS,
   checkTransition,
+  awaitingFirstContact,
   isLeadStatus,
   nextStatuses,
+  respondByIso,
+  transitionBlockReason,
 } from "@/lib/buyer-leads";
 
 // Cola de la broker para los compradores. La tecnología trae la solicitud; una Realtor
@@ -102,13 +105,40 @@ function back(lang: string, leadId: string, extra = ""): string {
 }
 
 async function readLeadForTransition(lang: string, id: string) {
-  const sb = await assertStaff(lang);
+  const { sb, userId } = await assertStaffWithUser(lang);
   const { data } = await sb
     .from("buyer_leads")
     .select("id,status,property_id,agreement_type,agreement_recorded_at,agreement_exception_code")
     .eq("id", id)
     .maybeSingle();
-  return { sb, lead: data };
+  return { sb, userId, lead: data };
+}
+
+/**
+ * Rastro de auditoría de un intento RECHAZADO (por la regla de la app o por la base). La
+ * base revierte la escritura rechazada, así que el trigger del historial no la ve: se
+ * registra aquí con la clave secreta y el usuario que lo intentó (migración
+ * 20261011160000). Nunca hace fallar la acción: si no se puede registrar, se loguea.
+ */
+async function logRejected(input: {
+  leadId: string;
+  userId: string;
+  from: string | null;
+  attempted: string;
+  reason: string;
+}): Promise<void> {
+  if (!UUID_RE.test(input.leadId)) return;
+  const { error } = await createService().from("buyer_lead_events").insert({
+    lead_id: input.leadId,
+    actor_user_id: input.userId,
+    event_type: "rejected_attempt",
+    from_value: input.from,
+    to_value: input.attempted,
+    note: input.reason,
+  });
+  if (error) {
+    console.error(JSON.stringify({ event: "buyer_lead_rejected_log_failed", code: error.code, message: error.message }));
+  }
 }
 
 export default async function AdminBuyerLeadsPage({
@@ -146,6 +176,8 @@ export default async function AdminBuyerLeadsPage({
   const agents = (agentRows ?? []) as Array<{ id: string; name: string; relationship: string; brokerage_name: string | null }>;
   const agentName = new Map(agents.map((a) => [a.id, a.name]));
   const events = (eventRows ?? []) as LeadEvent[];
+  // Quien mira, ¿es la broker licenciada? Solo ella ve el formulario de acuerdo.
+  const { data: viewerIsBroker } = await supabase.rpc("has_role", { _role: "broker" });
 
   // Qué ficha pidió: propios por dirección; del feed IDX, el número de MLS (lectura de
   // staff con la clave secreta, porque mls_listings es deny-all).
@@ -179,10 +211,13 @@ export default async function AdminBuyerLeadsPage({
     const id = String(formData.get("id") ?? "");
     const next = String(formData.get("status") ?? "");
     const reason = String(formData.get("cancel_reason") ?? "").trim().slice(0, 500);
-    const { sb, lead } = await readLeadForTransition(lang, id);
+    const { sb, userId, lead } = await readLeadForTransition(lang, id);
     if (!lead) redirect(`/${lang}/admin/buyer-leads?error=failed`);
     const check = checkTransition(lead, next);
-    if (!check.ok) redirect(back(lang, id, `&error=${check.error}`));
+    if (!check.ok) {
+      await logRejected({ leadId: id, userId, from: lead.status, attempted: `status:${next}`, reason: check.error });
+      redirect(back(lang, id, `&error=${check.error}`));
+    }
     if (next === "cancelled" && !reason) redirect(back(lang, id, "&error=reason_required"));
     const { error } = await sb
       .from("buyer_leads")
@@ -193,7 +228,13 @@ export default async function AdminBuyerLeadsPage({
       })
       .eq("id", id);
     // 23514 = check_violation: la base aplicó la regla aunque la UI la hubiera dejado pasar.
-    if (error) redirect(back(lang, id, `&error=${error.code === "23514" ? "agreement_missing" : "failed"}`));
+    if (error) {
+      const why = error.code === "23514" ? "agreement_missing" : "failed";
+      if (why !== "failed") {
+        await logRejected({ leadId: id, userId, from: lead.status, attempted: `status:${next}`, reason: `db:${why}` });
+      }
+      redirect(back(lang, id, `&error=${why}`));
+    }
     revalidatePath(`/${lang}/admin/buyer-leads`);
     redirect(back(lang, id, "&done=status"));
   }
@@ -207,10 +248,19 @@ export default async function AdminBuyerLeadsPage({
     const note = String(formData.get("agreement_note") ?? "").trim().slice(0, 500);
     if (!(AGREEMENT_TYPES as readonly string[]).includes(type)) redirect(back(lang, id, "&error=invalid_agreement"));
     const isException = type === "not_required";
+    const { sb, userId } = await assertStaffWithUser(lang);
+    const attempted = `agreement:${type}${isException ? `:${code || "none"}` : ""}`;
+    // Solo la broker licenciada registra acuerdos. La base lo exige igual (42501); esto
+    // evita el viaje y deja el intento en el historial.
+    const { data: isBroker } = await sb.rpc("has_role", { _role: "broker" });
+    if (isBroker !== true) {
+      await logRejected({ leadId: id, userId, from: null, attempted, reason: "broker_only" });
+      redirect(back(lang, id, "&error=broker_only"));
+    }
     if (isException && !(AGREEMENT_EXCEPTION_CODES as readonly string[]).includes(code)) {
+      await logRejected({ leadId: id, userId, from: null, attempted, reason: "exception_required" });
       redirect(back(lang, id, "&error=exception_required"));
     }
-    const sb = await assertStaff(lang);
     // La base aplica las reglas de verdad: catálogo + solo listings propios (23514) y solo
     // el rol `broker` puede registrar el acuerdo (42501).
     const { error } = await sb
@@ -226,6 +276,7 @@ export default async function AdminBuyerLeadsPage({
       .eq("id", id);
     if (error) {
       const why = error.code === "42501" ? "broker_only" : error.code === "23514" ? "exception_required" : "failed";
+      if (why !== "failed") await logRejected({ leadId: id, userId, from: null, attempted, reason: `db:${why}` });
       redirect(back(lang, id, `&error=${why}`));
     }
     revalidatePath(`/${lang}/admin/buyer-leads`);
@@ -252,6 +303,27 @@ export default async function AdminBuyerLeadsPage({
     if (error) redirect(back(lang, id, "&error=failed"));
     revalidatePath(`/${lang}/admin/buyer-leads`);
     redirect(back(lang, id, "&done=assigned"));
+  }
+
+  // "Take lead": quien lo recibió pasa a atenderlo. Reasignar sigue en "Handled by".
+  async function takeLead(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    const sb = await assertStaff(lang);
+    const { data: lead } = await sb
+      .from("buyer_leads")
+      .select("assigned_agent_id,handled_by_agent_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!lead?.assigned_agent_id || lead.handled_by_agent_id) redirect(back(lang, id, "&error=failed"));
+    const { error } = await sb
+      .from("buyer_leads")
+      .update({ handled_by_agent_id: lead.assigned_agent_id, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .is("handled_by_agent_id", null);
+    if (error) redirect(back(lang, id, "&error=failed"));
+    revalidatePath(`/${lang}/admin/buyer-leads`);
+    redirect(back(lang, id, "&done=taken"));
   }
 
   async function saveNotes(formData: FormData) {
@@ -341,6 +413,11 @@ export default async function AdminBuyerLeadsPage({
                       {l.source.replace("_", " ")} · received {fmtDate(l.created_at)}
                       {l.legacy_status ? ` · legacy status: ${l.legacy_status} (pre-2026-10 pipeline)` : ""}
                     </p>
+                    {awaitingFirstContact(l.status) && (
+                      <p className={`text-[11px] ${new Date(respondByIso(l.created_at)) < new Date() ? "text-red-700 font-semibold" : "text-ink/60"}`}>
+                        Respond by {fmtDate(respondByIso(l.created_at))} ET (internal target)
+                      </p>
+                    )}
                   </div>
                   <span className="text-[9px] uppercase tracking-[0.18em] px-2.5 py-1 border border-gold-soft bg-ivory-strong/40 text-ink/80">
                     {statusLabel}
@@ -381,6 +458,11 @@ export default async function AdminBuyerLeadsPage({
                       ? `${AGREEMENT_TYPE_LABELS[l.agreement_type as keyof typeof AGREEMENT_TYPE_LABELS] ?? l.agreement_type} · recorded ${fmtDate(l.agreement_recorded_at)}${l.agreement_reference ? ` · ref ${l.agreement_reference}` : ""}${l.agreement_exception_code ? ` · reason: ${AGREEMENT_EXCEPTION_LABELS[l.agreement_exception_code as keyof typeof AGREEMENT_EXCEPTION_LABELS] ?? l.agreement_exception_code}` : ""}${l.agreement_note ? ` · note: ${l.agreement_note}` : ""}`
                       : "Not recorded. Required before confirming a tour."}
                   </p>
+                  {viewerIsBroker !== true ? (
+                    <p className="text-xs text-ink/55">
+                      Only the licensed broker can record agreements. Sign in with the broker account to record one.
+                    </p>
+                  ) : (
                   <form action={recordAgreement} className="flex flex-wrap items-end gap-2">
                     <input type="hidden" name="id" value={l.id} />
                     <select name="agreement_type" defaultValue={l.agreement_type ?? ""} className={control}>
@@ -401,6 +483,7 @@ export default async function AdminBuyerLeadsPage({
                     <input name="agreement_note" placeholder="Note (optional)" maxLength={500} className={`${control} min-w-[180px] flex-1`} />
                     <button type="submit" className={btn}>Record</button>
                   </form>
+                  )}
                 </div>
 
                 {/* Estado */}
@@ -411,9 +494,17 @@ export default async function AdminBuyerLeadsPage({
                       <input type="hidden" name="id" value={l.id} />
                       <select name="status" defaultValue="" className={control} required>
                         <option value="" disabled>Move to…</option>
-                        {moves.map((s) => (
-                          <option key={s} value={s}>{LEAD_STATUS_LABELS[s]}</option>
-                        ))}
+                        {moves.map((s) => {
+                          // Visible pero deshabilitada, con el motivo: evita un clic que siempre falla.
+                          const block = transitionBlockReason(l, s);
+                          return (
+                            <option key={s} value={s} disabled={block !== null}>
+                              {LEAD_STATUS_LABELS[s]}
+                              {block === "needs_agreement" ? " (record the written agreement first)" : ""}
+                              {block === "needs_written_agreement" ? " (needs a written agreement, not an exception)" : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                       <input name="cancel_reason" placeholder="Reason (required to cancel)" maxLength={500} className={`${control} flex-1 min-w-[180px]`} />
                       <button type="submit" className={btn}>Update</button>
@@ -424,6 +515,13 @@ export default async function AdminBuyerLeadsPage({
                 </div>
 
                 {/* Responsables */}
+                {!l.handled_by_agent_id && l.assigned_agent_id && (
+                  <form action={takeLead} className="border-t border-gold-soft pt-3 flex flex-wrap items-center gap-3">
+                    <input type="hidden" name="id" value={l.id} />
+                    <span className="text-xs text-amber-800">Not taken yet.</span>
+                    <button type="submit" className={btn}>Take lead</button>
+                  </form>
+                )}
                 <form action={assign} className="border-t border-gold-soft pt-3 flex flex-wrap items-end gap-2">
                   <input type="hidden" name="id" value={l.id} />
                   <label className="flex flex-col gap-1">
@@ -465,6 +563,7 @@ export default async function AdminBuyerLeadsPage({
                             : ""}
                           {e.note ? ` (${e.note})` : ""}
                           {e.actor_user_id ? " · staff" : " · system"}
+                          {e.event_type === "rejected_attempt" ? " · REJECTED" : ""}
                         </li>
                       ))}
                     </ol>

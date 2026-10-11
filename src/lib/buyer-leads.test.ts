@@ -9,8 +9,12 @@ import {
   LEAD_STATUSES,
   NEEDS_TO_SELL_OPTIONS,
   OTHER_AGENT_OPTIONS,
+  INTERNAL_RESPONSE_TARGET_HOURS,
   agreementRequirementMet,
+  awaitingFirstContact,
   normalizePhone,
+  respondByIso,
+  transitionBlockReason,
   checkTransition,
   initialStatusFor,
   nextStatuses,
@@ -211,3 +215,37 @@ describe("migración: segura para pegar y sin escrituras públicas", () => {
     expect(sql).toMatch(/drop policy if exists "agents read active" on public\.agent_partners/i);
   });
 });
+
+describe("fase 1.1", () => {
+  it("opciones deshabilitadas con motivo cuando falta el acuerdo", () => {
+    expect(transitionBlockReason(noAgreement, "showing_confirmed")).toBe("needs_agreement");
+    expect(transitionBlockReason(noAgreement, "agreement_signed")).toBe("needs_agreement");
+    expect(transitionBlockReason(noAgreement, "showing_coordinating")).toBeNull();
+    expect(transitionBlockReason(noAgreement, "cancelled")).toBeNull();
+    expect(transitionBlockReason(withAgreement, "showing_confirmed")).toBeNull();
+    expect(transitionBlockReason(exception("open_house_seller_side", "p1"), "agreement_signed"))
+      .toBe("needs_written_agreement");
+  });
+
+  it("meta interna de respuesta: 24 h desde la creación; solo antes del primer contacto", () => {
+    expect(INTERNAL_RESPONSE_TARGET_HOURS).toBe(24);
+    expect(respondByIso("2026-10-11T14:00:00.000Z")).toBe("2026-10-12T14:00:00.000Z");
+    expect(awaitingFirstContact("received")).toBe(true);
+    expect(awaitingFirstContact("contact_pending")).toBe(true);
+    expect(awaitingFirstContact("contacted")).toBe(false);
+  });
+
+  it("migración de intentos rechazados: segura para pegar, sin políticas nuevas", () => {
+    const m = readFileSync(
+      resolve(__dirname, "../../supabase/migrations/20261011160000_buyer_lead_events_rejected_attempts.sql"),
+      "utf8",
+    ).replace(/--.*$/gm, "");
+    expect(m).toContain("'rejected_attempt'");
+    for (const t of ["created", "status_changed", "assigned", "handler_changed", "agreement_recorded"]) {
+      expect(m).toContain(`'${t}'`);
+    }
+    expect(m).not.toMatch(/[$[]/);
+    expect(m).not.toMatch(/create policy|grant/i);
+  });
+});
+

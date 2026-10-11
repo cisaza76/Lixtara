@@ -140,6 +140,20 @@ export type TransitionError =
   | "agreement_missing"
   | "signed_needs_written";
 
+/**
+ * Por qué una transición NO se puede hacer todavía (para mostrarla deshabilitada con su
+ * motivo), o null si está disponible. Solo cubre las reglas de acuerdo: la lista de
+ * transiciones posibles ya la da `nextStatuses`.
+ */
+export function transitionBlockReason(
+  lead: AgreementRecord,
+  next: LeadStatus,
+): "needs_agreement" | "needs_written_agreement" | null {
+  if (AGREEMENT_REQUIRED_STATUSES.includes(next) && !agreementRequirementMet(lead)) return "needs_agreement";
+  if (next === "agreement_signed" && lead.agreement_type === "not_required") return "needs_written_agreement";
+  return null;
+}
+
 export function checkTransition(
   lead: AgreementRecord & { status: string },
   next: string,
@@ -175,6 +189,21 @@ export const CONSENT_VERSION = "2026-10-draft-2";
 
 // Sin plazo de respuesta prometido: el SLA no está confirmado con la broker (decisión del
 // owner, 2026-10-11). Ni el formulario ni los emails al comprador mencionan horas.
+
+/**
+ * Meta INTERNA de primera respuesta, solo para la broker (email interno y cola). NUNCA se
+ * muestra al comprador mientras el SLA no esté confirmado.
+ */
+export const INTERNAL_RESPONSE_TARGET_HOURS = 24;
+
+export function respondByIso(createdAtIso: string): string {
+  return new Date(new Date(createdAtIso).getTime() + INTERNAL_RESPONSE_TARGET_HOURS * 3_600_000).toISOString();
+}
+
+/** Estados en los que todavía nadie ha contactado al comprador. */
+export function awaitingFirstContact(status: string): boolean {
+  return status === "received" || status === "contact_pending";
+}
 
 export type ShowingTarget =
   | { kind: "mls"; listingKey: string }

@@ -7,7 +7,9 @@ const state = {
   target: { label: "MLS #A111", ownAddress: null } as { label: string; ownAddress: string | null } | null,
   leadStatus: "received",
 };
-const insertShowingLead = vi.fn(async () => ({ id: "lead-1", status: state.leadStatus }));
+const insertShowingLead = vi.fn(async () => ({
+  id: "lead-1", status: state.leadStatus, createdAt: "2026-10-11T14:00:00.000Z",
+}));
 const sendBroker = vi.fn(async () => ({ ok: true }));
 const sendBuyer = vi.fn(async () => ({ ok: true }));
 
@@ -75,6 +77,9 @@ describe("POST /api/showing-requests", () => {
     expect((sendBuyer.mock.calls as unknown[][])[0][0]).not.toHaveProperty("responseHours");
     expect(sendBroker).toHaveBeenCalledWith(expect.objectContaining({
       consentMarketing: false, consentVersion: "2026-10-draft-2",
+      // Meta interna: 24 h después de creado el lead.
+      respondBy: "2026-10-12T14:00:00.000Z",
+      adminUrl: expect.stringContaining("?lead=lead-1"),
     }));
   });
 

@@ -106,21 +106,26 @@ export async function resolveTarget(
   if (!opts.staff && !mlsDisplayDecision(opts.host, readMlsGateEnv()).allowed) return null;
   const { data } = await svc
     .from("mls_listings")
-    .select("listing_key,listing_id")
+    .select("listing_key,listing_id,city")
     .eq("listing_key", target.listingKey)
     .is("withdrawn_at", null)
     .in("mls_status", [...PUBLICLY_DISPLAYABLE_STATUSES])
     .maybeSingle();
   if (!data) return null;
-  return { label: `MLS #${data.listing_id}`, ownAddress: null };
+  // Para la broker: número de MLS y ciudad. La dirección completa se consulta en Matrix o en
+  // la cola (contenido licenciado; qué puede ir por email está pendiente de MIAMI, P3).
+  return { label: `MLS #${data.listing_id}${data.city ? ` · ${data.city}` : ""}`, ownAddress: null };
 }
 
-/** Inserta el lead, asignado a la broker de registro. Devuelve su id y estado. */
+/**
+ * Inserta el lead RECIBIDO por la broker de registro. "Atendido por" queda vacío hasta que
+ * alguien lo toma desde la cola (botón "Take lead").
+ */
 export async function insertShowingLead(
   svc: SupabaseClient,
   req: ShowingRequest,
   brokerId: string,
-): Promise<{ id: string; status: string }> {
+): Promise<{ id: string; status: string; createdAt: string }> {
   const { status, cancelReason } = initialStatusFor(req);
   const now = new Date().toISOString();
   const { data, error } = await svc
@@ -143,10 +148,10 @@ export async function insertShowingLead(
       consent_marketing_at: req.consentMarketing ? now : null,
       consent_version: CONSENT_VERSION,
       assigned_agent_id: brokerId,
-      handled_by_agent_id: brokerId,
+      handled_by_agent_id: null,
     })
-    .select("id,status")
+    .select("id,status,created_at")
     .single();
   if (error || !data) throw new Error(`no se pudo crear el lead: ${error?.message ?? "sin datos"}`);
-  return { id: data.id as string, status: data.status as string };
+  return { id: data.id as string, status: data.status as string, createdAt: data.created_at as string };
 }
