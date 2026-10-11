@@ -67,7 +67,13 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 - Pricing tiers live in **one** module: `src/lib/pricing-tiers.ts`. Never hardcode
   `199`, `495`, `995` in components — import from there (and Stripe amounts derive from it).
 - Virtual staging: `STAGING_FREE_QUOTA = 5` free actions per listing, then `STAGING_OVERAGE_PRICE = 5` USD each (`src/lib/staging.ts`), hard cap 30 rooms.
-- Buyer rebate: `LIXTARA_BUYER_FEE_PCT = 0.5`, `REBATE_CAP = 50_000`.
+- **Two separate revenue models; never mix their percentages:**
+  - Listings (seller, core): plan fee + 0.5 % / 1 % / 1.5 % listing commission (`pricing-tiers.ts`).
+  - Buyer brokerage: 2 % / 2.5 % / 3 % (3 % preferred), individually negotiated, capped across
+    all sources (NAR 8.13). No public percentages yet: terms are explained before any agreement.
+  - The former "Buyer rebate program" (0.5 % fee + rebate) is **retired** (2026-10-11): no public
+    copy, calculator or Loui answer may promise a rebate, cash back or buyer savings. Any rebate
+    or credit is a separate, undecided business decision. See `docs/planning/2026-10-compradores/`.
 
 ### Auth & RLS
 - Roles live in the `user_roles` table, never on `users`. Check via the `has_role()`
@@ -238,7 +244,7 @@ queue + payments view; the buyer side (offers + saved properties); the Loui AI c
 copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit.ts`).
 
 **Not yet done — go-live debt:** test coverage is unit-only (Vitest covers pure logic —
-pricing, buyer-rebate, status maps, i18n parity, webhook dedup; **webhooks, RLS, and route
+pricing, status maps, i18n parity, webhook dedup, buyer leads; **webhooks, RLS, and route
 handlers have no integration tests**); error/product analytics (Sentry/PostHog); the full
 5-checkout Stripe set (`tier` + `consultation` are wired); referrals; MLS sync; and the FL DBPR / NAR
 compliance review.
