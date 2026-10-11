@@ -8,7 +8,9 @@
 // FAIL-SOFT: si el gate niega o la consulta falla, se devuelve vacío y la página muestra
 // solo los listings propios. Una página pública no puede caerse porque el feed de un
 // tercero tenga un mal día.
+import { createHash } from "node:crypto";
 import { headers } from "next/headers";
+import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { createService } from "@/lib/supabase/service";
 import type { Locale } from "@/lib/i18n";
 import { mlsDisplayDecision, readMlsGateEnv } from "@/lib/mls/environment-gate";
@@ -29,12 +31,27 @@ const COLUMNAS =
   // tarjeta. Las URLs se usan por hot-link; nada se descarga.
   "media:payload->Media";
 
+/**
+ * Anti-scraping (Schedule A §1: "employ reasonable efforts to monitor for and prevent
+ * scraping"). Vistas de páginas con fichas del feed por IP en 5 minutos. Una persona que
+ * busca de verdad no llega: 24 fichas por página y 20 páginas por búsqueda como máximo.
+ * Pasado el tope, la página se sirve SIN fichas del feed y queda un log para monitoreo.
+ */
+export const MLS_PUBLIC_VIEWS_PER_5_MIN = 60;
+
+/** IP abreviada para los logs: suficiente para ver patrones, sin guardar la dirección. */
+function ipTag(ip: string): string {
+  return createHash("sha256").update(ip).digest("hex").slice(0, 12);
+}
+
 export interface PublicMlsResult {
   listings: MlsPublicListing[];
   /** false = el gate negó; la UI no debe mostrar avisos del MLS si no hay contenido suyo. */
   enabled: boolean;
   /** Fichas del feed que cumplen los filtros (antes de deduplicar). Para la paginación. */
   total: number;
+  /** true = esta IP superó el tope anti-scraping; la página se sirve sin fichas del feed. */
+  limited?: boolean;
 }
 
 /**
@@ -50,9 +67,20 @@ export async function getPublicMlsListings(
 ): Promise<PublicMlsResult> {
   // El host decide: un deployment de producción también responde en lixtara.vercel.app,
   // que el acuerdo NO nombra. Ver ADR-0013.
-  const host = (await headers()).get("host");
+  const h = await headers();
+  const host = h.get("host");
   if (!mlsDisplayDecision(host, readMlsGateEnv()).allowed) {
     return { listings: [], enabled: false, total: 0 };
+  }
+
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  const limited = await enforceLimit(apiLimiter("mls-public", MLS_PUBLIC_VIEWS_PER_5_MIN, "5 m"), ip, {
+    message: "rate_limited",
+    label: "mls public listings",
+  });
+  if (limited) {
+    console.warn(JSON.stringify({ event: "mls_scrape_suspect", ip: ipTag(ip), page: search.page }));
+    return { listings: [], enabled: true, total: 0, limited: true };
   }
 
   try {

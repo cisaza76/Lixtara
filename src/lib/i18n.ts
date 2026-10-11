@@ -851,6 +851,7 @@ export const dictionaries = {
       titleAccent: "now",
       titleAfter: ".",
       emptyState: "No active listings yet. Be the first to list with Lixtara.",
+      rateLimited: "You've viewed many pages in a short time. Please wait a few minutes and try again.",
       countSuffixOne: "listing",
       countSuffixMany: "listings",
       card: {
@@ -2523,6 +2524,7 @@ export const dictionaries = {
       titleAccent: "ahora",
       titleAfter: ".",
       emptyState: "Aún no hay propiedades activas. Sé el primero en publicar con Lixtara.",
+      rateLimited: "Has visto muchas páginas en poco tiempo. Espera unos minutos e inténtalo de nuevo.",
       countSuffixOne: "propiedad",
       countSuffixMany: "propiedades",
       card: {

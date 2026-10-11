@@ -28,6 +28,11 @@ const createService = vi.fn(() => {
   return { from: () => q };
 });
 vi.mock("@/lib/supabase/service", () => ({ createService: () => createService() }));
+const limiter = { limited: false };
+vi.mock("@/lib/ratelimit", () => ({
+  apiLimiter: () => ({}),
+  enforceLimit: async () => (limiter.limited ? new Response(null, { status: 429 }) : null),
+}));
 
 import { getPublicMlsListings } from "./public-listings.supabase";
 import { parsePropertySearch } from "@/lib/property-search";
@@ -36,6 +41,7 @@ const env = { ...process.env };
 beforeEach(() => {
   createService.mockClear();
   llamadas.length = 0;
+  limiter.limited = false;
   hostActual.value = "lixtara.com";
   for (const k of ["MLS_FEED_ENABLED", "MLS_SYNC_ENABLED", "MLS_DISPLAY_ENABLED"]) delete process.env[k];
   process.env.VERCEL_ENV = "production";
@@ -112,3 +118,21 @@ describe("filtros y paginación del lector público", () => {
     expect(llamadas.some(([m]) => m === "gte" || m === "lte" || m === "eq")).toBe(false);
   });
 });
+
+describe("anti-scraping (Schedule A §1)", () => {
+  beforeEach(() => { process.env.MLS_DISPLAY_ENABLED = "true"; });
+
+  it("pasado el tope por IP, la página sale sin fichas del feed y sin tocar la base", async () => {
+    limiter.limited = true;
+    const r = await getPublicMlsListings([], "en");
+    expect(r).toEqual({ listings: [], enabled: true, total: 0, limited: true });
+    expect(createService).not.toHaveBeenCalled();
+  });
+
+  it("dentro del tope, normal", async () => {
+    const r = await getPublicMlsListings([], "en");
+    expect(r.limited).toBeUndefined();
+    expect(r.listings).toHaveLength(1);
+  });
+});
+
