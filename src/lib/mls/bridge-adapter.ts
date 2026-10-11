@@ -60,6 +60,9 @@ export const REMOVED_KEYS_SELECT = ["ListingKey", "StandardStatus", "PropertyTyp
  */
 export const DISPLAYABLE_KEYS_SELECT = [
   "ListingKey", "StandardStatus", "PropertyType", "CountyOrParish", "StateOrProvince",
+  // VERIFICADO en `miamire` (2026-10-11, 100 % de una muestra de 1.000): para el
+  // diagnóstico de frescura de la reconciliación.
+  "BridgeModificationTimestamp",
 ] as const;
 
 export interface BridgeAdapterOptions {

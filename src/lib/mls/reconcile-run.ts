@@ -49,6 +49,31 @@ export function reconcileDue(lastFinishedAtMs: number | null, nowMs: number): bo
  */
 export const RECONCILE_STALE_AFTER_MS = 20 * 60 * 60 * 1000;
 
+/**
+ * Diagnóstico de frescura (Opción B, 2026-10-11): conteos de cómo están las fichas
+ * guardadas frente a BridgeModificationTimestamp. SOLO MIDE: no corrige ni descarga nada.
+ * Ver la migración 20261011170000.
+ */
+export interface Freshness {
+  missing: number;
+  stale: number;
+  recent: number;
+  current: number;
+  unknown: number;
+}
+
+export const EMPTY_FRESHNESS: Freshness = { missing: 0, stale: 0, recent: 0, current: 0, unknown: 0 };
+
+/** Un cambio de Bridge más nuevo que esto aún lo puede tomar el sync de cada hora. */
+export const FRESHNESS_RECENT_MS = 2 * 60 * 60 * 1000;
+
+function addFreshness(a: Freshness, b: Freshness): Freshness {
+  return {
+    missing: a.missing + b.missing, stale: a.stale + b.stale, recent: a.recent + b.recent,
+    current: a.current + b.current, unknown: a.unknown + b.unknown,
+  };
+}
+
 export interface ReconcileState {
   dataset: string;
   /** Inicio de la reconciliación EN CURSO; null = ninguna en curso. */
@@ -59,6 +84,8 @@ export interface ReconcileState {
   keysSeen: number;
   /** Cuándo terminó (ok o abortada) la última reconciliación. */
   lastFinishedAt: string | null;
+  /** Diagnóstico acumulado de la reconciliación en curso. null = no disponible. */
+  freshness?: Freshness | null;
 }
 
 export type ReconcileOutcome = "not_due" | "partial" | "failed" | "aborted" | "ok";
@@ -69,6 +96,8 @@ export interface ReconcileFinish {
   keysSeen: number;
   stored: number;
   error: string | null;
+  /** Diagnóstico de frescura de toda la lista; null = no disponible. */
+  freshness?: Freshness | null;
 }
 
 export interface ReconcileStore {
@@ -77,8 +106,17 @@ export interface ReconcileStore {
   beginReconciliation(dataset: string, startedAt: string): Promise<void>;
   /** Marca `last_confirmed_at = at` en las filas guardadas con esas claves. */
   confirmListings(listingKeys: string[], at: string): Promise<number>;
-  /** Cursor y conteo en UNA escritura: si no se guarda uno, no se guarda el otro. */
-  saveReconcileProgress(dataset: string, cursor: string | null, keysSeen: number): Promise<void>;
+  /** Cursor, conteo y diagnóstico en UNA escritura: si no se guarda uno, no se guarda el otro. */
+  saveReconcileProgress(
+    dataset: string, cursor: string | null, keysSeen: number, freshness?: Freshness | null,
+  ): Promise<void>;
+  /**
+   * Diagnóstico de SOLO LECTURA: compara la fecha de Bridge de cada clave con la guardada.
+   * Opcional: sin él (o si falla), la reconciliación sigue igual y el diagnóstico queda null.
+   */
+  compareFreshness?(
+    records: Array<{ key: string; bridgeTs: string | null }>, recentAfter: string,
+  ): Promise<Freshness>;
   /** Filas guardadas en mls_listings. */
   countListings(): Promise<number>;
   /** Borra lo no confirmado con `last_seen_at < startedAt`; devuelve cuántas filas. */
@@ -116,6 +154,8 @@ export interface ReconcileSummary {
   deleted: number;
   stoppedBy: "completed" | "time_budget" | "max_pages" | "error" | "not_due";
   error: string | null;
+  /** Diagnóstico de frescura acumulado (toda la lista al cerrar); null = no disponible. */
+  freshness: Freshness | null;
 }
 
 export async function runMlsReconciliation(deps: ReconcileDeps): Promise<ReconcileSummary> {
@@ -130,6 +170,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
   const resumen: ReconcileSummary = {
     dataset, outcome: "partial", started: false, restartedStale: false, pages: 0,
     keysReceived: 0, keysSeen: 0, stored: null, deleted: 0, stoppedBy: "completed", error: null,
+    freshness: null,
   };
 
   const estado = await store.readReconcileState(dataset);
@@ -153,6 +194,12 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
 
   let cursor = resumen.started ? null : estado?.cursor ?? null;
   let keysSeen = resumen.started ? 0 : estado?.keysSeen ?? 0;
+  // Diagnóstico: arranca en cero en una reconciliación nueva; si se continúa una, sigue el
+  // acumulado guardado (o queda no disponible si ya se había perdido).
+  let freshness: Freshness | null = !store.compareFreshness
+    ? null
+    : resumen.started ? { ...EMPTY_FRESHNESS } : estado?.freshness ?? null;
+  const recentAfter = new Date(Date.parse(startedAt) - FRESHNESS_RECENT_MS).toISOString();
   let completa = false;
 
   try {
@@ -171,8 +218,29 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
       if (claves.length > 0) await store.confirmListings(claves, startedAt);
       keysSeen += claves.length;
 
+      // Diagnóstico de frescura: nunca tumba la reconciliación. Si falla una vez, queda no
+      // disponible para el resto de esta lista (un total parcial engañaría).
+      if (freshness !== null && store.compareFreshness && included.length > 0) {
+        try {
+          const f = await store.compareFreshness(
+            included.map((k) => ({
+              key: k.ListingKey,
+              bridgeTs: typeof k.BridgeModificationTimestamp === "string" ? k.BridgeModificationTimestamp : null,
+            })),
+            recentAfter,
+          );
+          freshness = addFreshness(freshness, f);
+        } catch (e) {
+          freshness = null;
+          console.error(JSON.stringify({
+            event: "mls_freshness_unavailable",
+            message: e instanceof Error ? e.message : String(e),
+          }));
+        }
+      }
+
       cursor = pagina.nextCursor;
-      await store.saveReconcileProgress(dataset, cursor, keysSeen);
+      await store.saveReconcileProgress(dataset, cursor, keysSeen, freshness);
       if (cursor === null) { completa = true; break; }
     }
   } catch (e) {
@@ -180,6 +248,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
     resumen.error = e instanceof Error ? e.message : String(e);
   }
   resumen.keysSeen = keysSeen;
+  resumen.freshness = freshness;
 
   if (!completa) {
     resumen.outcome = resumen.stoppedBy === "error" ? "failed" : "partial";
@@ -200,7 +269,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
     resumen.outcome = "aborted";
     resumen.error = motivo;
     await store.finishReconciliation(dataset, {
-      status: "aborted", deleted: 0, keysSeen, stored, error: motivo,
+      status: "aborted", deleted: 0, keysSeen, stored, error: motivo, freshness,
     });
     return resumen;
   }
@@ -208,7 +277,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
   resumen.deleted = await store.sweepUnconfirmed(startedAt);
   resumen.outcome = "ok";
   await store.finishReconciliation(dataset, {
-    status: "ok", deleted: resumen.deleted, keysSeen, stored, error: null,
+    status: "ok", deleted: resumen.deleted, keysSeen, stored, error: null, freshness,
   });
   return resumen;
 }

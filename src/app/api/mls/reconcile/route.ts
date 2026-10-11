@@ -53,6 +53,7 @@ async function handle(req: Request): Promise<Response> {
     keysSeen: r.keysSeen,
     stored: r.stored,
     deleted: r.deleted,
+    freshness: r.freshness,
     error: r.error,
     needsAttention: atencion.attention,
     attentionReason: atencion.reason ?? null,

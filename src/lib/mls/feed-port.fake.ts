@@ -14,6 +14,7 @@ import type {
   MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
 } from "@/lib/mls/feed-port";
 import { INGESTED_STATUSES } from "@/lib/mls/display-compliance";
+import { DISPLAYABLE_KEYS_SELECT } from "@/lib/mls/bridge-adapter";
 import { SUPPORTED_PROPERTY_TYPES } from "@/lib/mls/coverage";
 
 export interface FakeFeedOptions {
@@ -87,8 +88,8 @@ export function createFakeFeedProvider(
     async fetchDisplayableKeys(cursor: string | null): Promise<MlsKeyPage> {
       const { pagina, nextCursor } = paginar(ordenados().filter(passesIngestFilter), cursor);
       return {
-        keys: pagina.map((l) => markAsMlsLicensed(proyectar(l,
-          ["ListingKey", "StandardStatus", "PropertyType", "CountyOrParish", "StateOrProvince"]))),
+        // Misma proyección que el adaptador real: si una cambia, la otra también.
+        keys: pagina.map((l) => markAsMlsLicensed(proyectar(l, [...DISPLAYABLE_KEYS_SELECT]))),
         nextCursor,
       };
     },
