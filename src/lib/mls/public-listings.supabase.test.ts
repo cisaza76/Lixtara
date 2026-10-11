@@ -29,9 +29,12 @@ const createService = vi.fn(() => {
 });
 vi.mock("@/lib/supabase/service", () => ({ createService: () => createService() }));
 const limiter = { limited: false };
-vi.mock("@/lib/ratelimit", () => ({
-  apiLimiter: () => ({}),
-  enforceLimit: async () => (limiter.limited ? new Response(null, { status: 429 }) : null),
+vi.mock("@/lib/mls/scrape-guard", () => ({
+  clientIp: () => "1.2.3.4",
+  checkMlsView: async () =>
+    limiter.limited
+      ? { outcome: "limited", degraded: false, tag: "t", window: "5m" }
+      : { outcome: "ok", degraded: false, tag: "t" },
 }));
 
 import { getPublicMlsListings } from "./public-listings.supabase";
