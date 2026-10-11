@@ -25,8 +25,22 @@ import { partitionByCoverage } from "@/lib/mls/coverage";
 /** Fracción mínima de filas guardadas que la lista debe cubrir para permitir el borrado. */
 export const RECONCILE_MIN_COVERAGE_RATIO = 0.8;
 
-/** Una reconciliación por día. Algo menos de 24 h para que el horario no derive. */
-export const RECONCILE_MIN_INTERVAL_MS = 20 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * ¿Toca reconciliar? Una vez por DÍA UTC: toca si la última reconciliación terminada es
+ * de un día UTC anterior (o no hay ninguna).
+ *
+ * Antes era "20 h desde la anterior", y eso desfasaba el calendario: una corrida manual a
+ * las 21:15 UTC dejó sin reconciliar toda la ventana de la mañana siguiente (08:07–10:52
+ * UTC, apenas 11–14 h después) y la siguiente quedó a ~35 h (2026-10-11). Con el día UTC,
+ * una corrida manual a cualquier hora no impide la de la mañana siguiente, y la ventana
+ * del cron (08–10 UTC) garantiza como mucho ~27 h entre dos reconciliaciones.
+ */
+export function reconcileDue(lastFinishedAtMs: number | null, nowMs: number): boolean {
+  if (lastFinishedAtMs === null) return true;
+  return Math.floor(lastFinishedAtMs / DAY_MS) < Math.floor(nowMs / DAY_MS);
+}
 
 /**
  * Una reconciliación a medias más vieja que esto se REEMPIEZA: el nextLink de Bridge
@@ -81,7 +95,6 @@ export interface ReconcileDeps {
   now(): number;
   timeBudgetMs: number;
   maxPages: number;
-  minIntervalMs?: number;
   staleAfterMs?: number;
   minCoverageRatio?: number;
 }
@@ -108,7 +121,6 @@ export interface ReconcileSummary {
 export async function runMlsReconciliation(deps: ReconcileDeps): Promise<ReconcileSummary> {
   const {
     provider, store, now, timeBudgetMs, maxPages,
-    minIntervalMs = RECONCILE_MIN_INTERVAL_MS,
     staleAfterMs = RECONCILE_STALE_AFTER_MS,
     minCoverageRatio = RECONCILE_MIN_COVERAGE_RATIO,
   } = deps;
@@ -131,7 +143,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
 
   if (startedAt === null) {
     const ultima = estado?.lastFinishedAt ? Date.parse(estado.lastFinishedAt) : null;
-    if (!resumen.restartedStale && ultima !== null && inicioMs - ultima < minIntervalMs) {
+    if (!resumen.restartedStale && !reconcileDue(ultima, inicioMs)) {
       return { ...resumen, outcome: "not_due", stoppedBy: "not_due" };
     }
     startedAt = new Date(inicioMs).toISOString();

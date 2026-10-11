@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  runMlsReconciliation, reconcileNeedsAttention,
+  runMlsReconciliation, reconcileNeedsAttention, reconcileDue,
   type ReconcileStore, type ReconcileState, type ReconcileFinish,
 } from "./reconcile-run";
 import { createFakeFeedProvider, makeResoListing } from "./feed-port.fake";
@@ -156,7 +156,7 @@ describe("no borra lo que el incremental tocó durante la reconciliación", () =
 });
 
 describe("programación y reanudación", () => {
-  it("no toca si la última terminó hace menos de 20 h: no llama a Bridge", async () => {
+  it("no toca dos veces el mismo día UTC: no llama a Bridge", async () => {
     const db = createFakeDb(claves(3));
     await correr(claves(3).map((k) => ficha(k)), db.store);
     const provider = createFakeFeedProvider([], { pageSize: 5 });
@@ -212,6 +212,58 @@ describe("programación y reanudación", () => {
     expect(r.keysSeen).toBe(12);
     expect(r.outcome).toBe("ok");
     expect(r.deleted).toBe(0);
+  });
+});
+
+describe("calendario: una vez por día UTC (2026-10-11)", () => {
+  const H = 60 * 60 * 1000;
+  const at = (iso: string) => Date.parse(iso);
+
+  it("el caso real: corrida manual a las 21:15 UTC → la mañana siguiente SÍ toca", () => {
+    expect(reconcileDue(at("2026-10-10T21:15:35Z"), at("2026-10-11T08:07:00Z"))).toBe(true);
+  });
+
+  it("después de completar en la mañana, ese mismo día ya no toca", () => {
+    expect(reconcileDue(at("2026-10-11T08:09:00Z"), at("2026-10-11T08:22:00Z"))).toBe(false);
+    expect(reconcileDue(at("2026-10-11T08:09:00Z"), at("2026-10-11T23:59:00Z"))).toBe(false);
+  });
+
+  it("sin reconciliaciones previas, toca", () => {
+    expect(reconcileDue(null, at("2026-10-11T08:07:00Z"))).toBe(true);
+  });
+
+  it("dentro de la ventana del cron el hueco máximo entre dos es ~27 h", () => {
+    // Peor caso: termina 08:07 un día y la siguiente cierra en el último intento, 10:52.
+    const a = at("2026-10-11T08:07:00Z");
+    const b = at("2026-10-12T10:52:00Z");
+    expect(reconcileDue(a, b)).toBe(true);
+    expect((b - a) / H).toBeLessThan(28);
+  });
+
+  it("integrado: tras una manual de la noche, la de la mañana corre y cierra", async () => {
+    const db = createFakeDb(claves(3));
+    const feed = claves(3).map((k) => ficha(k));
+    const original = reloj.t;
+    try {
+      // La base falsa sella `lastFinishedAt` con `reloj.t`: la manual termina a las 21:15.
+      reloj.t = at("2026-10-10T21:15:00Z");
+      const manual = await runMlsReconciliation({ provider: createFakeFeedProvider(feed, { pageSize: 5 }),
+        store: db.store, now: () => reloj.t, timeBudgetMs: 60_000, maxPages: 100 });
+      expect(manual.outcome).toBe("ok");
+      expect(db.estadoActual()?.lastFinishedAt).toBe("2026-10-10T21:15:00.000Z");
+      // Con la regla vieja (20 h) esto era not_due; ahora corre.
+      reloj.t = at("2026-10-11T08:07:00Z");
+      const mañana = await runMlsReconciliation({ provider: createFakeFeedProvider(feed, { pageSize: 5 }),
+        store: db.store, now: () => reloj.t, timeBudgetMs: 60_000, maxPages: 100 });
+      expect(mañana.outcome).toBe("ok");
+      // Y un segundo intento en la misma ventana ya no toca.
+      reloj.t = at("2026-10-11T08:22:00Z");
+      const otra = await runMlsReconciliation({ provider: createFakeFeedProvider(feed, { pageSize: 5 }),
+        store: db.store, now: () => reloj.t, timeBudgetMs: 60_000, maxPages: 100 });
+      expect(otra.outcome).toBe("not_due");
+    } finally {
+      reloj.t = original;
+    }
   });
 });
 

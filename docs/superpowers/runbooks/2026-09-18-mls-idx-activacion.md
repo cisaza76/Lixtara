@@ -252,7 +252,9 @@ curl -s -X POST https://lixtara.com/api/mls/reconcile \
 - `outcome: "aborted"` → **protección del 80 %**: la lista trajo menos del 80 % de lo
   guardado. **No se borró nada.** Investigar antes de repetir (feed parcial, filtro roto,
   cambio de nombre de campo). El motivo está en `last_reconciliation_error`.
-- `outcome: "not_due"` → ya corrió hace menos de 20 h.
+- `outcome: "not_due"` → ya hay una reconciliación completada en el día UTC actual (regla desde
+  2026-10-11; antes era "menos de 20 h", y una corrida manual de la noche hacía saltar la
+  ventana de la mañana siguiente).
 
 ```sql
 select last_reconciliation_at, last_reconciliation_status, last_reconciliation_deleted,
