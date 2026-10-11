@@ -23,6 +23,16 @@ import { partitionByCoverage, type CoverageExclusionReason } from "@/lib/mls/cov
 
 export type SyncPassPhase = "listings" | "removals";
 
+/**
+ * Solapamiento de la consulta incremental. El cursor es la hora de INICIO de la última
+ * pasada completa, medida con el reloj del servidor; Bridge filtra con su propio reloj
+ * (`BridgeModificationTimestamp gt …`, estricto). Un desfase de reloj o una modificación
+ * en el mismo milisegundo del cursor podría quedar justo fuera de las dos pasadas. Pedir
+ * desde 5 minutos antes lo cubre; repetir unas pocas fichas es inocuo (upsert y borrado
+ * son idempotentes).
+ */
+export const CURSOR_OVERLAP_MS = 5 * 60_000;
+
 export interface SyncState {
   dataset: string;
   lastModificationTs: string | null;
@@ -125,6 +135,8 @@ export async function runMlsSync(deps: SyncDeps): Promise<SyncSummary> {
 
   const estado = await store.readState(dataset);
   const since = estado?.lastModificationTs ? new Date(estado.lastModificationTs) : null;
+  // Lo que se le pide al proveedor: el cursor menos el solapamiento (ver CURSOR_OVERLAP_MS).
+  const consultaDesde = since ? new Date(since.getTime() - CURSOR_OVERLAP_MS) : null;
 
   // ¿Hay una pasada a medias? `resumeCursor` sin `passStartedAt` es el estado que dejaba
   // la versión anterior del worker: se continúa igual, con el inicio de esta invocación.
@@ -147,7 +159,7 @@ export async function runMlsSync(deps: SyncDeps): Promise<SyncSummary> {
       if (resumen.pages >= maxPages) { resumen.stoppedBy = "max_pages"; break; }
 
       if (phase === "listings") {
-        const pagina = await provider.fetchModifiedSince(since, cursor);
+        const pagina = await provider.fetchModifiedSince(consultaDesde, cursor);
         resumen.pages += 1;
         resumen.received += pagina.listings.length;
 
@@ -189,7 +201,7 @@ export async function runMlsSync(deps: SyncDeps): Promise<SyncSummary> {
         }
       } else {
         // `since` no es null aquí: la fase de bajas solo existe en incrementales.
-        const pagina = await provider.fetchRemovedKeysSince(since as Date, removalCursor);
+        const pagina = await provider.fetchRemovedKeysSince(consultaDesde as Date, removalCursor);
         resumen.pages += 1;
         resumen.removalKeysReceived += pagina.keys.length;
 
