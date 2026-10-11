@@ -12,13 +12,15 @@
 // Solo se monta si hay al menos una herramienta configurada (ver analytics-config.ts); si
 // no, el layout sigue mostrando el aviso informativo de siempre.
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CONSENT_COOKIE,
   CONSENT_MAX_AGE_S,
+  isAnalyticsExcludedPath,
   readConsent,
+  sanitizePosthogProperties,
   sanitizeUrl,
   type ConsentChoice,
 } from "@/lib/analytics-config";
@@ -72,12 +74,16 @@ async function loadPosthog(key: string, host: string, lang: string): Promise<Pos
     disable_surveys: true,
     person_profiles: "identified_only",
     persistence: "localStorage+cookie",
-    sanitize_properties: (props) => {
-      for (const k of ["$current_url", "$referrer", "$initial_referrer", "$initial_current_url"]) {
-        if (typeof props[k] === "string") props[k] = sanitizeUrl(props[k] as string) || props[k];
-      }
-      return props;
-    },
+    // Segunda barrera: ninguna captura automática, aunque se active desde el panel de PostHog.
+    enable_heatmaps: false,
+    capture_dead_clicks: false,
+    rageclick: false,
+    capture_performance: false,
+    capture_exceptions: false,
+    disable_web_experiments: true,
+    mask_all_text: true,
+    mask_all_element_attributes: true,
+    sanitize_properties: (props) => sanitizePosthogProperties(props),
   });
   posthog.register({ lang });
   return posthog as unknown as PostHogLike;
@@ -116,45 +122,55 @@ async function start(p: Pick<Props, "gtmId" | "posthogKey" | "posthogHost" | "la
   enableAnalytics(posthogInstance);
 }
 
+// La elección vive en la cookie; este pequeño "store" la lee sin esperar un frame de
+// animación (que no corre en pestañas en segundo plano): el banner aparece igual en una
+// pestaña visible que en una abierta en segundo plano.
+const listeners = new Set<() => void>();
+const consentStore = {
+  subscribe(l: () => void) {
+    listeners.add(l);
+    return () => listeners.delete(l);
+  },
+  get: (): ConsentChoice | null => readConsent(document.cookie),
+  server: (): "unknown" => "unknown",
+};
+function setConsent(choice: ConsentChoice): void {
+  saveChoice(choice);
+  for (const l of listeners) l();
+}
+
+let gtmLoaded = false;
+
 export function AnalyticsConsent(props: Props) {
-  const [choice, setChoice] = useState<ConsentChoice | null | "unknown">("unknown");
+  const choice = useSyncExternalStore(consentStore.subscribe, consentStore.get, consentStore.server);
   const pathname = usePathname();
+  const excluded = isAnalyticsExcludedPath(pathname);
 
+  // Efectos de la elección: cargar (solo con "granted") o apagar y limpiar.
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      const c = readConsent(document.cookie);
-      setChoice(c);
-      if (c === "granted") void start(props);
-      else {
-        disableAnalytics();
-        if (c === "denied") clearAnalyticsStorage();
-      }
-    });
-    return () => cancelAnimationFrame(id);
-    // Solo al montar: la configuración no cambia durante la vida de la página.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Pageview manual en PostHog con la URL sin parámetros. GA4 cuenta los suyos desde GTM.
-  useEffect(() => {
-    if (choice !== "granted" || !posthogInstance) return;
-    posthogInstance.capture("$pageview", { $current_url: sanitizeUrl(window.location.href) });
-  }, [pathname, choice]);
-
-  if (choice !== null) return null;
-
-  function decide(c: ConsentChoice) {
-    saveChoice(c);
-    setChoice(c);
-    if (c === "granted") void start(props);
-    else {
+    if (choice === "unknown" || excluded) return;
+    if (choice === "granted") {
+      gtmLoaded = gtmLoaded || !!props.gtmId;
+      void start(props).then(() => pageview());
+    } else {
       disableAnalytics();
-      clearAnalyticsStorage();
+      if (choice === "denied") clearAnalyticsStorage();
     }
-  }
+    // La configuración no cambia durante la vida de la página.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choice, excluded]);
 
+  // Un pageview por cambio de ruta, con la URL SIN parámetros, para GA4 (evento propio en
+  // el dataLayer; el Google tag NO envía su page_view automático, ver runbook) y PostHog.
+  useEffect(() => {
+    if (choice === "granted" && !excluded && started) pageview();
+  }, [pathname, choice, excluded]);
+
+  if (choice !== null || excluded) return null;
+
+  // Mismo peso visual para aceptar y rechazar: mismo estilo, mismo tamaño. Sin patrones oscuros.
   const button =
-    "shrink-0 inline-flex items-center justify-center px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition-colors";
+    "shrink-0 inline-flex items-center justify-center px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition-colors border border-gold text-ivory hover:bg-gold hover:text-ink";
   return (
     <div
       role="region"
@@ -168,18 +184,35 @@ export function AnalyticsConsent(props: Props) {
             {props.labels.learnMore}
           </Link>
         </p>
-        {/* Mismo peso visual para aceptar y rechazar: sin patrones oscuros. */}
         <div className="flex gap-2 self-start sm:self-auto">
-          <button type="button" onClick={() => decide("denied")} className={`${button} border border-ivory/60 text-ivory hover:bg-ivory/10`}>
+          <button type="button" onClick={() => setConsent("denied")} className={button}>
             {props.labels.reject}
           </button>
-          <button type="button" onClick={() => decide("granted")} className={`${button} border border-gold bg-gold text-ink hover:bg-gold/90`}>
+          <button type="button" onClick={() => setConsent("granted")} className={button}>
             {props.labels.accept}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+// Un pageview por ruta y por herramienta (la carga de PostHog es asíncrona: llega después).
+let lastGtmPath: string | null = null;
+let lastPosthogPath: string | null = null;
+function pageview(): void {
+  const path = window.location.pathname;
+  const page_location = sanitizeUrl(window.location.href);
+  if (gtmLoaded && lastGtmPath !== path) {
+    lastGtmPath = path;
+    const w = window as unknown as { dataLayer: unknown[] };
+    w.dataLayer = w.dataLayer ?? [];
+    w.dataLayer.push({ event: "lx_page_view", page_location, page_path: path });
+  }
+  if (posthogInstance && lastPosthogPath !== path) {
+    lastPosthogPath = path;
+    posthogInstance.capture("$pageview", { $current_url: page_location });
+  }
 }
 
 /** Enlace del pie para cambiar la elección: borra la cookie y recarga. */

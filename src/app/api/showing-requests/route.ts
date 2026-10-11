@@ -15,7 +15,7 @@ import { SITE_URL } from "@/lib/config";
 import { createService } from "@/lib/supabase/service";
 import { apiLimiter, clientIp, enforceLimit } from "@/lib/ratelimit";
 import { sendBrokerShowingRequest, sendShowingRequestReceived } from "@/lib/email";
-import { captureServerEvent } from "@/lib/analytics.server";
+import { recordServerEvent } from "@/lib/analytics.server";
 import { CONSENT_VERSION, parseShowingRequest, respondByIso } from "@/lib/buyer-leads";
 import {
   canUseShowingRequests,
@@ -62,9 +62,8 @@ export async function POST(req: Request): Promise<Response> {
     const brokerId = await ensureBrokerOfRecord(svc);
     const lead = await insertShowingLead(svc, data, brokerId);
     const exclusive = lead.status === "cancelled";
-    await captureServerEvent({
+    recordServerEvent({
       event: "buyer_lead_created",
-      distinctId: `lead:${lead.id}`,
       props: { source: "showing_request", target: data.target.kind, exclusive },
     });
 

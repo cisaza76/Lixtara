@@ -10,9 +10,9 @@ import { track, type AnalyticsEvent } from "@/lib/analytics";
 export function TrackOnMount({ event }: { event: AnalyticsEvent }) {
   const key = JSON.stringify(event);
   useEffect(() => {
-    // El banner puede habilitar la analítica en el mismo ciclo: un frame de margen.
-    const id = requestAnimationFrame(() => track(JSON.parse(key) as AnalyticsEvent));
-    return () => cancelAnimationFrame(id);
+    // Sin esperar un frame: track() lee el consentimiento de la cookie si el banner aún no
+    // montó, y retiene lo de PostHog mientras su SDK carga.
+    track(JSON.parse(key) as AnalyticsEvent);
   }, [key]);
   return null;
 }

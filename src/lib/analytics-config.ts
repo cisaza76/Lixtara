@@ -32,7 +32,7 @@ export function analyticsConfig(env: {
   const host = env.NEXT_PUBLIC_POSTHOG_HOST?.trim() ?? "";
   const gtmId = /^GTM-[A-Z0-9]{4,12}$/.test(gtm) ? gtm : null;
   const posthogKey = /^phc_[A-Za-z0-9]{20,64}$/.test(key) ? key : null;
-  const posthogHost = /^https:\/\/[a-z0-9.-]+$/i.test(host) ? host : DEFAULT_POSTHOG_HOST;
+  const posthogHost = /^https:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(host) ? host : DEFAULT_POSTHOG_HOST;
   return { gtmId, posthogKey, posthogHost, enabled: gtmId !== null || posthogKey !== null };
 }
 
@@ -53,4 +53,25 @@ export function sanitizeUrl(url: string): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * Páginas donde la analítica NO corre: el panel de staff (sus URLs llevan ids de leads y
+ * de propiedades, y no es audiencia de marketing ni de producto).
+ */
+export function isAnalyticsExcludedPath(pathname: string): boolean {
+  return /^\/(en|es)\/admin(\/|$)/.test(pathname);
+}
+
+/**
+ * Lo que PostHog recibe en cada evento: URLs y referrers sin parámetros ni fragmento, y sin
+ * el título de la página (puede nombrar una propiedad). Se usa como `sanitize_properties`.
+ */
+export function sanitizePosthogProperties(props: Record<string, unknown>): Record<string, unknown> {
+  for (const k of ["$current_url", "$referrer", "$initial_referrer", "$initial_current_url"]) {
+    if (typeof props[k] === "string" && props[k] !== "$direct") props[k] = sanitizeUrl(props[k] as string) || "$direct";
+  }
+  delete props.title;
+  delete props.$title;
+  return props;
 }

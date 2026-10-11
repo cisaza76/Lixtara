@@ -11,6 +11,8 @@
 // publicado) no salen de aquí: se emiten desde el servidor, a partir de cambios de estado
 // verificables (src/lib/analytics.server.ts).
 
+import { isAnalyticsExcludedPath, readConsent } from "@/lib/analytics-config";
+
 export const LISTING_STEP_SLUGS = [
   "address",
   "plan",
@@ -75,32 +77,48 @@ interface CaptureClient {
   capture(event: string, properties?: Record<string, unknown>): void;
 }
 
-// Estado de la página: lo fija el banner de consentimiento.
-let consentGranted = false;
+// Estado de la página. null = el banner aún no se inicializó: entonces manda la cookie
+// (una página puede emitir eventos antes de que el banner monte).
+let consentState: boolean | null = null;
 let posthogClient: CaptureClient | null = null;
+// Eventos de PostHog mientras su SDK carga (SOLO con consentimiento ya dado; se vacía al
+// cargar y se descarta al retirar el consentimiento).
+const pendingForPosthog: Array<[string, Record<string, unknown>]> = [];
+const PENDING_MAX = 50;
 
 /** Lo llama el banner al aceptar (y al cargar la página si ya había aceptado). */
 export function enableAnalytics(client: CaptureClient | null): void {
-  consentGranted = true;
+  consentState = true;
   posthogClient = client;
+  if (client) for (const [event, props] of pendingForPosthog.splice(0)) client.capture(event, props);
 }
 
 /** Lo llama el banner al rechazar o al retirar el consentimiento. */
 export function disableAnalytics(): void {
-  consentGranted = false;
+  consentState = false;
   posthogClient = null;
+  pendingForPosthog.length = 0;
 }
 
 export function analyticsEnabled(): boolean {
-  return consentGranted;
+  return consentState === true;
+}
+
+function granted(): boolean {
+  if (consentState !== null) return consentState;
+  try {
+    return readConsent(document.cookie) === "granted";
+  } catch {
+    return false;
+  }
 }
 
 export function track(e: AnalyticsEvent): void {
-  if (typeof window === "undefined" || !consentGranted) return;
+  if (typeof window === "undefined" || !granted()) return;
+  if (isAnalyticsExcludedPath(window.location?.pathname ?? "")) return;
   window.dataLayer = window.dataLayer ?? [];
   window.dataLayer.push(e);
-  if (posthogClient) {
-    const { event, ...props } = e;
-    posthogClient.capture(event, props);
-  }
+  const { event, ...props } = e;
+  if (posthogClient) posthogClient.capture(event, props);
+  else if (pendingForPosthog.length < PENDING_MAX) pendingForPosthog.push([event, props]);
 }

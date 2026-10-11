@@ -88,9 +88,10 @@
 14. **B4:** current relationship under our listing agreement, the disclosure to unrepresented buyers, and limits on assistance.
 15. **A:** the written instrument for reducing compensation before an offer, and the signed pre-offer breakdown.
 16. **Advertising of savings** (61J2-10.025): verifiable comparisons including the plan fee, and no "6 %" presented as standard or legal.
+17. **Analytics consent banner and cookie policy** (texts in `05-textos-consentimiento-cookies.md`): wording of the banner and of the analytics version of the Cookie Policy, and whether our opt-in approach (nothing loads before "Accept") is sufficient under Florida law and for EU/UK visitors.
 
 ## 7. What we need from you
-- A legal opinion on items 1–16.
+- A legal opinion on items 1–17.
 - A draft or redline of the Lixtara Showing Agreement and the B2 clauses (listing agreement and buyer agreement).
 - Required disclosures and their wording.
 - Review of the public copy before publication.
