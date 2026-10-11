@@ -10,6 +10,7 @@ import {
   NEEDS_TO_SELL_OPTIONS,
   OTHER_AGENT_OPTIONS,
   agreementRequirementMet,
+  normalizePhone,
   checkTransition,
   initialStatusFor,
   nextStatuses,
@@ -156,6 +157,23 @@ describe("formulario de solicitud de visita", () => {
     expect(parseShowingRequest(form({ phone: "call me" }))).toEqual({ ok: false, error: "phone" });
     expect(parseShowingRequest(form({ message: "x".repeat(1001) }))).toEqual({ ok: false, error: "too_long" });
     expect(parseShowingRequest(form({ other_agent_status: "maybe" }))).toEqual({ ok: false, error: "required" });
+  });
+
+  it("teléfono opcional; si viene, se normaliza a E.164", () => {
+    const sin = parseShowingRequest(form());
+    expect(sin.ok && sin.data.phone).toBeNull();
+    const us = parseShowingRequest(form({ phone: "(786) 210-3562" }));
+    expect(us.ok && us.data.phone).toBe("+17862103562");
+    expect(normalizePhone("1 786 210 3562")).toBe("+17862103562");
+    expect(normalizePhone("+57 300 123 4567")).toBe("+573001234567");
+    expect(normalizePhone("210-3562")).toBeNull();
+    expect(normalizePhone("+12")).toBeNull();
+    expect(normalizePhone("786.210.3562 ext 4")).toBeNull();
+  });
+
+  it("dar un teléfono no autoriza marketing", () => {
+    const r = parseShowingRequest(form({ phone: "+17862103562" }));
+    expect(r.ok && r.data.consentMarketing).toBe(false);
   });
 
   it("honeypot", () => {
