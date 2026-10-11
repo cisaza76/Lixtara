@@ -18,6 +18,9 @@ import { StagingShowcase } from "@/components/staging-showcase";
 import { LivingListingShowcase } from "@/components/living-listing-showcase";
 import { OfferForm } from "@/components/offer-form";
 import { SaveButton } from "@/components/save-button";
+import { ShowingRequestForm } from "@/components/showing-request-form";
+import { canUseShowingRequests } from "@/lib/buyer-leads.server";
+import { fillBrokerageCopy } from "@/config/brokerage";
 
 export default async function PropertyDetailPage({
   params,
@@ -81,6 +84,15 @@ export default async function PropertyDetailPage({
     }
   }
   const offerCopy = t(lang).offer;
+  // "Solicitar visita": solo con el interruptor público abierto o para staff (prueba).
+  // Control de servidor: sin permiso, el formulario ni siquiera llega al HTML.
+  const showingRequests = isOwner ? { allowed: false } : await canUseShowingRequests();
+  const showingCopy = t(lang).showingRequest;
+  const showingLabels = {
+    ...showingCopy,
+    intro: fillBrokerageCopy(showingCopy.intro),
+    successBody: fillBrokerageCopy(showingCopy.successBody),
+  };
   const saveCopy = t(lang).save;
   // Map coords: prefer the stored lat/lng; if missing (geocode never ran when
   // the listing was saved), best-effort geocode at render so the Location map
@@ -450,6 +462,13 @@ export default async function PropertyDetailPage({
               </div>
             </div>
 
+            {showingRequests.allowed && (
+              <ShowingRequestForm
+                target={{ propertyId: property.id }}
+                lang={lang}
+                labels={showingLabels}
+              />
+            )}
             <OfferForm
               propertyId={property.id}
               lang={lang}

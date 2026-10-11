@@ -276,3 +276,25 @@ describe("frontera MLS ⇄ IA — cadenas y rutas que alcanzan la IA", () => {
   });
 });
 
+
+// ── F · Leads de compradores (2026-10-11) ────────────────────────────────────────────
+// buyer_leads guarda el listing_key de la ficha del feed que pidió el comprador, y su
+// historial lo acompaña. Nada de eso puede llegar a un modelo: ni las superficies de IA
+// ni las rutas de servidor que las alcanzan pueden nombrar esas tablas.
+describe("frontera MLS ⇄ IA — leads de compradores", () => {
+  const LEAD_TABLE_RE = /\b(buyer_leads|buyer_lead_events)\b/;
+  const namesLeadTables = (rel: string) =>
+    LEAD_TABLE_RE.test(sinComentarios(readFileSync(join(SRC, rel), "utf8")));
+
+  it("ninguna superficie de IA ni ruta que la alcanza nombra buyer_leads / buyer_lead_events", () => {
+    const violations = [...new Set([...aiSurfaces, ...aiReachers])].flatMap((s) =>
+      [...closure(s)].filter((f) => !isTest(f) && namesLeadTables(f)).map((f) => `${s} ⇝ ${f}`));
+    expect(violations).toEqual([]);
+  });
+
+  it("el detector reconoce las tablas", () => {
+    expect(LEAD_TABLE_RE.test('sb.from("buyer_leads")')).toBe(true);
+    expect(LEAD_TABLE_RE.test("from public.buyer_lead_events")).toBe(true);
+    expect(LEAD_TABLE_RE.test(sinComentarios("// nunca leer buyer_leads aquí\nconst a = 1;"))).toBe(false);
+  });
+});

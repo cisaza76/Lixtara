@@ -443,3 +443,91 @@ export async function sendContactMessage(input: {
     text: `${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\n${input.message}\n\n${input.pageUrl}`,
   });
 }
+
+// ─── Buyer showing requests (/api/showing-requests) ──────────────────
+// Fase 1 del embudo del comprador. Ninguno de los dos emails confirma una visita.
+// Fichas del feed IDX: el email del COMPRADOR no lleva datos de la ficha (pendiente de
+// MIAMI, P3); el interno de la broker lleva solo el número de MLS.
+
+export async function sendBrokerShowingRequest(input: {
+  to: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone: string | null;
+  target: string;
+  preferredTimes: string | null;
+  message: string | null;
+  otherAgentStatus: string;
+  needsToSell: string | null;
+  lang: Lang;
+  adminUrl: string;
+}) {
+  const e = escapeHtml;
+  const subject = `New showing request: ${input.buyerName} (${input.target})`;
+  const rows: [string, string][] = [
+    ["Property", input.target],
+    ["Buyer", input.buyerName],
+    ["Email", input.buyerEmail],
+    ["Phone", input.buyerPhone || "—"],
+    ["Preferred times", input.preferredTimes || "—"],
+    ["Other agent", input.otherAgentStatus],
+    ["Needs to sell first", input.needsToSell || "—"],
+    ["Language", input.lang],
+  ];
+  const body = `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">New showing request</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Contact the buyer, verify prior representation and handle the written agreement before any tour. The showing is not confirmed.</p>
+    <table cellpadding="0" cellspacing="0" style="margin:16px 0;font-size:13px;color:#1c1c1c;">
+      ${rows
+        .map(
+          ([k, v]) =>
+            `<tr><td style="padding:4px 16px 4px 0;color:#8a8268;text-transform:uppercase;font-size:10px;letter-spacing:0.18em;">${k}</td><td style="padding:4px 0;">${e(v)}</td></tr>`,
+        )
+        .join("")}
+    </table>
+    ${input.message ? `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;white-space:pre-wrap;">${e(input.message)}</p>` : ""}
+    ${button(input.adminUrl, "Open buyer leads →")}
+  `;
+  return send({
+    to: input.to,
+    replyTo: input.buyerEmail,
+    subject,
+    html: shell({ preheader: subject, body }),
+    text: `${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\n${input.message ?? ""}\n\n${input.adminUrl}`,
+  });
+}
+
+export async function sendShowingRequestReceived(input: {
+  to: string;
+  lang: Lang;
+  buyerName: string;
+  /** Solo para listings propios; null para fichas del feed IDX. */
+  ownAddress: string | null;
+  responseHours: number;
+}) {
+  const isEs = input.lang === "es";
+  const broker = BROKERAGE.brokerName.split(" ")[0];
+  const subject = isEs ? "Recibimos tu solicitud de visita" : "We received your showing request";
+  // Texto plano primero; el HTML lo escapa entero (nombre y dirección vienen del usuario).
+  const interest = input.ownAddress ? (isEs ? ` por ${input.ownAddress}` : ` in ${input.ownAddress}`) : "";
+  const lines = isEs
+    ? [
+        `Hola ${input.buyerName}, gracias por tu interés${interest}.`,
+        `${broker}, nuestra broker licenciada, te contactará dentro de ${input.responseHours} horas para coordinar.`,
+        "Tu visita no está confirmada hasta que ella la confirme contigo.",
+      ]
+    : [
+        `Hi ${input.buyerName}, thanks for your interest${interest}.`,
+        `${broker}, our licensed broker, will contact you within ${input.responseHours} hours to coordinate.`,
+        "Your showing is not confirmed until she confirms it with you.",
+      ];
+  const body = lines
+    .map((l) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${escapeHtml(l)}</p>`)
+    .join("");
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: subject, body, lang: input.lang }),
+    text: lines.join("\n\n"),
+  });
+}
