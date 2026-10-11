@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
-  runMlsReconciliation, reconcileNeedsAttention, reconcileDue,
+  runMlsReconciliation, reconcileNeedsAttention, reconcileDue, FRESHNESS_RECENT_MS,
   type ReconcileStore, type ReconcileState, type ReconcileFinish,
 } from "./reconcile-run";
 import { createFakeFeedProvider, makeResoListing } from "./feed-port.fake";
@@ -70,7 +70,7 @@ describe("reconciliación — fichas eliminadas del feed", () => {
     expect(r.deleted).toBe(1);
     expect(db.filas.has("k9")).toBe(false);
     expect(db.filas.size).toBe(9);
-    expect(db.finales).toEqual([{ status: "ok", deleted: 1, keysSeen: 9, stored: 10, error: null }]);
+    expect(db.finales).toEqual([{ status: "ok", deleted: 1, keysSeen: 9, stored: 10, error: null, freshness: null }]);
   });
 
   it("una clave de la lista que cae fuera de cobertura NO confirma su fila", async () => {
@@ -269,7 +269,7 @@ describe("calendario: una vez por día UTC (2026-10-11)", () => {
 
 describe("reconcileNeedsAttention", () => {
   const base = { dataset: "d", started: true, restartedStale: false, pages: 1, keysReceived: 10,
-    keysSeen: 10, stoppedBy: "completed" as const, error: null };
+    keysSeen: 10, stoppedBy: "completed" as const, error: null, freshness: null };
   it("sana no pide atención; aborto, fallo y borrado >10 % sí", () => {
     expect(reconcileNeedsAttention({ ...base, outcome: "ok", stored: 100, deleted: 2 }).attention).toBe(false);
     expect(reconcileNeedsAttention({ ...base, outcome: "ok", stored: 100, deleted: 11 }).attention).toBe(true);
@@ -277,3 +277,87 @@ describe("reconcileNeedsAttention", () => {
     expect(reconcileNeedsAttention({ ...base, outcome: "failed", stored: null, deleted: 0 }).attention).toBe(true);
   });
 });
+
+describe("diagnóstico de frescura (Opción B, solo mide)", () => {
+  /** Base falsa con fechas de Bridge guardadas por clave, y la misma regla que el SQL. */
+  function conFrescura(guardadas: Record<string, string | null>, opts: { fallaEnLlamada?: number } = {}) {
+    const db = createFakeDb(Object.keys(guardadas));
+    let llamadas = 0;
+    const store: ReconcileStore = {
+      ...db.store,
+      async saveReconcileProgress(dataset, cursor, keysSeen, freshness) {
+        await db.store.saveReconcileProgress(dataset, cursor, keysSeen);
+        const e = db.estadoActual();
+        if (e) (e as ReconcileState).freshness = freshness ?? null;
+      },
+      async readReconcileState(dataset) {
+        const e = await db.store.readReconcileState(dataset);
+        return e;
+      },
+      async compareFreshness(records, recentAfter) {
+        llamadas += 1;
+        if (opts.fallaEnLlamada === llamadas) throw new Error("rpc caída");
+        const f = { missing: 0, stale: 0, recent: 0, current: 0, unknown: 0 };
+        for (const r of records) {
+          if (!(r.key in guardadas)) { f.missing += 1; continue; }
+          const g = guardadas[r.key];
+          if (!g || !r.bridgeTs) { f.unknown += 1; continue; }
+          if (g >= r.bridgeTs) f.current += 1;
+          else if (r.bridgeTs < recentAfter) f.stale += 1;
+          else f.recent += 1;
+        }
+        return f;
+      },
+    };
+    return { ...db, store };
+  }
+  const T = (iso: string) => iso;
+
+  it("cuenta faltantes, desactualizadas, recientes, al día y sin dato, sin tocar nada", async () => {
+    const db = conFrescura({ a: T("2026-09-20T00:00:00Z"), b: T("2026-09-01T00:00:00Z"), c: T("2026-09-25T00:00:00Z"), d: null });
+    const feed = [
+      ficha("a", { BridgeModificationTimestamp: "2026-09-20T00:00:00Z" }),            // al día
+      ficha("b", { BridgeModificationTimestamp: "2026-09-10T00:00:00Z" }),            // vieja
+      ficha("c", { BridgeModificationTimestamp: new Date(reloj.t - 30 * 60_000).toISOString() }), // reciente (<2 h)
+      ficha("d", { BridgeModificationTimestamp: "2026-09-10T00:00:00Z" }),            // sin dato guardado
+      ficha("nueva", { BridgeModificationTimestamp: "2026-09-10T00:00:00Z" }),        // falta
+    ];
+    const r = await correr(feed, db.store);
+    expect(r.outcome).toBe("ok");
+    expect(r.freshness).toEqual({ missing: 1, stale: 1, recent: 1, current: 1, unknown: 1 });
+    expect(db.finales[0].freshness).toEqual(r.freshness);
+    // Solo mide: no borra nada que esté en la lista y no agrega la que falta.
+    expect(r.deleted).toBe(0);
+    expect(db.filas.has("nueva")).toBe(false);
+    expect(FRESHNESS_RECENT_MS).toBe(2 * 60 * 60 * 1000);
+  });
+
+  it("acumula entre invocaciones sin contar dos veces", async () => {
+    const guardadas = Object.fromEntries(claves(12).map((k) => [k, "2026-09-20T00:00:00Z"]));
+    const db = conFrescura(guardadas);
+    const feed = claves(12).map((k) => ficha(k, { BridgeModificationTimestamp: "2026-09-20T00:00:00Z" }));
+    await correr(feed, db.store, { maxPages: 1 });
+    const r = await correr(feed, db.store);
+    expect(r.outcome).toBe("ok");
+    expect(r.freshness).toEqual({ missing: 0, stale: 0, recent: 0, current: 12, unknown: 0 });
+  });
+
+  it("si la función falla, la reconciliación sigue y el diagnóstico queda no disponible", async () => {
+    const db = conFrescura(Object.fromEntries(claves(12).map((k) => [k, "2026-09-20T00:00:00Z"])), { fallaEnLlamada: 2 });
+    const errores = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await correr(claves(12).map((k) => ficha(k)), db.store);
+    expect(r.outcome).toBe("ok");
+    expect(r.deleted).toBe(0);
+    expect(r.freshness).toBeNull();
+    expect(errores.mock.calls.some((c) => String(c[0]).includes("mls_freshness_unavailable"))).toBe(true);
+    errores.mockRestore();
+  });
+
+  it("un store sin diagnóstico (versión anterior) funciona igual", async () => {
+    const db = createFakeDb(claves(3));
+    const r = await correr(claves(3).map((k) => ficha(k)), db.store);
+    expect(r.outcome).toBe("ok");
+    expect(r.freshness).toBeNull();
+  });
+});
+

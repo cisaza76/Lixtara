@@ -213,9 +213,9 @@ describe("consulta de bajas del incremental", () => {
 describe("consulta de la reconciliación", () => {
   const url = () => new URL(buildDisplayableKeysUrl("mia", BRIDGE_REPLICATION_MAX_TOP));
 
-  it("pide claves + los campos que lee el filtro de cobertura, nada más", () => {
+  it("pide claves + los campos que lee el filtro de cobertura + la fecha de Bridge, nada más", () => {
     expect(url().searchParams.get("$select"))
-      .toBe("ListingKey,StandardStatus,PropertyType,CountyOrParish,StateOrProvince");
+      .toBe("ListingKey,StandardStatus,PropertyType,CountyOrParish,StateOrProvince,BridgeModificationTimestamp");
     expect(url().searchParams.get("$top")).toBe("2000");
   });
 

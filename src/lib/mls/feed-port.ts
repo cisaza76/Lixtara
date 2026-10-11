@@ -64,6 +64,8 @@ export interface ResoKeyRecord {
   PropertyType?: string | null;
   CountyOrParish?: string | null;
   StateOrProvince?: string | null;
+  /** Solo en la reconciliación: para el diagnóstico de frescura. */
+  BridgeModificationTimestamp?: string | null;
   [key: string]: unknown;
 }
 
