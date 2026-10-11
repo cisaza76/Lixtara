@@ -19,7 +19,7 @@ import {
   type MlsPublicRow,
   type OwnListingRef,
 } from "@/lib/mls/public-listings";
-import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { PUBLIC_DISPLAY_STATUSES } from "@/lib/mls/display-compliance";
 import { PAGE_SIZE, parsePropertySearch, type PropertySearch } from "@/lib/property-search";
 
 const COLUMNAS =
@@ -78,7 +78,7 @@ export async function getPublicMlsListings(
       .from("mls_listings")
       .select(COLUMNAS, { count: "exact" })
       .is("withdrawn_at", null)
-      .in("mls_status", [...PUBLICLY_DISPLAYABLE_STATUSES]);
+      .in("mls_status", [...PUBLIC_DISPLAY_STATUSES]);
     if (search.minPrice !== null) q = q.gte("list_price", search.minPrice);
     if (search.maxPrice !== null) q = q.lte("list_price", search.maxPrice);
     if (search.beds !== null) q = q.gte("bedrooms", search.beds);

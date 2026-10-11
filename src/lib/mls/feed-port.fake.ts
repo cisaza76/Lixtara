@@ -13,7 +13,7 @@ import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
 import type {
   MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
 } from "@/lib/mls/feed-port";
-import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { INGESTED_STATUSES } from "@/lib/mls/display-compliance";
 import { SUPPORTED_PROPERTY_TYPES } from "@/lib/mls/coverage";
 
 export interface FakeFeedOptions {
@@ -26,7 +26,7 @@ export interface FakeFeedOptions {
 
 /** El `$filter` positivo de estado + tipo que manda el adaptador real. */
 export function passesIngestFilter(l: { StandardStatus?: unknown; PropertyType?: unknown }): boolean {
-  return (PUBLICLY_DISPLAYABLE_STATUSES as readonly unknown[]).includes(l.StandardStatus) &&
+  return (INGESTED_STATUSES as readonly unknown[]).includes(l.StandardStatus) &&
     (SUPPORTED_PROPERTY_TYPES as readonly unknown[]).includes(l.PropertyType);
 }
 

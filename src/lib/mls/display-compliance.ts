@@ -114,19 +114,27 @@ export type DisplayBlockReason =
   | "not_displayable"; // estado que no corresponde a exhibición pública IDX
 
 /**
- * Estados de RESO que se exhiben públicamente bajo IDX.
+ * Estados que la SINCRONIZACIÓN trae y mantiene al día (y que la reconciliación considera
+ * vivos). Es el universo IDX que MIAMI describió por escrito (Benjamin Costa, 2026-09-09):
+ * active, active with contract, pending, coming soon.
  *
- * `Closed` NO está: MIAMI confirmó por escrito que los vendidos del feed pueden mostrarse,
- * pero eso es para el análisis de comparables del vendedor, no para el buscador público de
- * inventario — mezclar casas vendidas entre las disponibles es engañoso para el comprador
- * con independencia de lo que permita el contrato.
+ * `Closed` NO está: los vendidos del feed sirven para comparables del vendedor, no para el
+ * buscador público de inventario: mezclarlos con las disponibles engañaría al comprador.
  */
-export const PUBLICLY_DISPLAYABLE_STATUSES = [
+export const INGESTED_STATUSES = [
   "Active",
   "Active Under Contract",
   "Pending",
   "Coming Soon",
 ] as const;
+
+/**
+ * Estados que se MUESTRAN al público. Hoy solo `Active` (decisión del owner, 2026-10-11):
+ * el texto firmado (§II.E.1) dice que el IDX es "only active listing information", y los
+ * demás estados se publicarán solo cuando MIAMI lo confirme por escrito. Ampliar esta
+ * lista exige esa confirmación; display-compliance.test.ts lo fija.
+ */
+export const PUBLIC_DISPLAY_STATUSES = ["Active"] as const;
 
 export interface DisplayEligibilityInput {
   mlsStatus: string;
@@ -137,7 +145,7 @@ export function displayEligibility(
   input: DisplayEligibilityInput,
 ): { displayable: boolean; reason?: DisplayBlockReason } {
   if (input.withdrawnAt !== null) return { displayable: false, reason: "withdrawn" };
-  if (!(PUBLICLY_DISPLAYABLE_STATUSES as readonly string[]).includes(input.mlsStatus)) {
+  if (!(PUBLIC_DISPLAY_STATUSES as readonly string[]).includes(input.mlsStatus)) {
     return { displayable: false, reason: "not_displayable" };
   }
   return { displayable: true };

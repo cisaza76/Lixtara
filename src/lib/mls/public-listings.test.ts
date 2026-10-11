@@ -87,10 +87,12 @@ describe("elegibilidad de exhibición", () => {
     }
   });
 
-  it("deja pasar los estados públicos de IDX", () => {
-    for (const s of ["Active", "Active Under Contract", "Pending", "Coming Soon"]) {
+  it("deja pasar solo Active (los demás estados esperan la confirmación escrita de MIAMI)", () => {
+    expect(mergePublicListings([], [fila({ listing_id: "A1", mls_status: "Active" })], "en").mlsListings)
+      .toHaveLength(1);
+    for (const s of ["Active Under Contract", "Pending", "Coming Soon"]) {
       expect(mergePublicListings([], [fila({ listing_id: "A1", mls_status: s })], "en").mlsListings, s)
-        .toHaveLength(1);
+        .toHaveLength(0);
     }
   });
 
@@ -190,3 +192,14 @@ describe("foto principal (hot-link)", () => {
       .toBeNull();
   });
 });
+
+describe("solo Active al público (segunda defensa, en el servidor)", () => {
+  it("aunque la consulta devolviera otro estado, la fusión lo descarta", () => {
+    const filas = ["Active", "Active Under Contract", "Pending", "Coming Soon", "Closed"].map((st, i) =>
+      fila({ listing_id: `X${i}`, mls_status: st }));
+    const { mlsListings, suppressed } = mergePublicListings([], filas, "en");
+    expect(mlsListings.map((l) => l.listingId)).toEqual(["X0"]);
+    expect(suppressed.map((x) => x.reason)).toEqual(Array(4).fill("not_displayable"));
+  });
+});
+

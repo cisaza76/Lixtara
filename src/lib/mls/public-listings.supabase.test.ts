@@ -107,6 +107,8 @@ describe("filtros y paginación del lector público", () => {
       ["eq", ["county_key", "broward"]],
       ["eq", ["postal_code", "33301"]],
       ["order", ["list_price", { ascending: true, nullsFirst: false }]],
+      // Solo Active, filtrado en la BASE (antes de que nada llegue al navegador).
+      ["in", ["mls_status", ["Active"]]],
       ["range", [48, 71]],
     ]));
     expect(JSON.stringify(llamadas.filter(([m]) => m !== "select"))).not.toContain("payload");
