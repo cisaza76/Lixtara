@@ -1284,6 +1284,11 @@ export const dictionaries = {
       learnMore: "Cookie Policy",
       accept: "Got it",
       regionLabel: "Cookie notice",
+      consentMessage:
+        "We use essential cookies to run the site. With your permission, we also use analytics cookies (Google Analytics and PostHog) to understand how the site is used. No advertising cookies.",
+      consentAccept: "Accept analytics",
+      consentReject: "Reject",
+      settings: "Cookie settings",
     },
     quiz: {
       eyebrow: "Find your plan",
@@ -2951,6 +2956,11 @@ export const dictionaries = {
       learnMore: "Política de Cookies",
       accept: "Entendido",
       regionLabel: "Aviso de cookies",
+      consentMessage:
+        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica (Google Analytics y PostHog) para entender cómo se usa el sitio. Sin cookies de publicidad.",
+      consentAccept: "Aceptar analítica",
+      consentReject: "Rechazar",
+      settings: "Configurar cookies",
     },
     quiz: {
       eyebrow: "Encuentra tu plan",

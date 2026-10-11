@@ -174,6 +174,11 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   (`src/lib/email.ts#emailFrom`). Unset `EMAIL_FROM` = Resend's test sender
   `onboarding@resend.dev`, which only delivers to the Resend account owner.
   `EMAIL_DEV_OVERRIDE_TO` reroutes all mail to one address (debug only, never Production).
+- `NEXT_PUBLIC_GTM_ID` / `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` — public, Production
+  only. GA4 via Google Tag Manager (marketing) and PostHog (product). Unset = nothing loads and the
+  informational cookie notice stays. Set = consent banner; nothing loads before "Accept"; PostHog
+  without autocapture or session replay; URLs without query strings; the cookie policy switches to
+  its analytics variant. Event catalog and setup: `docs/superpowers/runbooks/2026-10-11-analitica.md`.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 
@@ -245,7 +250,8 @@ copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit
 
 **Not yet done — go-live debt:** test coverage is unit-only (Vitest covers pure logic —
 pricing, status maps, i18n parity, webhook dedup, buyer leads; **webhooks, RLS, and route
-handlers have no integration tests**); error/product analytics (Sentry/PostHog); the full
+handlers have no integration tests**); error analytics (Sentry) beyond the video pipeline;
+product analytics is built but OFF until the GTM/PostHog env vars are set; the full
 5-checkout Stripe set (`tier` + `consultation` are wired); referrals; MLS sync; and the FL DBPR / NAR
 compliance review.
 

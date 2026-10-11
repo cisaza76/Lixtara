@@ -11,6 +11,7 @@ import {
   type AgreementRef,
 } from "@/lib/agreement-refresh";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
+import { captureServerEvent } from "@/lib/analytics.server";
 import {
   ensureEnterMlsNumberTask,
   mapMlsNumberWriteError,
@@ -125,6 +126,10 @@ async function transition(
     action_type: actionType,
     description: note ?? `Listing → ${newStatus}`,
   });
+
+  if (newStatus === "active") {
+    await captureServerEvent({ event: "listing_published", distinctId: `property:${id}`, props: {} });
+  }
 
   redirect(`/${lang}/admin/listings/${id}/review?done=${actionType}`);
 }

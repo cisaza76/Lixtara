@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import type { t } from "@/lib/i18n";
+import { track } from "@/lib/analytics";
 
 type Widen<T> = { [K in keyof T]: T[K] extends string ? string : Widen<T[K]> };
 /** Los textos del diccionario, ya con {brokerFirstName} resuelto por el servidor. */
@@ -59,6 +60,12 @@ export function ShowingRequestForm({
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; exclusive?: boolean; error?: string };
       if (res.ok && data.ok) {
+        track({
+          event: "showing_request_submitted",
+          lang,
+          target: "listingKey" in target ? "mls" : "own",
+          exclusive: !!data.exclusive,
+        });
         setDone(data.exclusive ? "exclusive" : "received");
         return;
       }
@@ -92,7 +99,10 @@ export function ShowingRequestForm({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          track({ event: "showing_request_started", lang, target: "listingKey" in target ? "mls" : "own" });
+          setOpen(true);
+        }}
         className="w-full px-6 py-4 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
       >
         {labels.button}

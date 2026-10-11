@@ -19,6 +19,7 @@ import { LivingListingShowcase } from "@/components/living-listing-showcase";
 import { OfferForm } from "@/components/offer-form";
 import { SaveButton } from "@/components/save-button";
 import { ShowingRequestForm } from "@/components/showing-request-form";
+import { TrackOnMount } from "@/components/analytics-events";
 import { canUseShowingRequests } from "@/lib/buyer-leads.server";
 import { fillBrokerageCopy } from "@/config/brokerage";
 
@@ -462,6 +463,7 @@ export default async function PropertyDetailPage({
               </div>
             </div>
 
+            <TrackOnMount event={{ event: "property_open", lang, source: "own" }} />
             {showingRequests.allowed && (
               <ShowingRequestForm
                 target={{ propertyId: property.id }}

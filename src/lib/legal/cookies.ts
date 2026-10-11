@@ -328,3 +328,90 @@ export const cookiesDoc: LegalContent = {
     ],
   },
 };
+
+// ── Variante con analítica (2026-10-11) ─────────────────────────────────────────────
+// La política tiene que ser cierta en los dos estados del sitio. Sin analítica configurada
+// (sin NEXT_PUBLIC_GTM_ID ni NEXT_PUBLIC_POSTHOG_KEY) se muestra el texto de arriba tal
+// cual. Con analítica, estos párrafos se reemplazan por la descripción real: GA4 vía GTM y
+// PostHog, SOLO con consentimiento, sin publicidad. BORRADOR pendiente de revisión legal.
+
+const ANALYTICS_REPLACEMENTS: Record<"en" | "es", Array<[string, string]>> = {
+  en: [
+    [
+      "Any future use of non-essential cookies will be subject to the consent process described in this policy.",
+      "Non-essential analytics cookies are used only if you accept them through the consent banner described in this policy.",
+    ],
+    [
+      "We do not currently use cookies for advertising, and we do not currently run product or marketing analytics that rely on cookies.",
+      "We do not use cookies for advertising. With your consent, we use analytics cookies to understand how the site is used, as described in Section 3.4.",
+    ],
+    [
+      "We do not currently use analytics or performance cookies. If, in the future, we add privacy-respecting product or marketing analytics, this policy will be updated and, where required by applicable law, we will obtain your consent before such non-essential cookies are set.",
+      "Only if you accept analytics in the consent banner, we use Google Analytics 4 (loaded through Google Tag Manager) to measure traffic sources and campaigns, and PostHog to understand how visitors use our search and listing flows. We configure them to collect page addresses without query parameters, do not record sessions, do not capture the text you type, and do not use them for advertising. If you reject analytics, these tools are not loaded.",
+    ],
+    ["Not currently in use.", "Google Analytics 4 / Google Tag Manager (cookies such as _ga), only with your consent."],
+    [
+      "Any future use will be disclosed here and, where required, consent-based.",
+      "PostHog (cookies and local storage such as ph_*), only with your consent. You can change your choice at any time through \"Cookie settings\" in the site footer.",
+    ],
+    [
+      "When you first visit Lixtara, we show a lightweight cookie notice that informs you about our use of cookies and points you to this policy.",
+      "When you first visit Lixtara, we show a cookie banner that lets you accept or reject analytics cookies, with both options equally available, and points you to this policy.",
+    ],
+    [
+      "If we introduce non-essential cookies in the future (for example, analytics), we will request your consent where required by applicable privacy and ePrivacy laws before those cookies are set, and you will be able to make a choice through the cookie notice.",
+      "Analytics cookies are set only after you accept them. If you reject them, or later withdraw your consent through \"Cookie settings\", the analytics tools are not loaded and their cookies are deleted from your browser.",
+    ],
+  ],
+  es: [
+    [
+      "Cualquier uso futuro de cookies no esenciales estará sujeto al proceso de consentimiento descrito en esta política.",
+      "Las cookies de analítica, que no son esenciales, solo se usan si usted las acepta en el banner de consentimiento descrito en esta política.",
+    ],
+    [
+      "Actualmente no utilizamos cookies con fines publicitarios y no ejecutamos análisis de producto ni de marketing que dependan de cookies.",
+      "No utilizamos cookies con fines publicitarios. Con su consentimiento, usamos cookies de analítica para entender cómo se usa el sitio, según se describe en la Sección 3.4.",
+    ],
+    [
+      "Actualmente no utilizamos cookies de análisis ni de rendimiento. Si, en el futuro, incorporamos análisis de producto o de marketing que respeten la privacidad, esta política se actualizará y, cuando lo exija la ley aplicable, obtendremos su consentimiento antes de que se establezcan dichas cookies no esenciales.",
+      "Solo si usted acepta la analítica en el banner de consentimiento, usamos Google Analytics 4 (cargado a través de Google Tag Manager) para medir fuentes de tráfico y campañas, y PostHog para entender cómo los visitantes usan nuestra búsqueda y nuestros flujos de publicación. Los configuramos para recopilar direcciones de página sin parámetros, sin grabar sesiones, sin capturar el texto que usted escribe y sin usarlos para publicidad. Si rechaza la analítica, estas herramientas no se cargan.",
+    ],
+    ["No se utilizan actualmente.", "Google Analytics 4 / Google Tag Manager (cookies como _ga), solo con su consentimiento."],
+    [
+      "Cualquier uso futuro se divulgará aquí y, cuando se requiera, se basará en el consentimiento.",
+      "PostHog (cookies y almacenamiento local como ph_*), solo con su consentimiento. Puede cambiar su elección en cualquier momento en \"Configurar cookies\", en el pie del sitio.",
+    ],
+    [
+      "Cuando visita Lixtara por primera vez, le mostramos un aviso de cookies ligero que le informa sobre nuestro uso de cookies y le remite a esta política.",
+      "Cuando visita Lixtara por primera vez, le mostramos un banner de cookies que le permite aceptar o rechazar las cookies de analítica, con ambas opciones igual de accesibles, y le remite a esta política.",
+    ],
+    [
+      "Si en el futuro incorporamos cookies no esenciales (por ejemplo, de análisis), solicitaremos su consentimiento cuando lo exijan las leyes aplicables de privacidad y de privacidad en las comunicaciones electrónicas (ePrivacy) antes de establecer dichas cookies, y podrá realizar su elección a través del aviso de cookies.",
+      "Las cookies de analítica solo se establecen después de que usted las acepta. Si las rechaza, o retira su consentimiento más tarde en \"Configurar cookies\", las herramientas de analítica no se cargan y sus cookies se borran de su navegador.",
+    ],
+  ],
+};
+
+function replaceDeep<T>(value: T, pairs: Array<[string, string]>): T {
+  if (typeof value === "string") {
+    // Por fragmento: algunas frases viven dentro de un párrafo más largo.
+    return pairs.reduce((acc, [from, to]) => acc.split(from).join(to), value as string) as T;
+  }
+  if (Array.isArray(value)) return value.map((v) => replaceDeep(v, pairs)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, replaceDeep(v, pairs)])) as T;
+  }
+  return value;
+}
+
+/** La política que corresponde al estado real del sitio. */
+export function cookiesDocFor(lang: "en" | "es", analyticsEnabled: boolean) {
+  const doc = cookiesDoc[lang];
+  return analyticsEnabled ? replaceDeep(doc, ANALYTICS_REPLACEMENTS[lang]) : doc;
+}
+
+/** Para las pruebas: los textos que la variante con analítica debe encontrar. */
+export const ANALYTICS_REPLACEMENT_SOURCES = {
+  en: ANALYTICS_REPLACEMENTS.en.map(([from]) => from),
+  es: ANALYTICS_REPLACEMENTS.es.map(([from]) => from),
+};
