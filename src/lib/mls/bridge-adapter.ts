@@ -9,7 +9,7 @@
 // El diseño acota el daño de equivocarse: si la forma difiere, cambia ESTE archivo y nada
 // más — el puerto, el normalizador, el filtro de cobertura y el worker no se enteran.
 import { requireMlsServerToken } from "@/lib/mls/environment-gate";
-import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
+import { markAsMlsLicensed, type MlsLicensed } from "@/lib/mls/licensed-content";
 import type {
   MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
 } from "@/lib/mls/feed-port";
@@ -166,6 +166,20 @@ export function createBridgeProvider(opts: BridgeAdapterOptions): MlsFeedProvide
       return toKeyPage(await fetchPage(
         cursor ?? buildDisplayableKeysUrl(opts.dataset, BRIDGE_REPLICATION_MAX_TOP)));
     },
+
+    async fetchListingsByKeys(listingKeys: string[]): Promise<MlsLicensed<ResoListing>[]> {
+      const out: MlsLicensed<ResoListing>[] = [];
+      for (let i = 0; i < listingKeys.length; i += REFETCH_KEYS_PER_REQUEST) {
+        const tanda = listingKeys.slice(i, i + REFETCH_KEYS_PER_REQUEST);
+        const p = await fetchPage(buildListingsByKeysUrl(opts.dataset, tanda));
+        for (const l of p.value) {
+          if (typeof l === "object" && l !== null && typeof (l as ResoListing).ListingKey === "string") {
+            out.push(markAsMlsLicensed(l as ResoListing));
+          }
+        }
+      }
+      return out;
+    },
   };
 }
 
@@ -240,6 +254,29 @@ export function buildDisplayableKeysUrl(dataset: string, pageSize: number): stri
   url.searchParams.set(
     "$filter",
     [ingestableStatusFilter(), ingestablePropertyTypeFilter()].join(" and "),
+  );
+  return url.toString();
+}
+
+/** Claves por consulta al volver a descargar fichas desactualizadas (la URL queda en ~3 KB). */
+export const REFETCH_KEYS_PER_REQUEST = 50;
+
+/**
+ * Fichas COMPLETAS por clave, para recuperar las que la reconciliación detectó
+ * desactualizadas. Mismos filtros de estado y tipo que la ingesta: una ficha que ya no es
+ * ingerible no vuelve (y la consulta de bajas o el barrido la sacan).
+ *
+ * `in (…)` — VERIFICADO contra Bridge (2026-09-26, dataset `test`): responde 200 y filtra
+ * (ver buildRemovedKeysUrl). Las comillas simples de una clave se duplican, como pide
+ * OData; las claves de MIAMI son hexadecimales, así que en la práctica no aparecen.
+ */
+export function buildListingsByKeysUrl(dataset: string, listingKeys: string[]): string {
+  const url = new URL(`${BRIDGE_API_BASE}/${dataset}/Property/replication`);
+  url.searchParams.set("$top", String(Math.max(1, listingKeys.length)));
+  const lista = listingKeys.map((k) => `'${k.replace(/'/g, "''")}'`).join(",");
+  url.searchParams.set(
+    "$filter",
+    [`ListingKey in (${lista})`, ingestableStatusFilter(), ingestablePropertyTypeFilter()].join(" and "),
   );
   return url.toString();
 }

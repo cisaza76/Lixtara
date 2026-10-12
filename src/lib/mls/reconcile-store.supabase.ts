@@ -3,6 +3,10 @@
 // solo las ejecuta `service_role`.
 import { createService } from "@/lib/supabase/service";
 import type { Freshness, ReconcileState, ReconcileStore } from "@/lib/mls/reconcile-run";
+import { createSupabaseSyncStore } from "@/lib/mls/sync-store.supabase";
+
+/** Claves por consulta al leer fechas guardadas: caben en la URL de PostgREST (~6 KB). */
+const STORED_TS_CHUNK = 150;
 
 /** Lee un diagnóstico guardado como jsonb; cualquier forma inesperada = no disponible. */
 function parseFreshness(v: unknown): Freshness | null {
@@ -11,7 +15,8 @@ function parseFreshness(v: unknown): Freshness | null {
   const keys = ["missing", "stale", "recent", "current", "unknown"] as const;
   if (!keys.every((k) => typeof o[k] === "number")) return null;
   return { missing: o.missing as number, stale: o.stale as number, recent: o.recent as number,
-    current: o.current as number, unknown: o.unknown as number };
+    current: o.current as number, unknown: o.unknown as number,
+    ...(typeof o.refetched === "number" ? { refetched: o.refetched } : {}) };
 }
 
 export function createSupabaseReconcileStore(): ReconcileStore {
@@ -78,6 +83,24 @@ export function createSupabaseReconcileStore(): ReconcileStore {
       // Lanza: perder el progreso reempezaría la lista; y cursor y conteo van juntos.
       if (error) throw new Error(`no se pudo guardar el progreso de la reconciliación: ${error.message}`);
     },
+
+    async storedBridgeTimestamps(listingKeys): Promise<Map<string, string | null>> {
+      const out = new Map<string, string | null>();
+      for (let i = 0; i < listingKeys.length; i += STORED_TS_CHUNK) {
+        const { data, error } = await db
+          .from("mls_listings")
+          .select("listing_key, bridge_ts:payload->>BridgeModificationTimestamp")
+          .in("listing_key", listingKeys.slice(i, i + STORED_TS_CHUNK));
+        if (error) throw new Error(`no se pudieron leer fechas guardadas: ${error.message}`);
+        for (const r of (data ?? []) as Array<{ listing_key: string; bridge_ts: string | null }>) {
+          out.set(r.listing_key, r.bridge_ts ?? null);
+        }
+      }
+      return out;
+    },
+
+    // El MISMO upsert del sync: misma forma de fila, mismas tandas, mismo last_seen_at.
+    upsertListings: (rows) => createSupabaseSyncStore().upsertListings(rows),
 
     async countListings(): Promise<number> {
       const { count, error } = await db

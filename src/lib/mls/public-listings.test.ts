@@ -87,6 +87,16 @@ describe("elegibilidad de exhibición", () => {
     }
   });
 
+  it("suprime la ficha sin oficina: sin atribución no se exhibe", () => {
+    for (const office of [null, "", "   "]) {
+      const r = mergePublicListings([], [fila({ listing_id: "A1", list_office_name: office })], "en");
+      expect(r.mlsListings, String(office)).toHaveLength(0);
+      expect(r.suppressed[0].reason).toBe("missing_attribution");
+    }
+    expect(mergePublicListings([], [fila({ listing_id: "A1" })], "en").mlsListings[0].attribution.courtesyLine)
+      .toContain("Acme Realty");
+  });
+
   it("deja pasar solo Active (los demás estados esperan la confirmación escrita de MIAMI)", () => {
     expect(mergePublicListings([], [fila({ listing_id: "A1", mls_status: "Active" })], "en").mlsListings)
       .toHaveLength(1);
@@ -122,11 +132,6 @@ describe("atribución obligatoria (Schedule A §9)", () => {
   it("atribuye en español cuando el locale es es", () => {
     const r = mergePublicListings([], [fila({ listing_id: "A1" })], "es");
     expect(r.mlsListings[0].attribution.courtesyLine).toContain("Este listado es cortesía de");
-  });
-
-  it("sin nombre de oficina sigue atribuyendo: omitirla ES el incumplimiento", () => {
-    const r = mergePublicListings([], [fila({ listing_id: "A1", list_office_name: null })], "en");
-    expect(r.mlsListings[0].attribution.courtesyLine).toContain("another real estate firm");
   });
 
   it("incluye los campos extra que el feed traiga", () => {

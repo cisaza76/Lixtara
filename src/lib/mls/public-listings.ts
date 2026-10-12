@@ -104,7 +104,7 @@ function photoAlt(city: string | null, lang: Locale): string {
   return city ? `Home for sale in ${city}` : "Home for sale";
 }
 
-export type DedupeReason = "own_listing" | "not_displayable" | "withdrawn";
+export type DedupeReason = "own_listing" | "not_displayable" | "withdrawn" | "missing_attribution";
 
 export interface MergeResult {
   /** Fichas de terceros que sí se muestran, ya con su atribución. */
@@ -154,6 +154,13 @@ export function mergePublicListings(
         listingId: row.listing_id,
         reason: elegible.reason === "withdrawn" ? "withdrawn" : "not_displayable",
       });
+      continue;
+    }
+
+    // Sin el nombre de la oficina no se puede atribuir la ficha a su brokerage (Schedule A):
+    // no se exhibe con un "otra firma" genérico.
+    if (!row.list_office_name?.trim()) {
+      suppressed.push({ listingId: row.listing_id, reason: "missing_attribution" });
       continue;
     }
 

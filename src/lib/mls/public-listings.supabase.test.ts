@@ -19,7 +19,7 @@ const createService = vi.fn(() => {
   const anota = (m: string) => (...args: unknown[]) => { llamadas.push([m, args]); return q; };
   const q: Record<string, unknown> = {
     select: anota("select"), is: anota("is"), in: anota("in"), order: anota("order"),
-    gte: anota("gte"), lte: anota("lte"), eq: anota("eq"),
+    gte: anota("gte"), lte: anota("lte"), eq: anota("eq"), not: anota("not"), neq: anota("neq"),
     range: async (...args: unknown[]) => {
       llamadas.push(["range", args]);
       return { data: filas, error: null, count: 137 };
@@ -74,6 +74,13 @@ describe("lector público del MLS según los interruptores", () => {
     const r = await getPublicMlsListings([], "en");
     expect(r.enabled).toBe(true);
     expect(r.listings.map((l) => l.listingKey)).toEqual(["K1"]);
+  });
+
+  it("la consulta excluye las fichas sin oficina (sin atribución no se exhibe)", async () => {
+    process.env.MLS_DISPLAY_ENABLED = "true";
+    await getPublicMlsListings([], "en");
+    expect(llamadas).toContainEqual(["not", ["list_office_name", "is", null]]);
+    expect(llamadas).toContainEqual(["neq", ["list_office_name", ""]]);
   });
 
   it("display encendida en el alias de Vercel → vacío", async () => {
