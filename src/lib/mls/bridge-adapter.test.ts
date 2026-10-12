@@ -4,6 +4,7 @@ import {
   BRIDGE_API_BASE, BRIDGE_REPLICATION_PAGE_SIZE, SYNC_CURSOR_POLICY, ingestableStatusFilter,
   ingestablePropertyTypeFilter, buildRemovedKeysUrl, buildDisplayableKeysUrl,
   nonDisplayableStatusFilter, nonIngestablePropertyTypeFilter, BRIDGE_REPLICATION_MAX_TOP,
+  buildListingsByKeysUrl, REFETCH_KEYS_PER_REQUEST,
 } from "./bridge-adapter";
 import { INGESTED_STATUSES } from "./display-compliance";
 import { makeResoListing } from "./feed-port.fake";
@@ -231,6 +232,42 @@ describe("consulta de la reconciliación", () => {
     const p = createBridgeProvider({ dataset: "mia", fetchImpl: fetchImpl as never });
     await expect(p.fetchDisplayableKeys(null)).rejects.toThrow();
     await expect(p.fetchRemovedKeysSince(new Date(), null)).rejects.toThrow();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("descarga por clave (recuperación de desactualizadas)", () => {
+  it("filtra por las claves Y por los mismos estado y tipo que la ingesta; sin $select (ficha completa)", () => {
+    const u = new URL(buildListingsByKeysUrl("mia", ["K1", "K2"]));
+    expect(u.pathname).toBe("/api/v2/OData/mia/Property/replication");
+    expect(u.searchParams.get("$filter")).toBe(
+      `ListingKey in ('K1','K2') and ${ingestableStatusFilter()} and ${ingestablePropertyTypeFilter()}`);
+    expect(u.searchParams.get("$top")).toBe("2");
+    expect(u.searchParams.get("$select")).toBeNull();
+    expect(u.searchParams.get("$orderby")).toBeNull();
+  });
+
+  it("escapa comillas simples como pide OData", () => {
+    expect(new URL(buildListingsByKeysUrl("mia", ["a'b"])).searchParams.get("$filter"))
+      .toContain("ListingKey in ('a''b')");
+  });
+
+  it("parte en tandas, devuelve solo registros con ListingKey y la URL cabe holgada", async () => {
+    const keys = Array.from({ length: REFETCH_KEYS_PER_REQUEST + 1 }, (_, i) => `${"f".repeat(32)}${i}`);
+    const fetchImpl = vi.fn(async () => respuesta({ value: [{ ListingKey: "K1" }, { nada: 1 }] }));
+    const p = createBridgeProvider({ dataset: "mia", fetchImpl: fetchImpl as never, ...conToken });
+    const out = await p.fetchListingsByKeys!(keys);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(out.map((l) => l.ListingKey)).toEqual(["K1", "K1"]);
+    const primera = (fetchImpl.mock.calls[0] as unknown as [string])[0];
+    expect(primera.length).toBeLessThan(8_000);
+  });
+
+  it("la credencial pasa por el gate", async () => {
+    const fetchImpl = vi.fn(async () => respuesta({ value: [] }));
+    const p = createBridgeProvider({ dataset: "mia", fetchImpl: fetchImpl as never });
+    await expect(p.fetchListingsByKeys!(["K1"])).rejects.toThrow();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

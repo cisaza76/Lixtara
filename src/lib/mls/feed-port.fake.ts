@@ -9,7 +9,7 @@
 //
 // `listings` se lee en cada llamada, así que un test puede mutar el arreglo entre
 // invocaciones para simular cambios de estado o borrados en el feed.
-import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
+import { markAsMlsLicensed, type MlsLicensed } from "@/lib/mls/licensed-content";
 import type {
   MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
 } from "@/lib/mls/feed-port";
@@ -92,6 +92,15 @@ export function createFakeFeedProvider(
         keys: pagina.map((l) => markAsMlsLicensed(proyectar(l, [...DISPLAYABLE_KEYS_SELECT]))),
         nextCursor,
       };
+    },
+
+    async fetchListingsByKeys(listingKeys: string[]): Promise<MlsLicensed<ResoListing>[]> {
+      calls += 1;
+      if (opts.failOnCall === calls) throw new Error("fallo inyectado del proveedor");
+      // Mismo filtro de estado y tipo que el adaptador real.
+      return listings
+        .filter((l) => listingKeys.includes(l.ListingKey) && passesIngestFilter(l))
+        .map((l) => markAsMlsLicensed(l));
     },
   };
 }

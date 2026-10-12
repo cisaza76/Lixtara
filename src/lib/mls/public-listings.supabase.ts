@@ -78,7 +78,12 @@ export async function getPublicMlsListings(
       .from("mls_listings")
       .select(COLUMNAS, { count: "exact" })
       .is("withdrawn_at", null)
-      .in("mls_status", [...PUBLIC_DISPLAY_STATUSES]);
+      .in("mls_status", [...PUBLIC_DISPLAY_STATUSES])
+      // Sin oficina no hay atribución válida ("courtesy of <firma>", Schedule A): esa ficha
+      // no se exhibe. Va en la consulta para que el total y la paginación cuadren; el
+      // armado de tarjetas lo vuelve a comprobar (public-listings.ts).
+      .not("list_office_name", "is", null)
+      .neq("list_office_name", "");
     if (search.minPrice !== null) q = q.gte("list_price", search.minPrice);
     if (search.maxPrice !== null) q = q.lte("list_price", search.maxPrice);
     if (search.beds !== null) q = q.gte("bedrooms", search.beds);

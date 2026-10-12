@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  runMlsReconciliation, reconcileNeedsAttention, reconcileDue, FRESHNESS_RECENT_MS,
+  runMlsReconciliation, reconcileNeedsAttention, reconcileDue, selectStaleKeys, FRESHNESS_RECENT_MS,
+  REFETCH_MAX_PER_RUN,
   type ReconcileStore, type ReconcileState, type ReconcileFinish,
 } from "./reconcile-run";
 import { createFakeFeedProvider, makeResoListing } from "./feed-port.fake";
-import type { ResoListing } from "./feed-port";
+import type { NormalizedListing, ResoListing } from "./feed-port";
 
 // Base falsa con las dos marcas de tiempo de las que depende el barrido. El predicado de
 // `sweepUnconfirmed` replica EXACTAMENTE el de `mls_reconcile_sweep` en la migración
@@ -269,7 +270,7 @@ describe("calendario: una vez por día UTC (2026-10-11)", () => {
 
 describe("reconcileNeedsAttention", () => {
   const base = { dataset: "d", started: true, restartedStale: false, pages: 1, keysReceived: 10,
-    keysSeen: 10, stoppedBy: "completed" as const, error: null, freshness: null };
+    keysSeen: 10, stoppedBy: "completed" as const, error: null, freshness: null, refetched: 0 };
   it("sana no pide atención; aborto, fallo y borrado >10 % sí", () => {
     expect(reconcileNeedsAttention({ ...base, outcome: "ok", stored: 100, deleted: 2 }).attention).toBe(false);
     expect(reconcileNeedsAttention({ ...base, outcome: "ok", stored: 100, deleted: 11 }).attention).toBe(true);
@@ -361,3 +362,135 @@ describe("diagnóstico de frescura (Opción B, solo mide)", () => {
   });
 });
 
+
+
+describe("recuperación de fichas desactualizadas (arreglo 2026-10-12)", () => {
+  const VIEJA = "2026-09-01T00:00:00Z";
+  const NUEVA = "2026-09-10T00:00:00Z";
+
+  /** Base falsa con la fecha de Bridge guardada por clave + upsert que la actualiza. */
+  function conRecuperacion(guardadas: Record<string, string | null>, opts: { upsertFalla?: boolean } = {}) {
+    const db = createFakeDb(Object.keys(guardadas));
+    const fechas = new Map<string, string | null>(Object.entries(guardadas));
+    const upserts: NormalizedListing[][] = [];
+    const store: ReconcileStore = {
+      ...db.store,
+      async saveReconcileProgress(dataset, cursor, keysSeen, freshness) {
+        await db.store.saveReconcileProgress(dataset, cursor, keysSeen);
+        const e = db.estadoActual();
+        if (e) (e as ReconcileState).freshness = freshness ?? null;
+      },
+      async compareFreshness(records, recentAfter) {
+        const f = { missing: 0, stale: 0, recent: 0, current: 0, unknown: 0 };
+        for (const r of records) {
+          if (!fechas.has(r.key)) { f.missing += 1; continue; }
+          const g = fechas.get(r.key);
+          if (!g || !r.bridgeTs) { f.unknown += 1; continue; }
+          if (g >= r.bridgeTs) f.current += 1;
+          else if (r.bridgeTs < recentAfter) f.stale += 1;
+          else f.recent += 1;
+        }
+        return f;
+      },
+      async storedBridgeTimestamps(keys) {
+        return new Map(keys.filter((k) => fechas.has(k)).map((k) => [k, fechas.get(k) ?? null]));
+      },
+      async upsertListings(rows) {
+        if (opts.upsertFalla) throw new Error("upsert caído");
+        upserts.push(rows);
+        for (const r of rows) {
+          fechas.set(r.listing_key, String((r.payload as ResoListing).BridgeModificationTimestamp ?? null));
+        }
+        return rows.length;
+      },
+    };
+    return { ...db, store, upserts, fechas };
+  }
+
+  it("vuelve a descargar SOLO las desactualizadas y las guarda; las demás no se tocan", async () => {
+    const db = conRecuperacion({ a: NUEVA, b: VIEJA, c: VIEJA, d: null });
+    const feed = [
+      ficha("a", { BridgeModificationTimestamp: NUEVA }),                                       // al día
+      ficha("b", { BridgeModificationTimestamp: NUEVA, ListPrice: 450_000 }),                   // vieja → se recupera
+      ficha("c", { BridgeModificationTimestamp: new Date(reloj.t - 30 * 60_000).toISOString() }), // reciente: la toma el sync
+      ficha("d", { BridgeModificationTimestamp: NUEVA }),                                       // sin fecha guardada
+      ficha("nueva", { BridgeModificationTimestamp: NUEVA }),                                   // no guardada
+    ];
+    const r = await correr(feed, db.store);
+    expect(r.outcome).toBe("ok");
+    expect(r.refetched).toBe(1);
+    expect(db.upserts.flat().map((x) => x.listing_key)).toEqual(["b"]);
+    expect(db.upserts[0][0].list_price).toBe(450_000);
+    // El diagnóstico sigue contando lo que ENCONTRÓ, y registra lo que corrigió.
+    expect(r.freshness).toMatchObject({ stale: 1, refetched: 1 });
+    expect(db.finales[0].freshness).toMatchObject({ stale: 1, refetched: 1 });
+    // Una segunda reconciliación (otro día) ya no encuentra "b" desactualizada. ("c", que
+    // ayer era reciente, hoy ya tiene más de 2 h sin que el sync la tomara: esa sí se
+    // recupera ahora.)
+    reloj.t += 24 * 60 * 60 * 1000;
+    const r2 = await correr(feed, db.store);
+    expect(db.upserts.slice(1).flat().map((x) => x.listing_key)).toEqual(["c"]);
+    expect(r2.freshness).toMatchObject({ stale: 1, refetched: 1 });
+    reloj.t -= 24 * 60 * 60 * 1000;
+  });
+
+  it("una desactualizada que ya no es ingerible o salió de cobertura no se guarda", async () => {
+    const db = conRecuperacion({ b: VIEJA, e: VIEJA });
+    const feed = [
+      ficha("b", { BridgeModificationTimestamp: NUEVA, CountyOrParish: "Orange" }), // fuera de cobertura
+      ficha("e", { BridgeModificationTimestamp: NUEVA }),
+    ];
+    const r = await correr(feed, db.store);
+    expect(db.upserts.flat().map((x) => x.listing_key)).toEqual(["e"]);
+    expect(r.refetched).toBe(1);
+  });
+
+  it("si la recuperación falla, la reconciliación termina igual (y borra lo eliminado)", async () => {
+    const presentes = claves(8, "p");
+    const db = conRecuperacion(
+      { b: VIEJA, z: VIEJA, ...Object.fromEntries(presentes.map((k) => [k, NUEVA])) }, { upsertFalla: true });
+    const errores = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await correr([
+      ficha("b", { BridgeModificationTimestamp: NUEVA }),
+      ...presentes.map((k) => ficha(k, { BridgeModificationTimestamp: NUEVA })),
+    ], db.store);
+    expect(r.outcome).toBe("ok");
+    expect(r.deleted).toBe(1); // z ya no está en el feed
+    expect(r.refetched).toBe(0);
+    expect(errores.mock.calls.some((c) => String(c[0]).includes("mls_stale_refetch_failed"))).toBe(true);
+    errores.mockRestore();
+  });
+
+  it("sin los métodos de recuperación (store viejo) no intenta nada", async () => {
+    const db = conRecuperacion({ b: VIEJA });
+    const sinRecuperar: ReconcileStore = { ...db.store };
+    delete sinRecuperar.storedBridgeTimestamps;
+    delete sinRecuperar.upsertListings;
+    const r = await correr([ficha("b", { BridgeModificationTimestamp: NUEVA })], sinRecuperar);
+    expect(r.refetched).toBe(0);
+    expect(r.freshness?.refetched).toBeUndefined();
+  });
+
+  it("respeta el tope por invocación", async () => {
+    const n = REFETCH_MAX_PER_RUN + 3;
+    const ks = claves(n);
+    const db = conRecuperacion(Object.fromEntries(ks.map((k) => [k, VIEJA])));
+    const r = await correr(ks.map((k) => ficha(k, { BridgeModificationTimestamp: NUEVA })), db.store, {
+      provider: createFakeFeedProvider(ks.map((k) => ficha(k, { BridgeModificationTimestamp: NUEVA })), { pageSize: 2000 }),
+    });
+    expect(r.refetched).toBe(REFETCH_MAX_PER_RUN);
+  });
+
+  it("selectStaleKeys: misma regla que el SQL", () => {
+    const stored = new Map<string, string | null>([["a", VIEJA], ["b", NUEVA], ["c", null]]);
+    const recentAfter = "2026-09-20T00:00:00Z";
+    expect(selectStaleKeys([
+      { key: "a", bridgeTs: NUEVA },               // vieja → sí
+      { key: "b", bridgeTs: NUEVA },               // igual → no
+      { key: "c", bridgeTs: NUEVA },               // sin fecha guardada → no
+      { key: "x", bridgeTs: NUEVA },               // no guardada → no
+      { key: "a", bridgeTs: null },                // sin fecha de Bridge → no
+      { key: "a", bridgeTs: "2026-09-21T00:00:00Z" }, // reciente → no
+    ], stored, recentAfter)).toEqual(["a"]);
+  });
+});

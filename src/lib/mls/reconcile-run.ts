@@ -19,7 +19,8 @@
 //          paginaba.
 //
 // Se ejecuta con los mismos gates que la sincronización (es ingesta: llama a Bridge).
-import type { MlsFeedProvider } from "@/lib/mls/feed-port";
+import type { MlsFeedProvider, NormalizedListing } from "@/lib/mls/feed-port";
+import { MlsNormalizationError, normalizeListing } from "@/lib/mls/feed-port";
 import { partitionByCoverage } from "@/lib/mls/coverage";
 
 /** Fracción mínima de filas guardadas que la lista debe cubrir para permitir el borrado. */
@@ -60,6 +61,12 @@ export interface Freshness {
   recent: number;
   current: number;
   unknown: number;
+  /**
+   * Fichas desactualizadas que esta reconciliación VOLVIÓ A DESCARGAR y guardó (arreglo
+   * del 2026-10-12). `stale` cuenta lo que se encontró ANTES de corregir; esto, lo que se
+   * corrigió. Ausente = la recuperación no corrió.
+   */
+  refetched?: number;
 }
 
 export const EMPTY_FRESHNESS: Freshness = { missing: 0, stale: 0, recent: 0, current: 0, unknown: 0 };
@@ -69,9 +76,37 @@ export const FRESHNESS_RECENT_MS = 2 * 60 * 60 * 1000;
 
 function addFreshness(a: Freshness, b: Freshness): Freshness {
   return {
+    ...a,
     missing: a.missing + b.missing, stale: a.stale + b.stale, recent: a.recent + b.recent,
     current: a.current + b.current, unknown: a.unknown + b.unknown,
   };
+}
+
+/** Tope de fichas que una invocación vuelve a descargar: protege el presupuesto de tiempo. */
+export const REFETCH_MAX_PER_RUN = 500;
+
+/**
+ * Claves DESACTUALIZADAS: guardadas, con fecha de Bridge en los dos lados, la guardada más
+ * vieja que la actual, y el cambio con más de FRESHNESS_RECENT_MS (lo reciente lo toma el
+ * sync de cada hora). Misma regla que `stale` en mls_freshness_counts (migración
+ * 20261011170000).
+ */
+export function selectStaleKeys(
+  records: Array<{ key: string; bridgeTs: string | null }>,
+  stored: Map<string, string | null>,
+  recentAfter: string,
+): string[] {
+  const limite = Date.parse(recentAfter);
+  return records
+    .filter((r) => {
+      if (!stored.has(r.key) || !r.bridgeTs) return false;
+      const guardada = stored.get(r.key);
+      if (!guardada) return false;
+      const b = Date.parse(r.bridgeTs);
+      const g = Date.parse(guardada);
+      return Number.isFinite(b) && Number.isFinite(g) && g < b && b < limite;
+    })
+    .map((r) => r.key);
 }
 
 export interface ReconcileState {
@@ -117,6 +152,14 @@ export interface ReconcileStore {
   compareFreshness?(
     records: Array<{ key: string; bridgeTs: string | null }>, recentAfter: string,
   ): Promise<Freshness>;
+  /**
+   * Fecha de Bridge GUARDADA (payload.BridgeModificationTimestamp) de esas claves; las que
+   * no están guardadas no aparecen en el mapa. Opcional, junto con `upsertListings`: sin
+   * los dos, la reconciliación no recupera nada.
+   */
+  storedBridgeTimestamps?(listingKeys: string[]): Promise<Map<string, string | null>>;
+  /** Upsert por listing_key, el mismo del sync. */
+  upsertListings?(rows: NormalizedListing[]): Promise<number>;
   /** Filas guardadas en mls_listings. */
   countListings(): Promise<number>;
   /** Borra lo no confirmado con `last_seen_at < startedAt`; devuelve cuántas filas. */
@@ -156,6 +199,8 @@ export interface ReconcileSummary {
   error: string | null;
   /** Diagnóstico de frescura acumulado (toda la lista al cerrar); null = no disponible. */
   freshness: Freshness | null;
+  /** Fichas desactualizadas vueltas a descargar y guardadas EN ESTA invocación. */
+  refetched: number;
 }
 
 export async function runMlsReconciliation(deps: ReconcileDeps): Promise<ReconcileSummary> {
@@ -170,7 +215,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
   const resumen: ReconcileSummary = {
     dataset, outcome: "partial", started: false, restartedStale: false, pages: 0,
     keysReceived: 0, keysSeen: 0, stored: null, deleted: 0, stoppedBy: "completed", error: null,
-    freshness: null,
+    freshness: null, refetched: 0,
   };
 
   const estado = await store.readReconcileState(dataset);
@@ -201,6 +246,31 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
     : resumen.started ? { ...EMPTY_FRESHNESS } : estado?.freshness ?? null;
   const recentAfter = new Date(Date.parse(startedAt) - FRESHNESS_RECENT_MS).toISOString();
   let completa = false;
+  // Recuperación de desactualizadas: hace falta el diagnóstico (dice en qué páginas hay),
+  // la descarga por clave y el upsert. Si falla una vez, se apaga por esta invocación: la
+  // reconciliación (borrar lo eliminado) es lo que no puede caerse.
+  let recuperar = !!(provider.fetchListingsByKeys && store.storedBridgeTimestamps && store.upsertListings);
+
+  /** Vuelve a descargar y guarda las desactualizadas de una página. Devuelve cuántas guardó. */
+  async function refetchStale(
+    registros: Array<{ key: string; bridgeTs: string | null }>, max: number,
+  ): Promise<number> {
+    const guardadas = await store.storedBridgeTimestamps!(registros.map((r) => r.key));
+    const viejas = selectStaleKeys(registros, guardadas, recentAfter).slice(0, max);
+    if (viejas.length === 0) return 0;
+    const fichas = await provider.fetchListingsByKeys!(viejas);
+    // Mismo camino que el sync: cobertura en código y normalización.
+    const { included: enCobertura } = partitionByCoverage(fichas);
+    const filas: NormalizedListing[] = [];
+    for (const l of enCobertura) {
+      try {
+        filas.push(normalizeListing(l, startedAt!));
+      } catch (e) {
+        if (!(e instanceof MlsNormalizationError)) throw e;
+      }
+    }
+    return filas.length > 0 ? await store.upsertListings!(filas) : 0;
+  }
 
   try {
     for (;;) {
@@ -220,16 +290,27 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
 
       // Diagnóstico de frescura: nunca tumba la reconciliación. Si falla una vez, queda no
       // disponible para el resto de esta lista (un total parcial engañaría).
+      const registros = included.map((k) => ({
+        key: k.ListingKey,
+        bridgeTs: typeof k.BridgeModificationTimestamp === "string" ? k.BridgeModificationTimestamp : null,
+      }));
       if (freshness !== null && store.compareFreshness && included.length > 0) {
         try {
-          const f = await store.compareFreshness(
-            included.map((k) => ({
-              key: k.ListingKey,
-              bridgeTs: typeof k.BridgeModificationTimestamp === "string" ? k.BridgeModificationTimestamp : null,
-            })),
-            recentAfter,
-          );
+          const f = await store.compareFreshness(registros, recentAfter);
           freshness = addFreshness(freshness, f);
+          if (recuperar && f.stale > 0 && resumen.refetched < REFETCH_MAX_PER_RUN) {
+            try {
+              const n = await refetchStale(registros, REFETCH_MAX_PER_RUN - resumen.refetched);
+              resumen.refetched += n;
+              freshness = { ...freshness, refetched: (freshness.refetched ?? 0) + n };
+            } catch (e) {
+              recuperar = false;
+              console.error(JSON.stringify({
+                event: "mls_stale_refetch_failed",
+                message: e instanceof Error ? e.message : String(e),
+              }));
+            }
+          }
         } catch (e) {
           freshness = null;
           console.error(JSON.stringify({
