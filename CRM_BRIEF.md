@@ -26,6 +26,13 @@ Todo se probó en Postgres 16 con stubs de `auth`: migración idempotente, trigg
    python scripts/import_crm_leads.py --dir ~/lixtara-data/salida --dry-run
    python scripts/import_crm_leads.py --dir ~/lixtara-data/salida
    ```
+6. Emails del skip tracing (Camilo, en local), después de la importación de propietarios.
+   CSV con `owner_key,email,email_source,verification_status` (`valid|invalid|risky|unknown`).
+   Solo `valid` queda enviable; nunca se pisa ni se carga un email suprimido:
+   ```
+   python scripts/import_contacts.py --file ~/lixtara-data/contactos.csv --dry-run
+   python scripts/import_contacts.py --file ~/lixtara-data/contactos.csv
+   ```
 
 ## Pantallas del admin por construir (mínimo útil)
 
@@ -44,7 +51,7 @@ Todas server-side o con la sesión del admin. **Nunca** usar la service role key
    - "Enviar segmento a Instantly":
      - Leer **solo** desde `crm_sendable_email_owners`, que ya excluye supresiones, rebotes, bajas y propietarios con listado activo en el MLS.
      - Guardar el snapshot en `crm_campaign_members`.
-     - Llamar a la API de Instantly para agregar los leads a la campaña, enviando `owner_key` como variable personalizada; el webhook la usa para identificar al propietario.
+     - Llamar a la API de Instantly para agregar los leads a la campaña, enviando `owner_key` (el webhook la usa para identificar al propietario) y `property_address` (dirección y ciudad de la propiedad vigente de mayor score) como variables personalizadas.
      - **Verificar el endpoint exacto de "add leads to campaign" en developer.instantly.ai antes de implementarlo.** No está confirmado.
    - Métricas por campaña y por `pilot_group`: enviados, respuestas, interesados, bajas y rebotes. **Comparar Score vs Control** antes de escalar.
 4. **Bandeja de respuestas**

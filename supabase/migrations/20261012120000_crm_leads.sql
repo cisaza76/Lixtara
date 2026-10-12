@@ -354,10 +354,19 @@ revoke all on function public.crm_touch_updated_at() from public, anon, authenti
 -- -----------------------------------------------------------------------------
 -- Vista: propietarios que SÍ se pueden incluir en un envío de email
 -- (email verificado, sin supresión, sin propiedad con listado activo en MLS)
+-- property_address: dirección y ciudad de la propiedad vigente de mayor score
+-- (desempate: mayor valor, luego id). Va a Instantly como variable personalizada.
 -- -----------------------------------------------------------------------------
 create or replace view public.crm_sendable_email_owners
 with (security_invoker = true) as
-select o.*
+select o.*,
+       (select nullif(concat_ws(', ', nullif(concat_ws(' ', p.address, p.unit), ''), p.city), '')
+          from public.crm_property_owners po
+          join public.crm_properties p on p.id = po.property_id
+         where po.owner_id = o.id
+           and po.valid_to is null
+         order by p.score desc nulls last, p.just_value desc nulls last, p.id
+         limit 1) as property_address
   from public.crm_owners o
  where o.email is not null
    and o.email_verified_at is not null

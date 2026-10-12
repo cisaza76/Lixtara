@@ -15,9 +15,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export interface InstantlyLead {
   email: string;
-  // owner_key comes back on every webhook event (Instantly merges lead data into the
-  // payload), so the webhook can identify the owner without relying on the email.
-  custom_variables: { owner_key: string };
+  custom_variables: {
+    // Comes back on every webhook event (Instantly merges lead data into the payload),
+    // so the webhook can identify the owner without relying on the email.
+    owner_key: string;
+    // Address and city of the owner's highest-score current property, for the templates.
+    property_address: string;
+  };
 }
 
 export interface AddLeadsResult {

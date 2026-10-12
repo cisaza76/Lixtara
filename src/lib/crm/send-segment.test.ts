@@ -11,7 +11,9 @@ const db = {
   calls: [] as Call[],
   campaign: null as Record<string, unknown> | null,
   members: [] as Array<{ campaign_id: string; owner_id: string; pilot_group: string | null }>,
-  sendable: [] as Array<{ id: string; owner_key: string; email: string; pilot_group: string | null }>,
+  sendable: [] as Array<{
+    id: string; owner_key: string; email: string; pilot_group: string | null; property_address: string | null;
+  }>,
   membersInsertError: null as { code: string } | null,
 };
 
@@ -22,8 +24,9 @@ function fakeClient(): SupabaseClient {
       let range: [number, number] = [0, 999];
       let op = "select";
       let payload: unknown;
+      let columns = "";
       const run = () => {
-        db.calls.push({ table, op, args: [filters.slice(), payload] });
+        db.calls.push({ table, op, args: [filters.slice(), payload, columns] });
         if (op === "upsert" && table === "crm_campaign_members") {
           if (db.membersInsertError) return { data: null, error: db.membersInsertError };
           for (const m of payload as typeof db.members) {
@@ -45,7 +48,7 @@ function fakeClient(): SupabaseClient {
         throw new Error(`unexpected table ${table}`);
       };
       const q = {
-        select: () => q,
+        select: (cols?: string) => ((columns = cols ?? ""), q),
         eq: (c: string, v: unknown) => (filters.push([c, v]), q),
         is: (c: string, v: unknown) => (filters.push([`${c} is`, v]), q),
         not: (c: string, o: string, v: unknown) => (filters.push([`${c} not ${o}`, v]), q),
@@ -80,8 +83,9 @@ function instantlyOk() {
   });
 }
 
-const owner = (i: number, group = i % 2 ? "Score" : "Control") => ({
+const owner = (i: number, group = i % 2 ? "Score" : "Control", address: string | null = `${i} Brickell Ave, Miami`) => ({
   id: `owner-${String(i).padStart(4, "0")}`, owner_key: `ok-${i}`, email: `o${i}@example.com`, pilot_group: group,
+  property_address: address,
 });
 
 beforeEach(() => {
@@ -116,10 +120,10 @@ describe("sendSegmentToInstantly", () => {
     ]);
   });
 
-  it("posts to the verified endpoint with owner_key as a custom variable", async () => {
+  it("posts to the verified endpoint with owner_key and property_address as custom variables", async () => {
     const f = instantlyOk();
     const out = await send(f as unknown as typeof fetch);
-    expect(out).toMatchObject({ ok: true, batch: 3, moreRemaining: false });
+    expect(out).toMatchObject({ ok: true, batch: 3, withoutAddress: 0, moreRemaining: false });
     const [url, init] = f.mock.calls[0];
     expect(url).toBe(INSTANTLY_ADD_LEADS_URL);
     expect(init?.method).toBe("POST");
@@ -127,7 +131,10 @@ describe("sendSegmentToInstantly", () => {
     const body = JSON.parse(String(init?.body));
     expect(body.campaign_id).toBe(INSTANTLY_CAMPAIGN);
     expect(body.skip_if_in_workspace).toBe(true);
-    expect(body.leads[0]).toEqual({ email: "o1@example.com", custom_variables: { owner_key: "ok-1" } });
+    expect(body.leads[0]).toEqual({
+      email: "o1@example.com",
+      custom_variables: { owner_key: "ok-1", property_address: "1 Brickell Ave, Miami" },
+    });
   });
 
   it("snapshots created leads into crm_campaign_members with their pilot group and activates the campaign", async () => {
@@ -138,6 +145,29 @@ describe("sendSegmentToInstantly", () => {
       { campaign_id: "camp-1", owner_id: "owner-0003", pilot_group: "Score" },
     ]);
     expect(db.campaign?.status).toBe("Activa");
+  });
+
+  it("selects property_address from the sendable view", async () => {
+    await send(instantlyOk() as unknown as typeof fetch);
+    const viewCall = db.calls.find((c) => c.table === SENDABLE_VIEW)!;
+    expect(String(viewCall.args[2]).split(",")).toContain("property_address");
+  });
+
+  it("skips and counts owners without a property address (never a blank address)", async () => {
+    db.sendable = [owner(1), owner(2, "Control", null), owner(3, "Score", "   ")];
+    const f = instantlyOk();
+    const out = await send(f as unknown as typeof fetch);
+    expect(out).toMatchObject({ ok: true, batch: 1, withoutAddress: 2 });
+    const leads = JSON.parse(String(f.mock.calls[0][1]?.body)).leads;
+    expect(leads.map((l: { email: string }) => l.email)).toEqual(["o1@example.com"]);
+    expect(db.members.map((m) => m.owner_id)).toEqual(["owner-0001"]);
+  });
+
+  it("only address-less owners left → nothing_to_send, Instantly not called", async () => {
+    db.sendable = [owner(1, "Score", null)];
+    const f = instantlyOk();
+    expect(await send(f as unknown as typeof fetch)).toEqual({ ok: false, error: "nothing_to_send" });
+    expect(f).not.toHaveBeenCalled();
   });
 
   it("only records the leads Instantly created (blocklist / skipped are not members)", async () => {

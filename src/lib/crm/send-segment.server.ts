@@ -6,6 +6,9 @@
 //   active MLS listing. Never from crm_owners.
 // - The snapshot of who entered the campaign goes to crm_campaign_members.
 // - owner_key travels as an Instantly custom variable; the webhook uses it.
+// - property_address (from the view: highest-score current property) is the other
+//   custom variable. Owners without one are skipped and counted: a template that
+//   names "your property at …" must never go out with a blank address.
 //
 // One call = at most one Instantly batch (1000 leads). Sending a big segment is a
 // repeated, deliberate action ("send the next batch"), never a single click that
@@ -29,7 +32,7 @@ const PAGE = 1000;
 const MAX_PAGES = 50; // scans at most 50k sendable owners per click
 
 export type SendOutcome =
-  | { ok: true; result: AddLeadsResult; batch: number; moreRemaining: boolean }
+  | { ok: true; result: AddLeadsResult; batch: number; withoutAddress: number; moreRemaining: boolean }
   | { ok: false; error: "not_found" | "not_email" | "no_provider_id" | "finished" | "nothing_to_send" | "db" | "instantly" };
 
 interface CampaignRow {
@@ -41,7 +44,13 @@ interface CampaignRow {
   status: string;
 }
 
-interface SendableRow { id: string; owner_key: string; email: string; pilot_group: string | null }
+interface SendableRow {
+  id: string;
+  owner_key: string;
+  email: string;
+  pilot_group: string | null;
+  property_address: string | null;
+}
 
 export async function sendSegmentToInstantly(input: {
   supabase: SupabaseClient;
@@ -78,11 +87,14 @@ export async function sendSegmentToInstantly(input: {
 
   // Next batch from the sendable view, highest score first.
   const segment = parseSegment(campaign.segment as Record<string, unknown>);
-  const batch: SendableRow[] = [];
+  const batch: Array<SendableRow & { property_address: string }> = [];
+  let withoutAddress = 0;
   let moreRemaining = false;
   for (let page = 0; page < MAX_PAGES && !moreRemaining; page++) {
     const query = applySegment(
-      supabase.from(SENDABLE_VIEW).select(segmentSelect("id,owner_key,email,pilot_group", segment)),
+      supabase
+        .from(SENDABLE_VIEW)
+        .select(segmentSelect("id,owner_key,email,pilot_group,property_address", segment)),
       segment,
     );
     const { data, error } = await query
@@ -93,7 +105,12 @@ export async function sendSegmentToInstantly(input: {
     const rows = (data ?? []) as unknown as SendableRow[];
     for (const r of rows) {
       if (already.has(r.id) || !r.email) continue;
-      if (batch.length < INSTANTLY_MAX_LEADS_PER_CALL) batch.push(r);
+      const address = r.property_address?.trim();
+      if (!address) {
+        withoutAddress++;
+        continue;
+      }
+      if (batch.length < INSTANTLY_MAX_LEADS_PER_CALL) batch.push({ ...r, property_address: address });
       else {
         moreRemaining = true;
         break;
@@ -105,7 +122,7 @@ export async function sendSegmentToInstantly(input: {
 
   const leads: InstantlyLead[] = batch.map((r) => ({
     email: r.email,
-    custom_variables: { owner_key: r.owner_key },
+    custom_variables: { owner_key: r.owner_key, property_address: r.property_address },
   }));
 
   let result: AddLeadsResult;
@@ -148,5 +165,5 @@ export async function sendSegmentToInstantly(input: {
     await supabase.from("crm_campaigns").update({ status: "Activa" }).eq("id", campaign.id);
   }
 
-  return { ok: true, result, batch: batch.length, moreRemaining };
+  return { ok: true, result, batch: batch.length, withoutAddress, moreRemaining };
 }

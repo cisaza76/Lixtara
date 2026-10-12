@@ -87,12 +87,15 @@ export default async function CrmCampaignPage({
     const out = await sendSegmentToInstantly({ supabase: sb, campaignId: id, apiKey });
     if (!out.ok) redirect(`${self}?error=${out.error}`);
     const r = out.result;
-    const sent = [out.batch, r.uploaded, r.inBlocklist, r.duplicated, r.skipped, r.invalidEmail, out.moreRemaining ? 1 : 0];
+    const sent = [
+      out.batch, r.uploaded, r.inBlocklist, r.duplicated, r.skipped, r.invalidEmail,
+      out.withoutAddress, out.moreRemaining ? 1 : 0,
+    ];
     redirect(`${self}?sent=${sent.join(".")}`);
   }
 
   const sentParts = sp.sent?.split(".").map((n) => Number.parseInt(n, 10));
-  const sentOk = sentParts?.length === 7 && sentParts.every(Number.isFinite);
+  const sentOk = sentParts?.length === 8 && sentParts.every(Number.isFinite);
   const sendError = (SEND_ERRORS as readonly string[]).includes(sp.error ?? "")
     ? k.errors[sp.error as (typeof SEND_ERRORS)[number]]
     : null;
@@ -133,7 +136,8 @@ export default async function CrmCampaignPage({
               duplicated: sentParts[3], skipped: sentParts[4], invalid: sentParts[5],
             })}
           </p>
-          {sentParts[6] === 1 && <p className="mt-1">{k.moreRemaining}</p>}
+          {sentParts[6] > 0 && <p className="mt-1">{fill(k.withoutAddress, { count: sentParts[6] })}</p>}
+          {sentParts[7] === 1 && <p className="mt-1">{k.moreRemaining}</p>}
         </div>
       )}
       {sendError && (

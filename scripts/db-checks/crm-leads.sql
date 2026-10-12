@@ -63,6 +63,16 @@ insert into public.crm_property_owners (property_id, owner_id, valid_to) values
   ('dddddddd-0000-4000-8000-000000000007', 'cccccccc-0000-4000-8000-000000000007', current_date);
 insert into public.crm_suppression (email, owner_id, reason, source)
   values ('owner4@example.com', 'cccccccc-0000-4000-8000-000000000004', 'manual', 'test');
+-- property_address: c…18 tiene dos propiedades vigentes (score 50 y 80) y una vieja de
+-- score 99 ya vendida (valid_to); c…19 no tiene ninguna.
+insert into public.crm_properties (id, county, folio, address, unit, city, score, source, collected_on) values
+  ('dddddddd-0000-4000-8000-000000000181', 'Miami-Dade', '0181', '10 Low St', null, 'Doral', 50, 'test', current_date),
+  ('dddddddd-0000-4000-8000-000000000182', 'Miami-Dade', '0182', '20 High St', '4B', 'Miami', 80, 'test', current_date),
+  ('dddddddd-0000-4000-8000-000000000183', 'Miami-Dade', '0183', '30 Sold St', null, 'Miami', 99, 'test', current_date);
+insert into public.crm_property_owners (property_id, owner_id, valid_to) values
+  ('dddddddd-0000-4000-8000-000000000181', 'cccccccc-0000-4000-8000-000000000018', null),
+  ('dddddddd-0000-4000-8000-000000000182', 'cccccccc-0000-4000-8000-000000000018', null),
+  ('dddddddd-0000-4000-8000-000000000183', 'cccccccc-0000-4000-8000-000000000018', current_date);
 
 -- Evento de outreach como lo escribe el webhook (service_role).
 create function pg_temp.ev(n int, tipo text) returns void language plpgsql as $$
@@ -119,6 +129,12 @@ select pg_temp.chk('acceso', 'admin no puede TRUNCATE', 'ERR:42501',
 -- ── Vista de enviables ──────────────────────────────────────────────────────────────
 select pg_temp.chk('vista', 'enviables (admin): 01, 06, 07 y 10–19', '01,06,07,10,11,12,13,14,15,16,17,18,19',
   (select string_agg(right(id::text, 2), ',' order by id) from public.crm_sendable_email_owners));
+
+select pg_temp.chk('vista', 'property_address = propiedad vigente de mayor score', '20 High St 4B, Miami',
+  (select property_address from public.crm_sendable_email_owners where id = 'cccccccc-0000-4000-8000-000000000018'));
+select pg_temp.chk('vista', 'property_address sin propiedad vigente → null', 'null',
+  (select coalesce(property_address, 'null') from public.crm_sendable_email_owners
+    where id = 'cccccccc-0000-4000-8000-000000000019'));
 
 -- ── Supresión ───────────────────────────────────────────────────────────────────────
 select pg_temp.chk('supresión', 'broker inserta una supresión manual', 'OK:1',
