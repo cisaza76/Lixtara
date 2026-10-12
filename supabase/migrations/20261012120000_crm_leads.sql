@@ -2,38 +2,43 @@
 -- Lixtara CRM — base de propietarios, campañas y supresión
 -- Fuente de datos: salidas de lixtara_base.py (NAL FL DOR + Sunbiz + señales)
 -- Prefijo crm_ para no chocar con las tablas de la app (properties, users, …)
--- Acceso: solo administradores (crm_admins) vía RLS. Edge functions e importador
--- usan service_role, que en Supabase ignora RLS.
+-- Acceso: staff de Lixtara (admin o broker de user_roles) vía RLS, a través de
+-- is_crm_admin(). El webhook de outreach (ruta de Next) y el importador usan
+-- service_role / postgres, que ignoran RLS.
 -- =============================================================================
 
 create extension if not exists pgcrypto;
 
 -- -----------------------------------------------------------------------------
--- Administradores del CRM
+-- Acceso al CRM
+-- No hay tabla propia de admins: el acceso es el mismo del panel de admin
+-- (user_roles admin o broker, vía is_admin_or_broker()). El fotógrafo no entra.
+-- La broker entra porque supervisa legalmente la publicidad de la brokerage y
+-- debe ver campañas y respuestas.
+-- OJO: si algún día entran más brokers (o cualquier rol nuevo pasa a
+-- is_admin_or_broker()), revisar este acceso: estas tablas tienen datos
+-- personales de propietarios que no son clientes de Lixtara.
 -- -----------------------------------------------------------------------------
-create table if not exists public.crm_admins (
-  user_id    uuid primary key references auth.users (id) on delete cascade,
-  created_at timestamptz not null default now()
-);
-
 create or replace function public.is_crm_admin()
 returns boolean
 language sql
 stable
-security definer
-set search_path = public
+security invoker
+set search_path = public, pg_temp
 as $$
-  select exists (select 1 from public.crm_admins where user_id = auth.uid());
+  select public.is_admin_or_broker();
 $$;
 
-revoke all on function public.is_crm_admin() from public;
+revoke all on function public.is_crm_admin() from public, anon;
 grant execute on function public.is_crm_admin() to authenticated;
 
 -- -----------------------------------------------------------------------------
 -- updated_at automático
 -- -----------------------------------------------------------------------------
 create or replace function public.crm_touch_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
   new.updated_at := now();
   return new;
@@ -125,6 +130,10 @@ create table if not exists public.crm_properties (
   score              integer,
   has_strong_signal  boolean not null default false,
   priority           text check (priority in ('A','B','C')),
+  -- mls_status (y la señal 'mls_expirado') llegan de CSV que Camilo carga a mano.
+  -- NUNCA salen del feed de Bridge / MIAMI: esa licencia IDX solo permite mostrar
+  -- listados en lixtara.com (Schedule B §1, §IX.J; ADR-0013), no prospectar.
+  -- Si un export manual de Matrix sirve como fuente está pendiente de respuesta del MLS.
   mls_status         text,
   source             text not null,
   collected_on       date not null,
@@ -208,16 +217,25 @@ create table if not exists public.crm_outreach (
   reply_text           text,
   payload              jsonb not null,
   occurred_at          timestamptz not null,
-  created_at           timestamptz not null default now()
+  created_at           timestamptz not null default now(),
+  -- Bandeja de respuestas: staff solo puede marcar/desmarcar estas dos columnas,
+  -- y solo a través de crm_set_outreach_handled() (no hay política de UPDATE).
+  handled_at           timestamptz,
+  handled_by           uuid references auth.users (id) on delete set null
 );
 create index if not exists crm_outreach_owner_idx on public.crm_outreach (owner_id, occurred_at desc);
 create index if not exists crm_outreach_type_idx on public.crm_outreach (event_type, occurred_at desc);
+create index if not exists crm_outreach_inbox_idx on public.crm_outreach (occurred_at desc)
+  where handled_at is null and event_type in ('reply_received','lead_interested');
 
 -- Lista de supresión global: nadie aquí recibe otro envío, por ningún proveedor
 create table if not exists public.crm_suppression (
   id         uuid primary key default gen_random_uuid(),
   email      text unique check (email is null or email = lower(email)),
-  owner_id   uuid unique references public.crm_owners (id) on delete cascade,
+  -- set null, no cascade: borrar o reimportar un propietario nunca borra su supresión.
+  -- Si la fila no tiene email, el check de abajo impide el set null y por lo tanto el
+  -- borrado del propietario: hay que resolverlo a mano, a propósito.
+  owner_id   uuid unique references public.crm_owners (id) on delete set null,
   channel    text not null default 'all' check (channel in ('all','email','postal','phone')),
   reason     text not null check (reason in
                ('unsubscribe','bounce','complaint','not_interested','wrong_person','manual')),
@@ -230,6 +248,27 @@ create table if not exists public.crm_suppression (
 -- Trigger: cada evento actualiza el estado del propietario y alimenta la supresión
 -- (la lógica vive en la base para que cualquier proveedor la respete igual)
 -- -----------------------------------------------------------------------------
+-- Precedencia del estado comercial (pura, para poder probarla aislada):
+--   * Baja, Rebote y Persona equivocada son terminales: nada los cambia.
+--   * No interesado solo lo cambia Interesado.
+--   * Interesado no baja a Respondió ni a Contactado.
+--   * Contactado solo aplica sobre Sin contactar.
+create or replace function public.crm_next_outreach_status(p_current text, p_incoming text)
+returns text
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select case
+    when p_incoming is null then p_current
+    when p_current in ('Baja','Rebote','Persona equivocada') then p_current
+    when p_current = 'No interesado' and p_incoming <> 'Interesado' then p_current
+    when p_current = 'Interesado' and p_incoming in ('Respondió','Contactado') then p_current
+    when p_incoming = 'Contactado' and p_current <> 'Sin contactar' then p_current
+    else p_incoming
+  end;
+$$;
+
 create or replace function public.crm_apply_outreach_event()
 returns trigger
 language plpgsql
@@ -261,12 +300,8 @@ begin
   end;
 
   if new.owner_id is not null and v_status is not null then
-    -- un 'Contactado' nunca pisa un estado más avanzado
     update public.crm_owners o
-       set outreach_status = case
-             when v_status = 'Contactado' and o.outreach_status <> 'Sin contactar'
-               then o.outreach_status
-             else v_status end,
+       set outreach_status = public.crm_next_outreach_status(o.outreach_status, v_status),
            last_event_at = greatest(coalesce(o.last_event_at, new.occurred_at), new.occurred_at)
      where o.id = new.owner_id;
   end if;
@@ -287,6 +322,34 @@ end $$;
 drop trigger if exists crm_outreach_apply on public.crm_outreach;
 create trigger crm_outreach_apply after insert on public.crm_outreach
   for each row execute function public.crm_apply_outreach_event();
+
+-- Marcar (o desmarcar) un evento de la bandeja como gestionado. Única vía de
+-- escritura de staff sobre crm_outreach: no toca ninguna otra columna.
+create or replace function public.crm_set_outreach_handled(p_outreach_id uuid, p_handled boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_crm_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  update public.crm_outreach
+     set handled_at = case when p_handled then now() else null end,
+         handled_by = case when p_handled then auth.uid() else null end
+   where id = p_outreach_id;
+  if not found then
+    raise exception 'outreach event not found' using errcode = 'P0002';
+  end if;
+end $$;
+
+revoke all on function public.crm_set_outreach_handled(uuid, boolean) from public, anon;
+grant execute on function public.crm_set_outreach_handled(uuid, boolean) to authenticated;
+
+-- Las funciones de trigger no se invocan por RPC.
+revoke all on function public.crm_apply_outreach_event() from public, anon, authenticated;
+revoke all on function public.crm_touch_updated_at() from public, anon, authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Vista: propietarios que SÍ se pueden incluir en un envío de email
@@ -312,17 +375,25 @@ select o.*
             and p.mls_status ilike 'activo%');
 
 -- -----------------------------------------------------------------------------
--- RLS: solo administradores del CRM
+-- RLS: solo staff del CRM (is_crm_admin)
 -- -----------------------------------------------------------------------------
 do $$
 declare t text;
 begin
-  foreach t in array array['crm_admins','crm_owners','crm_properties','crm_property_owners',
+  foreach t in array array['crm_owners','crm_properties','crm_property_owners',
                            'crm_property_signals','crm_campaigns','crm_campaign_members',
                            'crm_outreach','crm_suppression']
   loop
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from anon', t);
+    -- RLS no cubre TRUNCATE/REFERENCES/TRIGGER: se quitan aparte.
+    execute format('revoke truncate, references, trigger on public.%I from authenticated', t);
+  end loop;
+
+  -- Tablas de trabajo: staff lee y escribe.
+  foreach t in array array['crm_owners','crm_properties','crm_property_owners',
+                           'crm_property_signals','crm_campaigns','crm_campaign_members']
+  loop
     execute format('drop policy if exists %I on public.%I', t || '_admin_all', t);
     execute format(
       'create policy %I on public.%I for all to authenticated
@@ -330,5 +401,22 @@ begin
       t || '_admin_all', t);
   end loop;
 end $$;
+
+-- crm_outreach: los eventos los escribe el webhook (service_role). Staff solo lee;
+-- marcar como gestionado pasa por crm_set_outreach_handled().
+revoke insert, update, delete on public.crm_outreach from authenticated;
+drop policy if exists crm_outreach_admin_select on public.crm_outreach;
+create policy crm_outreach_admin_select on public.crm_outreach
+  for select to authenticated using (public.is_crm_admin());
+
+-- crm_suppression: global y permanente. Staff lee e inserta; nadie fuera de
+-- service_role la actualiza ni la borra.
+revoke update, delete on public.crm_suppression from authenticated;
+drop policy if exists crm_suppression_admin_select on public.crm_suppression;
+create policy crm_suppression_admin_select on public.crm_suppression
+  for select to authenticated using (public.is_crm_admin());
+drop policy if exists crm_suppression_admin_insert on public.crm_suppression;
+create policy crm_suppression_admin_insert on public.crm_suppression
+  for insert to authenticated with check (public.is_crm_admin());
 
 revoke all on public.crm_sendable_email_owners from anon;
