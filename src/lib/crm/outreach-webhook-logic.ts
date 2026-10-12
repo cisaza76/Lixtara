@@ -21,8 +21,12 @@ export type InstantlyPayload = {
   [k: string]: unknown;
 };
 
-// Eventos que no guardamos (ruido o internos de la cuenta de envío)
-export const IGNORED = new Set(["email_opened", "link_clicked", "account_error", "campaign_completed"]);
+// Eventos que no guardamos (ruido o internos de la cuenta de envío).
+// La guía de eventos dice "link_clicked" y el enum de "Create webhook" dice
+// "email_link_clicked": se ignoran los dos.
+export const IGNORED = new Set([
+  "email_opened", "link_clicked", "email_link_clicked", "account_error", "campaign_completed",
+]);
 
 export type OutreachRow = {
   event_hash: string;
@@ -55,14 +59,19 @@ export async function toOutreachRow(p: InstantlyPayload): Promise<OutreachRow | 
   if (!eventType || IGNORED.has(eventType)) return null;
 
   const email = p.lead_email ? String(p.lead_email).trim().toLowerCase() : null;
-  const occurred = p.timestamp && !isNaN(Date.parse(String(p.timestamp)))
+  const hasTimestamp = Boolean(p.timestamp) && !isNaN(Date.parse(String(p.timestamp)));
+  const occurred = hasTimestamp
     ? new Date(String(p.timestamp)).toISOString()
     : new Date().toISOString();
   const step = p.step === undefined || p.step === null || p.step === "" ? null : Number(p.step);
 
-  // Idempotencia: Instantly puede reintentar; el mismo evento produce el mismo hash
+  // Idempotencia: Instantly puede reintentar; el mismo evento produce el mismo hash.
+  // Sin timestamp, `occurred` es la hora de llegada y cambiaría en cada reintento:
+  // en ese caso el hash sale del cuerpo crudo del evento, que el reintento repite igual.
   const hash = await sha256Hex(
-    ["instantly", eventType, email ?? "", p.campaign_id ?? "", occurred, step ?? "", p.email_id ?? ""].join("|"),
+    hasTimestamp
+      ? ["instantly", eventType, email ?? "", p.campaign_id ?? "", occurred, step ?? "", p.email_id ?? ""].join("|")
+      : ["instantly", "raw", JSON.stringify(p)].join("|"),
   );
 
   return {
