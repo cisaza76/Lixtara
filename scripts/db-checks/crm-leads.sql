@@ -136,6 +136,12 @@ select pg_temp.chk('vista', 'property_address sin propiedad vigente → null', '
   (select coalesce(property_address, 'null') from public.crm_sendable_email_owners
     where id = 'cccccccc-0000-4000-8000-000000000019'));
 
+select pg_temp.chk('vista', 'authenticated solo tiene SELECT sobre la vista', 'SELECT',
+  (select string_agg(privilege_type, ',' order by privilege_type) from information_schema.role_table_grants
+    where grantee = 'authenticated' and table_name = 'crm_sendable_email_owners'));
+select pg_temp.chk('vista', 'staff no escribe a través de la vista', 'ERR:42501',
+  pg_temp.intento('authenticated', :ADMIN, $$update public.crm_sendable_email_owners set registered_name = 'x'$$));
+
 -- ── Supresión ───────────────────────────────────────────────────────────────────────
 select pg_temp.chk('supresión', 'broker inserta una supresión manual', 'OK:1',
   pg_temp.intento('authenticated', :BROKER, $$insert into public.crm_suppression (owner_id, reason, source)

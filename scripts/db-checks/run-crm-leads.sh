@@ -16,6 +16,7 @@ sleep 1
   cat scripts/db-checks/crm-leads-replica.sql
   echo "set client_min_messages = warning;"
   cat supabase/migrations/20261012120000_crm_leads.sql
+  cat supabase/migrations/20261012180000_crm_sendable_view_grants.sql
   cat scripts/db-checks/crm-leads.sql
   # Carga de contactos: el MISMO SQL que ejecuta scripts/import_contacts.py.
   cat scripts/db-checks/crm-contacts-before.sql
