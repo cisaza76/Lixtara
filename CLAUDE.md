@@ -169,6 +169,12 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   (anonymous until step 7); set = the seller confirms their email with a 6-digit code
   right after the address, and the broker can send a "continue your listing" magic link
   from `/admin/seller-leads` (sellers can request one at `/listing/continue`).
+- `OUTREACH_WEBHOOK_TOKEN` — server-only, **Production only**. Shared secret of the Instantly
+  webhook (`/api/crm/outreach-webhook`), sent by Instantly as `Authorization: Bearer <token>`.
+  Unset = every call is 401 (fail-closed). Created by the owner in the Vercel dashboard.
+- `INSTANTLY_API_KEY` — server-only, **Production only** (Preview shares the production DB: a
+  preview with this key could load real leads). Scope `leads:create` or `leads:all`. Read only by
+  `src/lib/crm/instantly.server.ts`; unset = the CRM's "send to Instantly" button is disabled.
 - `EMAIL_FROM` / `EMAIL_REPLY_TO` — server-only. Sender (`"Lixtara <…@lixtara.com>"`, a
   sender on the domain verified in Resend) and reply-to inbox for every email
   (`src/lib/email.ts#emailFrom`). Unset `EMAIL_FROM` = Resend's test sender
