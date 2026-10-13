@@ -9,8 +9,10 @@
 // en Production se rechaza todo (401) — fail-closed —; fuera de Production se procesa y
 // el evento queda registrado con hmac_valid = false.
 //
-// El estado del acuerdo nunca se toma del payload: se consulta a DocuSign
-// (getEnvelopeStatus). Así una firma válida no basta para falsificar un "completed".
+// El estado del acuerdo nunca se toma del payload: lo resuelve `refresh`
+// (refreshAgreement), que consulta DocuSign, actualiza la fila de forma condicionada y
+// envía el email al vendedor una sola vez. Así una firma válida no basta para
+// falsificar un "completed".
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -68,15 +70,18 @@ export interface ConnectPayload {
   };
 }
 
-export type AgreementStatus =
-  | "pending" | "sent" | "delivered" | "signed" | "completed" | "declined" | "voided" | "expired";
+export interface AgreementRow {
+  id: string;
+  property_id: string;
+  envelope_id: string | null;
+  status: string;
+}
 
 export interface WebhookDeps {
   db: () => SupabaseClient;
-  getEnvelopeStatus: (envelopeId: string) => Promise<{ status: string; completedDateTime?: string }>;
-  mapEnvelopeStatus: (s: string) => AgreementStatus;
   claimEvent: (db: SupabaseClient, eventId: string, eventType?: string) => Promise<"claimed" | "duplicate" | "unavailable">;
-  onSigned: (db: SupabaseClient, propertyId: string) => Promise<void>;
+  /** Trae el acuerdo al día desde DocuSign. Devuelve el estado vigente; nunca lanza. */
+  refresh: (agreement: AgreementRow) => Promise<string>;
   env: NodeJS.ProcessEnv;
 }
 
@@ -131,7 +136,7 @@ export async function handleConnectWebhook(req: Request, deps: WebhookDeps): Pro
 
   const { data: agreement } = await db
     .from("agreements")
-    .select("id, property_id")
+    .select("id, property_id, envelope_id, status")
     .eq("envelope_id", envelopeId)
     .maybeSingle();
   if (!agreement) {
@@ -139,46 +144,20 @@ export async function handleConnectWebhook(req: Request, deps: WebhookDeps): Pro
     return ack({ ok: true, note: "unknown_envelope" });
   }
 
-  // Estado canónico: DocuSign, nunca el payload. Si no se puede consultar, 503 para que
-  // Connect reintente (la entrega aún no se marcó como procesada).
-  let fresh: { status: string; completedDateTime?: string };
-  try {
-    fresh = await deps.getEnvelopeStatus(envelopeId);
-  } catch (e) {
-    console.error("docusign envelope re-fetch failed:", e);
-    await log({ note: "fetch_failed" });
-    return ack({ ok: false, error: "fetch_failed" }, 503);
-  }
+  // refresh consulta DocuSign y condiciona la actualización al estado leído: es
+  // idempotente, un reintento nunca queda sin aplicar y el email al vendedor sale una
+  // sola vez aunque lleguen entregas en paralelo. Si DocuSign no responde devuelve el
+  // estado anterior; el poller del paso 7 y la revisión del admin lo vuelven a intentar.
+  const ourStatus = await deps.refresh(agreement as AgreementRow);
 
-  // Actualizar el acuerdo es idempotente (mismo estado canónico), así que va antes de la
-  // deduplicación: un reintento tras un fallo nunca queda sin aplicar.
-  const ourStatus = deps.mapEnvelopeStatus(fresh.status);
-  const update: Record<string, unknown> = { status: ourStatus, updated_at: new Date().toISOString() };
-  if (ourStatus === "completed" || ourStatus === "signed") {
-    update.signed_at = fresh.completedDateTime ?? new Date().toISOString();
-  }
-  const { error: updateError } = await db.from("agreements").update(update).eq("id", agreement.id);
-  if (updateError) {
-    await log({ note: "update_failed" });
-    return ack({ ok: false, error: "update_failed" }, 503);
-  }
-
-  // Deduplicación por entrega (mismo cuerpo = misma entrega reintentada), como Stripe:
-  // solo la primera dispara efectos laterales (el email al vendedor).
+  // Deduplicación por entrega (mismo cuerpo = misma entrega reintentada): solo marca el
+  // registro; los efectos laterales ya están protegidos dentro de refresh.
   const claim = await deps.claimEvent(db, digest, eventType ?? undefined);
   if (claim === "duplicate") {
     await log({ duplicate: true, resulting_status: ourStatus });
     return ack({ ok: true, note: "duplicate", status: ourStatus });
   }
   await log({ resulting_status: ourStatus });
-
-  if (ourStatus === "signed" || ourStatus === "completed") {
-    try {
-      await deps.onSigned(db, agreement.property_id as string);
-    } catch (e) {
-      console.error("docusign webhook email failed:", e);
-    }
-  }
 
   return ack({ ok: true, status: ourStatus });
 }
