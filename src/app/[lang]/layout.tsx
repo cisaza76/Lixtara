@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
 import { CookieNotice } from "@/components/cookie-notice";
 import { AnalyticsConsent, CookieSettingsLink } from "@/components/analytics-consent";
-import { analyticsConfig } from "@/lib/analytics-config";
+import { analyticsConfig, consentTools } from "@/lib/analytics-config";
 import { MobileMenu } from "@/components/mobile-menu";
 import { Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import "../globals.css";
@@ -436,9 +436,13 @@ export default async function RootLayout({
             posthogKey={analytics.posthogKey}
             posthogHost={analytics.posthogHost}
             labels={{
-              message: cookieCopy.consentMessage,
+              // Con GTM el permiso cubre también publicidad (opt-in, decisión del owner 2026-10-13).
+              message: (analytics.gtmId ? cookieCopy.consentMessageAds : cookieCopy.consentMessage).replace(
+                "{tools}",
+                consentTools(analytics, lang),
+              ),
               learnMore: cookieCopy.learnMore,
-              accept: cookieCopy.consentAccept,
+              accept: analytics.gtmId ? cookieCopy.consentAcceptAll : cookieCopy.consentAccept,
               reject: cookieCopy.consentReject,
               regionLabel: cookieCopy.regionLabel,
             }}

@@ -1284,9 +1284,13 @@ export const dictionaries = {
       learnMore: "Cookie Policy",
       accept: "Got it",
       regionLabel: "Cookie notice",
+      // {tools}: las herramientas configuradas en este build (ver consentTools en analytics-config).
       consentMessage:
-        "We use essential cookies to run the site. With your permission, we also use analytics cookies (Google Analytics and PostHog) to understand how the site is used. No advertising cookies.",
+        "We use essential cookies to run the site. With your permission, we also use analytics cookies ({tools}) to understand how the site is used. No advertising cookies.",
+      consentMessageAds:
+        "We use essential cookies to run the site. With your permission, we also use analytics and advertising cookies ({tools}) to understand how the site is used and to measure and show our ads. Nothing loads until you accept.",
       consentAccept: "Accept analytics",
+      consentAcceptAll: "Accept",
       consentReject: "Reject",
       settings: "Cookie settings",
     },
@@ -3151,9 +3155,13 @@ export const dictionaries = {
       learnMore: "Política de Cookies",
       accept: "Entendido",
       regionLabel: "Aviso de cookies",
+      // {tools}: las herramientas configuradas en este build (ver consentTools en analytics-config).
       consentMessage:
-        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica (Google Analytics y PostHog) para entender cómo se usa el sitio. Sin cookies de publicidad.",
+        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica ({tools}) para entender cómo se usa el sitio. Sin cookies de publicidad.",
+      consentMessageAds:
+        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica y de publicidad ({tools}) para entender cómo se usa el sitio y para medir y mostrar nuestros anuncios. No se carga nada hasta que aceptes.",
       consentAccept: "Aceptar analítica",
+      consentAcceptAll: "Aceptar",
       consentReject: "Rechazar",
       settings: "Configurar cookies",
     },

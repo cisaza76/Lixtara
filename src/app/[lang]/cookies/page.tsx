@@ -24,9 +24,14 @@ export default async function CookiesPage({
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   // La política describe lo que el sitio hace de verdad: con o sin analítica configurada.
-  const { enabled } = analyticsConfig({
+  const { gtmId, posthogKey } = analyticsConfig({
     NEXT_PUBLIC_GTM_ID: process.env.NEXT_PUBLIC_GTM_ID,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   });
-  return <LegalDocument lang={lang as Locale} doc={cookiesDocFor(lang as Locale, enabled)} />;
+  return (
+    <LegalDocument
+      lang={lang as Locale}
+      doc={cookiesDocFor(lang as Locale, { gtm: gtmId !== null, posthog: posthogKey !== null })}
+    />
+  );
 }

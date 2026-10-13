@@ -105,13 +105,14 @@ export function analyticsEnabled(): boolean {
 }
 
 // ¿Este build tiene la analítica configurada? Variables NEXT_PUBLIC_ escritas literalmente
-// para que Next las incruste. Sin las dos, track() no hace nada, aunque quede una cookie de
-// consentimiento de una activación anterior.
-const CONFIGURED = analyticsConfig({
+// para que Next las incruste. Sin ninguna herramienta, track() no hace nada, aunque quede una
+// cookie de consentimiento de una activación anterior.
+const BUILD_CONFIG = analyticsConfig({
   NEXT_PUBLIC_GTM_ID: process.env.NEXT_PUBLIC_GTM_ID,
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-}).enabled;
+});
+const CONFIGURED = BUILD_CONFIG.enabled;
 
 function granted(): boolean {
   if (!CONFIGURED) return false;
@@ -130,5 +131,6 @@ export function track(e: AnalyticsEvent): void {
   window.dataLayer.push(e);
   const { event, ...props } = e;
   if (posthogClient) posthogClient.capture(event, props);
-  else if (pendingForPosthog.length < PENDING_MAX) pendingForPosthog.push([event, props]);
+  // Retener solo si PostHog va a cargar: con GTM solo, no hay a quién entregárselos.
+  else if (BUILD_CONFIG.posthogKey && pendingForPosthog.length < PENDING_MAX) pendingForPosthog.push([event, props]);
 }

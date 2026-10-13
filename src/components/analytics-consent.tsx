@@ -3,8 +3,11 @@
 // Banner de consentimiento de analítica + carga de las herramientas DESPUÉS de aceptar.
 //
 // - Sin elección guardada: banner con "Aceptar" y "Rechazar" del MISMO peso visual.
-// - Aceptar: guarda la cookie `lx_consent=granted` y recién entonces carga GTM (con Consent
-//   Mode v2: publicidad denegada, solo analytics_storage concedido) y PostHog.
+// - Aceptar: guarda la cookie `lx_consent=granted` y recién entonces carga GTM y PostHog.
+//   Consent Mode v2: todo denegado por defecto ANTES de gtm.js y, en la misma carga, todo
+//   concedido (analítica y publicidad), porque la persona ya aceptó. Opt-in en todas las
+//   regiones (decisión del owner, 2026-10-13): no hay default por región ni carga previa.
+//   Sin <noscript>: un iframe de GTM sin JavaScript se saltaría el consentimiento.
 // - Rechazar: `lx_consent=denied`. No se carga nada y track() no hace nada.
 // - PostHog en modo estricto: sin autocapture (no lee textos, imágenes ni URLs de fichas
 //   del MLS), sin grabación de sesión, pageviews manuales con la URL SIN parámetros.
@@ -16,8 +19,10 @@ import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ANALYTICS_COOKIE_RE,
   CONSENT_COOKIE,
   CONSENT_MAX_AGE_S,
+  GRANTED_CONSENT,
   isAnalyticsExcludedPath,
   readConsent,
   sanitizePosthogProperties,
@@ -55,7 +60,9 @@ function loadGtm(gtmId: string): void {
   gtag("consent", "default", {
     ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "denied",
   });
-  gtag("consent", "update", { analytics_storage: "granted" });
+  // Solo se llega aquí con `lx_consent=granted`: el banner pide permiso para analítica Y
+  // publicidad (Google Ads, Meta, Clarity vía GTM), y así lo dice la política de cookies.
+  gtag("consent", "update", GRANTED_CONSENT);
   w.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
   const s = document.createElement("script");
   s.async = true;
@@ -90,15 +97,17 @@ async function loadPosthog(key: string, host: string, lang: string): Promise<Pos
 }
 
 /**
- * Al rechazar o retirar el consentimiento: borra lo que las herramientas hubieran dejado
- * (cookies `_ga*` / `ph_*` y el almacenamiento local de PostHog).
+ * Al rechazar o retirar el consentimiento: borra lo que las herramientas hubieran dejado en
+ * NUESTRO dominio (GA4 `_ga*`/`_gid`, Google Ads `_gcl_*`, Meta `_fbp`/`_fbc`, Clarity
+ * `_clck`/`_clsk`, PostHog `ph_*` y su almacenamiento local). Las cookies que esos
+ * proveedores guardan en sus propios dominios no son accesibles desde aquí.
  */
 function clearAnalyticsStorage(): void {
   const host = window.location.hostname;
   const domains = ["", `; Domain=${host}`, `; Domain=.${host.replace(/^www\./, "")}`];
   for (const part of document.cookie.split(";")) {
     const name = part.split("=")[0]?.trim();
-    if (!name || !/^(_ga|_gid|ph_)/.test(name)) continue;
+    if (!name || !ANALYTICS_COOKIE_RE.test(name)) continue;
     for (const d of domains) document.cookie = `${name}=; Max-Age=0; Path=/${d}`;
   }
   try {

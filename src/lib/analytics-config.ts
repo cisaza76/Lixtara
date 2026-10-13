@@ -1,8 +1,9 @@
-// Configuración de analítica (decisión del owner, 2026-10-11):
-//   - GA4 vía Google Tag Manager → marketing y adquisición.
-//   - PostHog → producto: embudos, abandono, cohortes, feature flags.
-// Ninguna de las dos se carga sin el CONSENTIMIENTO del visitante (banner), y sin sus
-// variables de entorno no se carga nada: el sitio queda exactamente como antes.
+// Configuración de analítica (decisiones del owner):
+//   - 2026-10-11: GA4 vía Google Tag Manager → marketing y adquisición; PostHog → producto.
+//   - 2026-10-13: GTM (contenedor del CMO) también trae etiquetas de PUBLICIDAD (Google Ads,
+//     Meta) y Microsoft Clarity. Modelo OPT-IN en todas las regiones: nada se carga antes de
+//     "Aceptar". GTM y PostHog son independientes: cada uno se activa con su propia variable.
+// Sin variables no se carga nada: el sitio queda exactamente como antes.
 //
 // PURO: sin I/O. Lo lee el layout (servidor) y pasa el resultado al banner (cliente).
 
@@ -11,11 +12,29 @@ export type ConsentChoice = "granted" | "denied";
 /** Un año: después se vuelve a preguntar. */
 export const CONSENT_MAX_AGE_S = 365 * 24 * 60 * 60;
 
+/**
+ * Lo que concede "Aceptar" en Consent Mode v2: analítica y publicidad. El banner pide permiso
+ * para las dos y la política de cookies lo dice; antes de aceptar no se carga nada.
+ */
+export const GRANTED_CONSENT = {
+  ad_storage: "granted",
+  ad_user_data: "granted",
+  ad_personalization: "granted",
+  analytics_storage: "granted",
+} as const;
+
+/**
+ * Cookies que las herramientas dejan en NUESTRO dominio y que se borran al rechazar o retirar
+ * el consentimiento: GA4 `_ga*`/`_gid`, Google Ads `_gcl_*`, Meta `_fbp`/`_fbc`, Clarity
+ * `_clck`/`_clsk`, PostHog `ph_*`.
+ */
+export const ANALYTICS_COOKIE_RE = /^(_ga|_gid|_gcl_|_fbp|_fbc|_clck|_clsk|ph_)/;
+
 export interface AnalyticsConfig {
   gtmId: string | null;
   posthogKey: string | null;
   posthogHost: string;
-  /** true solo si las DOS herramientas están configuradas (entonces hay que pedir consentimiento). */
+  /** true si hay al menos una herramienta bien configurada (entonces hay que pedir consentimiento). */
   enabled: boolean;
 }
 
@@ -33,12 +52,22 @@ export function analyticsConfig(env: {
   const gtmId = /^GTM-[A-Z0-9]{4,12}$/.test(gtm) ? gtm : null;
   const posthogKey = /^phc_[A-Za-z0-9]{20,64}$/.test(key) ? key : null;
   const posthogHost = /^https:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(host) ? host : DEFAULT_POSTHOG_HOST;
-  // TODO O NADA: hacen falta las DOS herramientas bien configuradas. Una variable suelta (o
-  // con forma inválida) no activa nada: ni banner, ni carga, ni la política con analítica.
-  if (gtmId === null || posthogKey === null) {
-    return { gtmId: null, posthogKey: null, posthogHost, enabled: false };
-  }
-  return { gtmId, posthogKey, posthogHost, enabled: true };
+  // Cada herramienta por su lado: una variable con forma inválida se ignora sola, sin apagar
+  // la otra. Sin ninguna válida no hay banner, ni carga, ni política con analítica.
+  return { gtmId, posthogKey, posthogHost, enabled: gtmId !== null || posthogKey !== null };
+}
+
+/**
+ * Las herramientas que nombra el banner, según lo configurado. Con GTM entran las del
+ * contenedor del CMO (analítica, Clarity y publicidad); PostHog solo si está su variable.
+ */
+export function consentTools(c: Pick<AnalyticsConfig, "gtmId" | "posthogKey">, lang: "en" | "es"): string {
+  const tools = [
+    ...(c.gtmId ? ["Google Analytics", "Microsoft Clarity", "Google Ads", "Meta"] : []),
+    ...(c.posthogKey ? ["PostHog"] : []),
+  ];
+  const and = lang === "es" ? " y " : " and ";
+  return tools.length > 1 ? `${tools.slice(0, -1).join(", ")}${and}${tools.at(-1)}` : (tools[0] ?? "");
 }
 
 /** Lee la elección guardada de un `document.cookie`. null = aún no eligió. */
