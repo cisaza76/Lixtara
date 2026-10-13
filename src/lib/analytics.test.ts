@@ -10,7 +10,8 @@ import {
   LISTING_STEP_SLUGS, disableAnalytics, enableAnalytics, listingStepEvent, resultsBucket, track,
 } from "@/lib/analytics";
 import {
-  analyticsConfig, isAnalyticsExcludedPath, readConsent, sanitizePosthogProperties, sanitizeUrl,
+  ANALYTICS_COOKIE_RE, GRANTED_CONSENT, analyticsConfig, consentTools, isAnalyticsExcludedPath, readConsent,
+  sanitizePosthogProperties, sanitizeUrl,
 } from "@/lib/analytics-config";
 import { recordServerEvent } from "@/lib/analytics.server";
 
@@ -109,27 +110,25 @@ describe("lo que recibe PostHog", () => {
   });
 });
 
-describe("todo o nada: variables parciales no activan nada", () => {
+describe("cada herramienta por su lado (GTM ya no depende de PostHog)", () => {
   const gtm = "GTM-ABC1234";
   const key = "phc_" + "a".repeat(40);
-  it("hace falta GTM y PostHog, ambos con forma válida", () => {
-    expect(analyticsConfig({ NEXT_PUBLIC_GTM_ID: gtm, NEXT_PUBLIC_POSTHOG_KEY: key }).enabled).toBe(true);
-    for (const env of [
-      {},
-      { NEXT_PUBLIC_GTM_ID: gtm },
-      { NEXT_PUBLIC_POSTHOG_KEY: key },
-      { NEXT_PUBLIC_GTM_ID: gtm, NEXT_PUBLIC_POSTHOG_KEY: "phc_short" },
-      { NEXT_PUBLIC_GTM_ID: "G-12345", NEXT_PUBLIC_POSTHOG_KEY: key },
-      { NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com" },
-    ]) {
+  it("basta una herramienta con forma válida; la inválida se ignora sin apagar la otra", () => {
+    expect(analyticsConfig({ NEXT_PUBLIC_GTM_ID: gtm })).toMatchObject({ gtmId: gtm, posthogKey: null, enabled: true });
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: key })).toMatchObject({ gtmId: null, posthogKey: key, enabled: true });
+    expect(analyticsConfig({ NEXT_PUBLIC_GTM_ID: gtm, NEXT_PUBLIC_POSTHOG_KEY: "phc_short" }))
+      .toMatchObject({ gtmId: gtm, posthogKey: null, enabled: true });
+    expect(analyticsConfig({ NEXT_PUBLIC_GTM_ID: "G-12345", NEXT_PUBLIC_POSTHOG_KEY: key }))
+      .toMatchObject({ gtmId: null, posthogKey: key, enabled: true });
+    for (const env of [{}, { NEXT_PUBLIC_GTM_ID: "G-12345" }, { NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com" }]) {
       expect(analyticsConfig(env), JSON.stringify(env)).toEqual({
         gtmId: null, posthogKey: null, posthogHost: expect.any(String), enabled: false,
       });
     }
   });
 
-  it("en un build sin las dos variables, track() no hace nada aunque haya cookie 'granted' y alguien llame enableAnalytics", async () => {
-    vi.stubEnv("NEXT_PUBLIC_GTM_ID", gtm);
+  it("en un build sin ninguna herramienta, track() no hace nada aunque haya cookie 'granted' y alguien llame enableAnalytics", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GTM_ID", "");
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
     vi.resetModules();
     const fresh = await import("@/lib/analytics");
@@ -142,6 +141,49 @@ describe("todo o nada: variables parciales no activan nada", () => {
     expect((w.window as Window).dataLayer).toBeUndefined();
     expect(capture).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
+  });
+
+  it("con GTM solo, track() llega al dataLayer y no retiene nada para PostHog", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GTM_ID", gtm);
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
+    vi.resetModules();
+    const fresh = await import("@/lib/analytics");
+    const w = globalThis as unknown as { window?: unknown; document?: unknown };
+    w.window = { location: { pathname: "/en" } };
+    w.document = { cookie: "lx_consent=granted" };
+    fresh.enableAnalytics(null);
+    fresh.track({ event: "loui_open", lang: "en" });
+    expect((w.window as Window).dataLayer).toEqual([{ event: "loui_open", lang: "en" }]);
+    // Si después apareciera un cliente, no recibe eventos viejos: no había nada retenido.
+    const capture = vi.fn();
+    fresh.enableAnalytics({ capture });
+    expect(capture).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+});
+
+describe("consentimiento: lo que concede 'Aceptar' y lo que se borra al rechazar", () => {
+  it("aceptar concede analítica y publicidad (opt-in: antes de aceptar no se carga nada)", () => {
+    expect(GRANTED_CONSENT).toEqual({
+      ad_storage: "granted", ad_user_data: "granted", ad_personalization: "granted", analytics_storage: "granted",
+    });
+  });
+
+  it("al rechazar se borran las cookies de GA4, Google Ads, Meta, Clarity y PostHog, y no las propias del sitio", () => {
+    for (const c of ["_ga", "_ga_ABC123", "_gid", "_gcl_au", "_fbp", "_fbc", "_clck", "_clsk", "ph_phc_x_posthog"]) {
+      expect(ANALYTICS_COOKIE_RE.test(c), c).toBe(true);
+    }
+    for (const c of ["lx_consent", "sb-access-token", "NEXT_LOCALE", "gallery_view"]) {
+      expect(ANALYTICS_COOKIE_RE.test(c), c).toBe(false);
+    }
+  });
+
+  it("el banner nombra solo las herramientas configuradas", () => {
+    const gtm = "GTM-ABC1234";
+    const key = "phc_" + "a".repeat(40);
+    expect(consentTools({ gtmId: gtm, posthogKey: null }, "en")).toBe("Google Analytics, Microsoft Clarity, Google Ads and Meta");
+    expect(consentTools({ gtmId: gtm, posthogKey: key }, "es")).toBe("Google Analytics, Microsoft Clarity, Google Ads, Meta y PostHog");
+    expect(consentTools({ gtmId: null, posthogKey: key }, "en")).toBe("PostHog");
   });
 });
 
@@ -245,20 +287,49 @@ describe("consentimiento antes de que monte el banner, retención y staff", () =
 });
 
 describe("política de cookies según el estado real", () => {
-  it("sin analítica, el texto actual; con analítica, cada párrafo afectado se reemplaza (EN y ES)", async () => {
-    const { cookiesDoc, cookiesDocFor, ANALYTICS_REPLACEMENT_SOURCES } = await import("@/lib/legal/cookies");
+  const combos = [
+    { gtm: true, posthog: true },
+    { gtm: true, posthog: false },
+    { gtm: false, posthog: true },
+  ];
+
+  it("sin herramientas, el texto actual; con alguna, cada párrafo afectado se reemplaza (EN y ES)", async () => {
+    const { cookiesDoc, cookiesDocFor, cookieReplacementSources } = await import("@/lib/legal/cookies");
     for (const lang of ["en", "es"] as const) {
-      expect(cookiesDocFor(lang, false)).toBe(cookiesDoc[lang]);
+      expect(cookiesDocFor(lang, { gtm: false, posthog: false })).toBe(cookiesDoc[lang]);
       const original = JSON.stringify(cookiesDoc[lang]);
-      const conAnalitica = JSON.stringify(cookiesDocFor(lang, true));
-      // Cada texto a reemplazar existe hoy (si alguien lo edita, esta prueba avisa)…
-      for (const from of ANALYTICS_REPLACEMENT_SOURCES[lang]) {
-        expect(original.includes(JSON.stringify(from).slice(1, -1)), from.slice(0, 40)).toBe(true);
-        // …y ya no aparece en la variante con analítica.
-        expect(conAnalitica.includes(JSON.stringify(from).slice(1, -1)), from.slice(0, 40)).toBe(false);
+      for (const tools of combos) {
+        const variante = JSON.stringify(cookiesDocFor(lang, tools));
+        for (const from of cookieReplacementSources(lang, tools)) {
+          const needle = JSON.stringify(from).slice(1, -1);
+          // Cada texto a reemplazar existe hoy (si alguien lo edita, esta prueba avisa)…
+          expect(original.includes(needle), `${lang} ${JSON.stringify(tools)} ${from.slice(0, 40)}`).toBe(true);
+          // …y ya no aparece en la variante.
+          expect(variante.includes(needle), `${lang} ${JSON.stringify(tools)} ${from.slice(0, 40)}`).toBe(false);
+        }
       }
-      expect(conAnalitica).toMatch(/PostHog/);
-      expect(conAnalitica).toMatch(/Google Analytics 4/);
+    }
+  });
+
+  it("nombra exactamente lo que el sitio carga: publicidad y Clarity solo con GTM, PostHog solo con su variable", async () => {
+    const { cookiesDocFor } = await import("@/lib/legal/cookies");
+    for (const lang of ["en", "es"] as const) {
+      const ambos = JSON.stringify(cookiesDocFor(lang, { gtm: true, posthog: true }));
+      expect(ambos).toMatch(/Google Analytics 4/);
+      expect(ambos).toMatch(/Microsoft Clarity/);
+      expect(ambos).toMatch(/Google Ads/);
+      expect(ambos).toMatch(/Meta Pixel/);
+      expect(ambos).toMatch(/PostHog/);
+
+      const soloGtm = JSON.stringify(cookiesDocFor(lang, { gtm: true, posthog: false }));
+      expect(soloGtm).toMatch(/Meta Pixel/);
+      expect(soloGtm).not.toMatch(/PostHog/);
+
+      const soloPosthog = JSON.stringify(cookiesDocFor(lang, { gtm: false, posthog: true }));
+      expect(soloPosthog).toMatch(/PostHog/);
+      for (const ausente of [/Google Analytics/, /Clarity/, /Google Ads/, /Meta/]) expect(soloPosthog).not.toMatch(ausente);
+      // Sin GTM, la sección de publicidad sigue diciendo que no se usa.
+      expect(soloPosthog).toMatch(lang === "en" ? /We do not use advertising or targeting cookies/ : /No utilizamos cookies de publicidad/);
     }
   });
 });

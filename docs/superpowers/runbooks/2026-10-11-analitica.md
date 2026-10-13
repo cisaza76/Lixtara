@@ -1,7 +1,8 @@
 # Runbook · Analítica: GA4 (vía GTM) + PostHog
 
 **Estado:** código listo y apagado.
-- **Todo o nada:** si falta `NEXT_PUBLIC_GTM_ID` o `NEXT_PUBLIC_POSTHOG_KEY`, o alguna tiene una forma inválida, no se carga nada, `track()` no hace nada y queda el aviso de cookies de siempre. Una variable suelta no activa nada.
+- **Cada herramienta por su lado (desde 2026-10-13):** `NEXT_PUBLIC_GTM_ID` activa GTM y `NEXT_PUBLIC_POSTHOG_KEY` activa PostHog, independientes. Una variable con forma inválida se ignora sola. Sin ninguna válida no se carga nada, `track()` no hace nada y queda el aviso de cookies de siempre.
+- **Opt-in en todas las regiones (decisión del owner, 2026-10-13):** el contenedor del CMO (`GTM-5KGLHNL4`) trae GA4, Microsoft Clarity y publicidad (Google Ads, Meta). Nada de eso se carga antes de "Aceptar"; al aceptar se concede analítica **y** publicidad. Se descartó el modelo opt-out por región que propuso el CMO (GTM cargado para todos, concedido por defecto fuera de UE/UK/CH) y el `<noscript>` (se saltaría el consentimiento).
 - Activar = crear las cuentas + poner las variables en Vercel (Production) + redeploy, **con autorización del owner**.
 
 **Decisión del owner (2026-10-11):**
@@ -12,10 +13,10 @@
 | Regla | Dónde |
 |---|---|
 | Nada se carga sin consentimiento. "Aceptar" y "Rechazar" tienen el mismo estilo y tamaño. El banner aparece igual en pestañas en segundo plano | `src/components/analytics-consent.tsx` |
-| Consent Mode v2: publicidad siempre denegada, solo `analytics_storage` concedido al aceptar | `loadGtm()` |
+| Consent Mode v2: todo denegado por defecto antes de `gtm.js` y, como solo se carga tras "Aceptar", todo concedido en la misma carga (`GRANTED_CONSENT`: analítica y publicidad) | `loadGtm()` |
 | Sin consentimiento, `track()` no hace nada ni encola eventos. Con consentimiento, retiene lo de PostHog mientras su SDK carga | `src/lib/analytics.ts` |
 | La analítica **no corre en `/admin`** (sus URLs llevan ids de leads) | `isAnalyticsExcludedPath()` |
-| Al rechazar o retirar el consentimiento ("Configurar cookies" en el pie) se borran `_ga*`, `ph_*` y el almacenamiento de PostHog | `clearAnalyticsStorage()` |
+| Al rechazar o retirar el consentimiento ("Configurar cookies" en el pie) se borran las cookies de nuestro dominio de GA4 (`_ga*`, `_gid`), Google Ads (`_gcl_*`), Meta (`_fbp`, `_fbc`), Clarity (`_clck`, `_clsk`) y PostHog (`ph_*`), y el almacenamiento de PostHog | `clearAnalyticsStorage()` / `ANALYTICS_COOKIE_RE` |
 | PostHog **sin autocapture** (no lee textos, imágenes ni URLs de fichas del MLS), **sin grabación de sesión**, sin heatmaps, rage/dead clicks, rendimiento, errores, encuestas ni experimentos; texto enmascarado; sin título de página; `person_profiles: identified_only` | `loadPosthog()` |
 | URLs **sin parámetros ni fragmento** en PostHog (`$current_url`, referrers) | `sanitizeUrl()` |
 | **Un pageview por ruta y por herramienta**, con la URL sin parámetros: `$pageview` en PostHog y el evento `lx_page_view` en el dataLayer para GA4. El Google tag **no** debe enviar su page_view automático (ver paso 1) | `pageview()` |
@@ -64,7 +65,7 @@
    - una etiqueta **Google tag** con el Measurement ID, disparador *Initialization – All Pages*, en *Consent settings* exigir `analytics_storage`, y en *Configuration settings* el parámetro **`send_page_view` = `false`**;
    - una etiqueta **GA4 Event** `page_view` con el parámetro `page_location` = `{{DLV page_location}}`, disparada por el *Custom Event* `lx_page_view`. Así GA4 recibe un pageview por ruta, con la URL **sin parámetros**;
    - una etiqueta **GA4 Event** con el nombre `{{Event}}`, disparada por un *Custom Event* con la regex `^(listing_step_view|email_verified|property_search|property_open|showing_request_started|showing_request_submitted|loui_open|loui_message_sent|contact_form_submitted|whatsapp_click|phone_click)$`, y en ella también `page_location` = `{{DLV page_location}}`;
-   - **no** agregar etiquetas de publicidad (Google Ads, remarketing) ni de terceros.
+   - etiquetas de publicidad y Clarity: ver **"Contenedor del CMO"** más abajo.
 4. **Activar la vista previa de GTM**, comprobarla y **Publicar**.
 
 1b. **En GA4 → Data streams → Enhanced measurement:** desactivar *Page changes based on browser history events*, *Form interactions* y *Site search*. La primera duplicaría pageviews; las otras dos pueden leer parámetros o campos de formularios.
@@ -91,12 +92,22 @@
 Después, **Redeploy**: son variables `NEXT_PUBLIC_` y se incrustan en el build.
 
 ### 4 · Verificar
-1. **En una ventana privada:** debe aparecer el banner con "Aceptar analítica" y "Rechazar". Antes de elegir no debe haber peticiones a `googletagmanager.com` ni a `posthog.com` (DevTools → Network).
+1. **En una ventana privada:** debe aparecer el banner con "Aceptar" y "Rechazar" (o "Aceptar analítica" si solo está PostHog). Antes de elegir no debe haber peticiones a `googletagmanager.com` ni a `posthog.com` (DevTools → Network).
 2. **Rechazar:** sin peticiones, sin cookies `_ga` ni `ph_`.
 3. **"Configurar cookies" (pie) → Aceptar:** carga GTM y PostHog. GA4 DebugView y PostHog Live events muestran el pageview y los eventos.
 4. **En PostHog y en GA4 DebugView, revisar las URLs** (`$current_url`, `page_location`): no deben tener `?…`, y no debe aparecer texto ni datos personales. En GA4 debe haber **un** page_view por página.
 5. **Entrar a `/en/admin`:** no debe haber peticiones a Google ni a PostHog.
-6. **La política de cookies** (`/en/cookies`) debe mostrar la sección 3.4 con GA4 y PostHog.
+6. **La política de cookies** (`/en/cookies`) debe mostrar en 3.4 las herramientas configuradas (GA4 y Clarity con GTM; PostHog con su variable) y en 3.5 Google Ads y Meta Pixel solo con GTM.
+
+### Contenedor del CMO (`GTM-5KGLHNL4`, 2026-10-13) — requisitos antes de publicar etiquetas
+El sitio solo carga GTM cuando la persona ya aceptó, pero **lo que hace cada etiqueta lo decide la configuración del contenedor**. Antes de publicar GA4, Meta, Ads o Clarity:
+1. **Consent settings de cada etiqueta:** GA4 exige `analytics_storage`; Google Ads y Meta exigen `ad_storage` (y `ad_user_data` / `ad_personalization` para remarketing); Clarity exige `analytics_storage`.
+2. **URLs con identificadores.** Los píxeles leen la URL completa por su cuenta: en `/listing/new` la URL puede llevar `id` (propiedad) y `session_id` (Stripe), y en el resto del flujo de cuenta, parámetros de estado. Nuestro `sanitizeUrl` solo limpia los eventos que enviamos nosotros. Por eso:
+   - GA4: usar `page_location` = `{{DLV page_location}}` (ya sin parámetros) y `send_page_view = false`, como arriba;
+   - Meta Pixel y Google Ads: agregar una **excepción de disparador** para `Page Path` que empiece con `/en/listing/`, `/es/listing/`, `/en/account`, `/es/account`, `/en/auth`, `/es/auth`, o bien pasar la URL sin parámetros en el campo de URL de la etiqueta;
+   - Clarity: **masking "Strict"** y excluir las mismas rutas (o al menos `/listing/new`, donde se escriben dirección, email y datos del plan).
+3. **`/admin`** nunca carga GTM (lo impide el código).
+4. **Antes de publicar etiquetas de publicidad:** la política de privacidad dice que Lixtara "no comparte información personal para publicidad conductual de contexto cruzado" (sección de California). Con remarketing de Meta/Google eso deja de ser cierto: el abogado tiene que actualizar ese párrafo ese mismo día. La política de **cookies** ya cambia sola a la variante con publicidad cuando `NEXT_PUBLIC_GTM_ID` está configurado (borrador pendiente de revisión).
 
 ## Apagar
 Borrar `NEXT_PUBLIC_GTM_ID` y `NEXT_PUBLIC_POSTHOG_KEY` en Vercel y hacer Redeploy. Vuelve el aviso informativo y la política sin analítica. Las cookies ya puestas expiran solas, o se borran si el visitante pulsa "Configurar cookies".
