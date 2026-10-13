@@ -296,10 +296,6 @@ export interface BrokerListingRequestInput {
   requestId: string;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 export async function sendBrokerListingRequest(input: BrokerListingRequestInput) {
   const isChange = input.kind === "change";
   const subject = isChange
