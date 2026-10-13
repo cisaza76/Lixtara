@@ -43,7 +43,7 @@ export const cookiesDoc: LegalContent = {
         ],
         sub: [
           {
-            heading: "3.1 Strictly Necessary — Authentication & Session",
+            heading: "3.1 Strictly Necessary: Authentication & Session",
             body: [
               "These cookies are essential for the platform to work. They are set by our authentication provider (Supabase Auth) to keep sellers and buyers signed in, maintain a secure session, and protect the listing and transaction flows.",
               "Without these cookies, you would not be able to sign in or complete core actions such as creating or managing a listing.",
@@ -103,9 +103,9 @@ export const cookiesDoc: LegalContent = {
           "These third-party cookies are generally only relevant when you actually use the corresponding feature.",
         ],
         bullets: [
-          "Stripe — when you complete a payment or checkout.",
-          "DocuSign — when you review or sign documents electronically.",
-          "Mapbox and Google Maps — when maps are displayed or used.",
+          "Stripe: when you complete a payment or checkout.",
+          "DocuSign: when you review or sign documents electronically.",
+          "Mapbox and Google Maps: when maps are displayed or used.",
         ],
       },
       {
@@ -116,8 +116,8 @@ export const cookiesDoc: LegalContent = {
           "The exact lifespan of third-party cookies is determined by the providers that set them.",
         ],
         bullets: [
-          "Session cookies — deleted when you close your browser.",
-          "Persistent cookies — remain for a set period or until you clear them.",
+          "Session cookies: deleted when you close your browser.",
+          "Persistent cookies: remain for a set period or until you clear them.",
         ],
       },
       {
@@ -206,7 +206,7 @@ export const cookiesDoc: LegalContent = {
         ],
         sub: [
           {
-            heading: "3.1 Estrictamente Necesarias — Autenticación y Sesión",
+            heading: "3.1 Estrictamente Necesarias: Autenticación y Sesión",
             body: [
               "Estas cookies son esenciales para que la plataforma funcione. Las establece nuestro proveedor de autenticación (Supabase Auth) para mantener a vendedores y compradores con la sesión iniciada, conservar una sesión segura y proteger los flujos de publicación y de transacciones.",
               "Sin estas cookies, no podría iniciar sesión ni completar acciones esenciales como crear o gestionar una publicación.",
@@ -266,9 +266,9 @@ export const cookiesDoc: LegalContent = {
           "Estas cookies de terceros suelen ser relevantes únicamente cuando usted utiliza efectivamente la función correspondiente.",
         ],
         bullets: [
-          "Stripe — cuando realiza un pago o un proceso de pago (checkout).",
-          "DocuSign — cuando revisa o firma documentos electrónicamente.",
-          "Mapbox y Google Maps — cuando se muestran o utilizan mapas.",
+          "Stripe: cuando realiza un pago o un proceso de pago (checkout).",
+          "DocuSign: cuando revisa o firma documentos electrónicamente.",
+          "Mapbox y Google Maps: cuando se muestran o utilizan mapas.",
         ],
       },
       {
@@ -279,8 +279,8 @@ export const cookiesDoc: LegalContent = {
           "La duración exacta de las cookies de terceros la determinan los proveedores que las establecen.",
         ],
         bullets: [
-          "Cookies de sesión — se eliminan cuando cierra su navegador.",
-          "Cookies persistentes — permanecen durante un período determinado o hasta que las borre.",
+          "Cookies de sesión: se eliminan cuando cierra su navegador.",
+          "Cookies persistentes: permanecen durante un período determinado o hasta que las borre.",
         ],
       },
       {
@@ -328,3 +328,181 @@ export const cookiesDoc: LegalContent = {
     ],
   },
 };
+
+// ── Variante con analítica y publicidad (2026-10-11, ampliada 2026-10-13) ─────────────
+// La política tiene que ser cierta en cada estado del sitio. Sin herramientas configuradas
+// (sin NEXT_PUBLIC_GTM_ID ni NEXT_PUBLIC_POSTHOG_KEY) se muestra el texto de arriba tal cual.
+// Con alguna, estos párrafos se reemplazan por la descripción real, SOLO con consentimiento
+// (opt-in en todas las regiones):
+//   - GTM (contenedor del CMO): GA4, Microsoft Clarity y publicidad (Google Ads, Meta).
+//   - PostHog: analítica de producto.
+// BORRADOR pendiente de revisión legal. La política de privacidad (California, "share" para
+// publicidad conductual) se revisa aparte, ANTES de publicar etiquetas de publicidad.
+
+export interface CookieTools {
+  gtm: boolean;
+  posthog: boolean;
+}
+
+type Pairs = Array<[string, string]>;
+
+const SOURCES = {
+  en: {
+    intro: "Any future use of non-essential cookies will be subject to the consent process described in this policy.",
+    how: "We do not currently use cookies for advertising, and we do not currently run product or marketing analytics that rely on cookies.",
+    analyticsBody:
+      "We do not currently use analytics or performance cookies. If, in the future, we add privacy-respecting product or marketing analytics, this policy will be updated and, where required by applicable law, we will obtain your consent before such non-essential cookies are set.",
+    analyticsBullet1: "Not currently in use.",
+    analyticsBullet2: "Any future use will be disclosed here and, where required, consent-based.",
+    adsBody:
+      "We do not use advertising or targeting cookies. Lixtara does not serve third-party advertising and does not use cookies to build advertising profiles or track you across unrelated websites.",
+    adsBullet: "Not used.",
+    notice:
+      "When you first visit Lixtara, we show a lightweight cookie notice that informs you about our use of cookies and points you to this policy.",
+    future:
+      "If we introduce non-essential cookies in the future (for example, analytics), we will request your consent where required by applicable privacy and ePrivacy laws before those cookies are set, and you will be able to make a choice through the cookie notice.",
+  },
+  es: {
+    intro: "Cualquier uso futuro de cookies no esenciales estará sujeto al proceso de consentimiento descrito en esta política.",
+    how: "Actualmente no utilizamos cookies con fines publicitarios y no ejecutamos análisis de producto ni de marketing que dependan de cookies.",
+    analyticsBody:
+      "Actualmente no utilizamos cookies de análisis ni de rendimiento. Si, en el futuro, incorporamos análisis de producto o de marketing que respeten la privacidad, esta política se actualizará y, cuando lo exija la ley aplicable, obtendremos su consentimiento antes de que se establezcan dichas cookies no esenciales.",
+    analyticsBullet1: "No se utilizan actualmente.",
+    analyticsBullet2: "Cualquier uso futuro se divulgará aquí y, cuando se requiera, se basará en el consentimiento.",
+    adsBody:
+      "No utilizamos cookies de publicidad ni de segmentación. Lixtara no muestra publicidad de terceros y no utiliza cookies para crear perfiles publicitarios ni para rastrearle a través de sitios web no relacionados.",
+    adsBullet: "No se utilizan.",
+    notice:
+      "Cuando visita Lixtara por primera vez, le mostramos un aviso de cookies ligero que le informa sobre nuestro uso de cookies y le remite a esta política.",
+    future:
+      "Si en el futuro incorporamos cookies no esenciales (por ejemplo, de análisis), solicitaremos su consentimiento cuando lo exijan las leyes aplicables de privacidad y de privacidad en las comunicaciones electrónicas (ePrivacy) antes de establecer dichas cookies, y podrá realizar su elección a través del aviso de cookies.",
+  },
+} as const;
+
+function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
+  const src = SOURCES[lang];
+  const ads = t.gtm; // la publicidad solo entra por GTM
+  if (lang === "en") {
+    const kinds = ads ? "analytics and advertising" : "analytics";
+    const tools = [
+      t.gtm && "Google Analytics 4 (loaded through Google Tag Manager) to measure traffic sources and campaigns",
+      t.gtm &&
+        "Microsoft Clarity to understand how visitors interact with our pages through aggregated heatmaps and session replays, configured to mask the text you type",
+      t.posthog && "PostHog to understand how visitors use our search and listing flows, without recording sessions",
+    ].filter(Boolean) as string[];
+    const list = tools.length > 1 ? `${tools.slice(0, -1).join(", ")}, and ${tools.at(-1)}` : tools[0];
+    return [
+      [src.intro, `Non-essential ${kinds} cookies are used only if you accept them through the consent banner described in this policy.`],
+      [
+        src.how,
+        ads
+          ? "With your consent, we use analytics cookies to understand how the site is used and advertising cookies to measure and improve our marketing campaigns, as described in Sections 3.4 and 3.5. Without your consent, these tools are not loaded."
+          : "We do not use cookies for advertising. With your consent, we use analytics cookies to understand how the site is used, as described in Section 3.4.",
+      ],
+      [
+        src.analyticsBody,
+        `Only if you accept in the consent banner, we use ${list}. The events we send ourselves include page addresses without query parameters and never the text you type. If you reject, these tools are not loaded.`,
+      ],
+      [
+        src.analyticsBullet1,
+        t.gtm
+          ? "Google Analytics 4 / Google Tag Manager (cookies such as _ga) and Microsoft Clarity (cookies such as _clck and _clsk), only with your consent."
+          : "PostHog (cookies and local storage such as ph_*), only with your consent.",
+      ],
+      [
+        src.analyticsBullet2,
+        (t.gtm && t.posthog ? "PostHog (cookies and local storage such as ph_*), only with your consent. " : "") +
+          "You can change your choice at any time through \"Cookie settings\" in the site footer.",
+      ],
+      ...(ads
+        ? ([
+            [
+              src.adsBody,
+              "Only if you accept in the consent banner, we load advertising tags from Google (Google Ads) and Meta (Facebook and Instagram) through Google Tag Manager. They let us measure which of our ads lead to visits and inquiries and show our ads to people who have visited Lixtara (remarketing). These providers may combine this information with other data they hold about you, under their own privacy policies. Lixtara does not display third-party advertising on its site. If you reject, these tags are not loaded.",
+            ],
+            [src.adsBullet, "Google Ads (cookies such as _gcl_au) and Meta Pixel (cookies such as _fbp), only with your consent."],
+          ] as Pairs)
+        : []),
+      [
+        src.notice,
+        `When you first visit Lixtara, we show a cookie banner that lets you accept or reject ${kinds} cookies, with both options equally available, and points you to this policy.`,
+      ],
+      [
+        src.future,
+        `${kinds[0].toUpperCase()}${kinds.slice(1)} cookies are set only after you accept them. If you reject them, or later withdraw your consent through "Cookie settings", these tools are not loaded and the cookies they set on our domain are deleted from your browser.`,
+      ],
+    ];
+  }
+  const kinds = ads ? "de analítica y de publicidad" : "de analítica";
+  const tools = [
+    t.gtm && "Google Analytics 4 (cargado a través de Google Tag Manager) para medir fuentes de tráfico y campañas",
+    t.gtm &&
+      "Microsoft Clarity para entender cómo los visitantes interactúan con nuestras páginas mediante mapas de calor agregados y grabaciones de sesión, configurado para ocultar el texto que usted escribe",
+    t.posthog && "PostHog para entender cómo los visitantes usan nuestra búsqueda y nuestros flujos de publicación, sin grabar sesiones",
+  ].filter(Boolean) as string[];
+  const list = tools.length > 1 ? `${tools.slice(0, -1).join(", ")} y ${tools.at(-1)}` : tools[0];
+  return [
+    [src.intro, `Las cookies ${kinds}, que no son esenciales, solo se usan si usted las acepta en el banner de consentimiento descrito en esta política.`],
+    [
+      src.how,
+      ads
+        ? "Con su consentimiento, usamos cookies de analítica para entender cómo se usa el sitio y cookies de publicidad para medir y mejorar nuestras campañas de marketing, según se describe en las Secciones 3.4 y 3.5. Sin su consentimiento, estas herramientas no se cargan."
+        : "No utilizamos cookies con fines publicitarios. Con su consentimiento, usamos cookies de analítica para entender cómo se usa el sitio, según se describe en la Sección 3.4.",
+    ],
+    [
+      src.analyticsBody,
+      `Solo si usted acepta en el banner de consentimiento, usamos ${list}. Los eventos que enviamos nosotros incluyen direcciones de página sin parámetros y nunca el texto que usted escribe. Si rechaza, estas herramientas no se cargan.`,
+    ],
+    [
+      src.analyticsBullet1,
+      t.gtm
+        ? "Google Analytics 4 / Google Tag Manager (cookies como _ga) y Microsoft Clarity (cookies como _clck y _clsk), solo con su consentimiento."
+        : "PostHog (cookies y almacenamiento local como ph_*), solo con su consentimiento.",
+    ],
+    [
+      src.analyticsBullet2,
+      (t.gtm && t.posthog ? "PostHog (cookies y almacenamiento local como ph_*), solo con su consentimiento. " : "") +
+        "Puede cambiar su elección en cualquier momento en \"Configurar cookies\", en el pie del sitio.",
+    ],
+    ...(ads
+      ? ([
+          [
+            src.adsBody,
+            "Solo si usted acepta en el banner de consentimiento, cargamos etiquetas de publicidad de Google (Google Ads) y de Meta (Facebook e Instagram) a través de Google Tag Manager. Nos permiten medir qué anuncios nuestros generan visitas y consultas, y mostrar nuestros anuncios a personas que visitaron Lixtara (remarketing). Estos proveedores pueden combinar esta información con otros datos que tengan sobre usted, según sus propias políticas de privacidad. Lixtara no muestra publicidad de terceros en su sitio. Si rechaza, estas etiquetas no se cargan.",
+          ],
+          [src.adsBullet, "Google Ads (cookies como _gcl_au) y Meta Pixel (cookies como _fbp), solo con su consentimiento."],
+        ] as Pairs)
+      : []),
+    [
+      src.notice,
+      `Cuando visita Lixtara por primera vez, le mostramos un banner de cookies que le permite aceptar o rechazar las cookies ${kinds}, con ambas opciones igual de accesibles, y le remite a esta política.`,
+    ],
+    [
+      src.future,
+      `Las cookies ${kinds} solo se establecen después de que usted las acepta. Si las rechaza, o retira su consentimiento más tarde en "Configurar cookies", estas herramientas no se cargan y las cookies que dejaron en nuestro dominio se borran de su navegador.`,
+    ],
+  ];
+}
+
+function replaceDeep<T>(value: T, pairs: Array<[string, string]>): T {
+  if (typeof value === "string") {
+    // Por fragmento: algunas frases viven dentro de un párrafo más largo.
+    return pairs.reduce((acc, [from, to]) => acc.split(from).join(to), value as string) as T;
+  }
+  if (Array.isArray(value)) return value.map((v) => replaceDeep(v, pairs)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, replaceDeep(v, pairs)])) as T;
+  }
+  return value;
+}
+
+/** La política que corresponde al estado real del sitio. */
+export function cookiesDocFor(lang: "en" | "es", tools: CookieTools) {
+  const doc = cookiesDoc[lang];
+  return tools.gtm || tools.posthog ? replaceDeep(doc, replacementsFor(lang, tools)) : doc;
+}
+
+/** Para las pruebas: los textos que cada variante debe encontrar (y reemplazar). */
+export function cookieReplacementSources(lang: "en" | "es", tools: CookieTools): string[] {
+  return replacementsFor(lang, tools).map(([from]) => from);
+}

@@ -19,14 +19,29 @@
 //          paginaba.
 //
 // Se ejecuta con los mismos gates que la sincronización (es ingesta: llama a Bridge).
-import type { MlsFeedProvider } from "@/lib/mls/feed-port";
+import type { MlsFeedProvider, NormalizedListing } from "@/lib/mls/feed-port";
+import { MlsNormalizationError, normalizeListing } from "@/lib/mls/feed-port";
 import { partitionByCoverage } from "@/lib/mls/coverage";
 
 /** Fracción mínima de filas guardadas que la lista debe cubrir para permitir el borrado. */
 export const RECONCILE_MIN_COVERAGE_RATIO = 0.8;
 
-/** Una reconciliación por día. Algo menos de 24 h para que el horario no derive. */
-export const RECONCILE_MIN_INTERVAL_MS = 20 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * ¿Toca reconciliar? Una vez por DÍA UTC: toca si la última reconciliación terminada es
+ * de un día UTC anterior (o no hay ninguna).
+ *
+ * Antes era "20 h desde la anterior", y eso desfasaba el calendario: una corrida manual a
+ * las 21:15 UTC dejó sin reconciliar toda la ventana de la mañana siguiente (08:07–10:52
+ * UTC, apenas 11–14 h después) y la siguiente quedó a ~35 h (2026-10-11). Con el día UTC,
+ * una corrida manual a cualquier hora no impide la de la mañana siguiente, y la ventana
+ * del cron (08–10 UTC) garantiza como mucho ~27 h entre dos reconciliaciones.
+ */
+export function reconcileDue(lastFinishedAtMs: number | null, nowMs: number): boolean {
+  if (lastFinishedAtMs === null) return true;
+  return Math.floor(lastFinishedAtMs / DAY_MS) < Math.floor(nowMs / DAY_MS);
+}
 
 /**
  * Una reconciliación a medias más vieja que esto se REEMPIEZA: el nextLink de Bridge
@@ -34,6 +49,65 @@ export const RECONCILE_MIN_INTERVAL_MS = 20 * 60 * 60 * 1000;
  * coherente del feed.
  */
 export const RECONCILE_STALE_AFTER_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * Diagnóstico de frescura (Opción B, 2026-10-11): conteos de cómo están las fichas
+ * guardadas frente a BridgeModificationTimestamp. SOLO MIDE: no corrige ni descarga nada.
+ * Ver la migración 20261011170000.
+ */
+export interface Freshness {
+  missing: number;
+  stale: number;
+  recent: number;
+  current: number;
+  unknown: number;
+  /**
+   * Fichas desactualizadas que esta reconciliación VOLVIÓ A DESCARGAR y guardó (arreglo
+   * del 2026-10-12). `stale` cuenta lo que se encontró ANTES de corregir; esto, lo que se
+   * corrigió. Ausente = la recuperación no corrió.
+   */
+  refetched?: number;
+}
+
+export const EMPTY_FRESHNESS: Freshness = { missing: 0, stale: 0, recent: 0, current: 0, unknown: 0 };
+
+/** Un cambio de Bridge más nuevo que esto aún lo puede tomar el sync de cada hora. */
+export const FRESHNESS_RECENT_MS = 2 * 60 * 60 * 1000;
+
+function addFreshness(a: Freshness, b: Freshness): Freshness {
+  return {
+    ...a,
+    missing: a.missing + b.missing, stale: a.stale + b.stale, recent: a.recent + b.recent,
+    current: a.current + b.current, unknown: a.unknown + b.unknown,
+  };
+}
+
+/** Tope de fichas que una invocación vuelve a descargar: protege el presupuesto de tiempo. */
+export const REFETCH_MAX_PER_RUN = 500;
+
+/**
+ * Claves DESACTUALIZADAS: guardadas, con fecha de Bridge en los dos lados, la guardada más
+ * vieja que la actual, y el cambio con más de FRESHNESS_RECENT_MS (lo reciente lo toma el
+ * sync de cada hora). Misma regla que `stale` en mls_freshness_counts (migración
+ * 20261011170000).
+ */
+export function selectStaleKeys(
+  records: Array<{ key: string; bridgeTs: string | null }>,
+  stored: Map<string, string | null>,
+  recentAfter: string,
+): string[] {
+  const limite = Date.parse(recentAfter);
+  return records
+    .filter((r) => {
+      if (!stored.has(r.key) || !r.bridgeTs) return false;
+      const guardada = stored.get(r.key);
+      if (!guardada) return false;
+      const b = Date.parse(r.bridgeTs);
+      const g = Date.parse(guardada);
+      return Number.isFinite(b) && Number.isFinite(g) && g < b && b < limite;
+    })
+    .map((r) => r.key);
+}
 
 export interface ReconcileState {
   dataset: string;
@@ -45,6 +119,8 @@ export interface ReconcileState {
   keysSeen: number;
   /** Cuándo terminó (ok o abortada) la última reconciliación. */
   lastFinishedAt: string | null;
+  /** Diagnóstico acumulado de la reconciliación en curso. null = no disponible. */
+  freshness?: Freshness | null;
 }
 
 export type ReconcileOutcome = "not_due" | "partial" | "failed" | "aborted" | "ok";
@@ -55,6 +131,8 @@ export interface ReconcileFinish {
   keysSeen: number;
   stored: number;
   error: string | null;
+  /** Diagnóstico de frescura de toda la lista; null = no disponible. */
+  freshness?: Freshness | null;
 }
 
 export interface ReconcileStore {
@@ -63,8 +141,25 @@ export interface ReconcileStore {
   beginReconciliation(dataset: string, startedAt: string): Promise<void>;
   /** Marca `last_confirmed_at = at` en las filas guardadas con esas claves. */
   confirmListings(listingKeys: string[], at: string): Promise<number>;
-  /** Cursor y conteo en UNA escritura: si no se guarda uno, no se guarda el otro. */
-  saveReconcileProgress(dataset: string, cursor: string | null, keysSeen: number): Promise<void>;
+  /** Cursor, conteo y diagnóstico en UNA escritura: si no se guarda uno, no se guarda el otro. */
+  saveReconcileProgress(
+    dataset: string, cursor: string | null, keysSeen: number, freshness?: Freshness | null,
+  ): Promise<void>;
+  /**
+   * Diagnóstico de SOLO LECTURA: compara la fecha de Bridge de cada clave con la guardada.
+   * Opcional: sin él (o si falla), la reconciliación sigue igual y el diagnóstico queda null.
+   */
+  compareFreshness?(
+    records: Array<{ key: string; bridgeTs: string | null }>, recentAfter: string,
+  ): Promise<Freshness>;
+  /**
+   * Fecha de Bridge GUARDADA (payload.BridgeModificationTimestamp) de esas claves; las que
+   * no están guardadas no aparecen en el mapa. Opcional, junto con `upsertListings`: sin
+   * los dos, la reconciliación no recupera nada.
+   */
+  storedBridgeTimestamps?(listingKeys: string[]): Promise<Map<string, string | null>>;
+  /** Upsert por listing_key, el mismo del sync. */
+  upsertListings?(rows: NormalizedListing[]): Promise<number>;
   /** Filas guardadas en mls_listings. */
   countListings(): Promise<number>;
   /** Borra lo no confirmado con `last_seen_at < startedAt`; devuelve cuántas filas. */
@@ -81,7 +176,6 @@ export interface ReconcileDeps {
   now(): number;
   timeBudgetMs: number;
   maxPages: number;
-  minIntervalMs?: number;
   staleAfterMs?: number;
   minCoverageRatio?: number;
 }
@@ -103,12 +197,15 @@ export interface ReconcileSummary {
   deleted: number;
   stoppedBy: "completed" | "time_budget" | "max_pages" | "error" | "not_due";
   error: string | null;
+  /** Diagnóstico de frescura acumulado (toda la lista al cerrar); null = no disponible. */
+  freshness: Freshness | null;
+  /** Fichas desactualizadas vueltas a descargar y guardadas EN ESTA invocación. */
+  refetched: number;
 }
 
 export async function runMlsReconciliation(deps: ReconcileDeps): Promise<ReconcileSummary> {
   const {
     provider, store, now, timeBudgetMs, maxPages,
-    minIntervalMs = RECONCILE_MIN_INTERVAL_MS,
     staleAfterMs = RECONCILE_STALE_AFTER_MS,
     minCoverageRatio = RECONCILE_MIN_COVERAGE_RATIO,
   } = deps;
@@ -118,6 +215,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
   const resumen: ReconcileSummary = {
     dataset, outcome: "partial", started: false, restartedStale: false, pages: 0,
     keysReceived: 0, keysSeen: 0, stored: null, deleted: 0, stoppedBy: "completed", error: null,
+    freshness: null, refetched: 0,
   };
 
   const estado = await store.readReconcileState(dataset);
@@ -131,7 +229,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
 
   if (startedAt === null) {
     const ultima = estado?.lastFinishedAt ? Date.parse(estado.lastFinishedAt) : null;
-    if (!resumen.restartedStale && ultima !== null && inicioMs - ultima < minIntervalMs) {
+    if (!resumen.restartedStale && !reconcileDue(ultima, inicioMs)) {
       return { ...resumen, outcome: "not_due", stoppedBy: "not_due" };
     }
     startedAt = new Date(inicioMs).toISOString();
@@ -141,7 +239,38 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
 
   let cursor = resumen.started ? null : estado?.cursor ?? null;
   let keysSeen = resumen.started ? 0 : estado?.keysSeen ?? 0;
+  // Diagnóstico: arranca en cero en una reconciliación nueva; si se continúa una, sigue el
+  // acumulado guardado (o queda no disponible si ya se había perdido).
+  let freshness: Freshness | null = !store.compareFreshness
+    ? null
+    : resumen.started ? { ...EMPTY_FRESHNESS } : estado?.freshness ?? null;
+  const recentAfter = new Date(Date.parse(startedAt) - FRESHNESS_RECENT_MS).toISOString();
   let completa = false;
+  // Recuperación de desactualizadas: hace falta el diagnóstico (dice en qué páginas hay),
+  // la descarga por clave y el upsert. Si falla una vez, se apaga por esta invocación: la
+  // reconciliación (borrar lo eliminado) es lo que no puede caerse.
+  let recuperar = !!(provider.fetchListingsByKeys && store.storedBridgeTimestamps && store.upsertListings);
+
+  /** Vuelve a descargar y guarda las desactualizadas de una página. Devuelve cuántas guardó. */
+  async function refetchStale(
+    registros: Array<{ key: string; bridgeTs: string | null }>, max: number,
+  ): Promise<number> {
+    const guardadas = await store.storedBridgeTimestamps!(registros.map((r) => r.key));
+    const viejas = selectStaleKeys(registros, guardadas, recentAfter).slice(0, max);
+    if (viejas.length === 0) return 0;
+    const fichas = await provider.fetchListingsByKeys!(viejas);
+    // Mismo camino que el sync: cobertura en código y normalización.
+    const { included: enCobertura } = partitionByCoverage(fichas);
+    const filas: NormalizedListing[] = [];
+    for (const l of enCobertura) {
+      try {
+        filas.push(normalizeListing(l, startedAt!));
+      } catch (e) {
+        if (!(e instanceof MlsNormalizationError)) throw e;
+      }
+    }
+    return filas.length > 0 ? await store.upsertListings!(filas) : 0;
+  }
 
   try {
     for (;;) {
@@ -159,8 +288,40 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
       if (claves.length > 0) await store.confirmListings(claves, startedAt);
       keysSeen += claves.length;
 
+      // Diagnóstico de frescura: nunca tumba la reconciliación. Si falla una vez, queda no
+      // disponible para el resto de esta lista (un total parcial engañaría).
+      const registros = included.map((k) => ({
+        key: k.ListingKey,
+        bridgeTs: typeof k.BridgeModificationTimestamp === "string" ? k.BridgeModificationTimestamp : null,
+      }));
+      if (freshness !== null && store.compareFreshness && included.length > 0) {
+        try {
+          const f = await store.compareFreshness(registros, recentAfter);
+          freshness = addFreshness(freshness, f);
+          if (recuperar && f.stale > 0 && resumen.refetched < REFETCH_MAX_PER_RUN) {
+            try {
+              const n = await refetchStale(registros, REFETCH_MAX_PER_RUN - resumen.refetched);
+              resumen.refetched += n;
+              freshness = { ...freshness, refetched: (freshness.refetched ?? 0) + n };
+            } catch (e) {
+              recuperar = false;
+              console.error(JSON.stringify({
+                event: "mls_stale_refetch_failed",
+                message: e instanceof Error ? e.message : String(e),
+              }));
+            }
+          }
+        } catch (e) {
+          freshness = null;
+          console.error(JSON.stringify({
+            event: "mls_freshness_unavailable",
+            message: e instanceof Error ? e.message : String(e),
+          }));
+        }
+      }
+
       cursor = pagina.nextCursor;
-      await store.saveReconcileProgress(dataset, cursor, keysSeen);
+      await store.saveReconcileProgress(dataset, cursor, keysSeen, freshness);
       if (cursor === null) { completa = true; break; }
     }
   } catch (e) {
@@ -168,6 +329,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
     resumen.error = e instanceof Error ? e.message : String(e);
   }
   resumen.keysSeen = keysSeen;
+  resumen.freshness = freshness;
 
   if (!completa) {
     resumen.outcome = resumen.stoppedBy === "error" ? "failed" : "partial";
@@ -188,7 +350,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
     resumen.outcome = "aborted";
     resumen.error = motivo;
     await store.finishReconciliation(dataset, {
-      status: "aborted", deleted: 0, keysSeen, stored, error: motivo,
+      status: "aborted", deleted: 0, keysSeen, stored, error: motivo, freshness,
     });
     return resumen;
   }
@@ -196,7 +358,7 @@ export async function runMlsReconciliation(deps: ReconcileDeps): Promise<Reconci
   resumen.deleted = await store.sweepUnconfirmed(startedAt);
   resumen.outcome = "ok";
   await store.finishReconciliation(dataset, {
-    status: "ok", deleted: resumen.deleted, keysSeen, stored, error: null,
+    status: "ok", deleted: resumen.deleted, keysSeen, stored, error: null, freshness,
   });
   return resumen;
 }

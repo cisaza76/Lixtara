@@ -1,5 +1,6 @@
+import { assertStaff } from "@/lib/admin-auth";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -63,23 +64,10 @@ export default async function TransactionDetailPage({
     ? `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`
     : "—";
 
-  async function assertAdmin() {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
-    const [{ data: a }, { data: b }] = await Promise.all([
-      supabase.rpc("has_role", { _role: "admin" }),
-      supabase.rpc("has_role", { _role: "broker" }),
-    ]);
-    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
-    return supabase;
-  }
 
   async function saveTitle(formData: FormData) {
     "use server";
-    const sb = await assertAdmin();
+    const sb = await assertStaff(lang);
     await sb
       .from("transactions")
       .update({
@@ -101,7 +89,7 @@ export default async function TransactionDetailPage({
     "use server";
     const next = String(formData.get("status") ?? "");
     if (!STATUS_FLOW.includes(next)) return;
-    const sb = await assertAdmin();
+    const sb = await assertStaff(lang);
     const patch: Record<string, unknown> = {
       status: next,
       updated_at: new Date().toISOString(),

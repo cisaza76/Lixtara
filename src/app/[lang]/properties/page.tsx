@@ -5,24 +5,47 @@ import { PropertyCard } from "@/components/property-card";
 import { getPublicMlsListings } from "@/lib/mls/public-listings.supabase";
 import { MlsListingCard } from "@/components/mls-listing-card";
 import { MlsDisclosures } from "@/components/mls-disclosures";
+import { PropertySearchForm } from "@/components/property-search-form";
+import { PaginationNav } from "@/components/pagination-nav";
+import { TrackOnMount } from "@/components/analytics-events";
+import { resultsBucket } from "@/lib/analytics";
+import {
+  MAX_PAGE,
+  PAGE_SIZE,
+  hasActiveFilters,
+  isTruncated,
+  ownListingMatches,
+  pageCount,
+  parsePropertySearch,
+  propertySearchQuery,
+  type RawSearchParams,
+} from "@/lib/property-search";
 
 export default async function PropertiesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ lang: string }>;
+  searchParams: Promise<RawSearchParams>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  const search = parsePropertySearch(await searchParams);
 
   const copy = t(lang).properties;
-  const properties = await getActiveProperties();
+  // Los listings propios son pocos: se filtran en memoria y van solo en la página 1,
+  // antes del inventario del feed.
+  const ownMatches = (await getActiveProperties()).filter((p) => ownListingMatches(p, search));
+  const properties = search.page === 1 ? ownMatches : [];
 
-  // Inventario de terceros del feed IDX, ya deduplicado contra los listings propios.
-  // Cuando el gate niega —preview, sin flag, o host no licenciado— devuelve vacío y la
-  // página queda exactamente como antes: solo listings propios.
+  // Inventario de terceros del feed IDX, filtrado y paginado en la base, ya deduplicado
+  // contra los listings propios. Cuando el gate niega —preview, sin flag, o host no
+  // licenciado— devuelve vacío y la página muestra solo los listings propios.
   const mlsRefs = await getActiveListingMlsRefs();
-  const mls = await getPublicMlsListings(mlsRefs, lang);
-  const total = properties.length + mls.listings.length;
+  const mls = await getPublicMlsListings(mlsRefs, lang, search);
+  const total = ownMatches.length + mls.total;
+  const pages = pageCount(mls.total);
+  const hrefFor = (page: number) => `/${lang}/properties${propertySearchQuery(search, { page })}`;
 
   return (
     <main className="bg-background text-foreground flex-1 flex flex-col">
@@ -42,9 +65,32 @@ export default async function PropertiesPage({
           </p>
         </div>
 
+        <PropertySearchForm lang={lang} search={search} labels={copy.filters} />
+        {/* Solo qué filtros se usaron y un cubo de resultados: nada de fichas ni zips. */}
+        <TrackOnMount
+          event={{
+            event: "property_search",
+            lang,
+            page: search.page,
+            sort: search.sort,
+            has_price: search.minPrice !== null || search.maxPrice !== null,
+            has_beds: search.beds !== null,
+            has_baths: search.baths !== null,
+            county: search.county,
+            has_zip: search.zip !== null,
+            results_bucket: resultsBucket(total),
+          }}
+        />
+
+        {mls.limited && (
+          <p role="status" className="mb-10 border border-gold-soft bg-gold/5 px-4 py-3 text-sm text-ink/80">
+            {copy.rateLimited}
+          </p>
+        )}
+
         {total === 0 ? (
           <p className="text-lg text-ink/70 leading-relaxed max-w-xl">
-            {copy.emptyState}
+            {hasActiveFilters(search) ? copy.filters.noResults : copy.emptyState}
           </p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12 lg:gap-x-10 lg:gap-y-16">
@@ -61,6 +107,8 @@ export default async function PropertiesPage({
                   bedsShort: copy.card.bedsShort,
                   bathsShort: copy.card.bathsShort,
                   sqftSuffix: copy.card.sqftSuffix,
+                  noPhoto: copy.card.noPhoto,
+                  demo: copy.card.demo,
                 }}
               />
             ))}
@@ -71,6 +119,18 @@ export default async function PropertiesPage({
               <MlsListingCard key={l.listingKey} listing={l} />
             ))}
           </div>
+        )}
+
+        <PaginationNav
+          page={Math.min(search.page, pages)}
+          pages={pages}
+          hrefFor={hrefFor}
+          labels={copy.pagination}
+        />
+        {isTruncated(mls.total) && (
+          <p className="mt-6 text-sm text-ink/60 text-center">
+            {copy.pagination.truncated.replace("{shown}", (PAGE_SIZE * MAX_PAGE).toLocaleString(lang))}
+          </p>
         )}
 
         {/* Avisos del MLS SOLO si hay contenido licenciado en pantalla: mostrarlos sin

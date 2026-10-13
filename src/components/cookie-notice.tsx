@@ -15,11 +15,13 @@ export function CookieNotice({
   message,
   learnMore,
   accept,
+  regionLabel,
 }: {
   lang: string;
   message: string;
   learnMore: string;
   accept: string;
+  regionLabel: string;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -52,7 +54,7 @@ export function CookieNotice({
   return (
     <div
       role="region"
-      aria-label="Cookie notice"
+      aria-label={regionLabel}
       className="fixed inset-x-0 bottom-0 z-[1000] border-t border-gold-soft bg-ink/95 backdrop-blur-sm px-4 py-3 sm:px-6"
     >
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

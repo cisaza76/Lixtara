@@ -4,6 +4,7 @@ import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { SuccessBanner, ErrorBanner } from "@/components/auth-shell";
 import { sendListingApproved } from "@/lib/email";
+import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
 import {
   ensureEnterMlsNumberTask,
@@ -195,10 +196,14 @@ export default async function AdminPage({
       if (sellerEmail) {
         const origin =
           process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
+        // El email va en el idioma del vendedor (seller_leads.locale), no en el del
+        // admin que aprueba; si no lo conocemos, inglés.
+        const sellerLang = (await lookupRecipientLang(prop.owner_id)) ?? "en";
         await sendListingApproved({
           to: sellerEmail,
+          lang: sellerLang,
           propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
-          listingUrl: `${origin}/${lang}/property/${prop.id}`,
+          listingUrl: `${origin}/${sellerLang}/property/${prop.id}`,
         });
       }
     } catch (e) {

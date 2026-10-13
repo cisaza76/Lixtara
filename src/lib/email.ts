@@ -1,10 +1,13 @@
 // Transactional email wrapper around Resend.
 //
-// Test mode posture (until lixtara.com is verified in Resend):
-//   - from = onboarding@resend.dev (Resend's no-DNS sender)
-//   - to   = EMAIL_DEV_OVERRIDE_TO when set, otherwise the real recipient
-// Set EMAIL_DEV_OVERRIDE_TO to your own email to receive everything for
-// debugging. Remove the env var once you're on a verified domain.
+// Sender:
+//   - from     = EMAIL_FROM (e.g. "Lixtara <hola@lixtara.com>", a sender on the
+//                lixtara.com domain verified in Resend). Unset = Resend's test
+//                sender onboarding@resend.dev, which only delivers to the Resend
+//                account owner, so real customers get nothing.
+//   - reply-to = EMAIL_REPLY_TO when set (a real inbox for replies).
+//   - to       = EMAIL_DEV_OVERRIDE_TO when set (debugging), otherwise the real
+//                recipient. Never set it in Production.
 //
 // All public helpers (sendPaymentReceipt, sendAgreementSigned, etc.) are
 // fire-and-forget from the caller's perspective — they NEVER throw. The
@@ -19,6 +22,7 @@ import {
   type CanSpamMissing,
   type CommercialSenderIdentity,
 } from "@/lib/email-compliance";
+import { escapeHtml } from "@/lib/contact-form";
 
 let _client: Resend | null = null;
 function client(): Resend | null {
@@ -28,7 +32,16 @@ function client(): Resend | null {
   return _client;
 }
 
-const DEFAULT_FROM = "Lixtara <onboarding@resend.dev>";
+const TEST_FROM = "Lixtara <onboarding@resend.dev>";
+
+/** Sender for every Lixtara email (see header). */
+export function emailFrom(): string {
+  return process.env.EMAIL_FROM?.trim() || TEST_FROM;
+}
+
+function emailReplyTo(): string | undefined {
+  return process.env.EMAIL_REPLY_TO?.trim() || undefined;
+}
 
 interface SendInput {
   to: string;
@@ -41,6 +54,8 @@ interface SendInput {
   idempotencyKey?: string;
   /** Extra MIME headers (e.g. List-Unsubscribe for commercial email). */
   headers?: Record<string, string>;
+  /** Overrides EMAIL_REPLY_TO (e.g. the visitor who wrote via /contact). */
+  replyTo?: string;
 }
 
 async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -54,7 +69,8 @@ async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error
   try {
     const { data, error } = await c.emails.send(
       {
-        from: input.from ?? DEFAULT_FROM,
+        from: input.from ?? emailFrom(),
+        ...((input.replyTo ?? emailReplyTo()) ? { replyTo: input.replyTo ?? emailReplyTo() } : {}),
         to,
         subject: input.subject,
         html: input.html,
@@ -75,10 +91,14 @@ async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error
   }
 }
 
+type Lang = "en" | "es";
+
 // ─── Shared HTML wrapper ─────────────────────────────────────────────
 
-function shell(opts: { preheader: string; body: string }): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lixtara</title></head>
+function shell(opts: { preheader: string; body: string; lang?: Lang }): string {
+  const lang = opts.lang ?? "en";
+  const tagline = lang === "es" ? "Brokerage en Florida" : "Florida brokerage";
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lixtara</title></head>
 <body style="margin:0;padding:0;background:#f4f1ec;font-family:'Helvetica Neue',Arial,sans-serif;color:#1c1c1c;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${opts.preheader}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ec;">
@@ -86,13 +106,13 @@ function shell(opts: { preheader: string; body: string }): string {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border:1px solid #d8d1c0;">
       <tr><td style="padding:28px 32px;border-bottom:1px solid #ece6d6;">
         <span style="font-family:Georgia,serif;font-style:italic;font-size:28px;color:#1c1c1c;letter-spacing:-0.02em;">Lixtara</span>
-        <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.22em;color:#8a8268;margin-left:14px;">Florida brokerage</span>
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.22em;color:#8a8268;margin-left:14px;">${tagline}</span>
       </td></tr>
       <tr><td style="padding:32px;">${opts.body}</td></tr>
       <tr><td style="padding:20px 32px;border-top:1px solid #ece6d6;font-size:11px;color:#8a8268;line-height:1.6;">
-        ${brokerageLicenseLine("en")}<br>
+        ${brokerageLicenseLine(lang)}<br>
         ${BROKERAGE.address}<br>
-        <a href="https://lixtara.vercel.app" style="color:#a18943;text-decoration:none;">lixtara.com</a>
+        <a href="https://lixtara.com" style="color:#a18943;text-decoration:none;">lixtara.com</a>
       </td></tr>
     </table>
   </td></tr>
@@ -107,8 +127,6 @@ function button(href: string, label: string): string {
 }
 
 // ─── Public helpers ──────────────────────────────────────────────────
-
-type Lang = "en" | "es";
 
 export interface PaymentReceiptInput {
   to: string;
@@ -125,8 +143,8 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
   const isEs = lang === "es";
   const tierName = input.tier.charAt(0).toUpperCase() + input.tier.slice(1);
   const subject = isEs
-    ? `Pago recibido — listing ${tierName} de Lixtara`
-    : `Payment received — your ${tierName} Lixtara listing`;
+    ? `Pago recibido por tu listing ${tierName} de Lixtara`
+    : `Payment received for your ${tierName} Lixtara listing`;
 
   const body = isEs
     ? `
@@ -151,7 +169,7 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: isEs ? "Tu pago llegó" : "Payment confirmed", body }),
+    html: shell({ preheader: isEs ? "Tu pago llegó" : "Payment confirmed", body, lang }),
     text,
   });
 }
@@ -167,8 +185,8 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
   const lang = input.lang ?? "en";
   const isEs = lang === "es";
   const subject = isEs
-    ? `Acuerdo de listing firmado — Lixtara`
-    : `Listing agreement signed — Lixtara`;
+    ? `Tu acuerdo de listing con Lixtara está firmado`
+    : `Your Lixtara listing agreement is signed`;
 
   const body = isEs
     ? `
@@ -185,7 +203,7 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: isEs ? "Acuerdo firmado" : "Agreement signed", body }),
+    html: shell({ preheader: isEs ? "Acuerdo firmado" : "Agreement signed", body, lang }),
     text: isEs
       ? `Tu acuerdo de listing está firmado. Continúa al pago: ${input.paymentUrl}`
       : `Your listing agreement is signed. Continue to payment: ${input.paymentUrl}`,
@@ -203,15 +221,15 @@ export async function sendListingApproved(input: ListingApprovedInput) {
   const lang = input.lang ?? "en";
   const isEs = lang === "es";
   const subject = isEs
-    ? `🎉 Tu listing está en vivo en MLS — Lixtara`
-    : `🎉 Your listing is live on MLS — Lixtara`;
+    ? `🎉 Tu listing de Lixtara está en vivo en MLS`
+    : `🎉 Your Lixtara listing is live on MLS`;
 
   const body = isEs
     ? `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">¡Tu listing está activo! 🎉</p>
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Nuestro broker aprobó tu listing de <strong>${input.propertyAddress}</strong>. Acaba de sincronizarse con MLS y debería aparecer en Zillow, Realtor.com, Redfin y Trulia en las próximas horas.</p>
     ${button(input.listingUrl, "Ver mi listing")}
-    <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Próximos pasos: las solicitudes de visitas e ofertas que reciban los buyers van a aparecer en tu dashboard. Te notificamos por email cada una.</p>
+    <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Próximos pasos: las solicitudes de visita y las ofertas de los compradores van a aparecer en tu dashboard. Te avisamos por email de cada una.</p>
   `
     : `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Your listing is live! 🎉</p>
@@ -223,7 +241,7 @@ export async function sendListingApproved(input: ListingApprovedInput) {
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: isEs ? "Tu listing está en vivo" : "Your listing is live", body }),
+    html: shell({ preheader: isEs ? "Tu listing está en vivo" : "Your listing is live", body, lang }),
     text: isEs
       ? `Tu listing en ${input.propertyAddress} está activo en MLS. ${input.listingUrl}`
       : `Your listing at ${input.propertyAddress} is live on MLS. ${input.listingUrl}`,
@@ -242,7 +260,7 @@ export interface BrokerNewPendingInput {
 
 export async function sendBrokerNewPending(input: BrokerNewPendingInput) {
   const tierName = input.tier.charAt(0).toUpperCase() + input.tier.slice(1);
-  const subject = `New listing pending review — ${input.propertyAddress}`;
+  const subject = `New listing pending review: ${input.propertyAddress}`;
 
   const body = `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">New listing for broker review</p>
@@ -323,6 +341,62 @@ export async function sendListingVideoTerminal(input: {
   return send(input);
 }
 
+// ─── Listing email gate (step 1) ─────────────────────────────────────
+// Transactional: the seller asked for both (they typed their email to start a
+// listing, or asked for a link to continue it), so no CAN-SPAM footer.
+
+export async function sendListingEmailCode(input: {
+  to: string;
+  lang: Lang;
+  code: string;
+  minutes: number;
+}) {
+  const isEs = input.lang === "es";
+  const subject = isEs
+    ? `Tu código de Lixtara: ${input.code}`
+    : `Your Lixtara code: ${input.code}`;
+  const intro = isEs
+    ? "Usa este código para confirmar tu email y seguir con tu listing."
+    : "Use this code to confirm your email and keep going with your listing.";
+  const expiry = isEs
+    ? `Vence en ${input.minutes} minutos. Si no fuiste tú, ignora este correo.`
+    : `It expires in ${input.minutes} minutes. If this wasn't you, you can ignore this email.`;
+  const body = `
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;margin:0 0 16px;">${intro}</p>
+    <p style="font-family:Georgia,serif;font-size:34px;letter-spacing:0.3em;color:#1c1c1c;margin:0 0 16px;">${input.code}</p>
+    <p style="font-size:13px;line-height:1.7;color:#8a8268;">${expiry}</p>
+  `;
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: intro, body, lang: input.lang }),
+    text: `${intro}\n\n${input.code}\n\n${expiry}`,
+  });
+}
+
+export async function sendListingResumeLink(input: { to: string; lang: Lang; url: string }) {
+  const isEs = input.lang === "es";
+  const subject = isEs ? "Continúa tu listing en Lixtara" : "Continue your Lixtara listing";
+  const intro = isEs
+    ? "Tu listing te está esperando. Este link inicia tu sesión y te lleva al paso donde quedaste."
+    : "Your listing is waiting for you. This link signs you in and takes you to the step where you left off.";
+  const note = isEs
+    ? "El link funciona una sola vez. Si no lo pediste, ignora este correo."
+    : "The link works only once. If you didn't ask for it, you can ignore this email.";
+  const body = `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">${subject}</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${intro}</p>
+    ${button(input.url, isEs ? "Continuar mi listing" : "Continue my listing")}
+    <p style="font-size:13px;line-height:1.7;color:#8a8268;">${note}</p>
+  `;
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: intro, body, lang: input.lang }),
+    text: `${intro}\n\n${input.url}\n\n${note}`,
+  });
+}
+
 // ─── Commercial email (CAN-SPAM) ─────────────────────────────────────
 
 export interface CommercialEmailInput {
@@ -366,5 +440,148 @@ export async function sendCommercialEmail(
       "List-Unsubscribe": `<${input.unsubscribeUrl}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     },
+  });
+}
+
+// ─── Contact form (/contact) ─────────────────────────────────────────
+// Internal notification to the brokerage inbox; reply-to is the visitor so
+// answering the email answers them. All visitor input is HTML-escaped.
+
+export async function sendContactMessage(input: {
+  to: string;
+  lang: Lang;
+  name: string;
+  email: string;
+  phone: string;
+  topic: string;
+  message: string;
+  pageUrl: string;
+}) {
+  const e = escapeHtml;
+  const subject = `Contact form: ${input.name} (${input.topic})`;
+  const rows: [string, string][] = [
+    ["Name", input.name],
+    ["Email", input.email],
+    ["Phone", input.phone || "—"],
+    ["Topic", input.topic],
+    ["Language", input.lang],
+  ];
+  const body = `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">New message from lixtara.com</p>
+    <table cellpadding="0" cellspacing="0" style="margin:16px 0;font-size:13px;color:#1c1c1c;">
+      ${rows
+        .map(
+          ([k, v]) =>
+            `<tr><td style="padding:4px 16px 4px 0;color:#8a8268;text-transform:uppercase;font-size:10px;letter-spacing:0.18em;">${k}</td><td style="padding:4px 0;">${e(v)}</td></tr>`,
+        )
+        .join("")}
+    </table>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;white-space:pre-wrap;">${e(input.message)}</p>
+    <p style="font-size:12px;color:#8a8268;">Reply to this email to answer ${e(input.name)} directly.</p>
+  `;
+  return send({
+    to: input.to,
+    replyTo: input.email,
+    subject,
+    html: shell({ preheader: subject, body }),
+    text: `${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\n${input.message}\n\n${input.pageUrl}`,
+  });
+}
+
+// ─── Buyer showing requests (/api/showing-requests) ──────────────────
+// Fase 1 del embudo del comprador. Ninguno de los dos emails confirma una visita.
+// Fichas del feed IDX: el email del COMPRADOR no lleva datos de la ficha (pendiente de
+// MIAMI, P3); el interno de la broker lleva solo el número de MLS.
+
+export async function sendBrokerShowingRequest(input: {
+  to: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone: string | null;
+  target: string;
+  preferredTimes: string | null;
+  message: string | null;
+  otherAgentStatus: string;
+  needsToSell: string | null;
+  consentMarketing: boolean;
+  consentVersion: string;
+  /** Meta interna de primera respuesta (ISO). No es una promesa al comprador. */
+  respondBy: string;
+  lang: Lang;
+  adminUrl: string;
+}) {
+  const e = escapeHtml;
+  const subject = `New showing request: ${input.buyerName} (${input.target})`;
+  const respondBy = new Date(input.respondBy).toLocaleString("en-US", {
+    timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short",
+  });
+  const rows: [string, string][] = [
+    ["Respond by", `${respondBy} ET (internal target; not promised to the buyer)`],
+    ["Property", input.target],
+    ["Buyer", input.buyerName],
+    ["Email", input.buyerEmail],
+    ["Phone", input.buyerPhone || "Not provided: contact by email"],
+    ["Preferred times", input.preferredTimes || "—"],
+    ["Other agent", input.otherAgentStatus],
+    ["Needs to sell first", input.needsToSell || "—"],
+    // Lo que el comprador autorizó, para no llamar ni escribir fuera de ese alcance.
+    ["Consent", `Contact about this request by email or phone (no marketing, automated calls or texts) · text ${input.consentVersion}`],
+    ["Marketing consent", input.consentMarketing ? "Yes" : "No: do not send marketing, automated calls or texts"],
+    ["Language", input.lang],
+  ];
+  const body = `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">New showing request</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Contact the buyer, verify prior representation and handle the written agreement before any tour. The showing is not confirmed.</p>
+    <table cellpadding="0" cellspacing="0" style="margin:16px 0;font-size:13px;color:#1c1c1c;">
+      ${rows
+        .map(
+          ([k, v]) =>
+            `<tr><td style="padding:4px 16px 4px 0;color:#8a8268;text-transform:uppercase;font-size:10px;letter-spacing:0.18em;">${k}</td><td style="padding:4px 0;">${e(v)}</td></tr>`,
+        )
+        .join("")}
+    </table>
+    ${input.message ? `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;white-space:pre-wrap;">${e(input.message)}</p>` : ""}
+    ${button(input.adminUrl, "Open buyer leads →")}
+  `;
+  return send({
+    to: input.to,
+    replyTo: input.buyerEmail,
+    subject,
+    html: shell({ preheader: subject, body }),
+    text: `${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\n${input.message ?? ""}\n\n${input.adminUrl}`,
+  });
+}
+
+export async function sendShowingRequestReceived(input: {
+  to: string;
+  lang: Lang;
+  buyerName: string;
+  /** Solo para listings propios; null para fichas del feed IDX. */
+  ownAddress: string | null;
+}) {
+  const isEs = input.lang === "es";
+  const broker = BROKERAGE.brokerName.split(" ")[0];
+  const subject = isEs ? "Recibimos tu solicitud de visita" : "We received your showing request";
+  // Texto plano primero; el HTML lo escapa entero (nombre y dirección vienen del usuario).
+  const interest = input.ownAddress ? (isEs ? ` por ${input.ownAddress}` : ` in ${input.ownAddress}`) : "";
+  const lines = isEs
+    ? [
+        `Hola ${input.buyerName}, gracias por tu interés${interest}.`,
+        `${broker}, nuestra broker licenciada, te contactará para coordinar.`,
+        "Tu visita no está confirmada hasta que ella la confirme contigo.",
+      ]
+    : [
+        `Hi ${input.buyerName}, thanks for your interest${interest}.`,
+        `${broker}, our licensed broker, will contact you to coordinate.`,
+        "Your showing is not confirmed until she confirms it with you.",
+      ];
+  const body = lines
+    .map((l) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${escapeHtml(l)}</p>`)
+    .join("");
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: subject, body, lang: input.lang }),
+    text: lines.join("\n\n"),
   });
 }

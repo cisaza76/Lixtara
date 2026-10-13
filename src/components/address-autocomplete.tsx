@@ -5,6 +5,7 @@ import { Field } from "@/components/auth-shell";
 
 interface Props {
   streetLabel: string;
+  streetPlaceholder: string;
   unitLabel: string;
   cityLabel: string;
   stateLabel: string;
@@ -15,7 +16,12 @@ interface Props {
   defaultZip?: string;
   defaultLat?: number | null;
   defaultLng?: number | null;
-  verifiedNote?: string;
+  verifiedNote: string;
+  /** Page language: Google Places suggestions follow it, not the browser's. */
+  language: string;
+  mapsLoadingLabel: string;
+  mapsReadyLabel: string;
+  mapsErrorLabel: string;
 }
 
 interface AddressComponents {
@@ -72,7 +78,7 @@ function extractComponents(
 // to Google's inline bootstrap loader. The previous code combined the two
 // and produced "TypeError: window.google.maps.importLibrary is not a
 // function" in production.
-function loadGoogleMaps(apiKey: string): Promise<void> {
+function loadGoogleMaps(apiKey: string, language: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") {
       reject(new Error("not browser"));
@@ -103,7 +109,8 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
     script.id = SCRIPT_ID;
     script.src =
       `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}` +
-      `&libraries=places&v=weekly&loading=async&callback=__lixtaraMapsInit`;
+      `&libraries=places&v=weekly&loading=async&callback=__lixtaraMapsInit` +
+      `&language=${encodeURIComponent(language)}`;
     script.async = true;
     script.defer = true;
     script.onerror = () =>
@@ -114,6 +121,7 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
 
 export function AddressAutocomplete({
   streetLabel,
+  streetPlaceholder,
   unitLabel,
   cityLabel,
   stateLabel,
@@ -125,6 +133,10 @@ export function AddressAutocomplete({
   defaultLat = null,
   defaultLng = null,
   verifiedNote,
+  language,
+  mapsLoadingLabel,
+  mapsReadyLabel,
+  mapsErrorLabel,
 }: Props) {
   const streetInputRef = useRef<HTMLInputElement | null>(null);
   const cityInputRef = useRef<HTMLInputElement | null>(null);
@@ -143,6 +155,10 @@ export function AddressAutocomplete({
   const [errorMessage, setErrorMessage] = useState<string | null>(() =>
     mapsApiKey ? null : "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY missing.",
   );
+  // Shown to the seller as a localized notice; the English diagnostic stays here.
+  useEffect(() => {
+    if (errorMessage) console.warn("[AddressAutocomplete]", errorMessage);
+  }, [errorMessage]);
   const [verified, setVerified] = useState<boolean>(
     defaultLat !== null && defaultLng !== null,
   );
@@ -155,7 +171,7 @@ export function AddressAutocomplete({
 
     let autocomplete: google.maps.places.Autocomplete | null = null;
 
-    loadGoogleMaps(apiKey)
+    loadGoogleMaps(apiKey, language)
       .then(() => {
         if (!streetInputRef.current) {
           setStatus("error");
@@ -168,7 +184,7 @@ export function AddressAutocomplete({
         if (!places?.Autocomplete) {
           setStatus("error");
           setErrorMessage(
-            "Places library failed to load — check that Places API is enabled and your domain is allowlisted on the Google Maps key.",
+            "Places library failed to load. Check that Places API is enabled and your domain is allowlisted on the Google Maps key.",
           );
           return;
         }
@@ -189,7 +205,7 @@ export function AddressAutocomplete({
           console.error("[AddressAutocomplete] init failed", initErr);
           setStatus("error");
           setErrorMessage(
-            "Places Autocomplete init threw — likely Places API not enabled or HTTP referrer not allowlisted.",
+            "Places Autocomplete failed to start. Places API is probably not enabled, or the HTTP referrer is not allowlisted.",
           );
           return;
         }
@@ -223,7 +239,7 @@ export function AddressAutocomplete({
         setStatus("error");
         setErrorMessage(err.message);
       });
-  }, []);
+  }, [language]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -250,8 +266,8 @@ export function AddressAutocomplete({
           type="text"
           required
           defaultValue={defaultStreet}
-          autoComplete="address-line1"
-          placeholder="Start typing — pick from Google's suggestions"
+          autoComplete="section-property address-line1"
+          placeholder={streetPlaceholder}
           className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
         />
         <span
@@ -265,10 +281,11 @@ export function AddressAutocomplete({
                 : "text-ink/40"
           }`}
         >
-          {status === "loading" && "Maps: loading…"}
-          {status === "ready" && !verified && "Maps: ready — start typing"}
-          {status === "ready" && verified && `✓ ${verifiedNote ?? "Verified"}`}
-          {status === "error" && `Maps error — type manually. (${errorMessage})`}
+          {status === "loading" && mapsLoadingLabel}
+          {status === "ready" && !verified && mapsReadyLabel}
+          {status === "ready" && verified && `✓ ${verifiedNote}`}
+          {/* The technical cause (English, for us) goes to the console only. */}
+          {status === "error" && mapsErrorLabel}
         </span>
       </label>
 
@@ -281,7 +298,7 @@ export function AddressAutocomplete({
             name="unit"
             type="text"
             defaultValue={defaultUnit}
-            autoComplete="address-line2"
+            autoComplete="section-property address-line2"
             placeholder="4502"
             className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
           />
@@ -296,7 +313,7 @@ export function AddressAutocomplete({
             type="text"
             required
             defaultValue={defaultCity}
-            autoComplete="address-level2"
+            autoComplete="section-property address-level2"
             className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
           />
         </label>
@@ -306,7 +323,7 @@ export function AddressAutocomplete({
           label={stateLabel}
           name="state"
           defaultValue="FL"
-          autoComplete="address-level1"
+          autoComplete="section-property address-level1"
         />
         <label className="flex flex-col gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
@@ -318,7 +335,7 @@ export function AddressAutocomplete({
             type="text"
             required
             defaultValue={defaultZip}
-            autoComplete="postal-code"
+            autoComplete="section-property postal-code"
             className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
           />
         </label>

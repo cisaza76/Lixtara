@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/mls/sync",
-      "schedule": "23 */6 * * *"
+      "schedule": "23 * * * *"
     },
     {
       "path": "/api/mls/reconcile",

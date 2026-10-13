@@ -23,3 +23,29 @@ describe("mapEnvelopeStatus", () => {
     expect(mapEnvelopeStatus("")).toBe("pending");
   });
 });
+
+describe("sellerHasSigned", () => {
+  it("is true once the seller (embedded signer) completed, even if the broker hasn't", async () => {
+    const { sellerHasSigned } = await import("@/lib/docusign");
+    expect(
+      sellerHasSigned(
+        [
+          { roleName: "Seller", clientUserId: "p1", status: "completed" },
+          { roleName: "Broker", status: "sent" },
+        ],
+        "p1",
+      ),
+    ).toBe(true);
+  });
+  it("is false while the seller hasn't signed", async () => {
+    const { sellerHasSigned } = await import("@/lib/docusign");
+    expect(
+      sellerHasSigned([{ roleName: "Seller", clientUserId: "p1", status: "delivered" }], "p1"),
+    ).toBe(false);
+    expect(sellerHasSigned([], "p1")).toBe(false);
+  });
+  it("falls back to the Seller role when clientUserId is missing", async () => {
+    const { sellerHasSigned } = await import("@/lib/docusign");
+    expect(sellerHasSigned([{ roleName: "Seller", status: "completed" }], "p1")).toBe(true);
+  });
+});

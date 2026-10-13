@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, Globe, LayoutDashboard, LogOut } from "lucide-react";
+import { Menu, X, Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 
 interface Props {
   lang: string;
@@ -21,10 +21,14 @@ interface Props {
   auth: {
     greetingPrefix: string;
     dashboard: string;
+    account: string;
     signOut: string;
     signIn: string;
   };
   cta: string;
+  switchLanguageLabel: string;
+  openMenuLabel: string;
+  closeMenuLabel: string;
 }
 
 export function MobileMenu({
@@ -36,6 +40,9 @@ export function MobileMenu({
   nav,
   auth,
   cta,
+  switchLanguageLabel,
+  openMenuLabel,
+  closeMenuLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const link = "py-2 text-sm uppercase tracking-[0.18em] text-ink/70";
@@ -44,7 +51,7 @@ export function MobileMenu({
     <div className="md:hidden">
       <button
         type="button"
-        aria-label={open ? "Close menu" : "Open menu"}
+        aria-label={open ? closeMenuLabel : openMenuLabel}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="text-ink"
@@ -84,6 +91,7 @@ export function MobileMenu({
             <div className="flex items-center gap-5 pt-3 mt-2 border-t border-gold-soft">
               <Link
                 href={`/${altLang}`}
+                aria-label={switchLanguageLabel}
                 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55"
               >
                 <Globe className="w-4 h-4" /> {langCode}
@@ -95,6 +103,12 @@ export function MobileMenu({
                     className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70"
                   >
                     <LayoutDashboard className="w-4 h-4" /> {auth.dashboard}
+                  </Link>
+                  <Link
+                    href={`/${lang}/account`}
+                    className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70"
+                  >
+                    <UserRound className="w-4 h-4" /> {auth.account}
                   </Link>
                   <form action={`/${lang}/auth/sign-out`} method="POST">
                     <button

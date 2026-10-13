@@ -44,7 +44,7 @@ export function StagingShowcase({ copy }: { copy: StagingShowcaseCopy }) {
               beforeSrc={`/staging-showcase/${p.key}-before.jpg`}
               afterSrc={`/staging-showcase/${p.key}-after.jpg`}
               beforeAlt={copy.beforeLabel}
-              afterAlt={`${copy.afterLabel} — ${copy[p.styleKey]}`}
+              afterAlt={`${copy.afterLabel}, ${copy[p.styleKey]}`}
               beforeLabel={copy.beforeLabel}
               afterLabel={copy.afterLabel}
               handleLabel={copy.handleLabel}

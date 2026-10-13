@@ -1,7 +1,7 @@
 # Runbook — Activación del feed IDX de MIAMI
 
-**Fecha:** 2026-09-18 · **Revisado:** 2026-09-26 (activación en 3 fases) · **Estado:** listo
-para ejecutar, **no ejecutado**
+**Fecha:** 2026-09-18 · **Revisado:** 2026-09-26 (activación en 3 fases) · **Estado:** Fase 1
+**ejecutada el 2026-10-10** (50.836 fichas, reconciliación ok, exhibición apagada)
 **Dataset:** `miamire` — Miami Association of REALTORS® · acceso **APROBADO** y verificado
 **PRs:** #129 (adaptador, worker, lectura pública) · #130 (convergencia) · #131 (solo
 residencial) · PR de bloqueos de activación (bajas + reconciliación, `mls_number`,
@@ -160,6 +160,11 @@ que salga `"completed": true` — tres veces, aproximadamente.
 | `completed` | `true` al final | `false` → ver abajo |
 | `needsAttention` | `false` | `true` → ver el log estructurado |
 
+> **Medido el 2026-10-10:** la carga inicial necesitó ~14 invocaciones, no 3; tras las dos
+> primeras cada una bajó solo 2.000–4.500 fichas. Por eso el cron pasó de cada 6 h a cada
+> hora: con ~4.250 cambios cada 6 h, una sola invocación cada 6 h podía quedarse atrás.
+> `records_seen` solo se escribe al completar una pasada y cuenta la última invocación.
+
 ### Pasada incompleta no es un fallo
 
 `completed: false` con `stoppedBy: "time_budget"` o `"max_pages"` es el diseño: la pasada
@@ -247,7 +252,9 @@ curl -s -X POST https://lixtara.com/api/mls/reconcile \
 - `outcome: "aborted"` → **protección del 80 %**: la lista trajo menos del 80 % de lo
   guardado. **No se borró nada.** Investigar antes de repetir (feed parcial, filtro roto,
   cambio de nombre de campo). El motivo está en `last_reconciliation_error`.
-- `outcome: "not_due"` → ya corrió hace menos de 20 h.
+- `outcome: "not_due"` → ya hay una reconciliación completada en el día UTC actual (regla desde
+  2026-10-11; antes era "menos de 20 h", y una corrida manual de la noche hacía saltar la
+  ventana de la mañana siguiente).
 
 ```sql
 select last_reconciliation_at, last_reconciliation_status, last_reconciliation_deleted,
@@ -261,7 +268,7 @@ select last_reconciliation_at, last_reconciliation_status, last_reconciliation_d
 
 | Cron | Horario (UTC) | Qué hace |
 |---|---|---|
-| `/api/mls/sync` | `23 */6 * * *` — 4 veces al día | fichas modificadas + **bajas** |
+| `/api/mls/sync` | `23 * * * *` — cada hora (era cada 6 h hasta el 2026-10-10) | fichas modificadas + **bajas** |
 | `/api/mls/reconcile` | `7,22,37,52 8-10 * * *` — 12 intentos en la ventana 08–10 UTC | una reconciliación al día; cada intento continúa el anterior o no hace nada (`not_due`) |
 
 Plan de Vercel del proyecto: **Pro** (verificado 2026-09-26), que permite crons con
@@ -295,6 +302,13 @@ select distinct jsonb_object_keys(payload->'Media'->0) as campo
 select split_part(split_part(payload->'Media'->0->>'MediaURL', '://', 2), '/', 1) as host, count(*)
   from public.mls_listings group by 1 order by 2 desc;
 ```
+
+> **C construido el 2026-10-10** (PR "MLS photos by hot-link"): `primaryMlsPhotoUrl` en
+> `src/lib/mls/public-listings.ts` elige la de menor `Order` entre `MediaCategory` "Photo"
+> (o sin categoría) con `MediaURL` https; la tarjeta la pinta con `<img>` simple
+> (`photo-hotlink.test.ts` prohíbe next/image y nuevos `remotePatterns`). Las consultas de
+> arriba siguen siendo la verificación previa a la Fase 3: si los nombres de campo no son
+> `MediaURL` / `Order` / `MediaCategory`, ajustar la función antes de encender la exhibición.
 
 Con eso se construye C (en su propio PR): foto principal por hot-link al CDN del MLS (sin
 descargar ni guardar), imagen de reemplazo si no hay, `loading="lazy"` y dimensiones fijas,
@@ -347,6 +361,56 @@ select p.id, p.address_street, p.mls_number
 
 La segunda consulta debería salir vacía; cada fila es un listing que saldría **duplicado**.
 
+## 3.2b · Filtros y paginación de `/properties`
+
+Construidos el 2026-10-11 (PR #160). Requieren la migración
+`20261011120000_mls_listings_search_columns`: columnas `bedrooms`, `bathrooms`,
+`living_area`, `county_key` (+ `search_fields_at`), un trigger que las calcula desde
+`payload` en cada escritura del sync, e índices. Sin ella, el lector público falla y
+`/properties` queda sin feed (fail-soft): **aplicarla antes de encender la exhibición.**
+
+> **2026-10-11:** la primera versión usaba columnas `GENERATED ... STORED`; el ALTER
+> reescribe la tabla en una sola sentencia y superó el límite de tiempo del SQL Editor
+> ("upstream timeout"), así que se revirtió entero. La versión actual no reescribe nada.
+
+**Relleno de las filas existentes**, en tandas. Repetir hasta que diga *0 rows*
+(~11 veces con ~50.000 fichas):
+
+```sql
+update public.mls_listings set payload = payload
+ where listing_key in (select listing_key from public.mls_listings
+                        where search_fields_at is null limit 5000);
+```
+
+Verificación:
+
+```sql
+select county_key, count(*) from public.mls_listings group by 1 order by 2 desc;
+-- solo miamidade, broward, palmbeach (ningún null)
+select count(*) filter (where search_fields_at is null) as pendientes,
+       count(*) filter (where bedrooms is null) as sin_cuartos,
+       count(*) filter (where bathrooms is null) as sin_banos, count(*) as total
+  from public.mls_listings;
+```
+
+**Aplicado el 2026-10-10/11** (relleno completo: 50.836 filas; condados solo
+`miamidade` 19.986 · `broward` 17.386 · `palmbeach` 13.464). 6.523 fichas traían
+`BathroomsTotalInteger` en null → `20261011130000_mls_bathrooms_fallback` usa
+`BathroomsFull + BathroomsHalf`; tras aplicarla, recalcular solo esas:
+
+```sql
+with t as (update public.mls_listings set payload = payload
+            where bathrooms is null returning 1)
+select count(*) as recalculadas from t;
+```
+
+> **No correr rellenos en el minuto :23.** El 2026-10-10 a las 23:23 UTC el upsert del sync
+> chocó con una tanda de 10.000 que tenía las filas bloqueadas y superó el
+> `statement_timeout`. Desde entonces el sync escribe en tandas de 50 (`UPSERT_CHUNK`).
+
+Tope anti-scraping: 24 por página, máximo 20 páginas (`MAX_PAGE` en
+`src/lib/property-search.ts`); más allá hay que acotar la búsqueda.
+
 ## 3.3 · Encender la exhibición
 
 ```bash
@@ -374,24 +438,52 @@ ni "ahorro"; los listings propios aparecen una sola vez.
 
 ---
 
-## Interruptores de emergencia
+## Interruptores de emergencia: apagar la exhibición de inmediato
+
+**Cuándo apagar SIN esperar autorización** (decisión del owner, 2026-10-11): basta cualquiera de estos motivos.
+
+| Motivo | Señal |
+|---|---|
+| **Scraping** | Muchas líneas `mls_scrape_suspect` de la misma etiqueta `client`, o de muchas etiquetas a la vez, en los logs de Vercel |
+| **Sync caído o atrasado** | `last_run_status = failed` dos veces seguidas, o `last_modification_ts` con más de 12 h (el contrato exige retirar lo vendido o retirado en 24 h) |
+| **Reconciliación** | `last_reconciliation_status = aborted` o sin cerrar en más de 30 h |
+| **Incumplimiento IDX** | Una ficha sin atribución "courtesy of", sin los avisos SEFMLS, con un estado distinto de Active, o visible en un dominio que no sea lixtara.com |
+| **Pedido de MIAMI** | Cualquier aviso de MIAMI o de Bridge |
+
+**Apagar (dashboard de Vercel, unos 2 minutos):**
+1. Vercel → proyecto lixtara → **Settings → Environment Variables** → `MLS_DISPLAY_ENABLED` (Production) → **Edit** → valor `false`, o **Delete**. Cualquier valor distinto de `true` cierra la exhibición (fail-closed). Si la variable está definida, aunque esté vacía, manda sobre el flag viejo `MLS_FEED_ENABLED`.
+2. **Deployments** → el último de Production → **⋯ → Redeploy**. Las variables solo se aplican con un deploy nuevo.
+3. **Verificar:** `curl -s https://lixtara.com/en/properties | grep -c "courtesy of"` → **0**.
+4. Avisar al owner y anotar la hora y el motivo.
+
+La sincronización sigue corriendo: los datos se mantienen frescos para volver a encender. Si el problema es del sync, apagar también `MLS_SYNC_ENABLED` de la misma forma. ⚠️ Con el sync apagado, la exhibición debe quedar apagada: a las 24 h las fichas vendidas o retiradas incumplirían el Schedule A.
 
 ```bash
-# Dejar de PUBLICAR (la sincronización sigue; los datos se mantienen al día):
+# Equivalente por CLI
 vercel env rm MLS_DISPLAY_ENABLED production && vercel --prod
-
-# Dejar de SINCRONIZAR (y de reconciliar):
 vercel env rm MLS_SYNC_ENABLED production && vercel --prod
 ```
 
-Ambos son fail-closed. ⚠️ Apagar **solo** la sincronización con la exhibición encendida deja
-la página mostrando datos que envejecen: a las 24 h las fichas vendidas o retiradas
-incumplen Schedule A. Si la sincronización va a estar apagada más de unas horas, apagar
-también la exhibición.
+Los datos ingeridos siguen en la tabla. Para purgarlos (§ VI.C, al terminar el acuerdo) está
+`docs/superpowers/runbooks/rollback-20260916140000_mls_idx_feed.sql`, con la advertencia de que
+`DROP` no alcanza los backups PITR de Supabase.
 
-Los datos ingeridos siguen en la tabla. Para purgarlos —§ VI.C al terminar el acuerdo— está
-`docs/superpowers/runbooks/rollback-20260916140000_mls_idx_feed.sql`, con la advertencia de
-que `DROP` no alcanza los backups PITR de Supabase.
+## Anti-scraping: qué protege y qué no (2026-10-11)
+
+- **Límite centralizado (Upstash):** 60 vistas cada 5 minutos y 300 al día por cliente (`src/lib/mls/scrape-guard.ts`). El cliente se identifica con un HMAC diario de la IP; ni Upstash ni los logs ven la IP.
+- **Respaldo en memoria cuando Upstash falla:** es una **protección PARCIAL, no equivalente** al límite centralizado.
+  - Cada instancia de Vercel cuenta por su lado: con N instancias, un scraper puede llegar hasta N veces el tope.
+  - Las instancias nuevas empiezan en cero.
+  - Frena a un scraper insistente desde una IP, pero no sustituye a Upstash.
+- **Monitoreo:** buscar `mls_rate_limit_degraded` en los logs de Vercel (como máximo una línea por minuto por instancia).
+  - Si aparece de forma sostenida, revisar Upstash (Vercel → Storage → `lixtara-ratelimit`).
+  - Si coincide con `mls_scrape_suspect`, considerar el apagado de arriba.
+- **Retención de logs:** 24 h en el plan Pro (sin Observability Plus). Si hace falta más historial para una investigación, se necesita un Log Drain. Hoy no hay ninguno.
+- **Fuera de alcance por ahora:** Vercel BotID, que se evaluará con tráfico real (decisión del owner).
+
+## Estados que se muestran (2026-10-11)
+
+**Solo `Active`** (`PUBLIC_DISPLAY_STATUSES`, decisión del owner). El texto firmado (§II.E.1) dice "only active". *Active Under Contract*, *Pending* y *Coming Soon* se siguen sincronizando (`INGESTED_STATUSES`) pero **no se publican** hasta que MIAMI confirme por escrito que están autorizados. El filtro se aplica en el servidor dos veces: en la consulta a la base y en la fusión, antes de renderizar.
 
 ---
 

@@ -36,7 +36,7 @@ export const dmcaDoc: LegalContent = {
         bullets: [
           "A physical or electronic signature of a person authorized to act on behalf of the owner of the exclusive right that is allegedly infringed.",
           "Identification of the copyrighted work claimed to have been infringed, or, if multiple works are covered by a single notice, a representative list of those works.",
-          "Identification of the material that is claimed to be infringing and information reasonably sufficient to permit us to locate it — for a listing, please include the full URL of the page and identify the specific photograph or text at issue.",
+          "Identification of the material that is claimed to be infringing and information reasonably sufficient to permit us to locate it. For a listing, please include the full URL of the page and identify the specific photograph or text at issue.",
           "Information reasonably sufficient to permit us to contact you, including your mailing address, telephone number, and, if available, an email address.",
           "A statement that you have a good-faith belief that the disputed use is not authorized by the copyright owner, its agent, or the law.",
           "A statement that the information in the notification is accurate, and, under penalty of perjury, that you are the copyright owner or are authorized to act on the owner's behalf.",
@@ -60,7 +60,7 @@ export const dmcaDoc: LegalContent = {
           "Identification of the material that was removed or to which access was disabled, and the location at which the material appeared before it was removed or disabled.",
           "A statement under penalty of perjury that you have a good-faith belief that the material was removed or disabled as a result of mistake or misidentification.",
           "Your name, mailing address, and telephone number.",
-          "A statement that you consent to the jurisdiction of the Federal District Court for the judicial district in which your address is located — or, if your address is outside the United States, for any judicial district in which Lixtara may be found — and that you will accept service of process from the person who submitted the original notice, or from that person's agent.",
+          "A statement that you consent to the jurisdiction of the Federal District Court for the judicial district in which your address is located (or, if your address is outside the United States, for any judicial district in which Lixtara may be found), and that you will accept service of process from the person who submitted the original notice, or from that person's agent.",
         ],
       },
       {
@@ -80,7 +80,7 @@ export const dmcaDoc: LegalContent = {
       {
         heading: "7. Misrepresentations Carry Liability",
         body: [
-          "Under 17 U.S.C. § 512(f), a person who knowingly materially misrepresents that material is infringing, or that material was removed or disabled by mistake or misidentification, may be liable for damages — including costs and attorneys' fees — incurred by the alleged infringer, by any copyright owner or its licensee, or by Lixtara.",
+          "Under 17 U.S.C. § 512(f), a person who knowingly materially misrepresents that material is infringing, or that material was removed or disabled by mistake or misidentification, may be liable for damages (including costs and attorneys' fees) incurred by the alleged infringer, by any copyright owner or its licensee, or by Lixtara.",
           "If you are not certain whether the material at issue is protected by copyright or whether the use is infringing, we encourage you to seek advice from an attorney before submitting a notice or a counter-notification.",
         ],
       },
@@ -117,7 +117,7 @@ export const dmcaDoc: LegalContent = {
         bullets: [
           "La firma física o electrónica de una persona autorizada para actuar en nombre del titular del derecho exclusivo presuntamente infringido.",
           "La identificación de la obra protegida que se alega infringida o, si una sola notificación cubre varias obras, una lista representativa de ellas.",
-          "La identificación del material que se alega infractor e información razonablemente suficiente para permitirnos localizarlo — tratándose de una ficha de propiedad, incluya la URL completa de la página e identifique la fotografía o el texto específico en cuestión.",
+          "La identificación del material que se alega infractor e información razonablemente suficiente para permitirnos localizarlo. Tratándose de una ficha de propiedad, incluya la URL completa de la página e identifique la fotografía o el texto específico en cuestión.",
           "Información razonablemente suficiente para contactarlo, incluidos su dirección postal, número de teléfono y, de estar disponible, una dirección de correo electrónico.",
           "Una declaración de que usted tiene la creencia de buena fe de que el uso en disputa no está autorizado por el titular de los derechos, su agente o la ley.",
           "Una declaración de que la información de la notificación es exacta y, bajo pena de perjurio, de que usted es el titular de los derechos o está autorizado para actuar en su nombre.",
@@ -141,7 +141,7 @@ export const dmcaDoc: LegalContent = {
           "La identificación del material retirado o cuyo acceso fue deshabilitado, y la ubicación en la que aparecía antes de ser retirado o deshabilitado.",
           "Una declaración, bajo pena de perjurio, de que usted tiene la creencia de buena fe de que el material fue retirado o deshabilitado como resultado de un error o de una identificación equivocada.",
           "Su nombre, dirección postal y número de teléfono.",
-          "Una declaración de que usted acepta la jurisdicción del Tribunal Federal de Distrito del distrito judicial donde se ubica su dirección — o, si su dirección está fuera de los Estados Unidos, de cualquier distrito judicial donde Lixtara pueda ser hallada — y de que aceptará la notificación de actuaciones judiciales de parte de quien presentó la notificación original o de su agente.",
+          "Una declaración de que usted acepta la jurisdicción del Tribunal Federal de Distrito del distrito judicial donde se ubica su dirección (o, si su dirección está fuera de los Estados Unidos, de cualquier distrito judicial donde Lixtara pueda ser hallada), y de que aceptará la notificación de actuaciones judiciales de parte de quien presentó la notificación original o de su agente.",
         ],
       },
       {
@@ -161,7 +161,7 @@ export const dmcaDoc: LegalContent = {
       {
         heading: "7. Las Declaraciones Falsas Generan Responsabilidad",
         body: [
-          "Conforme al 17 U.S.C. § 512(f), quien a sabiendas tergiverse de forma sustancial que un material es infractor, o que un material fue retirado o deshabilitado por error o identificación equivocada, puede responder por los daños — incluidos costos y honorarios de abogados — que sufran el presunto infractor, cualquier titular de derechos o su licenciatario, o Lixtara.",
+          "Conforme al 17 U.S.C. § 512(f), quien a sabiendas tergiverse de forma sustancial que un material es infractor, o que un material fue retirado o deshabilitado por error o identificación equivocada, puede responder por los daños (incluidos costos y honorarios de abogados) que sufran el presunto infractor, cualquier titular de derechos o su licenciatario, o Lixtara.",
           "Si no tiene certeza de si el material en cuestión está protegido por derechos de autor o de si el uso es infractor, le recomendamos consultar a un abogado antes de enviar una notificación o una contranotificación.",
         ],
       },

@@ -17,18 +17,39 @@ interface PhotoUploaderProps {
     uploading: string;
     invalidFormat: string;
     genericError: string;
-    /** template: "{failed} of {total} photos couldn't upload — {reason}" */
+    /** template: "{failed} of {total} photos couldn't upload ({reason})" */
     partialFail: string;
+    /** The native file input is hidden: its button and "no file chosen" text
+     *  follow the BROWSER language, not the page's. These replace them. */
+    chooseFiles: string;
+    noFilesChosen: string;
+    /** template: "{n} photos selected" */
+    filesChosen: string;
+    fileChosenOne: string;
+    noFilesPicked: string;
+    notAuthenticated: string;
+    /** Every photo failed because of its size. */
+    tooLarge: string;
+    /** Short {reason} for partialFail. Storage errors come back in English. */
+    reasonTooLarge: string;
+    reasonGeneric: string;
   };
 }
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+
+// Supabase Storage answers in English ("The object exceeded the maximum
+// allowed size"); only its meaning reaches the seller, in their language.
+function isTooLarge(message: string): boolean {
+  return /exceed|too large|maximum allowed size|payload/i.test(message);
+}
 
 export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUploaderProps) {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [chosenCount, setChosenCount] = useState(0);
   const [, startTransition] = useTransition();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -39,7 +60,10 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
     const formEl = e.currentTarget;
     const fileInput = formEl.elements.namedItem("photos") as HTMLInputElement;
     const files = Array.from(fileInput.files ?? []).filter((f) => f.size > 0);
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      setError(labels.noFilesPicked);
+      return;
+    }
 
     const invalid = files.find((f) => !ACCEPTED.includes(f.type));
     if (invalid) {
@@ -55,7 +79,7 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      setError("not_authenticated");
+      setError(labels.notAuthenticated);
       setIsUploading(false);
       return;
     }
@@ -72,7 +96,10 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
         // Don't drop failures silently — collect them so the seller learns
         // which photos didn't make it and why (e.g. file too large).
         console.error("photo upload failed", file.name, upErr);
-        failures.push({ name: file.name, reason: upErr.message });
+        failures.push({
+          name: file.name,
+          reason: isTooLarge(upErr.message) ? "too_large" : "other",
+        });
         continue;
       }
       const { data: pub } = supabase.storage
@@ -83,7 +110,11 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
     }
 
     if (uploadedUrls.length === 0) {
-      setError(failures[0]?.reason ?? labels.genericError);
+      setError(
+        failures.every((f) => f.reason === "too_large")
+          ? labels.tooLarge
+          : labels.genericError,
+      );
       setIsUploading(false);
       return;
     }
@@ -92,7 +123,12 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
         labels.partialFail
           .replace("{failed}", String(failures.length))
           .replace("{total}", String(files.length))
-          .replace("{reason}", failures[0]!.reason),
+          .replace(
+            "{reason}",
+            failures[0]!.reason === "too_large"
+              ? labels.reasonTooLarge
+              : labels.reasonGeneric,
+          ),
       );
     }
 
@@ -108,6 +144,7 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
       setIsUploading(false);
       setProgress(null);
       formEl.reset();
+      setChosenCount(0);
     });
   }
 
@@ -116,15 +153,34 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
       onSubmit={handleSubmit}
       className="flex flex-col gap-4 border border-gold-soft p-5"
     >
-      <input
-        type="file"
-        name="photos"
-        multiple
-        accept="image/jpeg,image/png,image/webp"
-        required
-        disabled={isUploading}
-        className="text-sm text-ink file:mr-4 file:py-2 file:px-4 file:border file:border-gold-soft file:bg-ivory file:text-ink file:text-[10px] file:font-semibold file:uppercase file:tracking-[0.22em] file:cursor-pointer hover:file:border-gold disabled:opacity-50"
-      />
+      <label
+        className={`flex flex-wrap items-center gap-4 text-sm text-ink ${
+          isUploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+        }`}
+      >
+        <input
+          type="file"
+          name="photos"
+          multiple
+          accept="image/jpeg,image/png,image/webp"
+          disabled={isUploading}
+          onChange={(e) => {
+            setError(null);
+            setChosenCount(e.currentTarget.files?.length ?? 0);
+          }}
+          className="peer sr-only"
+        />
+        <span className="py-2 px-4 border border-gold-soft bg-ivory text-ink text-[10px] font-semibold uppercase tracking-[0.22em] hover:border-gold peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-gold">
+          {labels.chooseFiles}
+        </span>
+        <span className="text-ink/70">
+          {chosenCount === 0
+            ? labels.noFilesChosen
+            : chosenCount === 1
+              ? labels.fileChosenOne
+              : labels.filesChosen.replace("{n}", String(chosenCount))}
+        </span>
+      </label>
       <button
         type="submit"
         disabled={isUploading}
