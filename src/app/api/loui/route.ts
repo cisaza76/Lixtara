@@ -35,7 +35,16 @@ export const maxDuration = 60;
 
 interface LouiRequestBody {
   messages: UIMessage[];
+  /** Language of the page the widget is on (sent by the client transport). */
+  lang?: string;
 }
+
+// The prompt defaults to English; on the Spanish site Loui starts in Spanish instead.
+// Either way it still follows the language the user actually writes in.
+const SPANISH_PAGE_NOTE = `
+
+# Page language
+The user is browsing the Spanish version of the site. Reply in Spanish (Latin American, using "tú") unless the user writes to you in English.`;
 
 export async function POST(req: Request) {
   let body: LouiRequestBody;
@@ -203,7 +212,7 @@ export async function POST(req: Request) {
   const modelMessages = await convertToModelMessages(messages);
   const result = streamText({
     model: anthropic(CHAT_MODEL),
-    system: LOUI_SYSTEM_PROMPT,
+    system: body.lang === "es" ? LOUI_SYSTEM_PROMPT + SPANISH_PAGE_NOTE : LOUI_SYSTEM_PROMPT,
     messages: modelMessages,
     tools,
     stopWhen: ({ steps }) => steps.length >= 4,

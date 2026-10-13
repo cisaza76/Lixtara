@@ -1,8 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { isLocale, t, type Locale } from "@/lib/i18n";
 import { requireUser } from "@/lib/auth";
+import { isStaff } from "@/lib/admin-auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice, PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import {
@@ -127,6 +128,8 @@ export default async function DashboardPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) notFound();
+  // Staff have no seller dashboard — the admin panel is their home.
+  if (await isStaff(supabase)) redirect(`/${lang}/admin`);
 
   // Listings owned by the user. RLS already gates by owner, but be explicit.
   const { data: listingRows } = await supabase
@@ -322,6 +325,9 @@ export default async function DashboardPage({
     }
   }
   const buyerCopy = t(lang).dashboardBuyer;
+  // Estado de la oferta tal como lo guarda la DB → texto en el idioma de la página.
+  const offerStatusText = (status: string): string =>
+    (buyerCopy.offerStatuses as Record<string, string>)[status] ?? status;
   const hasBuyerActivity = offers.length > 0 || savedIds.length > 0;
 
   // Portfolio metrics (derived from the listings already fetched — no extra query).
@@ -569,7 +575,7 @@ export default async function DashboardPage({
                 };
 
               const tierText = tier
-                ? `${copy.tierLabel}: ${tierId.charAt(0).toUpperCase() + tierId.slice(1)}`
+                ? `${copy.tierLabel}: ${t(lang).pricing.tiers[tierId as PricingTierId].name}`
                 : undefined;
 
               return (
@@ -676,7 +682,7 @@ export default async function DashboardPage({
                                   : "border-gold-soft bg-ivory-strong/40 text-ink/70"
                             }`}
                           >
-                            {o.status}
+                            {offerStatusText(o.status)}
                           </span>
                         </td>
                       </tr>
@@ -738,7 +744,7 @@ export default async function DashboardPage({
                                       : "border-gold-soft bg-ivory-strong/40 text-ink/70"
                                 }`}
                               >
-                                {o.status}
+                                {offerStatusText(o.status)}
                               </span>
                             </td>
                             <td className="py-3 text-xs">

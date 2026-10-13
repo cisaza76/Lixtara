@@ -74,3 +74,22 @@ describe("safeNextPath — degenerate inputs", () => {
     expect(new URL(out, ORIGIN).host).toBe("lixtara.com");
   });
 });
+
+describe("withLocale", () => {
+  it("prefixes unlocalized paths with the user's language", async () => {
+    const { withLocale } = await import("@/lib/auth/safe-redirect");
+    expect(withLocale("/account", "es")).toBe("/es/account");
+    expect(withLocale("/listing/new?step=2", "es")).toBe("/es/listing/new?step=2");
+    expect(withLocale("/", "es")).toBe("/es");
+  });
+  it("leaves localized paths alone", async () => {
+    const { withLocale } = await import("@/lib/auth/safe-redirect");
+    expect(withLocale("/en/account", "es")).toBe("/en/account");
+    expect(withLocale("/es", "en")).toBe("/es");
+    expect(withLocale("/es?x=1", "en")).toBe("/es?x=1");
+  });
+  it("does not mistake look-alike segments for a locale", async () => {
+    const { withLocale } = await import("@/lib/auth/safe-redirect");
+    expect(withLocale("/estate", "en")).toBe("/en/estate");
+  });
+});

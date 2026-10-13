@@ -40,3 +40,13 @@ export function brokerageLicenseLine(lang: Lang): string {
 export function brokerageLicenseLineShort(): string {
   return `${BROKERAGE.legalName} · FL Lic. #${BROKERAGE.brokerageLicense}`;
 }
+
+/**
+ * Fills brokerage placeholders in dictionary copy so no license number or
+ * broker name is ever hardcoded in i18n: {brokerageLicense}, {brokerFirstName}.
+ */
+export function fillBrokerageCopy(text: string): string {
+  return text
+    .replaceAll("{brokerageLicense}", BROKERAGE.brokerageLicense)
+    .replaceAll("{brokerFirstName}", BROKERAGE.brokerName.split(" ")[0]);
+}

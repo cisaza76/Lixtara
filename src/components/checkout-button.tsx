@@ -31,7 +31,10 @@ export function CheckoutButton({ propertyId, lang, labels }: CheckoutButtonProps
       }
       window.location.href = data.url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : labels.failed);
+      // Localized message; a machine code (e.g. "agreement_not_signed") may
+      // follow for support, but never an English sentence from the API.
+      const code = e instanceof Error && /^[a-z0-9_]+$/.test(e.message) ? e.message : null;
+      setError(code ? `${labels.failed} (${code})` : labels.failed);
       setSubmitting(false);
     }
   }

@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState } from "react";
+import { track } from "@/lib/analytics";
 
 interface LouiWidgetProps {
   openLabel: string;
@@ -17,6 +18,24 @@ interface LouiWidgetProps {
   suggestions: string[];
   toolNotice: string;
   disclaimer: string;
+  youLabel: string;
+  assistantLabel: string;
+  errorRateLimit: string;
+  errorTooLong: string;
+  errorGeneric: string;
+  /** Page language, sent to /api/loui so Loui answers in it by default. */
+  lang: "en" | "es";
+}
+
+// El transporte entrega como `error.message` el cuerpo crudo de la respuesta (JSON con un
+// código). Nunca se muestra tal cual: se traduce a un texto en el idioma de la página.
+function errorText(
+  message: string,
+  copy: { errorRateLimit: string; errorTooLong: string; errorGeneric: string },
+): string {
+  if (message.includes("rate_limited")) return copy.errorRateLimit;
+  if (message.includes("input_too_large")) return copy.errorTooLong;
+  return copy.errorGeneric;
 }
 
 function messageText(m: UIMessage): string {
@@ -45,13 +64,19 @@ export function LouiWidget({
   suggestions,
   toolNotice,
   disclaimer,
+  youLabel,
+  assistantLabel,
+  errorRateLimit,
+  errorTooLong,
+  errorGeneric,
+  lang,
 }: LouiWidgetProps) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, status, error } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/loui" }),
+    transport: new DefaultChatTransport({ api: "/api/loui", body: { lang } }),
   });
 
   const isStreaming = status === "submitted" || status === "streaming";
@@ -65,6 +90,11 @@ export function LouiWidget({
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
     setInput("");
+    track({
+      event: "loui_message_sent",
+      message_index: messages.filter((m) => m.role === "user").length + 1,
+      lang,
+    });
     void sendMessage({ text: trimmed });
   }
 
@@ -74,7 +104,10 @@ export function LouiWidget({
       <button
         type="button"
         aria-label={open ? closeLabel : openLabel}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) track({ event: "loui_open", lang });
+          setOpen(!open);
+        }}
         className="fixed z-50 bottom-6 right-6 lg:bottom-8 lg:right-8 w-14 h-14 rounded-full bg-ink text-ivory shadow-xl flex items-center justify-center hover:bg-ink/90 transition-colors"
       >
         {open ? (
@@ -150,7 +183,7 @@ export function LouiWidget({
                   }`}
                 >
                   <span className="text-[9px] uppercase tracking-[0.22em] text-ink/45">
-                    {m.role === "user" ? "You" : "Loui"}
+                    {m.role === "user" ? youLabel : assistantLabel}
                   </span>
                   <div
                     className={`max-w-[85%] text-sm leading-relaxed px-3 py-2 whitespace-pre-wrap ${
@@ -172,7 +205,7 @@ export function LouiWidget({
             {isStreaming && messages[messages.length - 1]?.role === "user" && (
               <div className="flex flex-col gap-1 items-start">
                 <span className="text-[9px] uppercase tracking-[0.22em] text-ink/45">
-                  Loui
+                  {assistantLabel}
                 </span>
                 <div className="bg-ivory-strong/60 border border-gold-soft text-ink/55 italic text-sm px-3 py-2">
                   …
@@ -182,7 +215,7 @@ export function LouiWidget({
 
             {error && (
               <div className="text-xs text-red-700 italic">
-                {error.message}
+                {errorText(error.message, { errorRateLimit, errorTooLong, errorGeneric })}
               </div>
             )}
           </div>

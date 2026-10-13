@@ -64,6 +64,8 @@ export interface ResoKeyRecord {
   PropertyType?: string | null;
   CountyOrParish?: string | null;
   StateOrProvince?: string | null;
+  /** Solo en la reconciliación: para el diagnóstico de frescura. */
+  BridgeModificationTimestamp?: string | null;
   [key: string]: unknown;
 }
 
@@ -94,7 +96,7 @@ export interface MlsFeedProvider {
 
   /**
    * Claves de fichas modificadas DESPUÉS de `since` que YA NO se pueden mostrar: estado
-   * fuera de PUBLICLY_DISPLAYABLE_STATUSES o tipo fuera de SUPPORTED_PROPERTY_TYPES.
+   * fuera de INGESTED_STATUSES o tipo fuera de SUPPORTED_PROPERTY_TYPES.
    *
    * Existe porque `fetchModifiedSince` filtra por estado y tipo: una ficha que pasa a
    * Closed / Expired / Withdrawn deja de llegar por ahí y quedaría guardada como
@@ -109,6 +111,14 @@ export interface MlsFeedProvider {
    * incremental puede ver, porque una ficha borrada no tiene ModificationTimestamp nuevo.
    */
   fetchDisplayableKeys(cursor: string | null): Promise<MlsKeyPage>;
+
+  /**
+   * Fichas COMPLETAS por clave, con los mismos filtros de estado y tipo que la ingesta.
+   * Lo usa la reconciliación para volver a descargar solo las fichas que detectó
+   * desactualizadas (Bridge tiene una versión más nueva que la guardada). Una clave que
+   * ya no pasa los filtros simplemente no vuelve. Opcional: sin él no se recupera nada.
+   */
+  fetchListingsByKeys?(listingKeys: string[]): Promise<MlsLicensed<ResoListing>[]>;
 }
 
 // ── Normalización ───────────────────────────────────────────────────────────────────

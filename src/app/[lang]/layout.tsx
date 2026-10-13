@@ -2,14 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Inter, Playfair_Display } from "next/font/google";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { SITE_URL } from "@/lib/config";
+import { localeAlternates, PATHNAME_HEADER } from "@/lib/seo";
 import { isLocale, locales, t, type Locale } from "@/lib/i18n";
 import { BROKERAGE_LOCATION } from "@/lib/broker";
 import { brokerageLicenseLine, brokerageLicenseLineShort } from "@/config/brokerage";
 import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
 import { CookieNotice } from "@/components/cookie-notice";
+import { AnalyticsConsent, CookieSettingsLink } from "@/components/analytics-consent";
+import { analyticsConfig, consentTools } from "@/lib/analytics-config";
 import { MobileMenu } from "@/components/mobile-menu";
-import { Globe, LayoutDashboard, LogOut } from "lucide-react";
+import { Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import "../globals.css";
 
 const inter = Inter({
@@ -25,11 +30,21 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Lixtara — Florida real estate, licensed brokerage",
-  description:
-    "Sell your Florida home with a licensed brokerage. Full MLS exposure. You keep more equity.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  const meta = t(isLocale(lang) ? lang : "en").meta;
+  const pathname = (await headers()).get(PATHNAME_HEADER) ?? `/${lang}`;
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: meta.siteTitle,
+    description: meta.siteDescription,
+    alternates: localeAlternates(pathname, SITE_URL),
+  };
+}
 
 export function generateStaticParams() {
   return locales.map((lang) => ({ lang }));
@@ -48,6 +63,13 @@ export default async function RootLayout({
   const navCopy = t(lang).nav;
   const authNavCopy = t(lang).auth.nav;
   const footerCopy = t(lang).footer;
+  // Variables NEXT_PUBLIC_ escritas literalmente para que Next las incruste en el build.
+  const analytics = analyticsConfig({
+    NEXT_PUBLIC_GTM_ID: process.env.NEXT_PUBLIC_GTM_ID,
+    NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  });
+  const cookieCopy = t(lang).cookieNotice;
   const louiCopy = t(lang).loui;
   const closingCopy = t(lang).closingCosts;
   const altLang: Locale = lang === "en" ? "es" : "en";
@@ -129,7 +151,7 @@ export default async function RootLayout({
               <div className="flex items-center gap-4 border-l border-gold-soft pl-5">
                 <Link
                   href={`/${altLang}`}
-                  aria-label="Switch language"
+                  aria-label={navCopy.switchLanguage}
                   className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55 hover:text-gold transition-colors"
                 >
                   <Globe className="w-4 h-4" />
@@ -144,6 +166,14 @@ export default async function RootLayout({
                     >
                       <LayoutDashboard className="w-4 h-4" />
                       <span className="hidden lg:inline">{authNavCopy.dashboard}</span>
+                    </Link>
+                    <Link
+                      href={`/${lang}/account`}
+                      title={authNavCopy.account}
+                      className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70 hover:text-gold transition-colors"
+                    >
+                      <UserRound className="w-4 h-4" />
+                      <span className="hidden lg:inline">{authNavCopy.account}</span>
                     </Link>
                     <form action={`/${lang}/auth/sign-out`} method="POST">
                       <button
@@ -193,10 +223,14 @@ export default async function RootLayout({
               auth={{
                 greetingPrefix: authNavCopy.greetingPrefix,
                 dashboard: authNavCopy.dashboard,
+                account: authNavCopy.account,
                 signOut: authNavCopy.signOut,
                 signIn: authNavCopy.signIn,
               }}
               cta={navCopy.cta}
+              switchLanguageLabel={navCopy.switchLanguage}
+              openMenuLabel={navCopy.openMenu}
+              closeMenuLabel={navCopy.closeMenu}
             />
           </nav>
         </header>
@@ -298,6 +332,11 @@ export default async function RootLayout({
                 >
                   {footerCopy.links.cookies}
                 </Link>
+                {analytics.enabled && (
+                  <span className="text-sm text-ink/70 hover:text-gold transition-colors text-left">
+                    <CookieSettingsLink label={cookieCopy.settings} />
+                  </span>
+                )}
                 <Link
                   href={`/${lang}/disclaimers`}
                   className="text-sm text-ink/70 hover:text-gold transition-colors"
@@ -373,13 +412,42 @@ export default async function RootLayout({
           suggestions={[...louiCopy.suggestions]}
           toolNotice={louiCopy.toolNotice}
           disclaimer={louiCopy.disclaimer}
-        />
-        <CookieNotice
+          youLabel={louiCopy.youLabel}
+          assistantLabel={louiCopy.assistantLabel}
+          errorRateLimit={louiCopy.errorRateLimit}
+          errorTooLong={louiCopy.errorTooLong}
+          errorGeneric={louiCopy.errorGeneric}
           lang={lang}
-          message={t(lang).cookieNotice.message}
-          learnMore={t(lang).cookieNotice.learnMore}
-          accept={t(lang).cookieNotice.accept}
         />
+        {/* Con analítica configurada: banner de consentimiento (nada se carga sin aceptar).
+            Sin ella: el aviso informativo de siempre (solo cookies esenciales). */}
+        {analytics.enabled ? (
+          <AnalyticsConsent
+            lang={lang}
+            gtmId={analytics.gtmId}
+            posthogKey={analytics.posthogKey}
+            posthogHost={analytics.posthogHost}
+            labels={{
+              // Con GTM el permiso cubre también publicidad (opt-in, decisión del owner 2026-10-13).
+              message: (analytics.gtmId ? cookieCopy.consentMessageAds : cookieCopy.consentMessage).replace(
+                "{tools}",
+                consentTools(analytics, lang),
+              ),
+              learnMore: cookieCopy.learnMore,
+              accept: analytics.gtmId ? cookieCopy.consentAcceptAll : cookieCopy.consentAccept,
+              reject: cookieCopy.consentReject,
+              regionLabel: cookieCopy.regionLabel,
+            }}
+          />
+        ) : (
+          <CookieNotice
+            lang={lang}
+            message={cookieCopy.message}
+            learnMore={cookieCopy.learnMore}
+            accept={cookieCopy.accept}
+            regionLabel={cookieCopy.regionLabel}
+          />
+        )}
       </body>
     </html>
   );

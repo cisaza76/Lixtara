@@ -7,6 +7,7 @@ import {
   listingErrorHtml,
   matchListingDetailPath,
 } from "@/lib/routing/listing-http-status";
+import { PATHNAME_HEADER } from "@/lib/seo";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -50,12 +51,12 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const { response } = await updateSession(request);
+  const { response } = await updateSession(request, { [PATHNAME_HEADER]: pathname });
   return response;
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|webmanifest|txt|xml)$).*)",
   ],
 };

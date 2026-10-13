@@ -9,6 +9,7 @@
 // solo los listings propios. Una página pública no puede caerse porque el feed de un
 // tercero tenga un mal día.
 import { headers } from "next/headers";
+import { checkMlsView, clientIp } from "@/lib/mls/scrape-guard";
 import { createService } from "@/lib/supabase/service";
 import type { Locale } from "@/lib/i18n";
 import { mlsDisplayDecision, readMlsGateEnv } from "@/lib/mls/environment-gate";
@@ -18,17 +19,25 @@ import {
   type MlsPublicRow,
   type OwnListingRef,
 } from "@/lib/mls/public-listings";
-import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { PUBLIC_DISPLAY_STATUSES } from "@/lib/mls/display-compliance";
+import { PAGE_SIZE, parsePropertySearch, type PropertySearch } from "@/lib/property-search";
 
 const COLUMNAS =
   "listing_key,listing_id,mls_status,withdrawn_at,list_price,city,postal_code," +
   "list_office_name,list_agent_name,list_office_phone,list_office_email," +
-  "list_agent_phone,list_agent_email";
+  "list_agent_phone,list_agent_email," +
+  // Solo el arreglo de fotos, no el payload entero: es lo único del payload que pinta la
+  // tarjeta. Las URLs se usan por hot-link; nada se descarga.
+  "media:payload->Media";
 
 export interface PublicMlsResult {
   listings: MlsPublicListing[];
   /** false = el gate negó; la UI no debe mostrar avisos del MLS si no hay contenido suyo. */
   enabled: boolean;
+  /** Fichas del feed que cumplen los filtros (antes de deduplicar). Para la paginación. */
+  total: number;
+  /** true = este cliente superó un tope anti-scraping; la página sale sin fichas del feed. */
+  limited?: boolean;
 }
 
 /**
@@ -40,38 +49,70 @@ export interface PublicMlsResult {
 export async function getPublicMlsListings(
   own: OwnListingRef[],
   lang: Locale,
-  limit = 60,
+  search: PropertySearch = parsePropertySearch({}),
 ): Promise<PublicMlsResult> {
   // El host decide: un deployment de producción también responde en lixtara.vercel.app,
   // que el acuerdo NO nombra. Ver ADR-0013.
-  const host = (await headers()).get("host");
+  const h = await headers();
+  const host = h.get("host");
   if (!mlsDisplayDecision(host, readMlsGateEnv()).allowed) {
-    return { listings: [], enabled: false };
+    return { listings: [], enabled: false, total: 0 };
+  }
+
+  // Anti-scraping (Schedule A §1): ver src/lib/mls/scrape-guard.ts. El log nunca lleva la
+  // IP, solo su etiqueta HMAC diaria.
+  const guard = await checkMlsView(clientIp((n) => h.get(n)));
+  if (guard.outcome === "limited") {
+    console.warn(JSON.stringify({
+      event: "mls_scrape_suspect", client: guard.tag, window: guard.window,
+      page: search.page, degraded: guard.degraded,
+    }));
+    return { listings: [], enabled: true, total: 0, limited: true };
   }
 
   try {
     const db = createService();
-    const { data, error } = await db
+    // Los filtros van sobre columnas propias e indexadas (migración 20261011120000), nunca
+    // sobre `payload`: filtrar el jsonb obliga a descomprimir las ~50.000 filas.
+    let q = db
       .from("mls_listings")
-      .select(COLUMNAS)
+      .select(COLUMNAS, { count: "exact" })
       .is("withdrawn_at", null)
-      .in("mls_status", [...PUBLICLY_DISPLAYABLE_STATUSES])
-      .order("modification_ts", { ascending: false })
-      .limit(limit);
+      .in("mls_status", [...PUBLIC_DISPLAY_STATUSES])
+      // Sin oficina no hay atribución válida ("courtesy of <firma>", Schedule A): esa ficha
+      // no se exhibe. Va en la consulta para que el total y la paginación cuadren; el
+      // armado de tarjetas lo vuelve a comprobar (public-listings.ts).
+      .not("list_office_name", "is", null)
+      .neq("list_office_name", "");
+    if (search.minPrice !== null) q = q.gte("list_price", search.minPrice);
+    if (search.maxPrice !== null) q = q.lte("list_price", search.maxPrice);
+    if (search.beds !== null) q = q.gte("bedrooms", search.beds);
+    if (search.baths !== null) q = q.gte("bathrooms", search.baths);
+    if (search.county !== null) q = q.eq("county_key", search.county);
+    if (search.zip !== null) q = q.eq("postal_code", search.zip);
+
+    q = search.sort === "newest"
+      ? q.order("modification_ts", { ascending: false })
+      : q.order("list_price", { ascending: search.sort === "price_asc", nullsFirst: false });
+    // Desempate estable: sin él, dos fichas con el mismo precio pueden saltar de página.
+    q = q.order("listing_key", { ascending: true });
+
+    const from = (search.page - 1) * PAGE_SIZE;
+    const { data, error, count } = await q.range(from, from + PAGE_SIZE - 1);
 
     if (error) {
       console.error(JSON.stringify({ event: "mls_public_read_failed", message: error.message }));
-      return { listings: [], enabled: true };
+      return { listings: [], enabled: true, total: 0 };
     }
 
     const { mlsListings } = mergePublicListings(
       own, (data ?? []) as unknown as MlsPublicRow[], lang);
-    return { listings: mlsListings, enabled: true };
+    return { listings: mlsListings, enabled: true, total: count ?? mlsListings.length };
   } catch (e) {
     console.error(JSON.stringify({
       event: "mls_public_read_failed",
       message: e instanceof Error ? e.message : String(e),
     }));
-    return { listings: [], enabled: true };
+    return { listings: [], enabled: true, total: 0 };
   }
 }

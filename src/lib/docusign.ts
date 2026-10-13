@@ -196,7 +196,7 @@ export async function createEnvelopeFromTemplate(
   const body = {
     templateId: input.templateId,
     status: "sent",
-    emailSubject: input.emailSubject ?? "Lixtara listing agreement — please sign",
+    emailSubject: input.emailSubject ?? "Please sign your Lixtara listing agreement",
     templateRoles: [
       {
         email: input.signerEmail,
@@ -257,6 +257,35 @@ export async function getEnvelopeStatus(envelopeId: string): Promise<EnvelopeSta
   return authedRequest<EnvelopeStatus>(
     `/envelopes/${encodeURIComponent(envelopeId)}`,
   );
+}
+
+interface EnvelopeSigner {
+  roleName?: string;
+  clientUserId?: string;
+  status?: string;
+}
+
+/**
+ * True when the SELLER has finished signing, even if the envelope is still
+ * waiting for someone else (e.g. the broker's countersignature). The envelope
+ * only turns "completed" when every signer is done, so its status alone kept
+ * the seller stuck on "Waiting for your signature" after they had signed.
+ * The seller is the embedded signer: matched by clientUserId (the property
+ * id), or by the "Seller" role.
+ */
+export function sellerHasSigned(signers: EnvelopeSigner[], clientUserId: string): boolean {
+  const seller =
+    signers.find((r) => r.clientUserId === clientUserId) ??
+    signers.find((r) => r.roleName?.toLowerCase() === "seller");
+  const st = seller?.status?.toLowerCase();
+  return st === "completed" || st === "signed";
+}
+
+export async function getEnvelopeSigners(envelopeId: string): Promise<EnvelopeSigner[]> {
+  const res = await authedRequest<{ signers?: EnvelopeSigner[] }>(
+    `/envelopes/${encodeURIComponent(envelopeId)}/recipients`,
+  );
+  return res.signers ?? [];
 }
 
 export type AgreementStatus =

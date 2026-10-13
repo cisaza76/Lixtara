@@ -18,6 +18,10 @@ import { StagingShowcase } from "@/components/staging-showcase";
 import { LivingListingShowcase } from "@/components/living-listing-showcase";
 import { OfferForm } from "@/components/offer-form";
 import { SaveButton } from "@/components/save-button";
+import { ShowingRequestForm } from "@/components/showing-request-form";
+import { TrackOnMount } from "@/components/analytics-events";
+import { canUseShowingRequests } from "@/lib/buyer-leads.server";
+import { fillBrokerageCopy } from "@/config/brokerage";
 
 export default async function PropertyDetailPage({
   params,
@@ -67,6 +71,15 @@ export default async function PropertyDetailPage({
     }
   }
   const offerCopy = t(lang).offer;
+  // "Solicitar visita": solo con el interruptor público abierto o para staff (prueba).
+  // Control de servidor: sin permiso, el formulario ni siquiera llega al HTML.
+  const showingRequests = isOwner ? { allowed: false } : await canUseShowingRequests();
+  const showingCopy = t(lang).showingRequest;
+  const showingLabels = {
+    ...showingCopy,
+    intro: fillBrokerageCopy(showingCopy.intro),
+    successBody: fillBrokerageCopy(showingCopy.successBody),
+  };
   const saveCopy = t(lang).save;
   // Map coords: prefer the stored lat/lng; if missing (geocode never ran when
   // the listing was saved), best-effort geocode at render so the Location map
@@ -219,7 +232,7 @@ export default async function PropertyDetailPage({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={ph.url}
-                    alt={`${street} — photo ${i + 1}`}
+                    alt={copy.photoAlt.replace("{street}", street).replace("{n}", String(i + 1))}
                     className="h-full w-full object-cover transition-transform duration-[600ms] ease-out group-hover/photo:scale-[1.05]"
                   />
                   {ph.is_staged && (
@@ -418,13 +431,13 @@ export default async function PropertyDetailPage({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={mapUrl}
-                    alt={`Map of ${fullAddress}`}
+                    alt={copy.mapAlt.replace("{address}", fullAddress)}
                     className="w-full h-full object-cover"
                   />
                 </div>
               ) : (
                 <div className="aspect-[3/2] bg-ivory-strong flex items-center justify-center text-[10px] uppercase tracking-[0.18em] text-ink/40">
-                  Location unavailable
+                  {copy.locationUnavailable}
                 </div>
               )}
               <div className="flex flex-col gap-1 text-sm leading-relaxed text-ink">
@@ -436,6 +449,14 @@ export default async function PropertyDetailPage({
               </div>
             </div>
 
+            <TrackOnMount event={{ event: "property_open", lang, source: "own" }} />
+            {showingRequests.allowed && (
+              <ShowingRequestForm
+                target={{ propertyId: property.id }}
+                lang={lang}
+                labels={showingLabels}
+              />
+            )}
             <OfferForm
               propertyId={property.id}
               lang={lang}
@@ -448,7 +469,7 @@ export default async function PropertyDetailPage({
             <div className="flex flex-col gap-3 border-t border-gold-soft pt-5 text-[11px] leading-relaxed text-ink/75">
               {[
                 {
-                  text: `${BROKERAGE_NAME} — ${copy.trustLicensed}`,
+                  text: `${BROKERAGE_NAME} · ${copy.trustLicensed}`,
                   icon: (
                     <path d="M12 22s7-3.5 7-9V5.5L12 3 5 5.5V13c0 5.5 7 9 7 9zM9 12l2 2 4-4" />
                   ),

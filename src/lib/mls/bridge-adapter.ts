@@ -9,11 +9,11 @@
 // El diseño acota el daño de equivocarse: si la forma difiere, cambia ESTE archivo y nada
 // más — el puerto, el normalizador, el filtro de cobertura y el worker no se enteran.
 import { requireMlsServerToken } from "@/lib/mls/environment-gate";
-import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
+import { markAsMlsLicensed, type MlsLicensed } from "@/lib/mls/licensed-content";
 import type {
   MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
 } from "@/lib/mls/feed-port";
-import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { INGESTED_STATUSES } from "@/lib/mls/display-compliance";
 import { SUPPORTED_PROPERTY_TYPES } from "@/lib/mls/coverage";
 
 /** VERIFICADO: base de la Web API v2 de Bridge. */
@@ -34,6 +34,22 @@ export const BRIDGE_REPLICATION_PAGE_SIZE = 200;
  */
 export const BRIDGE_REPLICATION_MAX_TOP = 2000;
 
+/**
+ * Campo del filtro INCREMENTAL. Bridge (docs de la plataforma, "Dataset Replication"):
+ * "BridgeModificationTimestamp is the best field to use for incremental updates as it
+ * represents the last modification in the Bridge system; ModificationTimestamp is ingested
+ * directly from the MLS system and is not a consistent proxy". Filtrar por el del MLS
+ * puede perder cambios que Bridge aplica después.
+ *
+ * VERIFICADO contra `miamire` (2026-10-11, muestra de 1.000 fichas): presente en el 100 %;
+ * el más antiguo de Bridge es de 2026-06 cuando el del MLS es de 2025-07, o sea que Bridge
+ * sí modifica fichas después de la fecha del MLS.
+ *
+ * `modification_ts` (orden "más recientes" en /properties) sigue siendo la fecha del MLS:
+ * es la que tiene sentido para el comprador.
+ */
+export const INCREMENTAL_TIMESTAMP_FIELD = "BridgeModificationTimestamp";
+
 /** Campos de una consulta de bajas: lo justo para auditar por qué se borra. */
 export const REMOVED_KEYS_SELECT = ["ListingKey", "StandardStatus", "PropertyType"] as const;
 
@@ -44,6 +60,9 @@ export const REMOVED_KEYS_SELECT = ["ListingKey", "StandardStatus", "PropertyTyp
  */
 export const DISPLAYABLE_KEYS_SELECT = [
   "ListingKey", "StandardStatus", "PropertyType", "CountyOrParish", "StateOrProvince",
+  // VERIFICADO en `miamire` (2026-10-11, 100 % de una muestra de 1.000): para el
+  // diagnóstico de frescura de la reconciliación.
+  "BridgeModificationTimestamp",
 ] as const;
 
 export interface BridgeAdapterOptions {
@@ -147,6 +166,20 @@ export function createBridgeProvider(opts: BridgeAdapterOptions): MlsFeedProvide
       return toKeyPage(await fetchPage(
         cursor ?? buildDisplayableKeysUrl(opts.dataset, BRIDGE_REPLICATION_MAX_TOP)));
     },
+
+    async fetchListingsByKeys(listingKeys: string[]): Promise<MlsLicensed<ResoListing>[]> {
+      const out: MlsLicensed<ResoListing>[] = [];
+      for (let i = 0; i < listingKeys.length; i += REFETCH_KEYS_PER_REQUEST) {
+        const tanda = listingKeys.slice(i, i + REFETCH_KEYS_PER_REQUEST);
+        const p = await fetchPage(buildListingsByKeysUrl(opts.dataset, tanda));
+        for (const l of p.value) {
+          if (typeof l === "object" && l !== null && typeof (l as ResoListing).ListingKey === "string") {
+            out.push(markAsMlsLicensed(l as ResoListing));
+          }
+        }
+      }
+      return out;
+    },
   };
 }
 
@@ -155,8 +188,9 @@ export function createBridgeProvider(opts: BridgeAdapterOptions): MlsFeedProvide
  *
  * VERIFICADO contra la API real (2026-09-16, dataset `test`):
  *   - `/replication` responde 200 y pagina con `$next=` en el nextLink.
- *   - `$filter` sobre ModificationTimestamp FUNCIONA — es lo que hace posible el
- *     incremental.
+ *   - `$filter` por fecha de modificación FUNCIONA, y es lo que hace posible el
+ *     incremental. Desde 2026-10-11 el campo es `BridgeModificationTimestamp` (ver
+ *     INCREMENTAL_TIMESTAMP_FIELD).
  *   - **`$orderby` NO está soportado en este endpoint**: devuelve
  *     `400 "$orderby is not supported on this endpoint"`.
  *
@@ -175,7 +209,7 @@ export function buildReplicationUrl(
   url.searchParams.set("$top", String(pageSize));
 
   const clausulas = [ingestableStatusFilter(), ingestablePropertyTypeFilter()];
-  if (since) clausulas.push(`ModificationTimestamp gt ${since.toISOString()}`);
+  if (since) clausulas.push(`${INCREMENTAL_TIMESTAMP_FIELD} gt ${since.toISOString()}`);
   url.searchParams.set("$filter", clausulas.join(" and "));
 
   return url.toString();
@@ -202,7 +236,7 @@ export function buildRemovedKeysUrl(dataset: string, since: Date, pageSize: numb
   url.searchParams.set("$select", REMOVED_KEYS_SELECT.join(","));
   url.searchParams.set(
     "$filter",
-    `ModificationTimestamp gt ${since.toISOString()} and ` +
+    `${INCREMENTAL_TIMESTAMP_FIELD} gt ${since.toISOString()} and ` +
       `(${nonDisplayableStatusFilter()} or ${nonIngestablePropertyTypeFilter()})`,
   );
   return url.toString();
@@ -224,9 +258,32 @@ export function buildDisplayableKeysUrl(dataset: string, pageSize: number): stri
   return url.toString();
 }
 
+/** Claves por consulta al volver a descargar fichas desactualizadas (la URL queda en ~3 KB). */
+export const REFETCH_KEYS_PER_REQUEST = 50;
+
+/**
+ * Fichas COMPLETAS por clave, para recuperar las que la reconciliación detectó
+ * desactualizadas. Mismos filtros de estado y tipo que la ingesta: una ficha que ya no es
+ * ingerible no vuelve (y la consulta de bajas o el barrido la sacan).
+ *
+ * `in (…)` — VERIFICADO contra Bridge (2026-09-26, dataset `test`): responde 200 y filtra
+ * (ver buildRemovedKeysUrl). Las comillas simples de una clave se duplican, como pide
+ * OData; las claves de MIAMI son hexadecimales, así que en la práctica no aparecen.
+ */
+export function buildListingsByKeysUrl(dataset: string, listingKeys: string[]): string {
+  const url = new URL(`${BRIDGE_API_BASE}/${dataset}/Property/replication`);
+  url.searchParams.set("$top", String(Math.max(1, listingKeys.length)));
+  const lista = listingKeys.map((k) => `'${k.replace(/'/g, "''")}'`).join(",");
+  url.searchParams.set(
+    "$filter",
+    [`ListingKey in (${lista})`, ingestableStatusFilter(), ingestablePropertyTypeFilter()].join(" and "),
+  );
+  return url.toString();
+}
+
 /** Negación del filtro de estado: ningún estado mostrable (incluye StandardStatus null). */
 export function nonDisplayableStatusFilter(): string {
-  return `(${PUBLICLY_DISPLAYABLE_STATUSES.map((s) => `StandardStatus ne '${s}'`).join(" and ")})`;
+  return `(${INGESTED_STATUSES.map((s) => `StandardStatus ne '${s}'`).join(" and ")})`;
 }
 
 /** Negación del filtro de tipo: ningún tipo ingerible (incluye PropertyType null). */
@@ -269,7 +326,7 @@ export function ingestablePropertyTypeFilter(): string {
 }
 
 export function ingestableStatusFilter(): string {
-  return PUBLICLY_DISPLAYABLE_STATUSES
+  return INGESTED_STATUSES
     .map((s) => `StandardStatus eq '${s}'`)
     .join(" or ")
     .replace(/^(.*)$/, "($1)");

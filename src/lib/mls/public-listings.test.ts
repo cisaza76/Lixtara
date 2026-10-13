@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mergePublicListings, normalizeMlsNumber, type MlsPublicRow, type OwnListingRef } from "./public-listings";
+import { mergePublicListings, normalizeMlsNumber, primaryMlsPhotoUrl, type MlsPublicRow, type OwnListingRef } from "./public-listings";
 
 const fila = (over: Partial<MlsPublicRow> & { listing_id: string }): MlsPublicRow => ({
   listing_key: `K_${over.listing_id}`,
@@ -87,10 +87,22 @@ describe("elegibilidad de exhibición", () => {
     }
   });
 
-  it("deja pasar los estados públicos de IDX", () => {
-    for (const s of ["Active", "Active Under Contract", "Pending", "Coming Soon"]) {
+  it("suprime la ficha sin oficina: sin atribución no se exhibe", () => {
+    for (const office of [null, "", "   "]) {
+      const r = mergePublicListings([], [fila({ listing_id: "A1", list_office_name: office })], "en");
+      expect(r.mlsListings, String(office)).toHaveLength(0);
+      expect(r.suppressed[0].reason).toBe("missing_attribution");
+    }
+    expect(mergePublicListings([], [fila({ listing_id: "A1" })], "en").mlsListings[0].attribution.courtesyLine)
+      .toContain("Acme Realty");
+  });
+
+  it("deja pasar solo Active (los demás estados esperan la confirmación escrita de MIAMI)", () => {
+    expect(mergePublicListings([], [fila({ listing_id: "A1", mls_status: "Active" })], "en").mlsListings)
+      .toHaveLength(1);
+    for (const s of ["Active Under Contract", "Pending", "Coming Soon"]) {
       expect(mergePublicListings([], [fila({ listing_id: "A1", mls_status: s })], "en").mlsListings, s)
-        .toHaveLength(1);
+        .toHaveLength(0);
     }
   });
 
@@ -122,11 +134,6 @@ describe("atribución obligatoria (Schedule A §9)", () => {
     expect(r.mlsListings[0].attribution.courtesyLine).toContain("Este listado es cortesía de");
   });
 
-  it("sin nombre de oficina sigue atribuyendo: omitirla ES el incumplimiento", () => {
-    const r = mergePublicListings([], [fila({ listing_id: "A1", list_office_name: null })], "en");
-    expect(r.mlsListings[0].attribution.courtesyLine).toContain("another real estate firm");
-  });
-
   it("incluye los campos extra que el feed traiga", () => {
     const r = mergePublicListings([], [fila({
       listing_id: "A1", list_agent_name: "Jane Agent", list_office_phone: "305-555-0100",
@@ -148,3 +155,56 @@ describe("casos límite", () => {
     expect(r.suppressed).toHaveLength(2);
   });
 });
+
+describe("foto principal (hot-link)", () => {
+  const foto = (url: string, extra: Record<string, unknown> = {}) => ({ MediaURL: url, ...extra });
+
+  it("elige la de menor Order, aunque no venga primera", () => {
+    expect(primaryMlsPhotoUrl([
+      foto("https://cdn.test/b.jpg", { Order: 2 }),
+      foto("https://cdn.test/a.jpg", { Order: 1 }),
+    ])).toBe("https://cdn.test/a.jpg");
+  });
+
+  it("sin Order, gana la primera del arreglo", () => {
+    expect(primaryMlsPhotoUrl([foto("https://cdn.test/1.jpg"), foto("https://cdn.test/2.jpg")]))
+      .toBe("https://cdn.test/1.jpg");
+  });
+
+  it("ignora documentos, videos y URLs que no son https", () => {
+    expect(primaryMlsPhotoUrl([
+      foto("https://cdn.test/plano.pdf", { Order: 0, MediaCategory: "Document" }),
+      foto("http://cdn.test/inseguro.jpg", { Order: 1 }),
+      foto("javascript:alert(1)", { Order: 2 }),
+      foto("https://cdn.test/ok.jpg", { Order: 3, MediaCategory: "Photo" }),
+    ])).toBe("https://cdn.test/ok.jpg");
+  });
+
+  it("null cuando no hay nada utilizable", () => {
+    for (const m of [undefined, null, "x", [], [{}], [{ MediaURL: 5 }]]) {
+      expect(primaryMlsPhotoUrl(m)).toBeNull();
+    }
+  });
+
+  it("llega a la ficha pública, con alt en el idioma de la página", () => {
+    const row = fila({ listing_id: "A1", media: [foto("https://cdn.test/a.jpg")] });
+    const en = mergePublicListings([], [row], "en").mlsListings[0];
+    expect(en.photoUrl).toBe("https://cdn.test/a.jpg");
+    expect(en.photoAlt).toBe("Home for sale in Miami");
+    expect(mergePublicListings([], [row], "es").mlsListings[0].photoAlt)
+      .toBe("Propiedad en venta en Miami");
+    expect(mergePublicListings([], [fila({ listing_id: "A2" })], "en").mlsListings[0].photoUrl)
+      .toBeNull();
+  });
+});
+
+describe("solo Active al público (segunda defensa, en el servidor)", () => {
+  it("aunque la consulta devolviera otro estado, la fusión lo descarta", () => {
+    const filas = ["Active", "Active Under Contract", "Pending", "Coming Soon", "Closed"].map((st, i) =>
+      fila({ listing_id: `X${i}`, mls_status: st }));
+    const { mlsListings, suppressed } = mergePublicListings([], filas, "en");
+    expect(mlsListings.map((l) => l.listingId)).toEqual(["X0"]);
+    expect(suppressed.map((x) => x.reason)).toEqual(Array(4).fill("not_displayable"));
+  });
+});
+

@@ -5,7 +5,8 @@ import {
   reliabilityDisclaimer,
   displayEligibility,
   syncIntervalMeetsContract,
-  PUBLICLY_DISPLAYABLE_STATUSES,
+  INGESTED_STATUSES,
+  PUBLIC_DISPLAY_STATUSES,
   ATTRIBUTION_TYPOGRAPHY,
   MAX_REFRESH_INTERVAL_HOURS,
   MAX_WITHDRAWAL_LATENCY_HOURS,
@@ -92,10 +93,20 @@ describe("disclaimer de fiabilidad (Schedule C §2)", () => {
 });
 
 describe("elegibilidad de exhibición", () => {
-  it("permite los estados públicos de IDX", () => {
-    for (const s of PUBLICLY_DISPLAYABLE_STATUSES) {
-      expect(displayEligibility({ mlsStatus: s, withdrawnAt: null }).displayable, s).toBe(true);
+  it("al público SOLO se muestra Active (decisión del owner, 2026-10-11)", () => {
+    // Ampliar esta lista exige la confirmación escrita de MIAMI de que esos estados están
+    // autorizados bajo el acuerdo IDX (§II.E.1 dice "only active").
+    expect([...PUBLIC_DISPLAY_STATUSES]).toEqual(["Active"]);
+    expect(displayEligibility({ mlsStatus: "Active", withdrawnAt: null }).displayable).toBe(true);
+    for (const s of ["Active Under Contract", "Pending", "Coming Soon", "Closed", "Expired", "Withdrawn", "Canceled", "active", ""]) {
+      expect(displayEligibility({ mlsStatus: s, withdrawnAt: null }), s)
+        .toEqual({ displayable: false, reason: "not_displayable" });
     }
+  });
+
+  it("la sincronización sigue trayendo los cuatro estados (datos listos si MIAMI los aprueba)", () => {
+    expect([...INGESTED_STATUSES]).toEqual(["Active", "Active Under Contract", "Pending", "Coming Soon"]);
+    for (const s of PUBLIC_DISPLAY_STATUSES) expect(INGESTED_STATUSES as readonly string[]).toContain(s);
   });
 
   it("bloquea lo retirado — Schedule A exige sacarlo en 24h", () => {
