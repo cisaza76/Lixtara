@@ -26,11 +26,11 @@ export const BROKERAGE = {
  * verificación en dos pasos, idealmente en el dominio lixtara.com; nunca uno genérico
  * compartido (DocuSign atribuye la firma a quien controla el email).
  *
- * PENDIENTE: el owner debe proveerlo. Mientras sea null, NINGÚN acuerdo se crea: la
+ * Provisto por el owner (2026-10-13). Si se vuelve a null, NINGÚN acuerdo se crea: la
  * creación del sobre falla antes de llamar a DocuSign (un acuerdo con una sola firma no
  * tiene validez como listing agreement).
  */
-export const BROKER_SIGNER_EMAIL: string | null = null;
+export const BROKER_SIGNER_EMAIL: string | null = "anamaria@lixtara.com";
 
 /** Firmante broker de Lixtara: nombre del DBPR + email de firma, o null si falta el email. */
 export function brokerSigner(): { name: string; email: string } | null {
