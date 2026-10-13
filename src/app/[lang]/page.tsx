@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { BROKER_LICENSE, BROKERAGE_NAME } from "@/lib/broker";
+import { fillBrokerageCopy } from "@/config/brokerage";
 import { BROKER_STATS } from "@/lib/broker-stats";
 import {
   PRICING_TIERS,
@@ -18,7 +19,6 @@ import { parseQuizPhoto, parseQuizValue } from "@/lib/plan-quiz";
 import { PlanQuiz, type QuizTierDetails } from "@/components/plan-quiz";
 import { SavingsSlider } from "@/components/savings-slider";
 import { InvestorClubVolume } from "@/components/investor-club-volume";
-import { RebateSlider } from "@/components/rebate-slider";
 
 export default async function Home({
   params,
@@ -40,7 +40,7 @@ export default async function Home({
   const savingsCopy = t(lang).savings;
   const investorClubCopy = t(lang).investorClub;
   const toursCopy = t(lang).tours;
-  const rebateCopy = t(lang).rebate;
+  const buyerCopy = t(lang).buyerServices;
   const investorCopy = t(lang).investor;
   const faqCopy = t(lang).faq;
 
@@ -67,7 +67,7 @@ export default async function Home({
   }
   if (BROKER_STATS.yearsExperience) {
     visibleMetrics.push({
-      value: `${BROKER_STATS.yearsExperience} Yrs`,
+      value: `${BROKER_STATS.yearsExperience} ${copy.metricYearsUnit}`,
       label: copy.metricYearsLabel,
     });
   }
@@ -163,7 +163,7 @@ export default async function Home({
 
               <Image
                 src="/hero-dusk.jpg"
-                alt="Florida home at dusk with warm interior lights, palms, and a still pool"
+                alt={copy.imageAlt}
                 fill
                 priority
                 sizes="(min-width: 1024px) 380px, 80vw"
@@ -208,7 +208,7 @@ export default async function Home({
                 <h3 className="text-base font-semibold text-ink leading-snug">
                   {p.headline}
                 </h3>
-                <p className="text-sm leading-relaxed text-ink/70">{p.body}</p>
+                <p className="text-sm leading-relaxed text-ink/70">{fillBrokerageCopy(p.body)}</p>
               </div>
             ))}
           </div>
@@ -532,61 +532,51 @@ export default async function Home({
         </div>
       </section>
 
+      {/* Compradores: búsqueda con acompañamiento humano. Sin porcentajes, rebate ni
+          ahorros: los términos económicos se explican en el flujo correspondiente, antes de
+          cualquier acuerdo (docs/planning/2026-10-compradores, anexo C.1). */}
       <section
-        id="buyer-rebate"
+        id="buyers"
         className="border-t border-gold-soft scroll-mt-20"
       >
         <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start mb-16 lg:mb-20">
-            <div className="lg:col-span-7 flex flex-col gap-6">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
-                {rebateCopy.eyebrow}
-              </p>
-              <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal">
-                {rebateCopy.titleBefore}
-                <em className="italic text-gold">{rebateCopy.titleAccent}</em>
-                {rebateCopy.titleAfter}
-              </h2>
-              <p className="max-w-xl text-base leading-relaxed text-ink/70">
-                {rebateCopy.body}
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 sm:items-center pt-2">
-                <Link
-                  href={`/${lang}/properties`}
-                  className="inline-flex items-center justify-center px-8 py-4 bg-ink text-ivory text-[11px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
-                >
-                  {rebateCopy.ctaPrimary}
-                </Link>
-                <Link
-                  href={`/${lang}/contact?topic=buyer-rebate`}
-                  className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center"
-                >
-                  {rebateCopy.ctaSecondary} →
-                </Link>
-              </div>
-            </div>
-            <ul className="lg:col-span-5 flex flex-col gap-3 border-l border-gold-soft pl-6 lg:pl-8 text-sm leading-relaxed text-ink/80">
-              {[
-                rebateCopy.bullet1,
-                rebateCopy.bullet2,
-                rebateCopy.bullet3,
-                rebateCopy.bullet4,
-              ].map((b) => (
-                <li key={b} className="flex items-start gap-3">
-                  <span aria-hidden className="text-gold mt-1 leading-none">•</span>
-                  <span>{b}</span>
-                </li>
-              ))}
-            </ul>
+          <div className="flex flex-col gap-6 max-w-3xl mb-12 lg:mb-16">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+              {buyerCopy.eyebrow}
+            </p>
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal">
+              {buyerCopy.title}
+            </h2>
+            <p className="max-w-xl text-base leading-relaxed text-ink/70">
+              {buyerCopy.body}
+            </p>
           </div>
-          <RebateSlider
-            priceLabel={rebateCopy.priceLabel}
-            commissionLabel={rebateCopy.commissionLabel}
-            feeLabel={rebateCopy.feeLabel}
-            rebateLabel={rebateCopy.rebateLabel}
-            capNotice={rebateCopy.capNotice}
-            formulaLabel={rebateCopy.formulaLabel}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12 mb-12">
+            {[
+              [buyerCopy.pillar1Title, buyerCopy.pillar1Body],
+              [buyerCopy.pillar2Title, fillBrokerageCopy(buyerCopy.pillar2Body)],
+              [buyerCopy.pillar3Title, buyerCopy.pillar3Body],
+            ].map(([title, body]) => (
+              <div key={title} className="flex flex-col gap-3 border-t border-gold-soft pt-6">
+                <h3 className="font-display text-xl text-ink font-normal">{title}</h3>
+                <p className="text-sm leading-relaxed text-ink/70">{body}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+            <Link
+              href={`/${lang}/properties`}
+              className="inline-flex items-center justify-center px-8 py-4 bg-ink text-ivory text-[11px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+            >
+              {buyerCopy.ctaPrimary}
+            </Link>
+            <Link
+              href={`/${lang}/contact?topic=buy`}
+              className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center"
+            >
+              {fillBrokerageCopy(buyerCopy.ctaSecondary)} →
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -628,6 +618,9 @@ export default async function Home({
             discountGold={investorClubCopy.discountGold}
             discountPlatinum={investorClubCopy.discountPlatinum}
             footerNote={investorClubCopy.footerNote}
+            tableTier={investorClubCopy.tableTier}
+            tableDiscount={investorClubCopy.tableDiscount}
+            tableTotal={investorClubCopy.tableTotal}
           />
 
           <div className="mt-10 lg:mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
@@ -682,7 +675,7 @@ export default async function Home({
                   {item.q}
                 </dt>
                 <dd className="md:col-span-7 text-sm lg:text-base leading-relaxed text-ink/70">
-                  {fillPricingCopy(item.a)}
+                  {fillPricingCopy(fillBrokerageCopy(item.a))}
                 </dd>
               </div>
             ))}

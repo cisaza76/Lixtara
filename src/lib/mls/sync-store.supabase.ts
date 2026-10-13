@@ -5,6 +5,10 @@ import { createService } from "@/lib/supabase/service";
 import type { NormalizedListing } from "@/lib/mls/feed-port";
 import type { SyncPassPhase, SyncState, SyncStore } from "@/lib/mls/sync-run";
 
+
+/** Fichas por sentencia de upsert. Ver `upsertListings`. */
+export const UPSERT_CHUNK = 50;
+
 export function createSupabaseSyncStore(): SyncStore {
   const db = createService();
 
@@ -32,12 +36,18 @@ export function createSupabaseSyncStore(): SyncStore {
       // `last_seen_at` se refresca en cada pasada; `first_seen_at` conserva su default
       // en el INSERT y no se toca en el UPDATE.
       const ahora = new Date().toISOString();
-      const { error } = await db
-        .from("mls_listings")
-        .upsert(rows.map((r) => ({ ...r, last_seen_at: ahora })), {
-          onConflict: "listing_key",
-        });
-      if (error) throw new Error(`no se pudo hacer upsert de listings: ${error.message}`);
+      // En tandas: un upsert de la página entera (200 fichas, cada una con su payload
+      // completo y el trigger de campos de búsqueda) superó el statement_timeout de la base
+      // el 2026-10-10 mientras otra escritura tenía filas bloqueadas. Si una tanda falla,
+      // las anteriores ya quedaron (el upsert es idempotente) y el cursor no avanza.
+      for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
+        const { error } = await db
+          .from("mls_listings")
+          .upsert(rows.slice(i, i + UPSERT_CHUNK).map((r) => ({ ...r, last_seen_at: ahora })), {
+            onConflict: "listing_key",
+          });
+        if (error) throw new Error(`no se pudo hacer upsert de listings: ${error.message}`);
+      }
       return rows.length;
     },
 

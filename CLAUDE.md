@@ -66,8 +66,14 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 ### Pricing
 - Pricing tiers live in **one** module: `src/lib/pricing-tiers.ts`. Never hardcode
   `199`, `495`, `995` in components — import from there (and Stripe amounts derive from it).
-- Virtual staging: `FREE_QUOTA = 3`, `PRICE_PER_ROOM = 500` cents, hard cap 30 rooms.
-- Buyer rebate: `LIXTARA_BUYER_FEE_PCT = 0.5`, `REBATE_CAP = 50_000`.
+- Virtual staging: `STAGING_FREE_QUOTA = 5` free actions per listing, then `STAGING_OVERAGE_PRICE = 5` USD each (`src/lib/staging.ts`), hard cap 30 rooms.
+- **Two separate revenue models; never mix their percentages:**
+  - Listings (seller, core): plan fee + 0.5 % / 1 % / 1.5 % listing commission (`pricing-tiers.ts`).
+  - Buyer brokerage: 2 % / 2.5 % / 3 % (3 % preferred), individually negotiated, capped across
+    all sources (NAR 8.13). No public percentages yet: terms are explained before any agreement.
+  - The former "Buyer rebate program" (0.5 % fee + rebate) is **retired** (2026-10-11): no public
+    copy, calculator or Loui answer may promise a rebate, cash back or buyer savings. Any rebate
+    or credit is a separate, undecided business decision. See `docs/planning/2026-10-compradores/`.
 
 ### Auth & RLS
 - Roles live in the `user_roles` table, never on `users`. Check via the `has_role()`
@@ -81,6 +87,12 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   dates, `mls_number`, `owner_id`, `is_test` and `pricing_tier` after draft are broker/admin
   or `service_role` only. A new seller-editable column must be added to that list (a test
   fails otherwise). Every `mls_status` change is logged in `property_status_history`.
+- Once a listing is no longer a draft, the seller writes only
+  `properties_seller_post_draft_columns()` (migration `20261007170000`: contact preference,
+  photo-rights confirmation, internal comps). Key fields and withdrawal go through
+  `listing_requests` (`POST /api/listings/[id]/change-request` and `/withdrawal-request`):
+  the broker updates Matrix, approves on `/admin/listings/[id]/review`, and only then is the
+  change applied. Verified with `pnpm db-check:listing-requests`.
 
 ### Test data
 - Tests run in **preview**, not production. If something must be tested in production,
@@ -142,7 +154,9 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 - `MLS_BRIDGE_DATASET` — server-only. Código del dataset en Bridge (`miamire` para
   MIAMI Association of REALTORS®). No es secreto, pero sí server-only: nombra el feed.
 - `MLS_SYNC_BUDGET_MS` / `MLS_SYNC_MAX_PAGES` — server-only, opcionales (50.000 ms / 200).
-  Presupuesto de una invocación del cron `/api/mls/sync`, que corre cada 6 h (`23 */6 * * *`).
+  Presupuesto de una invocación del cron `/api/mls/sync`, que corre cada hora (`23 * * * *`).
+  Era cada 6 h hasta el 2026-10-10: una invocación de ~50 s no alcanzaba los ~4.250
+  cambios de 6 h.
   El mínimo contractual de refresco son 24 h (Schedule A §5) — ver ADR-0013.
 - `MLS_BRIDGE_SERVER_TOKEN` — server-only Bridge Interactive server token. **Production
   only.** Never `NEXT_PUBLIC_`-prefixed. Obtainable only via `requireMlsServerToken()`,
@@ -156,7 +170,30 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   the code first, THEN enable Turnstile in Supabase — the reverse breaks every sign-in.
 - `EMAIL_CODE_PEPPER` — server-only. HMAC key for the email verification codes of the
   seller funnel gate (`email_verification_challenges.code_hmac`). That table, not Supabase's
-  OTP, validates those codes. Required once the Phase B gate ships.
+  OTP, validates those codes. It is also the switch for the step-1 email gate of
+  `/listing/new` (`src/lib/listing-email-gate*.ts`): unset = the flow runs as before
+  (anonymous until step 7); set = the seller confirms their email with a 6-digit code
+  right after the address, and the broker can send a "continue your listing" magic link
+  from `/admin/seller-leads` (sellers can request one at `/listing/continue`).
+- `OUTREACH_WEBHOOK_TOKEN` — server-only, **Production only**. Shared secret of the Instantly
+  webhook (`/api/crm/outreach-webhook`), sent by Instantly as `Authorization: Bearer <token>`.
+  Unset = every call is 401 (fail-closed). Created by the owner in the Vercel dashboard.
+- `INSTANTLY_API_KEY` — server-only, **Production only** (Preview shares the production DB: a
+  preview with this key could load real leads). Scope `leads:create` or `leads:all`. Read only by
+  `src/lib/crm/instantly.server.ts`; unset = the CRM's "send to Instantly" button is disabled.
+- `EMAIL_FROM` / `EMAIL_REPLY_TO` — server-only. Sender (`"Lixtara <…@lixtara.com>"`, a
+  sender on the domain verified in Resend) and reply-to inbox for every email
+  (`src/lib/email.ts#emailFrom`). Unset `EMAIL_FROM` = Resend's test sender
+  `onboarding@resend.dev`, which only delivers to the Resend account owner.
+  `EMAIL_DEV_OVERRIDE_TO` reroutes all mail to one address (debug only, never Production).
+- `NEXT_PUBLIC_GTM_ID` / `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` — public, Production
+  only. GTM (the CMO's container `GTM-5KGLHNL4`: GA4, Microsoft Clarity, Google Ads, Meta) and PostHog
+  (product). **Independent:** each tool turns on with its own valid variable; neither set = nothing loads,
+  `track()` is a no-op and the informational cookie notice stays. Any set = consent banner, **opt-in in every
+  region** (owner decision 2026-10-13): nothing loads before "Accept", and accepting grants analytics AND
+  advertising (Consent Mode v2). No `<noscript>` GTM iframe. PostHog without autocapture or session replay;
+  our events carry URLs without query strings; the cookie policy switches to the variant for the configured
+  tools. Event catalog, container requirements and setup: `docs/superpowers/runbooks/2026-10-11-analitica.md`.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via
   `vercel env add`.
 
@@ -227,8 +264,9 @@ queue + payments view; the buyer side (offers + saved properties); the Loui AI c
 copy; KIRI 3D tours; and per-route rate limiting via Upstash (`src/lib/ratelimit.ts`).
 
 **Not yet done — go-live debt:** test coverage is unit-only (Vitest covers pure logic —
-pricing, buyer-rebate, status maps, i18n parity, webhook dedup; **webhooks, RLS, and route
-handlers have no integration tests**); error/product analytics (Sentry/PostHog); the full
+pricing, status maps, i18n parity, webhook dedup, buyer leads; **webhooks, RLS, and route
+handlers have no integration tests**); error analytics (Sentry) beyond the video pipeline;
+product analytics is built but OFF until the GTM/PostHog env vars are set; the full
 5-checkout Stripe set (`tier` + `consultation` are wired); referrals; MLS sync; and the FL DBPR / NAR
 compliance review.
 

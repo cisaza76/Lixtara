@@ -9,11 +9,12 @@
 //
 // `listings` se lee en cada llamada, así que un test puede mutar el arreglo entre
 // invocaciones para simular cambios de estado o borrados en el feed.
-import { markAsMlsLicensed } from "@/lib/mls/licensed-content";
+import { markAsMlsLicensed, type MlsLicensed } from "@/lib/mls/licensed-content";
 import type {
   MlsFeedPage, MlsFeedProvider, MlsKeyPage, ResoKeyRecord, ResoListing,
 } from "@/lib/mls/feed-port";
-import { PUBLICLY_DISPLAYABLE_STATUSES } from "@/lib/mls/display-compliance";
+import { INGESTED_STATUSES } from "@/lib/mls/display-compliance";
+import { DISPLAYABLE_KEYS_SELECT } from "@/lib/mls/bridge-adapter";
 import { SUPPORTED_PROPERTY_TYPES } from "@/lib/mls/coverage";
 
 export interface FakeFeedOptions {
@@ -26,7 +27,7 @@ export interface FakeFeedOptions {
 
 /** El `$filter` positivo de estado + tipo que manda el adaptador real. */
 export function passesIngestFilter(l: { StandardStatus?: unknown; PropertyType?: unknown }): boolean {
-  return (PUBLICLY_DISPLAYABLE_STATUSES as readonly unknown[]).includes(l.StandardStatus) &&
+  return (INGESTED_STATUSES as readonly unknown[]).includes(l.StandardStatus) &&
     (SUPPORTED_PROPERTY_TYPES as readonly unknown[]).includes(l.PropertyType);
 }
 
@@ -87,10 +88,19 @@ export function createFakeFeedProvider(
     async fetchDisplayableKeys(cursor: string | null): Promise<MlsKeyPage> {
       const { pagina, nextCursor } = paginar(ordenados().filter(passesIngestFilter), cursor);
       return {
-        keys: pagina.map((l) => markAsMlsLicensed(proyectar(l,
-          ["ListingKey", "StandardStatus", "PropertyType", "CountyOrParish", "StateOrProvince"]))),
+        // Misma proyección que el adaptador real: si una cambia, la otra también.
+        keys: pagina.map((l) => markAsMlsLicensed(proyectar(l, [...DISPLAYABLE_KEYS_SELECT]))),
         nextCursor,
       };
+    },
+
+    async fetchListingsByKeys(listingKeys: string[]): Promise<MlsLicensed<ResoListing>[]> {
+      calls += 1;
+      if (opts.failOnCall === calls) throw new Error("fallo inyectado del proveedor");
+      // Mismo filtro de estado y tipo que el adaptador real.
+      return listings
+        .filter((l) => listingKeys.includes(l.ListingKey) && passesIngestFilter(l))
+        .map((l) => markAsMlsLicensed(l));
     },
   };
 }

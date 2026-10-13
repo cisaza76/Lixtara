@@ -27,11 +27,16 @@ export function AgreementButton({ propertyId, lang, labels }: AgreementButtonPro
       });
       const data = (await res.json()) as { url?: string; error?: string; detail?: string };
       if (!res.ok || !data.url) {
-        throw new Error(data.detail ?? data.error ?? "no_url");
+        // `detail` is DocuSign's English text: console only.
+        if (data.detail) console.error("agreement create failed", data.detail);
+        throw new Error(data.error ?? "no_url");
       }
       window.location.href = data.url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : labels.failed);
+      // Localized message; a machine code (e.g. "agreement_not_signed") may
+      // follow for support, but never an English sentence from the API.
+      const code = e instanceof Error && /^[a-z0-9_]+$/.test(e.message) ? e.message : null;
+      setError(code ? `${labels.failed} (${code})` : labels.failed);
       setSubmitting(false);
     }
   }

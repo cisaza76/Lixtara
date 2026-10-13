@@ -3,12 +3,22 @@ import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { createService } from "@/lib/supabase/service";
+import { assertStaffWithUser } from "@/lib/admin-auth";
+import {
+  isFinalAgreementStatus,
+  refreshAgreement,
+  type AgreementRef,
+} from "@/lib/agreement-refresh";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
+import { recordServerEvent } from "@/lib/analytics.server";
 import {
   ensureEnterMlsNumberTask,
   mapMlsNumberWriteError,
   saveListingMlsNumber,
 } from "@/lib/listing-mls-number.server";
+import { describeChanges, type ChangeSet } from "@/lib/listing-requests";
+import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
 
 interface Property {
   id: string;
@@ -38,6 +48,14 @@ interface Property {
   buyer_agent_commission: number | null;
 }
 
+interface SellerRequest {
+  id: string;
+  kind: "change" | "withdrawal";
+  changes: ChangeSet;
+  reason: string | null;
+  created_at: string;
+}
+
 interface Photo {
   id: string;
   url: string;
@@ -65,6 +83,67 @@ function field(label: string, value: string | number | null | undefined) {
   );
 }
 
+// Module scope on purpose: a plain function declared inside the page and
+// called from its server actions gets captured by them, and Next.js cannot
+// serialize a function into the action's bound arguments ("Functions cannot be
+// passed directly to Client Components"), which crashed the review page.
+async function transition(
+  lang: string,
+  id: string,
+  shortAddress: string,
+  newStatus: string,
+  actionType: string,
+  note: string | null,
+  mlsNumber: string | null = null,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(`/${lang}/sign-in?next=/admin`);
+  const [{ data: a }, { data: b }] = await Promise.all([
+    supabase.rpc("has_role", { _role: "admin" }),
+    supabase.rpc("has_role", { _role: "broker" }),
+  ]);
+  if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
+
+  const { error: updateError } = await supabase
+    .from("properties")
+    .update(mlsNumber ? { mls_status: newStatus, mls_number: mlsNumber } : { mls_status: newStatus })
+    .eq("id", id);
+  if (mlsNumber && updateError) {
+    // Con número, la aprobación va en la MISMA escritura: si el número choca, no se
+    // aprueba nada y se avisa.
+    redirect(`/${lang}/admin/listings/${id}/review?error=${mapMlsNumberWriteError(updateError)}`);
+  }
+
+  if (newStatus === "active" && !mlsNumber) {
+    await ensureEnterMlsNumberTask(supabase, id, shortAddress);
+  }
+
+  if (newStatus === "active" || newStatus === "withdrawn") {
+    await supabase
+      .from("broker_tasks")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("property_id", id)
+      .eq("task_type", "approve_listing")
+      .eq("status", "pending");
+  }
+
+  await supabase.from("activity_log").insert({
+    user_id: user.id,
+    property_id: id,
+    action_type: actionType,
+    description: note ?? `Listing → ${newStatus}`,
+  });
+
+  if (newStatus === "active") {
+    recordServerEvent({ event: "listing_published", props: {} });
+  }
+
+  redirect(`/${lang}/admin/listings/${id}/review?done=${actionType}`);
+}
+
 export default async function ListingReviewPage({
   params,
   searchParams,
@@ -87,22 +166,47 @@ export default async function ListingReviewPage({
   if (!property) notFound();
   const prop = property as Property;
 
+  // property_photos and agreements have no admin/broker SELECT policy (only the
+  // owner, and the public for ACTIVE listings' photos), so with the session
+  // client the review page always showed "no photos" and "no agreement on
+  // file" for drafts. Re-check the role here (page data loads in parallel with
+  // the admin layout's guard), then read both with the secret key.
+  await assertStaffWithUser(lang);
+  const svc = createService();
   const [{ data: photoRows }, { data: agreementRow }] = await Promise.all([
-    supabase
+    svc
       .from("property_photos")
       .select("id,url,is_primary,display_order")
       .eq("property_id", id)
       .order("display_order", { ascending: true }),
-    supabase
+    svc
       .from("agreements")
-      .select("status,signer_name,signer_email,signed_at")
+      .select("id,envelope_id,property_id,status,signer_name,signer_email,signed_at")
       .eq("property_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
   const photos = (photoRows ?? []) as Photo[];
-  const agreement = (agreementRow ?? null) as Agreement | null;
+
+  // Solicitudes pendientes del vendedor (#134, #136): se aplican solo al aprobarlas aquí.
+  const { data: requestRows } = await supabase
+    .from("listing_requests")
+    .select("id,kind,changes,reason,created_at")
+    .eq("property_id", id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  const sellerRequests = (requestRows ?? []) as SellerRequest[];
+  const agreement = (agreementRow ?? null) as (Agreement & AgreementRef) | null;
+  // Live status: the stored one lags until the seller's page or a DocuSign
+  // webhook refreshes it, so refresh it here too.
+  if (agreement && !isFinalAgreementStatus(agreement.status)) {
+    const live = await refreshAgreement(agreement);
+    if (live !== agreement.status) {
+      agreement.status = live as Agreement["status"];
+      if (live === "signed" || live === "completed") agreement.signed_at ??= new Date().toISOString();
+    }
+  }
 
   // ── Broker actions (admin/broker gated). The Lovable workflow statuses
   // (rejected / changes_requested / awaiting_broker_signature) don't exist in
@@ -117,57 +221,10 @@ export default async function ListingReviewPage({
     empty: "Enter the MLS number.",
     taken: "That MLS number is already on another listing.",
     failed: "Could not save the MLS number. Try again.",
+    matrix_required: "Confirm you already made this change in Matrix.",
+    not_pending: "That request was already handled.",
+    apply_failed: "Could not apply the request to the listing. Try again.",
   };
-
-  async function transition(
-    newStatus: string,
-    actionType: string,
-    note: string | null,
-    mlsNumber: string | null = null,
-  ) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
-    const [{ data: a }, { data: b }] = await Promise.all([
-      supabase.rpc("has_role", { _role: "admin" }),
-      supabase.rpc("has_role", { _role: "broker" }),
-    ]);
-    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
-
-    const { error: updateError } = await supabase
-      .from("properties")
-      .update(mlsNumber ? { mls_status: newStatus, mls_number: mlsNumber } : { mls_status: newStatus })
-      .eq("id", id);
-    if (mlsNumber && updateError) {
-      // Con número, la aprobación va en la MISMA escritura: si el número choca, no se
-      // aprueba nada y se avisa.
-      redirect(`/${lang}/admin/listings/${id}/review?error=${mapMlsNumberWriteError(updateError)}`);
-    }
-
-    if (newStatus === "active" && !mlsNumber) {
-      await ensureEnterMlsNumberTask(supabase, id, shortAddress);
-    }
-
-    if (newStatus === "active" || newStatus === "withdrawn") {
-      await supabase
-        .from("broker_tasks")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("property_id", id)
-        .eq("task_type", "approve_listing")
-        .eq("status", "pending");
-    }
-
-    await supabase.from("activity_log").insert({
-      user_id: user.id,
-      property_id: id,
-      action_type: actionType,
-      description: note ?? `Listing → ${newStatus}`,
-    });
-
-    redirect(`/${lang}/admin/listings/${id}/review?done=${actionType}`);
-  }
 
   async function approve(formData: FormData) {
     "use server";
@@ -176,7 +233,7 @@ export default async function ListingReviewPage({
     if (!mls.ok && mls.reason === "invalid_format") {
       redirect(`/${lang}/admin/listings/${id}/review?error=invalid_format`);
     }
-    await transition("active", "listing_approved", null, mls.ok ? mls.value : null);
+    await transition(lang, id, shortAddress, "active", "listing_approved", null, mls.ok ? mls.value : null);
   }
   async function saveMlsNumber(formData: FormData) {
     "use server";
@@ -202,14 +259,49 @@ export default async function ListingReviewPage({
         : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
     );
   }
+  // Solicitud del vendedor: Matrix primero, luego aprobar (se aplica) o rechazar (#134, #136).
+  async function reviewSellerRequest(formData: FormData) {
+    "use server";
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect(`/${lang}/sign-in?next=/admin`);
+    const [{ data: a }, { data: b }] = await Promise.all([
+      supabase.rpc("has_role", { _role: "admin" }),
+      supabase.rpc("has_role", { _role: "broker" }),
+    ]);
+    if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
+
+    const requestId = String(formData.get("request_id") ?? "");
+    const decision = String(formData.get("decision") ?? "");
+    const note = String(formData.get("note") ?? "").slice(0, 2000).trim() || null;
+    if (!requestId || (decision !== "approve" && decision !== "reject")) {
+      redirect(`/${lang}/admin/listings/${id}/review`);
+    }
+    if (decision === "approve" && formData.get("matrix_done") !== "1") {
+      redirect(`/${lang}/admin/listings/${id}/review?error=matrix_required`);
+    }
+    const args = { requestId, propertyId: id, reviewerId: user.id, note };
+    const r =
+      decision === "approve"
+        ? await approveListingRequest(supabase, args)
+        : await rejectListingRequest(supabase, args);
+    redirect(
+      r.ok
+        ? `/${lang}/admin/listings/${id}/review?done=seller_request_${decision === "approve" ? "approved" : "rejected"}`
+        : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
+    );
+  }
+
   async function reject() {
     "use server";
-    await transition("withdrawn", "listing_rejected", null);
+    await transition(lang, id, shortAddress, "withdrawn", "listing_rejected", null);
   }
   async function requestChanges(formData: FormData) {
     "use server";
     const note = String(formData.get("note") ?? "").slice(0, 1000).trim();
-    await transition("draft", "listing_changes_requested", note || null);
+    await transition(lang, id, shortAddress, "draft", "listing_changes_requested", note || null);
   }
 
   const fullAddress = `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`;
@@ -245,6 +337,66 @@ export default async function ListingReviewPage({
         <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
           {MLS_ERRORS[sp.error]} Nothing was changed.
         </div>
+      )}
+
+      {sellerRequests.length > 0 && (
+        <section className="border border-gold bg-gold/5 p-6 flex flex-col gap-5">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
+            Seller requests ({sellerRequests.length})
+          </span>
+          <p className="text-sm text-ink/75">
+            Make the change in Matrix first. Approving applies it on lixtara.com; nothing is
+            published before that.
+          </p>
+          {sellerRequests.map((r) => (
+            <form
+              key={r.id}
+              action={reviewSellerRequest}
+              className="border-t border-gold-soft pt-4 flex flex-col gap-3"
+            >
+              <input type="hidden" name="request_id" value={r.id} />
+              <p className="text-sm text-ink">
+                <strong>{r.kind === "change" ? "Change" : "Withdrawal"}</strong>
+                <span className="text-ink/55"> · {new Date(r.created_at).toLocaleDateString("en-US")}</span>
+              </p>
+              {r.kind === "change" ? (
+                <p className="text-sm text-ink/80 font-mono break-words">{describeChanges(r.changes)}</p>
+              ) : (
+                <p className="text-sm text-ink/80">Take this listing off the market (→ withdrawn).</p>
+              )}
+              {r.reason && <p className="text-sm text-ink/70 italic">“{r.reason}”</p>}
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input type="checkbox" name="matrix_done" value="1" />
+                {r.kind === "change" ? "Already updated in Matrix" : "Already withdrawn in Matrix"}
+              </label>
+              <textarea
+                name="note"
+                rows={2}
+                maxLength={2000}
+                placeholder="Note to the seller (optional)"
+                className="w-full border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink"
+              />
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  name="decision"
+                  value="approve"
+                  className="inline-flex items-center px-5 py-2.5 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
+                >
+                  Approve &amp; apply
+                </button>
+                <button
+                  type="submit"
+                  name="decision"
+                  value="reject"
+                  className="inline-flex items-center px-5 py-2.5 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.22em] uppercase hover:border-gold transition-colors"
+                >
+                  Reject
+                </button>
+              </div>
+            </form>
+          ))}
+        </section>
       )}
 
       {/* MLS number — anotado a mano desde Matrix; evita que /properties muestre el
@@ -287,6 +439,12 @@ export default async function ListingReviewPage({
           Enter it after the listing is live in Matrix. Saving it closes the
           &ldquo;Enter MLS number&rdquo; task.
         </p>
+        <Link
+          href={`/${lang}/admin/listings/${id}/matrix`}
+          className="self-start inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
+        >
+          Matrix input sheet →
+        </Link>
       </section>
 
       {/* Listing data */}
@@ -422,7 +580,7 @@ export default async function ListingReviewPage({
         )}
         {!agreementSigned && (
           <p className="text-xs text-amber-700">
-            ⚠️ Seller hasn&apos;t completed the listing agreement — approving is
+            ⚠️ Seller hasn&apos;t completed the listing agreement. Approving is
             not advisable until it&apos;s signed.
           </p>
         )}

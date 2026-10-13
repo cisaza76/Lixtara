@@ -36,6 +36,20 @@ describe("buildVideoTerminalEmail", () => {
     expect(m.text.toLowerCase()).not.toContain("try again");
   });
 
+  it("known recipient language: the message is only in that language", () => {
+    const es = buildVideoTerminalEmail({ ...base, outcome: "completed", lang: "es" });
+    expect(es.subject).toContain("Tu video");
+    expect(es.html).toContain("Tu video");
+    expect(es.html).not.toContain("Your listing video");
+    const en = buildVideoTerminalEmail({ ...base, outcome: "failed", kind: "technical_retryable", reference: "A7F31C2D", lang: "en" });
+    expect(en.text).toContain("A7F31C2D");
+    expect(en.text).not.toContain("Referencia");
+    const esFail = buildVideoTerminalEmail({ ...base, outcome: "failed", kind: "source_action_required", reference: "A7F31C2D", lang: "es" });
+    expect(esFail.subject).toContain("otro archivo");
+    expect(esFail.text).toContain("Referencia: A7F31C2D");
+    expect(esFail.text).not.toContain("Reference:");
+  });
+
   it("never leaks technical vocabulary in any variant", () => {
     for (const kind of ["technical_retryable", "source_action_required", "technical_support"] as const) {
       const m = buildVideoTerminalEmail({ ...base, outcome: "failed", kind, reference: "AAAA1111" });

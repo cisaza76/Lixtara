@@ -20,7 +20,7 @@ export class MockProvider implements MediaGenerationProvider {
       url: null,
       status: "mock",
       provider: this.id,
-      detail: "mock render — real generation lands in a later slice",
+      detail: "Mock render. Real generation lands in a later slice.",
     };
   }
 }

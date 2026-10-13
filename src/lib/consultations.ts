@@ -41,10 +41,10 @@ export const CONSULTATION_PRODUCTS: Record<
     attorneyHours: BEST_VALUE.attorneyHours,
     name: "Best Value Package (15h Realtor + 1h Attorney)",
   },
-  realtor_1: { amount: 150, realtorHours: 1, attorneyHours: 0, name: "Realtor consultation — 1 hour" },
-  realtor_5: { amount: 675, realtorHours: 5, attorneyHours: 0, name: "Realtor consultation — 5 hours" },
-  realtor_10: { amount: 1200, realtorHours: 10, attorneyHours: 0, name: "Realtor consultation — 10 hours" },
-  attorney_1: { amount: 450, realtorHours: 0, attorneyHours: 1, name: "Attorney consultation — 1 hour" },
+  realtor_1: { amount: 150, realtorHours: 1, attorneyHours: 0, name: "Realtor consultation (1 hour)" },
+  realtor_5: { amount: 675, realtorHours: 5, attorneyHours: 0, name: "Realtor consultation (5 hours)" },
+  realtor_10: { amount: 1200, realtorHours: 10, attorneyHours: 0, name: "Realtor consultation (10 hours)" },
+  attorney_1: { amount: 450, realtorHours: 0, attorneyHours: 1, name: "Attorney consultation (1 hour)" },
 };
 
 export function isConsultationProduct(v: string): v is ConsultationProduct {

@@ -3,7 +3,7 @@
 // a crafted sign-in link cannot bounce a just-authenticated user off-site. Mirrors the exact
 // call shape used in src/app/[lang]/sign-in/page.tsx: safeNextPath(next, SITE_URL, `/${lang}`).
 import { describe, it, expect } from "vitest";
-import { safeNextPath } from "@/lib/auth/safe-redirect";
+import { postSignInPath, safeNextPath } from "@/lib/auth/safe-redirect";
 
 const SITE_URL = "https://lixtara.com";
 const fallback = "/en";
@@ -31,4 +31,23 @@ describe("sign-in post-auth redirect — next is validated to same-origin", () =
       expect(new URL(out, SITE_URL).origin).toBe(SITE_URL);
     });
   }
+});
+
+describe("sign-in post-auth redirect — staff land on the admin panel", () => {
+  it("sends staff with no specific destination to /admin", () => {
+    expect(postSignInPath("/en", "en", true)).toBe("/en/admin");
+    expect(postSignInPath("/es/", "es", true)).toBe("/es/admin");
+    expect(postSignInPath("/", "es", true)).toBe("/es/admin");
+    expect(postSignInPath("/dashboard", "en", true)).toBe("/en/admin");
+  });
+
+  it("honors an explicit destination for staff", () => {
+    expect(postSignInPath("/admin/listings", "es", true)).toBe("/es/admin/listings");
+    expect(postSignInPath("/en/property/123", "en", true)).toBe("/en/property/123");
+  });
+
+  it("leaves non-staff destinations unchanged", () => {
+    expect(postSignInPath("/en", "en", false)).toBe("/en");
+    expect(postSignInPath("/dashboard", "es", false)).toBe("/es/dashboard");
+  });
 });

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { isLocale, t, type Locale } from "@/lib/i18n";
 import { requireUser } from "@/lib/auth";
+import { isStaff } from "@/lib/admin-auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice, PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import {
@@ -15,6 +16,8 @@ import type { StrategyPayload } from "@/lib/media-intelligence/types";
 import { ListingVideoPanel } from "@/components/listing-video-panel";
 import { SourceVideoSection } from "@/components/source-video-section";
 import { resolveVisibleVideoListings } from "@/lib/creative-studio/video-access-guard";
+import { canRequest } from "@/lib/listing-requests";
+import { REQUESTS_COPY } from "@/lib/listing-requests-copy";
 
 interface ListingRow {
   id: string;
@@ -127,6 +130,8 @@ export default async function DashboardPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) notFound();
+  // Staff have no seller dashboard — the admin panel is their home.
+  if (await isStaff(supabase)) redirect(`/${lang}/admin`);
 
   // Listings owned by the user. RLS already gates by owner, but be explicit.
   const { data: listingRows } = await supabase
@@ -322,6 +327,9 @@ export default async function DashboardPage({
     }
   }
   const buyerCopy = t(lang).dashboardBuyer;
+  // Estado de la oferta tal como lo guarda la DB → texto en el idioma de la página.
+  const offerStatusText = (status: string): string =>
+    (buyerCopy.offerStatuses as Record<string, string>)[status] ?? status;
   const hasBuyerActivity = offers.length > 0 || savedIds.length > 0;
 
   // Portfolio metrics (derived from the listings already fetched — no extra query).
@@ -569,7 +577,7 @@ export default async function DashboardPage({
                 };
 
               const tierText = tier
-                ? `${copy.tierLabel}: ${tierId.charAt(0).toUpperCase() + tierId.slice(1)}`
+                ? `${copy.tierLabel}: ${t(lang).pricing.tiers[tierId as PricingTierId].name}`
                 : undefined;
 
               return (
@@ -599,6 +607,15 @@ export default async function DashboardPage({
                       isDraft ? copy.continueListingButton : copy.viewListingButton
                     }
                   />
+                  {/* Listing ya enviado: los cambios y el retiro pasan por la broker (#134, #136). */}
+                  {!isDraft && (canRequest("change", l.mls_status) || canRequest("withdrawal", l.mls_status)) && (
+                    <Link
+                      href={`/${lang}/dashboard/listings/${l.id}/requests`}
+                      className="self-start text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+                    >
+                      {REQUESTS_COPY[lang as Locale].dashboardLink}
+                    </Link>
+                  )}
                   {mediaAgentEnabled && (
                     <MediaStrategyPanel
                       propertyId={l.id}
@@ -676,7 +693,7 @@ export default async function DashboardPage({
                                   : "border-gold-soft bg-ivory-strong/40 text-ink/70"
                             }`}
                           >
-                            {o.status}
+                            {offerStatusText(o.status)}
                           </span>
                         </td>
                       </tr>
@@ -738,7 +755,7 @@ export default async function DashboardPage({
                                       : "border-gold-soft bg-ivory-strong/40 text-ink/70"
                                 }`}
                               >
-                                {o.status}
+                                {offerStatusText(o.status)}
                               </span>
                             </td>
                             <td className="py-3 text-xs">

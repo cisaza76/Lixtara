@@ -46,7 +46,15 @@ interface PhotoGridDraggableProps {
     livingGenerating: string;
     livingFailed: string;
     livingView: string;
+    stagingRateLimited: string;
+    livingRateLimited: string;
   };
+}
+
+// Error text shown next to a localized message: only machine codes
+// ("luma_generation_failed") pass, never a provider's English sentence.
+function withCode(message: string, code: string | null): string {
+  return code && /^[a-z0-9_]+$/.test(code) ? `${message} (${code})` : message;
 }
 
 export function PhotoGridDraggable({
@@ -86,6 +94,10 @@ export function PhotoGridDraggable({
         window.location.assign(`/${lang}/sign-in`);
         return;
       }
+      if (res.status === 429) {
+        setLivingError(labels.livingRateLimited);
+        return;
+      }
       const data = (await res.json()) as {
         video_url?: string;
         status?: string;
@@ -97,9 +109,7 @@ export function PhotoGridDraggable({
       setLivingVideos((m) => new Map(m).set(photoId, data.video_url as string));
     } catch (e) {
       setLivingError(
-        e instanceof Error
-          ? `${labels.livingFailed} (${e.message})`
-          : labels.livingFailed,
+        withCode(labels.livingFailed, e instanceof Error ? e.message : null),
       );
     } finally {
       setLivingInFlight((s) => {
@@ -193,6 +203,10 @@ export function PhotoGridDraggable({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ photo_id: photoId, style }),
       });
+      if (res.status === 429) {
+        setStagingError(labels.stagingRateLimited);
+        return;
+      }
       const data = (await res.json()) as {
         photo?: {
           id: string;
@@ -223,7 +237,7 @@ export function PhotoGridDraggable({
       ]);
     } catch (e) {
       setStagingError(
-        e instanceof Error ? `${labels.stagingFailed} (${e.message})` : labels.stagingFailed,
+        withCode(labels.stagingFailed, e instanceof Error ? e.message : null),
       );
     } finally {
       setStagingInFlight((s) => {

@@ -61,3 +61,11 @@ staging-eval/
 
 # DocuSign template exports — contain personal emails; keep out of the repo
 docs/docusign/
+
+# CRM de prospección: los CSV y carpetas de lixtara_base.py tienen datos personales
+# de propietarios. Nunca entran al repo.
+*.csv
+/salida/
+/nal/
+/cor/
+/mls/

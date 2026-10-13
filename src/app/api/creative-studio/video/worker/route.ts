@@ -40,6 +40,7 @@ import { buildRealWorkerDeps } from "@/lib/video-engine/worker-deps";
 import { buildVideoTerminalEmail } from "@/lib/creative-studio/video-notifications";
 import { referenceCodeFromTraceId, sellerFailureKindFor } from "@/lib/creative-studio/seller-failure-kind";
 import { sendListingVideoTerminal } from "@/lib/email";
+import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 
 // Constant-time compare of the SECRET VALUE only. The length pre-check is the
 // standard, widely-used deviation for this pattern (Node's own `timingSafeEqual`
@@ -211,7 +212,12 @@ function defaultRunDeps(): RunDeps {
         ]);
         const to = owner?.user?.email;
         if (!to) return;
-        const addressLine = (property?.address_street as string | undefined) ?? "your listing";
+        // Idioma del vendedor si lo conocemos (seller_leads.locale); si no, el email
+        // bilingüe del piloto y el panel en inglés, como antes.
+        const sellerLang = await lookupRecipientLang(event.ownerId);
+        const addressLine =
+          (property?.address_street as string | undefined) ??
+          (sellerLang === "es" ? "tu listing" : "your listing");
         const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
         const kind = event.outcome === "failed" ? sellerFailureKindFor(event.errorCode) : undefined;
         const built = buildVideoTerminalEmail({
@@ -219,7 +225,8 @@ function defaultRunDeps(): RunDeps {
           kind,
           reference: event.outcome === "failed" ? referenceCodeFromTraceId(event.traceId) : null,
           addressLine,
-          dashboardUrl: `${site}/en/dashboard`,
+          dashboardUrl: `${site}/${sellerLang ?? "en"}/dashboard`,
+          ...(sellerLang ? { lang: sellerLang } : {}),
         });
         await sendListingVideoTerminal({
           to,

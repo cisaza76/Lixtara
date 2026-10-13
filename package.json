@@ -15,6 +15,8 @@
     "e2e:ui-teardown": "tsx --env-file=.env.local scripts/e2e/ui-teardown.ts",
     "mls:inspect-fields": "tsx scripts/inspect-bridge-fields.ts",
     "db-check:mls-status-guard": "bash scripts/db-checks/run-guard-properties-mls-status.sh",
+    "db-check:listing-requests": "bash scripts/db-checks/run-listing-requests.sh",
+    "db-check:crm": "bash scripts/db-checks/run-crm-leads.sh",
     "mls:backfill-numbers": "tsx scripts/backfill-mls-numbers.ts"
   },
   "dependencies": {
@@ -38,6 +40,7 @@
     "jose": "^6.2.3",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
+    "posthog-js": "1.434.13",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "remotion": "4.0.489",

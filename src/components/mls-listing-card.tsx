@@ -6,6 +6,11 @@
 // Tipografía de la atribución: `ATTRIBUTION_TYPOGRAPHY`, no una clase suelta. El §9 exige
 // que no sea menor que la mediana de la ficha — la letra chica es justo donde el instinto
 // de diseño la pondría, y hay un test que lo impide.
+//
+// Foto por HOT-LINK con un <img> simple, NO con next/image: el optimizador de Vercel
+// descargaría la imagen y guardaría copias en su caché, que es justo lo que § III.B.9
+// prohíbe y lo que complicaría la purga del § VI.C. El navegador la pide directo al CDN
+// del MLS. `photo-hotlink.test.ts` impide volver a next/image aquí.
 import { ATTRIBUTION_TYPOGRAPHY } from "@/lib/mls/display-compliance";
 import type { MlsPublicListing } from "@/lib/mls/public-listings";
 
@@ -21,6 +26,28 @@ export function MlsListingCard({ listing }: { listing: MlsPublicListing }) {
 
   return (
     <article className="flex flex-col gap-3 border border-gold-soft p-5">
+      <div className="relative aspect-[4/3] -mx-5 -mt-5 mb-1 overflow-hidden border-b border-gold-soft bg-ivory-strong">
+        {listing.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- hot-link obligatorio, ver arriba
+          <img
+            src={listing.photoUrl}
+            alt={listing.photoAlt}
+            width={800}
+            height={600}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            aria-hidden="true"
+            className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-[0.18em] text-ink/30"
+          >
+            MLS
+          </div>
+        )}
+      </div>
+
       <div className="flex items-baseline justify-between gap-3">
         {precio && (
           <span className="font-display text-2xl text-ink leading-none">{precio}</span>

@@ -1,12 +1,27 @@
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { isLocale, t } from "@/lib/i18n";
+import { isLocale, t, type Locale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createService } from "@/lib/supabase/service";
 import { SITE_URL } from "@/lib/config";
 import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
+import { ListingEmailCode } from "@/components/listing-email-code";
+import {
+  cleanCodeInput,
+  isCodeFormat,
+  isValidEmail,
+  normalizeEmail,
+} from "@/lib/listing-email-gate";
+import {
+  emailTakenByAnotherUser,
+  pendingChallengeEmail,
+  recordLeadStep,
+  startEmailChallenge,
+  verifyEmailChallenge,
+} from "@/lib/listing-email-gate.server";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
 import { StepShell } from "@/components/step-shell";
@@ -39,12 +54,15 @@ import { PhotographyCheckoutButton } from "@/components/photography-checkout-but
 import { PhotoUploader } from "@/components/photo-uploader";
 import { OccupancySection } from "@/components/occupancy-section";
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
+import { CheckAllToggle } from "@/components/check-all-toggle";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
 import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
 import { DashboardRedirect } from "@/components/dashboard-redirect";
+import { ListingFunnelEvents } from "@/components/listing-funnel-events";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
+import { LocalizedValidation } from "@/components/localized-validation";
 
 const TOTAL_STEPS = 8;
 const PROPERTY_TYPES = [
@@ -70,6 +88,7 @@ type OccupancyStatus = "vacant" | "owner_occupied" | "tenant_occupied";
 
 interface Draft {
   id: string;
+  owner_id: string;
   address_street: string;
   address_city: string;
   address_state: string;
@@ -133,10 +152,14 @@ export default async function ListingNewPage({
     resent?: string;
     cerror?: string;
     verified?: string;
+    gerror?: string;
+    gresent?: string;
+    change?: string;
   }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  const locale: Locale = lang;
 
   // Deferred registration: the listing flow runs on an anonymous Supabase
   // session (created lazily in saveStep1). We do NOT force sign-in here — the
@@ -148,13 +171,33 @@ export default async function ListingNewPage({
   // A real (email-bearing) account is required to sign. Anonymous users — and
   // users mid email-confirmation (email pending in new_email) — are gated at
   // step 7. A confirmed email is the signal that registration is complete.
-  const needsAccount = !sessionUser?.email;
+  // Sellers who confirmed their email at step 1 still owe a name and a
+  // password at step 7 (`account_pending`), but no second email code.
+  const accountPending = sessionUser?.user_metadata?.account_pending === true;
+  const needsAccount = !sessionUser?.email || accountPending;
   const pendingEmail = (sessionUser?.new_email as string | undefined) ?? null;
 
   const sp = await searchParams;
   const step = clampStep(Number.parseInt(sp.step ?? "1", 10) || 1);
   const draftId = sp.id ?? null;
   const copy = t(lang).listingForm;
+
+  // Step-1 email gate (Phase B). Off until EMAIL_CODE_PEPPER is set, so the
+  // flow keeps working exactly as before in any environment without it.
+  const emailGateOn = Boolean(process.env.EMAIL_CODE_PEPPER);
+  const needsGateEmail = emailGateOn && !sessionUser?.email;
+  // The gate is the first thing after the address: no step 2+ without a
+  // confirmed email, so we can always reach the seller with a magic link.
+  if (needsGateEmail && sessionUser && draftId && step >= 2) {
+    redirect(`/${lang}/listing/new?step=1&id=${draftId}`);
+  }
+  const gateCodeEmail =
+    needsGateEmail && sessionUser && draftId && step === 1 && sp.change !== "1"
+      ? await pendingChallengeEmail(sessionUser.id)
+      : null;
+  if (emailGateOn && sessionUser?.email && draftId && step >= 2) {
+    await recordLeadStep(sessionUser.id, draftId, step);
+  }
 
   let draft: Draft | null = null;
   let photos: Array<{
@@ -180,11 +223,69 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,appliances",
+        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,appliances",
       )
       .eq("id", draftId)
       .maybeSingle();
     draft = (data as Draft | null) ?? null;
+
+    // Admins and brokers can READ every draft (RLS), so a staff session could
+    // walk a seller's listing all the way to step 7 and only then fail with
+    // property_not_found_or_not_yours. Stop here and say why instead.
+    if (draft && sessionUser && draft.owner_id !== sessionUser.id) {
+      const [{ data: isAdmin }, { data: isBroker }] = await Promise.all([
+        supabase.rpc("has_role", { _role: "admin" }),
+        supabase.rpc("has_role", { _role: "broker" }),
+      ]);
+      const isStaff = isAdmin === true || isBroker === true;
+      const notice = copy.foreignDraft;
+      return (
+        <StepShell
+          stepNumber={step}
+          totalSteps={TOTAL_STEPS}
+          stepNames={copy.stepNames}
+          eyebrow={copy.eyebrow}
+          titleBefore={copy.titleBefore}
+          titleAccent={copy.titleAccent}
+          titleAfter={copy.titleAfter}
+          stepLabel={copy.stepLabel}
+          ofLabel={copy.ofLabel}
+        >
+          <div className="flex flex-col gap-5 border border-gold bg-gold/5 p-6 lg:p-8">
+            <h2 className="font-display text-2xl text-ink font-normal">{notice.title}</h2>
+            <p className="text-base leading-relaxed text-ink/75">
+              {notice.body} <span className="font-semibold text-ink">{sessionUser.email}</span>.{" "}
+              {notice.howTo}
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              {isStaff && (
+                <Link
+                  href={`/${lang}/admin/listings/${draft.id}/review`}
+                  className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+                >
+                  {notice.adminReview} →
+                </Link>
+              )}
+              <form action={`/${lang}/auth/sign-out`} method="post">
+                <button
+                  type="submit"
+                  className="text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+                >
+                  {notice.signOut}
+                </button>
+              </form>
+            </div>
+          </div>
+        </StepShell>
+      );
+    }
+
+    // Ya enviado (pagado, activo, bajo contrato…): sus campos clave no se editan aquí —
+    // el guard de la base los rechaza — sino por solicitud a la broker (#136). Fotos
+    // (paso 5) y cuenta / pago / acuerdo (7–8) siguen disponibles.
+    if (draft && draft.mls_status !== "draft" && [1, 2, 3, 4, 6].includes(step)) {
+      redirect(`/${lang}/dashboard/listings/${draftId}/requests`);
+    }
 
     // Step 3 auto-fetch: Miami-Dade autofill (if zip is Miami-Dade + fields
     // still placeholders) + Rentcast comps (if not fetched yet). Runs server-
@@ -340,6 +441,29 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=fl_only`);
     }
 
+    // Email gate: only asked while the session has no confirmed email.
+    const gateOn = Boolean(process.env.EMAIL_CODE_PEPPER);
+    const {
+      data: { user: currentUser },
+    } = await (await createClient()).auth.getUser();
+    const askEmail = gateOn && !currentUser?.email;
+    const gateEmail = normalizeEmail(formData.get("email"));
+    if (askEmail) {
+      if (!isValidEmail(gateEmail)) {
+        redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email`);
+      }
+      if (await emailTakenByAnotherUser(gateEmail, currentUser?.id ?? null)) {
+        redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email_exists`);
+      }
+    }
+    // After saving the address: send the code, or go straight to step 2.
+    const continueTo = async (propertyId: string, uid: string): Promise<never> => {
+      if (!askEmail) redirect(`/${lang}/listing/new?id=${propertyId}&step=2`);
+      const sent = await startEmailChallenge({ userId: uid, email: gateEmail, lang: locale });
+      const err = sent === "sent" ? "" : sent === "limit" ? "&gerror=limit" : "&gerror=send";
+      redirect(`/${lang}/listing/new?step=1&id=${propertyId}${err}`);
+    };
+
     // Geocoding is BEST-EFFORT only — it drops a map pin, it NEVER gates the
     // seller's progress. Google Maps can be unavailable (referrer-restricted
     // key, quota, network) and a real seller must always be able to type their
@@ -398,7 +522,7 @@ export default async function ListingNewPage({
       if (error) {
         redirect(`/${lang}/listing/new?step=1&id=${id}&error=save_failed`);
       }
-      redirect(`/${lang}/listing/new?id=${id}&step=2`);
+      await continueTo(id, user.id);
     }
 
     const suggestedTierRaw = String(formData.get("suggested_tier") ?? "");
@@ -427,7 +551,48 @@ export default async function ListingNewPage({
     if (error || !created) {
       redirect(`/${lang}/listing/new?step=1&error=save_failed`);
     }
-    redirect(`/${lang}/listing/new?id=${created.id}&step=2`);
+    await continueTo(created.id, user.id);
+  }
+
+  // Step 1 email code: confirm, or resend.
+  async function verifyGateCode(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    const back = `/${lang}/listing/new?step=1&id=${id}`;
+    const code = cleanCodeInput(formData.get("code"));
+    if (!isCodeFormat(code)) redirect(`${back}&gerror=format`);
+
+    const {
+      data: { user },
+    } = await (await createClient()).auth.getUser();
+    if (!user) redirect(`/${lang}/listing/continue`);
+
+    const result = await verifyEmailChallenge({
+      userId: user.id,
+      code,
+      lang: locale,
+      propertyId: id,
+    });
+    if (result !== "verified") redirect(`${back}&gerror=${result}`);
+    redirect(`/${lang}/listing/new?id=${id}&step=2&ev=email_verified_gate`);
+  }
+
+  async function resendGateCode(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
+    const back = `/${lang}/listing/new?step=1&id=${id}`;
+    const {
+      data: { user },
+    } = await (await createClient()).auth.getUser();
+    if (!user) redirect(`/${lang}/listing/continue`);
+    const email = await pendingChallengeEmail(user.id);
+    if (!email) redirect(`${back}&change=1`);
+    const sent = await startEmailChallenge({ userId: user.id, email, lang: locale });
+    if (sent === "limit") redirect(`${back}&gerror=limit`);
+    if (sent !== "sent") redirect(`${back}&gerror=send`);
+    redirect(`${back}&gresent=1`);
   }
 
   async function saveStep2(formData: FormData) {
@@ -1119,7 +1284,6 @@ export default async function ListingNewPage({
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
     const back = `/${lang}/listing/new?step=7&id=${id}`;
     if (!firstName || !lastName) redirect(`${back}&aerror=name`);
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) redirect(`${back}&aerror=email`);
     if (password.length < 8) redirect(`${back}&aerror=password`);
 
     const supabase = await createClient();
@@ -1127,6 +1291,30 @@ export default async function ListingNewPage({
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    // Email already confirmed with the step-1 code: no second code, just set
+    // the name and password on the same account.
+    if (user.email && user.user_metadata?.account_pending === true) {
+      const svc = createService();
+      const { error: pwError } = await svc.auth.admin.updateUserById(user.id, {
+        password,
+        user_metadata: {
+          first_name: firstName,
+          last_name: lastName,
+          account_pending: false,
+        },
+      });
+      if (pwError) redirect(`${back}&aerror=failed`);
+      await svc
+        .from("users")
+        .upsert(
+          { id: user.id, email: user.email, first_name: firstName, last_name: lastName },
+          { onConflict: "id" },
+        );
+      redirect(back);
+    }
+
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) redirect(`${back}&aerror=email`);
 
     const { error } = await supabase.auth.updateUser(
       {
@@ -1265,32 +1453,36 @@ export default async function ListingNewPage({
     }
     if (!verified) redirect(`${back}&pending=1&cerror=invalid`);
 
-    redirect(`${back}&verified=1`);
+    redirect(`${back}&verified=1&ev=email_verified_account`);
   }
 
   const errorMessage =
     sp.error === "captcha"
       ? t(lang).auth.errors.captchaFailed
+      : sp.error === "email"
+      ? copy.step1.emailInvalid
+      : sp.error === "email_exists"
+      ? copy.step1.emailExists
       : sp.error === "required"
-      ? "All fields are required."
+      ? copy.stepErrors.required
       : sp.error === "fl_only"
         ? copy.step1.flOnly
         : sp.error === "address_invalid"
           ? copy.step1.addressInvalid
         : sp.error === "invalid"
-          ? "Please check the values."
+          ? copy.stepErrors.invalid
           : sp.error === "invalid_type"
-            ? "Pick a property type."
+            ? copy.stepErrors.invalidType
             : sp.error === "invalid_beds"
-              ? "Bedrooms must be 0–30."
+              ? copy.stepErrors.invalidBeds
               : sp.error === "invalid_baths"
-                ? "Bathrooms must be a number greater than 0 (e.g. 2 or 2.5)."
+                ? copy.stepErrors.invalidBaths
                 : sp.error === "invalid_sqft"
-                  ? "Square feet must be greater than 0."
+                  ? copy.stepErrors.invalidSqft
                   : sp.error === "invalid_year"
-                    ? "Year built must be 1800 to current year + 2."
+                    ? copy.stepErrors.invalidYear
                     : sp.error === "invalid_price"
-                      ? "List price must be greater than 0 (in USD, no commas)."
+                      ? copy.stepErrors.invalidPrice
                       : sp.error === "empty_improve"
                         ? copy.step4.emptyToImprove
                         : sp.error === "improve_failed"
@@ -1302,17 +1494,17 @@ export default async function ListingNewPage({
                               : sp.error === "no_files"
                                 ? copy.step5.invalidFormat
                                 : sp.error === "save_failed"
-                                  ? "Could not save. Please try again."
+                                  ? copy.stepErrors.saveFailed
                                   : sp.error === "no_estimate"
-                                    ? "No price estimate available yet."
+                                    ? copy.stepErrors.noEstimate
                                     : sp.error === "rights_required"
                                       ? copy.step5.ownershipRequired
                                       : sp.error === "invalid_parking"
-                                        ? "Parking spaces must be 0–50."
+                                        ? copy.stepErrors.invalidParking
                                         : sp.error === "invalid_hoa"
-                                          ? "HOA fee must be a non-negative dollar amount."
+                                          ? copy.stepErrors.invalidHoa
                                           : sp.error === "invalid_tax"
-                                            ? "Property tax must be a non-negative dollar amount."
+                                            ? copy.stepErrors.invalidTax
                                             : sp.error === "buyer_commission_required" ||
                                                 sp.error === "invalid_buyer_commission"
                                               ? copy.step6.buyerCommissionRequired
@@ -1344,6 +1536,9 @@ export default async function ListingNewPage({
       stepLabel={copy.stepLabel}
       ofLabel={copy.ofLabel}
     >
+      <ListingFunnelEvents step={step} lang={lang} />
+      {/* Browser validation bubbles in the page's language, not the browser's. */}
+      <LocalizedValidation labels={copy.validation} />
       {/* ─── Step 1: Address ─── */}
       {step === 1 && (
         <div className="flex flex-col gap-8">
@@ -1356,6 +1551,27 @@ export default async function ListingNewPage({
             </p>
           </div>
           {errorMessage && <ErrorBanner message={errorMessage} />}
+          {sp.error === "email_exists" && (
+            <Link
+              href={`/${lang}/sign-in?next=/listing/new`}
+              className="self-start text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+            >
+              {copy.step1.emailSignIn} →
+            </Link>
+          )}
+          {gateCodeEmail && draftId ? (
+            <ListingEmailCode
+              email={gateCodeEmail}
+              draftId={draftId}
+              verifyAction={verifyGateCode}
+              resendAction={resendGateCode}
+              changeEmailHref={`/${lang}/listing/new?step=1&id=${draftId}&change=1`}
+              signInHref={`/${lang}/sign-in?next=/listing/new`}
+              error={typeof sp.gerror === "string" ? sp.gerror : null}
+              resent={sp.gresent === "1"}
+              labels={copy.step1.emailCode}
+            />
+          ) : (
           <form action={saveStep1} className="flex flex-col gap-6">
             {draftId && <input type="hidden" name="id" value={draftId} />}
             {sp.suggested_tier && (
@@ -1367,6 +1583,7 @@ export default async function ListingNewPage({
             )}
             <AddressAutocomplete
               streetLabel={copy.step1.streetLabel}
+              streetPlaceholder={copy.step1.streetPlaceholder}
               unitLabel={copy.step1.unitLabel}
               cityLabel={copy.step1.cityLabel}
               stateLabel={copy.step1.stateLabel}
@@ -1377,12 +1594,38 @@ export default async function ListingNewPage({
               defaultLat={draft?.latitude ?? null}
               defaultLng={draft?.longitude ?? null}
               verifiedNote={copy.step1.verifiedNote}
+              language={lang}
+              mapsLoadingLabel={copy.step1.mapsLoading}
+              mapsReadyLabel={copy.step1.mapsReady}
+              mapsErrorLabel={copy.step1.mapsError}
             />
+            {needsGateEmail && (
+              <Field
+                label={copy.step1.emailLabel}
+                name="email"
+                type="email"
+                // Its own autofill section: with plain "email", picking the
+                // browser suggestion also filled the street/city/ZIP with the
+                // seller's saved home address, overwriting the property's.
+                autoComplete="section-seller email"
+                required
+                help={copy.step1.emailHelp}
+              />
+            )}
             {/* Only a visitor without a session triggers the anonymous
-                sign-up in saveStep1 — that's the only call needing a token. */}
+                sign-up in saveStep1; that's the only call needing a token. */}
             {!sessionUser && <TurnstileWidget lang={lang} />}
             <SubmitButton>{copy.nextLabel} →</SubmitButton>
+            {!sessionUser && (
+              <Link
+                href={`/${lang}/listing/continue`}
+                className="self-start text-sm text-ink/60 underline underline-offset-4 hover:text-gold transition-colors"
+              >
+                {copy.step1.continueExisting}
+              </Link>
+            )}
           </form>
+          )}
         </div>
       )}
 
@@ -1587,7 +1830,8 @@ export default async function ListingNewPage({
                     </div>
                     <span className="text-xs text-ink/60">
                       {copy.step3.compsRangeLabel}: ${" "}
-                      {draft.price_estimate_low.toLocaleString()} – $
+                      {draft.price_estimate_low.toLocaleString()}{" "}
+                      {lang === "es" ? "a" : "to"} $
                       {draft.price_estimate_high.toLocaleString()}
                     </span>
                   </div>
@@ -1645,8 +1889,10 @@ export default async function ListingNewPage({
                           </div>
                           <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.12em] text-ink/55 flex-wrap">
                             <span>
-                              {c.bedrooms}bd · {c.bathrooms}ba ·{" "}
-                              {c.squareFootage.toLocaleString()}sqft
+                              {copy.step3.compsSpecs
+                                .replace("{beds}", String(c.bedrooms))
+                                .replace("{baths}", String(c.bathrooms))
+                                .replace("{sqft}", c.squareFootage.toLocaleString())}
                             </span>
                             <span className="text-gold-soft">·</span>
                             <span>
@@ -1825,7 +2071,7 @@ export default async function ListingNewPage({
                     defaultValue={draft?.flood_zone ?? ""}
                     className="bg-ivory border-2 border-gold-soft px-4 py-3 text-base text-ink focus:outline-none focus:border-gold"
                   >
-                    <option value="">—</option>
+                    <option value="">{copy.step3.notSpecifiedOption}</option>
                     <option value="X">{copy.step3.floodZoneOptionX}</option>
                     <option value="AE">{copy.step3.floodZoneOptionAE}</option>
                     <option value="VE">{copy.step3.floodZoneOptionVE}</option>
@@ -1872,6 +2118,7 @@ export default async function ListingNewPage({
                   coopDifficult: copy.step3.coopDifficult,
                   tenantNotesLabel: copy.step3.tenantNotesLabel,
                   tenantNotesPlaceholder: copy.step3.tenantNotesPlaceholder,
+                  notSpecifiedOption: copy.step3.notSpecifiedOption,
                 }}
               />
 
@@ -1918,6 +2165,7 @@ export default async function ListingNewPage({
                 <p className="text-xs text-ink/55 leading-relaxed">
                   {copy.step3.appliancesBody}
                 </p>
+                <CheckAllToggle name="appliances" label={copy.step3.appliancesMarkAll} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                   {APPLIANCE_KEYS.map((key) => (
                     <label
@@ -2067,9 +2315,11 @@ export default async function ListingNewPage({
           {errorMessage && <ErrorBanner message={errorMessage} />}
           {sp.uploaded && (
             <SuccessBanner
-              message={`Uploaded ${sp.uploaded} ${
-                Number(sp.uploaded) === 1 ? "photo" : "photos"
-              }.`}
+              message={
+                Number(sp.uploaded) === 1
+                  ? copy.step5.uploadedNoticeOne
+                  : copy.step5.uploadedNotice.replace("{n}", String(sp.uploaded))
+              }
             />
           )}
           {sp.deleted === "1" && (
@@ -2135,6 +2385,15 @@ export default async function ListingNewPage({
               invalidFormat: copy.step5.invalidFormat,
               genericError: copy.step5.uploadFailed,
               partialFail: copy.step5.photoPartialFail,
+              chooseFiles: copy.step5.chooseFiles,
+              noFilesChosen: copy.step5.noFilesChosen,
+              filesChosen: copy.step5.filesChosen,
+              fileChosenOne: copy.step5.fileChosenOne,
+              noFilesPicked: copy.step5.noFilesPicked,
+              notAuthenticated: copy.step5.notAuthenticated,
+              tooLarge: copy.step5.uploadTooLarge,
+              reasonTooLarge: copy.step5.uploadReasonTooLarge,
+              reasonGeneric: copy.step5.uploadReasonGeneric,
             }}
           />
 
@@ -2197,6 +2456,8 @@ export default async function ListingNewPage({
                   livingGenerating: copy.step5.living.generating,
                   livingFailed: copy.step5.living.failed,
                   livingView: copy.step5.living.view,
+                  stagingRateLimited: copy.step5.stagingRateLimited,
+                  livingRateLimited: copy.step5.living.rateLimited,
                 }}
               />
             )}
@@ -2324,7 +2585,7 @@ export default async function ListingNewPage({
                       </span>
                       {draft.latitude && draft.longitude && (
                         <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45 mt-1">
-                          ✓ Verified · {draft.latitude.toFixed(4)},{" "}
+                          ✓ {copy.step6.addressVerified} · {draft.latitude.toFixed(4)},{" "}
                           {draft.longitude.toFixed(4)}
                         </span>
                       )}
@@ -2380,18 +2641,22 @@ export default async function ListingNewPage({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                       <div className="flex flex-col">
                         <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                          Type
+                          {copy.step6.typeLabel}
                         </span>
                         <span className="text-ink">
-                          {draft.property_type.replace("_", " ")}
+                          {(copy.step3.types as Record<string, string>)[
+                            draft.property_type
+                          ] ?? draft.property_type.replace("_", " ")}
                         </span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                          Beds / Baths
+                          {copy.step6.bedsBathsLabel}
                         </span>
                         <span className="text-ink">
-                          {draft.bedrooms} bd / {draft.bathrooms} ba
+                          {copy.step6.bedsBathsValue
+                            .replace("{beds}", String(draft.bedrooms))
+                            .replace("{baths}", String(draft.bathrooms))}
                         </span>
                       </div>
                       <div className="flex flex-col">
@@ -2402,7 +2667,11 @@ export default async function ListingNewPage({
                           {draft.sqft.toLocaleString()}
                           {draft.lot_size && (
                             <span className="text-ink/55 text-xs ml-1">
-                              · lot {draft.lot_size.toLocaleString()}
+                              ·{" "}
+                              {copy.step6.lotValue.replace(
+                                "{n}",
+                                draft.lot_size.toLocaleString(),
+                              )}
                             </span>
                           )}
                         </span>
@@ -2423,20 +2692,42 @@ export default async function ListingNewPage({
                         draft.as_is_sale) && (
                         <div className="col-span-2 sm:col-span-4 border-t border-gold-soft pt-3 mt-1 flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink/75">
                           {draft.parking_spaces != null && (
-                            <span>🚗 {draft.parking_spaces} parking</span>
+                            <span>
+                              🚗{" "}
+                              {copy.step6.parkingValue.replace(
+                                "{n}",
+                                String(draft.parking_spaces),
+                              )}
+                            </span>
                           )}
                           {draft.hoa_fee != null && (
                             <span>
-                              🏢 HOA ${draft.hoa_fee.toLocaleString()}/mo
+                              🏢{" "}
+                              {copy.step6.hoaValue.replace(
+                                "{amount}",
+                                draft.hoa_fee.toLocaleString(),
+                              )}
                             </span>
                           )}
                           {draft.tax_annual_amount != null && (
                             <span>
-                              🧾 Tax ${draft.tax_annual_amount.toLocaleString()}/yr
+                              🧾{" "}
+                              {copy.step6.taxValue.replace(
+                                "{amount}",
+                                draft.tax_annual_amount.toLocaleString(),
+                              )}
                             </span>
                           )}
                           {draft.flood_zone && (
-                            <span>🌊 Flood zone {draft.flood_zone}</span>
+                            <span>
+                              🌊{" "}
+                              {draft.flood_zone === "UNKNOWN"
+                                ? copy.step6.floodZoneUnknown
+                                : copy.step6.floodZoneValue.replace(
+                                    "{zone}",
+                                    draft.flood_zone,
+                                  )}
+                            </span>
                           )}
                           {draft.occupancy_status && (
                             <span>
@@ -2448,9 +2739,9 @@ export default async function ListingNewPage({
                                   : copy.step3.occupancyTenant}
                             </span>
                           )}
-                          {draft.has_pool && <span>🏊 Pool</span>}
-                          {draft.cash_only && <span>💵 Cash only</span>}
-                          {draft.as_is_sale && <span>📋 As-is</span>}
+                          {draft.has_pool && <span>🏊 {copy.step6.poolTag}</span>}
+                          {draft.cash_only && <span>💵 {copy.step6.cashOnlyTag}</span>}
+                          {draft.as_is_sale && <span>📋 {copy.step6.asIsTag}</span>}
                         </div>
                       )}
                       {draft.appliances && draft.appliances.length > 0 && (
@@ -2515,7 +2806,7 @@ export default async function ListingNewPage({
                           .replace(
                             "{primary}",
                             primaryPhoto
-                              ? "set"
+                              ? copy.step6.primarySet
                               : copy.step6.primaryNone,
                           )}
                       </p>
@@ -2568,7 +2859,7 @@ export default async function ListingNewPage({
                               )
                               .replace(
                                 "{range}",
-                                `${draft.price_estimate_low.toLocaleString()}–${draft.price_estimate_high.toLocaleString()}`,
+                                `${draft.price_estimate_low.toLocaleString()} ${lang === "es" ? "a" : "to"} $${draft.price_estimate_high.toLocaleString()}`,
                               )
                           : copy.step6.compsNone}
                       </div>
@@ -2831,6 +3122,7 @@ export default async function ListingNewPage({
               lang={lang}
               draftId={draftId}
               pendingEmail={pendingEmail}
+              knownEmail={accountPending ? (sessionUser?.email ?? null) : null}
               resentAt={
                 typeof sp.resent === "string" ? Number.parseInt(sp.resent, 10) : null
               }
@@ -3078,7 +3370,7 @@ export default async function ListingNewPage({
                       {copy.step8.tierLabel}
                     </span>
                     <span className="font-display text-xl text-ink">
-                      {tierId.charAt(0).toUpperCase() + tierId.slice(1)}
+                      {t(lang).pricing.tiers[tierId].name}
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between gap-4 border-t border-gold-soft pt-3">

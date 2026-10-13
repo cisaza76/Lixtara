@@ -2,27 +2,48 @@
 // y `mls_sync_state` tienen RLS deny-all, y las funciones de la migración 20260926120000
 // solo las ejecuta `service_role`.
 import { createService } from "@/lib/supabase/service";
-import type { ReconcileState, ReconcileStore } from "@/lib/mls/reconcile-run";
+import type { Freshness, ReconcileState, ReconcileStore } from "@/lib/mls/reconcile-run";
+import { createSupabaseSyncStore } from "@/lib/mls/sync-store.supabase";
+
+/** Claves por consulta al leer fechas guardadas: caben en la URL de PostgREST (~6 KB). */
+const STORED_TS_CHUNK = 150;
+
+/** Lee un diagnóstico guardado como jsonb; cualquier forma inesperada = no disponible. */
+function parseFreshness(v: unknown): Freshness | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const keys = ["missing", "stale", "recent", "current", "unknown"] as const;
+  if (!keys.every((k) => typeof o[k] === "number")) return null;
+  return { missing: o.missing as number, stale: o.stale as number, recent: o.recent as number,
+    current: o.current as number, unknown: o.unknown as number,
+    ...(typeof o.refetched === "number" ? { refetched: o.refetched } : {}) };
+}
 
 export function createSupabaseReconcileStore(): ReconcileStore {
   const db = createService();
   const ahora = () => new Date().toISOString();
+  // ¿Existen las columnas del diagnóstico (migración 20261011170000)? Se sabe al leer el
+  // estado. Si el código llega antes que la migración, simplemente no se escriben: la
+  // reconciliación no puede romperse por el diagnóstico.
+  let conDiagnostico = false;
 
   return {
     async readReconcileState(dataset): Promise<ReconcileState | null> {
       const { data, error } = await db
         .from("mls_sync_state")
-        .select("dataset,reconciliation_started_at,reconciliation_cursor,reconciliation_keys_seen,last_reconciliation_at")
+        .select("*")
         .eq("dataset", dataset)
         .maybeSingle();
       if (error) throw new Error(`no se pudo leer mls_sync_state: ${error.message}`);
       if (!data) return null;
+      conDiagnostico = "reconciliation_freshness" in data;
       return {
         dataset: data.dataset,
         startedAt: data.reconciliation_started_at ?? null,
         cursor: data.reconciliation_cursor ?? null,
         keysSeen: Number(data.reconciliation_keys_seen ?? 0),
         lastFinishedAt: data.last_reconciliation_at ?? null,
+        freshness: conDiagnostico ? parseFreshness(data.reconciliation_freshness) : null,
       };
     },
 
@@ -33,6 +54,7 @@ export function createSupabaseReconcileStore(): ReconcileStore {
           reconciliation_started_at: startedAt,
           reconciliation_cursor: null,
           reconciliation_keys_seen: 0,
+          ...(conDiagnostico ? { reconciliation_freshness: null } : {}),
           updated_at: ahora(),
         },
         { onConflict: "dataset" },
@@ -48,14 +70,37 @@ export function createSupabaseReconcileStore(): ReconcileStore {
       return typeof data === "number" ? data : 0;
     },
 
-    async saveReconcileProgress(dataset, cursor, keysSeen): Promise<void> {
+    async saveReconcileProgress(dataset, cursor, keysSeen, freshness): Promise<void> {
       const { error } = await db
         .from("mls_sync_state")
-        .update({ reconciliation_cursor: cursor, reconciliation_keys_seen: keysSeen, updated_at: ahora() })
+        .update({
+          reconciliation_cursor: cursor,
+          reconciliation_keys_seen: keysSeen,
+          ...(conDiagnostico ? { reconciliation_freshness: freshness ?? null } : {}),
+          updated_at: ahora(),
+        })
         .eq("dataset", dataset);
       // Lanza: perder el progreso reempezaría la lista; y cursor y conteo van juntos.
       if (error) throw new Error(`no se pudo guardar el progreso de la reconciliación: ${error.message}`);
     },
+
+    async storedBridgeTimestamps(listingKeys): Promise<Map<string, string | null>> {
+      const out = new Map<string, string | null>();
+      for (let i = 0; i < listingKeys.length; i += STORED_TS_CHUNK) {
+        const { data, error } = await db
+          .from("mls_listings")
+          .select("listing_key, bridge_ts:payload->>BridgeModificationTimestamp")
+          .in("listing_key", listingKeys.slice(i, i + STORED_TS_CHUNK));
+        if (error) throw new Error(`no se pudieron leer fechas guardadas: ${error.message}`);
+        for (const r of (data ?? []) as Array<{ listing_key: string; bridge_ts: string | null }>) {
+          out.set(r.listing_key, r.bridge_ts ?? null);
+        }
+      }
+      return out;
+    },
+
+    // El MISMO upsert del sync: misma forma de fila, mismas tandas, mismo last_seen_at.
+    upsertListings: (rows) => createSupabaseSyncStore().upsertListings(rows),
 
     async countListings(): Promise<number> {
       const { count, error } = await db
@@ -87,10 +132,27 @@ export function createSupabaseReconcileStore(): ReconcileStore {
           last_reconciliation_stored: r.stored,
           last_reconciliation_keys_seen: r.keysSeen,
           last_reconciliation_error: r.error ? r.error.slice(0, 500) : null,
+          ...(conDiagnostico
+            ? { reconciliation_freshness: null, last_reconciliation_freshness: r.freshness ?? null }
+            : {}),
           updated_at: ahora(),
         })
         .eq("dataset", dataset);
       if (error) throw new Error(`no se pudo cerrar la reconciliación: ${error.message}`);
+    },
+
+    async compareFreshness(records, recentAfter): Promise<Freshness> {
+      // RPC: hasta 2.000 claves por página, que no caben en una URL. Solo lectura.
+      const { data, error } = await db.rpc("mls_freshness_counts", {
+        p_keys: records.map((r) => r.key),
+        p_bridge_ts: records.map((r) => r.bridgeTs ?? ""),
+        p_recent_after: recentAfter,
+      });
+      if (error) throw new Error(`diagnóstico de frescura no disponible: ${error.message}`);
+      const row = Array.isArray(data) ? data[0] : data;
+      const f = parseFreshness(row);
+      if (!f) throw new Error("diagnóstico de frescura: respuesta inesperada");
+      return f;
     },
 
     async recordReconcileRun(dataset, status, err): Promise<void> {
