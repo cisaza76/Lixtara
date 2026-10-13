@@ -75,26 +75,23 @@ function fakeDb(agreement: { id: string; property_id: string } | null, calls: Ca
 
 function setup(opts: {
   env?: Record<string, string>;
-  agreement?: { id: string; property_id: string } | null;
-  docusignStatus?: string;
-  fetchFails?: boolean;
+  agreement?: { id: string; property_id: string; envelope_id: string; status: string } | null;
+  refreshedStatus?: string;
   claim?: "claimed" | "duplicate" | "unavailable";
 }) {
   const calls: Call[] = [];
-  const onSigned = vi.fn(async () => {});
-  const getEnvelopeStatus = vi.fn(async () => {
-    if (opts.fetchFails) throw new Error("down");
-    return { status: opts.docusignStatus ?? "completed", completedDateTime: "2026-10-07T12:00:00Z" };
-  });
+  const refresh = vi.fn(async () => opts.refreshedStatus ?? "completed");
   const deps: WebhookDeps = {
-    db: () => fakeDb(opts.agreement === undefined ? { id: "ag1", property_id: "p1" } : opts.agreement, calls),
-    getEnvelopeStatus,
-    mapEnvelopeStatus: (s) => s as never,
+    db: () =>
+      fakeDb(
+        opts.agreement === undefined ? { id: "ag1", property_id: "p1", envelope_id: ENV_ID, status: "sent" } : opts.agreement,
+        calls,
+      ),
     claimEvent: async () => opts.claim ?? "claimed",
-    onSigned,
+    refresh,
     env: { DOCUSIGN_CONNECT_HMAC_KEY: KEY, ...(opts.env ?? {}) } as never,
   };
-  return { deps, calls, onSigned, getEnvelopeStatus };
+  return { deps, calls, refresh };
 }
 
 const signed = (b = body, key = KEY) =>
@@ -102,17 +99,18 @@ const signed = (b = body, key = KEY) =>
 
 describe("webhook /api/webhooks/docusign", () => {
   it("firma inválida → 401, sin tocar la base ni DocuSign", async () => {
-    const { deps, calls, getEnvelopeStatus } = setup({});
+    const { deps, calls, refresh } = setup({});
     const res = await handleConnectWebhook(signed(body, "wrong"), deps);
     expect(res.status).toBe(401);
     expect(calls).toEqual([]);
-    expect(getEnvelopeStatus).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("sin clave en Production → 401 (fail-closed)", async () => {
-    const { deps } = setup({});
+    const { deps, refresh } = setup({});
     deps.env = { VERCEL_ENV: "production" } as never;
     expect((await handleConnectWebhook(signed(), deps)).status).toBe(401);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("sin clave fuera de Production → procesa y registra hmac_valid = false", async () => {
@@ -123,48 +121,33 @@ describe("webhook /api/webhooks/docusign", () => {
     expect(ev.payload).toMatchObject({ hmac_valid: false });
   });
 
-  it("válido → estado CANÓNICO de DocuSign (no el del payload), registro y email", async () => {
-    // El payload dice "completed" pero DocuSign dice "delivered" (falta la firma de la broker).
-    const { deps, calls, onSigned } = setup({ docusignStatus: "delivered" });
+  it("válido → estado que resuelve refresh (DocuSign), no el del payload, y registro", async () => {
+    // El payload dice "completed" pero DocuSign dice que solo firmó el vendedor.
+    const { deps, calls, refresh } = setup({ refreshedStatus: "signed" });
     const res = await handleConnectWebhook(signed(), deps);
-    expect(await res.json()).toEqual({ ok: true, status: "delivered" });
-    const upd = calls.find((c) => c.table === "agreements" && c.op === "update")!;
-    expect(upd.payload).toMatchObject({ status: "delivered" });
-    expect((upd.payload as Record<string, unknown>).signed_at).toBeUndefined();
-    expect(onSigned).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ ok: true, status: "signed" });
+    expect(refresh).toHaveBeenCalledWith({ id: "ag1", property_id: "p1", envelope_id: ENV_ID, status: "sent" });
+    // El webhook no escribe el acuerdo por su cuenta: eso (y el email) es de refresh.
+    expect(calls.some((c) => c.table === "agreements" && c.op === "update")).toBe(false);
     const ev = calls.find((c) => c.table === "docusign_events")!;
     expect(ev.payload).toMatchObject({
       envelope_id: ENV_ID, event_type: "envelope-completed", hmac_valid: true, duplicate: false,
-      resulting_status: "delivered", payload_sha256: sha256Hex(body),
+      resulting_status: "signed", payload_sha256: sha256Hex(body),
     });
   });
 
-  it("completed → signed_at y aviso al vendedor una sola vez", async () => {
-    const { deps, calls, onSigned } = setup({});
-    await handleConnectWebhook(signed(), deps);
-    const upd = calls.find((c) => c.table === "agreements" && c.op === "update")!;
-    expect(upd.payload).toMatchObject({ status: "completed", signed_at: "2026-10-07T12:00:00Z" });
-    expect(onSigned).toHaveBeenCalledTimes(1);
-  });
-
-  it("entrega duplicada → se registra como duplicado y no repite el email", async () => {
-    const { deps, calls, onSigned } = setup({ claim: "duplicate" });
+  it("entrega duplicada → se registra como duplicado", async () => {
+    const { deps, calls } = setup({ claim: "duplicate" });
     const res = await handleConnectWebhook(signed(), deps);
     expect((await res.json()).note).toBe("duplicate");
-    expect(onSigned).not.toHaveBeenCalled();
     expect(calls.find((c) => c.table === "docusign_events")!.payload).toMatchObject({ duplicate: true });
   });
 
-  it("DocuSign no responde → 503 (Connect reintenta), sin actualizar el acuerdo", async () => {
-    const { deps, calls } = setup({ fetchFails: true });
-    expect((await handleConnectWebhook(signed(), deps)).status).toBe(503);
-    expect(calls.some((c) => c.table === "agreements" && c.op === "update")).toBe(false);
-  });
-
-  it("sobre desconocido → 200 y registro", async () => {
-    const { deps, calls } = setup({ agreement: null });
+  it("sobre desconocido → 200, registro y sin refresh", async () => {
+    const { deps, calls, refresh } = setup({ agreement: null });
     const res = await handleConnectWebhook(signed(), deps);
     expect(res.status).toBe(200);
+    expect(refresh).not.toHaveBeenCalled();
     expect(calls.find((c) => c.table === "docusign_events")!.payload).toMatchObject({ note: "unknown_envelope" });
   });
 });
