@@ -3,6 +3,11 @@ import type { Locale } from "@/lib/i18n";
 
 const intl = (lang: Locale) => (lang === "es" ? "es-US" : "en-US");
 
+// Operating time zone of the CRM (Miami). The database stores UTC instants (timestamptz); the
+// server renders on Vercel in UTC, so every displayed date must name the zone explicitly.
+// America/New_York switches EDT (UTC-4) ↔ EST (UTC-5) on its own. Same zone as src/lib/email.ts.
+export const CRM_TIME_ZONE = "America/New_York";
+
 /** Replaces {name} placeholders. */
 export function fill(text: string, vars: Record<string, string | number>): string {
   return text.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
@@ -20,7 +25,7 @@ export function dateTime(lang: Locale, iso: string | null | undefined): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? "—"
-    : d.toLocaleString(intl(lang), { dateStyle: "medium", timeStyle: "short" });
+    : d.toLocaleString(intl(lang), { timeZone: CRM_TIME_ZONE, dateStyle: "medium", timeStyle: "short" });
 }
 
 export function label<T extends Record<string, string>>(map: T, key: string | null | undefined): string {
