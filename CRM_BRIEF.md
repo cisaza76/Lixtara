@@ -27,8 +27,12 @@ Todo se probó en Postgres 16 con stubs de `auth`: migración idempotente, trigg
    python scripts/import_crm_leads.py --dir ~/lixtara-data/salida
    ```
 6. Emails del skip tracing (Camilo, en local), después de la importación de propietarios.
-   CSV con `owner_key,email,email_source,verification_status` (`valid|invalid|risky|unknown`).
-   Solo `valid` queda enviable; nunca se pisa ni se carga un email suprimido:
+   Requiere la migración `20261013235500_crm_contacts_evidence`. CSV con
+   `owner_key,email,email_source,verification_status` (`valid|invalid|risky|unknown`) y la evidencia
+   del pipeline local: `class` (A/B/C), `rule`, `rules_version`, `eligible`, `eligibility_basis`
+   (opcionales: `evidence`, `ledger_ref`, `verification_method`, `validated_at`). Todo queda en
+   `crm_contacts` con historial append-only; solo Clase A elegible + `valid` llega a `crm_owners.email`
+   (enviable). Nunca se pisa ni se carga un email suprimido:
    ```
    python scripts/import_contacts.py --file ~/lixtara-data/contactos.csv --dry-run
    python scripts/import_contacts.py --file ~/lixtara-data/contactos.csv

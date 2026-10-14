@@ -32,9 +32,12 @@ insert into public.crm_suppression (email, reason, source) values
 
 -- El CSV, ya en la tabla temporal (como lo deja import_contacts.py).
 create temp table stg_contacts (
-  row_no int, owner_key text, email text, email_source text, verification text
+  row_no int, owner_key text, email text, email_source text, verification text,
+  class text, rule text, rules_version text, evidence text, ledger_ref text,
+  eligible text, eligibility_basis text, verification_method text, validated_at text
 ) on commit drop;
-insert into stg_contacts values
+-- Filas 2–21: contactos Clase A elegibles (las reglas de crm_owners de siempre).
+insert into stg_contacts (row_no, owner_key, email, email_source, verification) values
   (2,  'ct-1',     'new1@example.com',      'tracer', 'valid'),
   (3,  'ct-2',     'new2@example.com',      'tracer', 'unknown'),
   (4,  'ct-3',     'cur3@example.com',      'tracer', 'invalid'),
@@ -56,3 +59,16 @@ insert into stg_contacts values
   (20, 'ct-17',    'un17@example.com',      'tracer', 'unknown'),
   -- ct-3 repetido con otro email: la fila invalid igual desmarca cur3
   (21, 'ct-3',     'other3@example.com',    'tracer', 'valid');
+update stg_contacts set class = 'A', rule = 'test', rules_version = 'v1', eligible = 'true',
+                        eligibility_basis = 'test', ledger_ref = 'L' || row_no;
+-- Filas 22–25: evidencia (migración 20261013235500).
+insert into public.crm_owners (owner_key, owner_type, registered_name, source, collected_on) values
+  ('ct-18', 'Persona Natural', 'CT 18', 'test', current_date),
+  ('ct-19', 'Persona Natural', 'CT 19', 'test', current_date),
+  ('ct-20', 'Persona Natural', 'CT 20', 'test', current_date),
+  ('ct-21', 'Persona Natural', 'CT 21', 'test', current_date);
+insert into stg_contacts values
+  (22, 'ct-18', 'b18@example.com', 'tracer', 'valid', 'B', 'sin vínculo', 'v1', '{"mx": true}', 'L22', 'false', 'Clase B', 'smtp:test', '2026-10-13T00:00:00Z'),
+  (23, 'ct-19', 'a19@example.com', 'tracer', 'valid', 'A', 'titular',     'v1', '{"mx": true}', 'L23', 'false', 'pendiente legal', 'smtp:test', null),
+  (24, 'ct-20', 'a20@example.com', 'tracer', 'valid', 'A', null,          'v1', null,           'L24', 'true',  'ok', null, null),
+  (25, 'ct-21', 'c21@example.com', 'tracer', 'invalid', 'C', 'tercero',   'v1', null,           'L25', 'false', 'Clase C', null, null);
