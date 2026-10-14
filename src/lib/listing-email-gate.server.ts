@@ -274,7 +274,8 @@ export async function sendResumeLink(input: {
     return "failed";
   }
 
-  const next = resumePath(lang, lead.property_id, lead.current_step);
+  // Pedido por la broker (userId) o por el vendedor desde /listing/continue (email).
+  const next = resumePath(lang, lead.property_id, lead.current_step, input.userId ? "broker_link" : "email_link");
   const url = `${SITE_URL}/${lang}/auth/confirm?token_hash=${encodeURIComponent(
     tokenHash,
   )}&type=email&next=${encodeURIComponent(next)}`;

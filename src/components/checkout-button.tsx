@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { trackThen, type PlanTier } from "@/lib/analytics";
 
 interface CheckoutButtonProps {
   propertyId: string;
   lang: string;
+  /** Plan and its fee (from pricing-tiers.ts) for the begin_checkout event. */
+  planTier: PlanTier | null;
+  value: number | null;
   labels: {
     payButton: string;
     redirecting: string;
@@ -12,7 +16,7 @@ interface CheckoutButtonProps {
   };
 }
 
-export function CheckoutButton({ propertyId, lang, labels }: CheckoutButtonProps) {
+export function CheckoutButton({ propertyId, lang, planTier, value, labels }: CheckoutButtonProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +33,14 @@ export function CheckoutButton({ propertyId, lang, labels }: CheckoutButtonProps
       if (!res.ok || !data.url) {
         throw new Error(data.error ?? "no_url");
       }
-      window.location.href = data.url;
+      const url = data.url;
+      const go = () => {
+        window.location.href = url;
+      };
+      // begin_checkout right before leaving for Stripe; the redirect waits for GTM (≤1 s).
+      if (planTier && value !== null) {
+        trackThen({ event: "begin_checkout", plan_tier: planTier, value, currency: "USD", lang }, go, 1000);
+      } else go();
     } catch (e) {
       // Localized message; a machine code (e.g. "agreement_not_signed") may
       // follow for support, but never an English sentence from the API.

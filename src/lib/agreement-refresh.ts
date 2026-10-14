@@ -23,6 +23,7 @@ import {
 import { sendAgreementSigned } from "@/lib/email";
 import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { SITE_URL } from "@/lib/config";
+import { recordFunnelEvent } from "@/lib/funnel-events.server";
 
 // "signed" (seller done) is not final: it still moves to "completed" once the
 // countersignature lands.
@@ -91,6 +92,9 @@ export async function refreshAgreement(a: AgreementRef): Promise<string> {
   // Email once, on the first transition into a signed state.
   const wasSigned = a.status === "signed" || a.status === "completed";
   if (won && !wasSigned && (next === "signed" || next === "completed")) {
+    // Embudo: firmar ES terminar el paso 7. Una sola vez, la de la transición.
+    await recordFunnelEvent({ event: "listing_step_complete", propertyId: a.property_id, step: 7 });
+    await recordFunnelEvent({ event: "agreement_signed", propertyId: a.property_id, step: 7 });
     await notifySellerSigned(a.property_id).catch((e) =>
       console.error("agreement refresh: email failed", e instanceof Error ? e.message : e),
     );

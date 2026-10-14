@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ListingCtaLink } from "@/components/listing-cta-link";
 import { Menu, X, Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 
 interface Props {
@@ -71,9 +72,9 @@ export function MobileMenu({
               <Link href={`/${lang}/properties`} className={link}>
                 {nav.buy}
               </Link>
-              <Link href={`/${lang}/listing/new`} className={link}>
+              <ListingCtaLink href={`/${lang}/listing/new`} location="header" lang={lang} className={link}>
                 {nav.sell}
-              </Link>
+              </ListingCtaLink>
               <Link href={`/${lang}#how-it-works`} className={link}>
                 {nav.howItWorks}
               </Link>
@@ -128,13 +129,15 @@ export function MobileMenu({
                 </Link>
               )}
             </div>
-            <Link
+            <ListingCtaLink
               href={`/${lang}/listing/new`}
+              location="header"
+              lang={lang}
               onClick={() => setOpen(false)}
               className="mt-4 inline-flex items-center justify-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase"
             >
               {cta}
-            </Link>
+            </ListingCtaLink>
           </div>
         </div>
       )}

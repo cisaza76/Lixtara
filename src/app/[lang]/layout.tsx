@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ListingCtaLink } from "@/components/listing-cta-link";
 import { Inter, Playfair_Display } from "next/font/google";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
@@ -114,9 +115,14 @@ export default async function RootLayout({
                   </Link>
                 </li>
                 <li>
-                  <Link href={`/${lang}/listing/new`} className="hover:text-gold transition-colors">
+                  <ListingCtaLink
+                    href={`/${lang}/listing/new`}
+                    location="header"
+                    lang={lang}
+                    className="hover:text-gold transition-colors"
+                  >
                     {navCopy.sell}
-                  </Link>
+                  </ListingCtaLink>
                 </li>
                 <li>
                   <Link href={`/${lang}#how-it-works`} className="hover:text-gold transition-colors">
@@ -196,12 +202,14 @@ export default async function RootLayout({
                 )}
               </div>
               {!user && (
-                <Link
+                <ListingCtaLink
                   href={`/${lang}/listing/new`}
+                  location="header"
+                  lang={lang}
                   className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
                 >
                   {navCopy.cta}
-                </Link>
+                </ListingCtaLink>
               )}
             </div>
 

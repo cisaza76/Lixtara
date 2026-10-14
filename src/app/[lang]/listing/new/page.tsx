@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { after } from "next/server";
 import Link from "next/link";
 import { isLocale, t, type Locale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -60,6 +62,10 @@ import { CheckoutButton } from "@/components/checkout-button";
 import { PaymentStatusPoller } from "@/components/payment-status-poller";
 import { DashboardRedirect } from "@/components/dashboard-redirect";
 import { ListingFunnelEvents } from "@/components/listing-funnel-events";
+import { isPlanTier, listingErrorField } from "@/lib/analytics";
+import { CONSENT_COOKIE } from "@/lib/analytics-config";
+import { FIRST_TOUCH_COOKIE, parseFirstTouch } from "@/lib/funnel-events";
+import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
 import { LocalizedValidation } from "@/components/localized-validation";
@@ -74,6 +80,26 @@ const PROPERTY_TYPES = [
 
 function clampStep(value: number): number {
   return Math.min(Math.max(value, 1), TOTAL_STEPS);
+}
+
+// Paso terminado (validado y guardado): fila en funnel_events después de responder, para
+// no demorar el redirect. El navegador recibe ?done=N y envía listing_step_complete.
+function stepCompleted(
+  lang: string,
+  step: number,
+  propertyId: string,
+  userId: string | null,
+  metadata: Record<string, unknown> = {},
+): void {
+  after(() =>
+    recordFunnelEvent({
+      event: "listing_step_complete",
+      propertyId,
+      userId,
+      step,
+      metadata: { lang, ...metadata },
+    }),
+  );
 }
 
 // Strip a trailing unit/apt token so county + comps lookups match the building
@@ -155,6 +181,7 @@ export default async function ListingNewPage({
     gerror?: string;
     gresent?: string;
     change?: string;
+    resumed?: string;
   }>;
 }) {
   const { lang } = await params;
@@ -277,6 +304,27 @@ export default async function ListingNewPage({
             </div>
           </div>
         </StepShell>
+      );
+    }
+
+    // Llegó por un enlace para retomar (correo pedido por el vendedor o enviado por la
+    // broker). El navegador lo reporta con listing_resumed y quita el marcador de la URL.
+    const resumedSource = sp.resumed;
+    if (
+      draft &&
+      sessionUser &&
+      draft.owner_id === sessionUser.id &&
+      (resumedSource === "email_link" || resumedSource === "broker_link")
+    ) {
+      const resumedId = draft.id;
+      after(() =>
+        recordFunnelEvent({
+          event: "listing_resumed",
+          propertyId: resumedId,
+          userId: sessionUser.id,
+          step,
+          metadata: { lang, source: resumedSource },
+        }),
       );
     }
 
@@ -456,12 +504,20 @@ export default async function ListingNewPage({
         redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email_exists`);
       }
     }
-    // After saving the address: send the code, or go straight to step 2.
+    // After saving the address (step 1 complete): send the code, or go straight to step 2.
+    // UTM de primer contacto solo si la persona aceptó cookies (sin consentimiento no hay
+    // cookie lx_ft, y se comprueba igual).
     const continueTo = async (propertyId: string, uid: string): Promise<never> => {
-      if (!askEmail) redirect(`/${lang}/listing/new?id=${propertyId}&step=2`);
+      const jar = await cookies();
+      const firstTouch =
+        jar.get(CONSENT_COOKIE)?.value === "granted"
+          ? parseFirstTouch(jar.get(FIRST_TOUCH_COOKIE)?.value)
+          : {};
+      stepCompleted(lang, 1, propertyId, uid, firstTouch);
+      if (!askEmail) redirect(`/${lang}/listing/new?id=${propertyId}&step=2&done=1`);
       const sent = await startEmailChallenge({ userId: uid, email: gateEmail, lang: locale });
       const err = sent === "sent" ? "" : sent === "limit" ? "&gerror=limit" : "&gerror=send";
-      redirect(`/${lang}/listing/new?step=1&id=${propertyId}${err}`);
+      redirect(`/${lang}/listing/new?step=1&id=${propertyId}&done=1${err}`);
     };
 
     // Geocoding is BEST-EFFORT only — it drops a map pin, it NEVER gates the
@@ -618,7 +674,8 @@ export default async function ListingNewPage({
     if (error) {
       redirect(`/${lang}/listing/new?step=2&id=${id}&error=save_failed`);
     }
-    redirect(`/${lang}/listing/new?id=${id}&step=3`);
+    stepCompleted(lang, 2, id, user.id, { plan_tier: tier });
+    redirect(`/${lang}/listing/new?id=${id}&step=3&done=2`);
   }
 
   async function saveStep3(formData: FormData) {
@@ -769,7 +826,8 @@ export default async function ListingNewPage({
     if (error) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
     }
-    redirect(`/${lang}/listing/new?id=${id}&step=4`);
+    stepCompleted(lang, 3, id, user.id);
+    redirect(`/${lang}/listing/new?id=${id}&step=4&done=3`);
   }
 
   async function refreshComps(formData: FormData) {
@@ -1004,7 +1062,8 @@ export default async function ListingNewPage({
     if (error) {
       redirect(`/${lang}/listing/new?step=4&id=${id}&error=save_failed`);
     }
-    redirect(`/${lang}/listing/new?id=${id}&step=5`);
+    stepCompleted(lang, 4, id, user.id);
+    redirect(`/${lang}/listing/new?id=${id}&step=5&done=4`);
   }
 
   async function uploadPhotosAction(formData: FormData) {
@@ -1204,7 +1263,8 @@ export default async function ListingNewPage({
       .update({ photos_rights_confirmed: true })
       .eq("id", id);
 
-    redirect(`/${lang}/listing/new?step=6&id=${id}`);
+    if (prop) stepCompleted(lang, 5, id, null, { photos_count: photoCount });
+    redirect(`/${lang}/listing/new?step=6&id=${id}&done=5`);
   }
 
   async function setBuyerCommission(formData: FormData) {
@@ -1266,7 +1326,8 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?step=6&id=${id}&error=buyer_commission_required`);
     }
 
-    redirect(`/${lang}/listing/new?step=7&id=${id}`);
+    if (prop) stepCompleted(lang, 6, id, null);
+    redirect(`/${lang}/listing/new?step=7&id=${id}&done=6`);
   }
 
   // Signing gate: convert the anonymous seller into a permanent account. The
@@ -1536,7 +1597,16 @@ export default async function ListingNewPage({
       stepLabel={copy.stepLabel}
       ofLabel={copy.ofLabel}
     >
-      <ListingFunnelEvents step={step} lang={lang} />
+      <ListingFunnelEvents
+        step={step}
+        lang={lang}
+        planTier={draft?.pricing_tier ?? null}
+        photosCount={step === 6 ? photos.length : undefined}
+        agreementSigned={
+          latestAgreement?.status === "signed" || latestAgreement?.status === "completed"
+        }
+        errorField={listingErrorField(sp.error)}
+      />
       {/* Browser validation bubbles in the page's language, not the browser's. */}
       <LocalizedValidation labels={copy.validation} />
       {/* ─── Step 1: Address ─── */}
@@ -3393,6 +3463,8 @@ export default async function ListingNewPage({
                 <CheckoutButton
                   propertyId={draftId}
                   lang={lang}
+                  planTier={isPlanTier(draft?.pricing_tier) ? draft.pricing_tier : null}
+                  value={isPlanTier(draft?.pricing_tier) ? PRICING_TIERS[draft.pricing_tier].flatFee : null}
                   labels={{
                     payButton: copy.step8.payButton,
                     redirecting: copy.step8.redirecting,

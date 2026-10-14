@@ -7,7 +7,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_" + "a".repeat(40);
 });
 import {
-  LISTING_STEP_SLUGS, disableAnalytics, enableAnalytics, listingStepEvent, resultsBucket, track,
+  LISTING_STEP_SLUGS, disableAnalytics, enableAnalytics, listingErrorField, listingStepCompleteEvent, listingStepEvent,
+  resultsBucket, track, trackThen,
 } from "@/lib/analytics";
 import {
   ANALYTICS_COOKIE_RE, GRANTED_CONSENT, analyticsConfig, consentTools, isAnalyticsExcludedPath, readConsent,
@@ -29,6 +30,68 @@ describe("listingStepEvent", () => {
 
   it("falls back for an out-of-range step", () => {
     expect(listingStepEvent(9, "en").step_name).toBe("step_9");
+  });
+});
+
+describe("listing_step_complete", () => {
+  it("plan_tier desde el paso 2, fotos solo en el 5", () => {
+    expect(listingStepCompleteEvent({ step: 1, lang: "es", planTier: "pro" })).toEqual({
+      event: "listing_step_complete", step: 1, step_name: "address", lang: "es",
+    });
+    expect(listingStepCompleteEvent({ step: 2, lang: "en", planTier: "pro" })).toEqual({
+      event: "listing_step_complete", step: 2, step_name: "plan", plan_tier: "pro", lang: "en",
+    });
+    expect(listingStepCompleteEvent({ step: 5, lang: "en", planTier: "essentials", photosCount: 12 })).toMatchObject({
+      step_name: "photos", plan_tier: "essentials", photos_count: 12,
+    });
+    expect(listingStepCompleteEvent({ step: 4, lang: "en", planTier: "pro", photosCount: 12 })).not.toHaveProperty("photos_count");
+    expect(listingStepCompleteEvent({ step: 7, lang: "en", planTier: "gold" })).not.toHaveProperty("plan_tier");
+  });
+
+  it("errores: el nombre del campo, y nada para los fallos del sistema", () => {
+    expect(listingErrorField("invalid_beds")).toBe("bedrooms");
+    expect(listingErrorField("rights_required")).toBe("photo_rights");
+    expect(listingErrorField("save_failed")).toBeNull();
+    expect(listingErrorField("toString")).toBeNull();
+    expect(listingErrorField(undefined)).toBeNull();
+  });
+});
+
+describe("trackThen: begin_checkout antes de salir a Stripe", () => {
+  const begin = { event: "begin_checkout", plan_tier: "pro", value: 495, currency: "USD", lang: "es" } as const;
+  beforeEach(() => {
+    (globalThis as { window?: unknown }).window = { location: { pathname: "/es/listing/new" } };
+    disableAnalytics();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+  const dl = () => (globalThis as unknown as { window: Window }).window.dataLayer as Array<Record<string, unknown>>;
+
+  it("sin consentimiento redirige enseguida y no empuja nada", () => {
+    const done = vi.fn();
+    trackThen(begin, done);
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(dl()).toBeUndefined();
+  });
+
+  it("con consentimiento espera el eventCallback de GTM, una sola vez", () => {
+    enableAnalytics(null);
+    const done = vi.fn();
+    trackThen(begin, done);
+    const pushed = dl()[0];
+    expect(pushed).toMatchObject({ ...begin, eventTimeout: 1000 });
+    expect(done).not.toHaveBeenCalled();
+    (pushed.eventCallback as () => void)();
+    vi.advanceTimersByTime(2000);
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  it("si GTM nunca responde, redirige igual pasado el tiempo", () => {
+    enableAnalytics(null);
+    const done = vi.fn();
+    trackThen(begin, done);
+    vi.advanceTimersByTime(1100);
+    expect(done).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -170,7 +233,7 @@ describe("consentimiento: lo que concede 'Aceptar' y lo que se borra al rechazar
   });
 
   it("al rechazar se borran las cookies de GA4, Google Ads, Meta, Clarity y PostHog, y no las propias del sitio", () => {
-    for (const c of ["_ga", "_ga_ABC123", "_gid", "_gcl_au", "_fbp", "_fbc", "_clck", "_clsk", "ph_phc_x_posthog"]) {
+    for (const c of ["_ga", "_ga_ABC123", "_gid", "_gcl_au", "_fbp", "_fbc", "_clck", "_clsk", "ph_phc_x_posthog", "lx_ft"]) {
       expect(ANALYTICS_COOKIE_RE.test(c), c).toBe(true);
     }
     for (const c of ["lx_consent", "sb-access-token", "NEXT_LOCALE", "gallery_view"]) {

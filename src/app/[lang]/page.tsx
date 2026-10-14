@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ListingCtaLink } from "@/components/listing-cta-link";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { BROKER_LICENSE, BROKERAGE_NAME } from "@/lib/broker";
@@ -97,12 +98,14 @@ export default async function Home({
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6 sm:items-center pt-2">
-              <Link
+              <ListingCtaLink
                 href={`/${lang}/listing/new`}
+                location="hero"
+                lang={lang}
                 className="inline-flex items-center justify-center px-10 py-5 bg-ink text-ivory text-xs font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
               >
                 {copy.ctaPrimary}
-              </Link>
+              </ListingCtaLink>
               <Link
                 href={`/${lang}/properties`}
                 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center gap-2 group"
@@ -473,8 +476,11 @@ export default async function Home({
                     })}
                   </ul>
 
-                  <Link
+                  <ListingCtaLink
                     href={`/${lang}/listing/new?tier=${id}`}
+                    location="pricing"
+                    tier={id}
+                    lang={lang}
                     className={`inline-flex items-center justify-center px-6 py-4 text-xs font-medium tracking-[0.2em] uppercase transition-colors ${
                       isPopular
                         ? "bg-ivory text-ink hover:bg-ivory-strong"
@@ -482,7 +488,7 @@ export default async function Home({
                     }`}
                   >
                     {prCopy.ctaLabel}
-                  </Link>
+                  </ListingCtaLink>
                 </div>
               );
             })}
