@@ -12,10 +12,11 @@ select 'fila ' || e.row_no || ' (' || coalesce(e.owner_key, '∅') || ')', x.esp
     (9, 'skipped_email_taken'), (10, 'duplicate_owner_in_file'), (11, 'duplicate_owner_in_file'),
     (12, 'duplicate_email_in_file'), (13, 'duplicate_email_in_file'), (14, 'unknown_owner'),
     (15, 'bad_status'), (16, 'bad_email'), (17, 'missing_source'), (18, 'loaded_valid'),
-    (19, 'rejected_invalid'), (20, 'loaded_unverified'), (21, 'duplicate_owner_in_file')
+    (19, 'rejected_invalid'), (20, 'loaded_unverified'), (21, 'duplicate_owner_in_file'),
+    (22, 'recorded_only'), (23, 'recorded_only'), (24, 'missing_evidence'), (25, 'rejected_invalid')
   ) as x(row_no, esperado) on x.row_no = e.row_no;
 insert into cres (caso, esperado, obtenido)
-  values ('todas las filas evaluadas', '20', (select count(*)::text from stg_contacts_eval));
+  values ('todas las filas evaluadas', '24', (select count(*)::text from stg_contacts_eval));
 
 -- Estado final de cada propietario: email | verificado
 create function pg_temp.st(k text) returns text language plpgsql as $$
@@ -43,6 +44,38 @@ insert into cres (caso, esperado, obtenido) values
   ('email_source queda guardado', 'tracer',
     (select email_source from public.crm_owners where owner_key = 'ct-1'));
 
+-- Historial (migración 20261013235500): contactos, evidencia, validación y elegibilidad.
+create function pg_temp.ct(k text) returns text language plpgsql as $$
+begin
+  return (select coalesce(string_agg(c.value || ':' || cc.class || ':' || cc.validation_status || ':' ||
+                                     cc.eligible::text, ',' order by c.value), '∅')
+            from public.crm_contacts c join public.crm_owners o on o.id = c.owner_id
+            join public.crm_contacts_current cc on cc.id = c.id
+           where o.owner_key = k);
+end $$;
+insert into cres (caso, esperado, obtenido) values
+  ('B elegible=false: registrado, crm_owners intacto', 'b18@example.com:B:valid:false', pg_temp.ct('ct-18')),
+  ('… y no llega a crm_owners', '∅|false', pg_temp.st('ct-18')),
+  ('A no elegible: registrado, no enviable', 'a19@example.com:A:valid:false', pg_temp.ct('ct-19')),
+  ('… y no llega a crm_owners', '∅|false', pg_temp.st('ct-19')),
+  ('sin regla de identidad: no se registra nada', '∅', pg_temp.ct('ct-20')),
+  ('C invalid: se registra con su validación', 'c21@example.com:C:invalid:false', pg_temp.ct('ct-21')),
+  ('owner_key repetido: se registran ambos contactos', 'x9@example.com:A:valid:true,y9@example.com:A:valid:true', pg_temp.ct('ct-9')),
+  ('email suprimido: se registra (historial) aunque no se cargue', 'blocked5@example.com:A:valid:true', pg_temp.ct('ct-5')),
+  ('propietario inexistente: nada', '0', (select count(*)::text from public.crm_contacts where value = 'ghost@example.com')),
+  ('evidencia jsonb guardada', 'true', (select (evidence ->> 'mx') from public.crm_identity_evidence e
+     join public.crm_contacts c on c.id = e.contact_id where c.value = 'b18@example.com')),
+  ('método y fecha de validación', 'smtp:test|2026-10-13', (select v.method || '|' || to_char(v.checked_at at time zone 'UTC', 'YYYY-MM-DD')
+     from public.crm_contact_validations v join public.crm_contacts c on c.id = v.contact_id where c.value = 'b18@example.com')),
+  ('método por defecto = import:<fuente>', 'import:tracer', (select v.method from public.crm_contact_validations v
+     join public.crm_contacts c on c.id = v.contact_id where c.value = 'new1@example.com')),
+  ('ledger_ref guardado', 'L22', (select ledger_ref from public.crm_contacts where value = 'b18@example.com'));
+
+-- Conteos para la re-ejecución (crm-contacts-rerun.sql)
+create temp table hist_before on commit drop as
+select (select count(*) from public.crm_contacts) c, (select count(*) from public.crm_identity_evidence) e,
+       (select count(*) from public.crm_contact_validations) v, (select count(*) from public.crm_contact_eligibility) g;
+
 -- Lo que importa al final: quién queda enviable.
 insert into cres (caso, esperado, obtenido) values
   ('enviables tras la carga: ct-1, ct-15, ct-2, ct-6', 'ct-1,ct-15,ct-2,ct-6',
@@ -59,4 +92,6 @@ do $$ begin
   end if;
 end $$;
 \echo 'crm-contacts: todos los casos ok'
-rollback;
+-- Sigue en crm-contacts-rerun.sql (misma transacción): re-ejecuta la carga y termina con ROLLBACK.
+drop table stg_contacts_eval;
+drop table stg_contacts_rec;

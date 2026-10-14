@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Verifica 20261012120000_crm_leads en un Postgres DESECHABLE (Docker). Nunca toca producción.
+# Verifica 20261012120000_crm_leads (y 20261013235500_crm_contacts_evidence, de la que depende la
+# carga de contactos) en un Postgres DESECHABLE (Docker). Nunca toca producción.
 # Réplica mínima de Supabase → migración → casos de crm-leads.sql y de la carga de contactos
 # (crm-contacts-*.sql alrededor de scripts/sql/crm_import_contacts.sql). Sale con código 1 si
 # algún caso no coincide.
@@ -17,9 +18,12 @@ sleep 1
   echo "set client_min_messages = warning;"
   cat supabase/migrations/20261012120000_crm_leads.sql
   cat supabase/migrations/20261012180000_crm_sendable_view_grants.sql
+  cat supabase/migrations/20261013235500_crm_contacts_evidence.sql
   cat scripts/db-checks/crm-leads.sql
   # Carga de contactos: el MISMO SQL que ejecuta scripts/import_contacts.py.
   cat scripts/db-checks/crm-contacts-before.sql
   cat scripts/sql/crm_import_contacts.sql
   cat scripts/db-checks/crm-contacts-after.sql
+  cat scripts/sql/crm_import_contacts.sql      # misma carga, mismo CSV: no debe agregar historial
+  cat scripts/db-checks/crm-contacts-rerun.sql
 } | docker exec -i "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -X
