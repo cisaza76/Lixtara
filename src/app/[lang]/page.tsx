@@ -477,7 +477,7 @@ export default async function Home({
                   </ul>
 
                   <ListingCtaLink
-                    href={`/${lang}/listing/new?tier=${id}`}
+                    href={`/${lang}/listing/new?suggested_tier=${id}`}
                     location="pricing"
                     tier={id}
                     lang={lang}
