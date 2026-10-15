@@ -152,6 +152,28 @@ describe("webhook /api/webhooks/docusign", () => {
   });
 });
 
+describe("webhook sin la tabla docusign_events (migración sin aplicar)", () => {
+  it("el insert del registro falla → 200, el acuerdo igual se actualiza y DocuSign no reintenta", async () => {
+    const { deps, refresh } = setup({});
+    const base = deps.db;
+    deps.db = () => {
+      const db = base();
+      return {
+        from: (t: string) =>
+          t === "docusign_events"
+            ? { insert: () => Promise.resolve({ data: null, error: { code: "PGRST205", message: "Could not find the table 'public.docusign_events'" } }) }
+            : db.from(t),
+      } as unknown as SupabaseClient;
+    };
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await handleConnectWebhook(signed(), deps);
+    expect(res.status).toBe(200);
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(err.mock.calls.some((c) => String(c[0]).includes("docusign_event_log_failed"))).toBe(true);
+    err.mockRestore();
+  });
+});
+
 describe("migración docusign_events (#137 b)", () => {
   const sql = readFileSync(
     join(resolve(__dirname, "../.."), "supabase/migrations/20261007180000_docusign_events.sql"), "utf8");
