@@ -181,6 +181,11 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 - `INSTANTLY_API_KEY` — server-only, **Production only** (Preview shares the production DB: a
   preview with this key could load real leads). Scope `leads:create` or `leads:all`. Read only by
   `src/lib/crm/instantly.server.ts`; unset = the CRM's "send to Instantly" button is disabled.
+- `GA4_MEASUREMENT_ID` / `GA4_MP_API_SECRET` — server-only, **Production only**. GA4 Measurement Protocol
+  (`src/lib/ga4-mp.server.ts`): the Stripe webhook sends `purchase` ONLY with the consent stored in the
+  Checkout metadata = `granted`, Stripe `livemode`, `VERCEL_ENV=production` and a non-`is_test` property
+  (owner decision 2026-10-14). The Checkout metadata carries only lang, consent and the GA4 client/session
+  ids (never `_fbp`/`_fbc`/`gclid`). Either unset = nothing is sent. The secret is created by the owner.
 - `EMAIL_FROM` / `EMAIL_REPLY_TO` — server-only. Sender (`"Lixtara <…@lixtara.com>"`, a
   sender on the domain verified in Resend) and reply-to inbox for every email
   (`src/lib/email.ts#emailFrom`). Unset `EMAIL_FROM` = Resend's test sender

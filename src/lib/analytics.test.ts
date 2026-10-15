@@ -8,10 +8,11 @@ vi.hoisted(() => {
 });
 import {
   LISTING_STEP_SLUGS, disableAnalytics, enableAnalytics, listingErrorField, listingStepCompleteEvent, listingStepEvent,
-  resultsBucket, track, trackThen,
+  homePriceRange, markPageview, resultsBucket, track, trackThen,
 } from "@/lib/analytics";
 import {
-  ANALYTICS_COOKIE_RE, GRANTED_CONSENT, analyticsConfig, consentTools, isAnalyticsExcludedPath, readConsent,
+  ANALYTICS_COOKIE_RE, GRANTED_CONSENT, analyticsConfig, consentTools, isAnalyticsExcludedPath, isRecordingExcludedPath,
+  readConsent,
   sanitizePosthogProperties, sanitizeUrl,
 } from "@/lib/analytics-config";
 import { recordServerEvent } from "@/lib/analytics.server";
@@ -26,6 +27,18 @@ describe("listingStepEvent", () => {
       lang: "es",
     });
     expect(listingStepEvent(8, "en").step_name).toBe("payment");
+  });
+
+  it("plan_tier from step 3 on (it's chosen in step 2)", () => {
+    expect(listingStepEvent(2, "en", "pro")).not.toHaveProperty("plan_tier");
+    expect(listingStepEvent(3, "en", "pro")).toMatchObject({ step_name: "details", plan_tier: "pro" });
+    expect(listingStepEvent(4, "en", null)).not.toHaveProperty("plan_tier");
+  });
+
+  it("calculator: price range, never the exact value", () => {
+    expect([200_000, 399_999, 400_000, 625_000, 999_999, 1_000_000, 1_500_000, 2_000_000].map(homePriceRange)).toEqual([
+      "200-400k", "200-400k", "400-600k", "600-800k", "800k-1m", "1-1.5m", "1.5-2m", "1.5-2m",
+    ]);
   });
 
   it("falls back for an out-of-range step", () => {
@@ -99,6 +112,7 @@ describe("track: nada sale sin consentimiento", () => {
   beforeEach(() => {
     (globalThis as { window?: unknown }).window = { location: { pathname: "/en" } };
     disableAnalytics();
+    markPageview("/en");
   });
   const dl = () => (globalThis as unknown as { window: Window }).window.dataLayer;
 
@@ -215,6 +229,7 @@ describe("cada herramienta por su lado (GTM ya no depende de PostHog)", () => {
     w.window = { location: { pathname: "/en" } };
     w.document = { cookie: "lx_consent=granted" };
     fresh.enableAnalytics(null);
+    fresh.markPageview("/en");
     fresh.track({ event: "loui_open", lang: "en" });
     expect((w.window as Window).dataLayer).toEqual([{ event: "loui_open", lang: "en" }]);
     // Si después apareciera un cliente, no recibe eventos viejos: no había nada retenido.
@@ -222,6 +237,18 @@ describe("cada herramienta por su lado (GTM ya no depende de PostHog)", () => {
     fresh.enableAnalytics({ capture });
     expect(capture).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
+  });
+});
+
+describe("Clarity: rutas que nunca graba (se entra con carga completa)", () => {
+  it("registro, cuenta, autenticación, panel y admin, en los dos idiomas", () => {
+    for (const p of ["/en/listing/new", "/es/listing/continue", "/en/account", "/es/auth/confirm", "/en/sign-in",
+      "/es/sign-up", "/en/dashboard/listings/x", "/es/admin"]) {
+      expect(isRecordingExcludedPath(p), p).toBe(true);
+    }
+    for (const p of ["/en", "/es/properties", "/en/property/abc", "/en/listings-guide", "/en/accounting"]) {
+      expect(isRecordingExcludedPath(p), p).toBe(false);
+    }
   });
 });
 
@@ -305,10 +332,47 @@ describe("consentimiento antes de que monte el banner, retención y staff", () =
     const fresh = await import("@/lib/analytics");
     page("/en/properties", "lx_consent=granted");
     fresh.track({ event: "loui_open", lang: "en" });
-    expect((w.window as Window).dataLayer).toEqual([{ event: "loui_open", lang: "en" }]);
+    // Espera al lx_page_view de la ruta; el banner lo empuja y luego llama markPageview.
+    expect((w.window as Window).dataLayer).toBeUndefined();
+    (w.window as Window).dataLayer = [{ event: "lx_page_view", page_path: "/en/properties" }];
+    fresh.markPageview("/en/properties");
+    expect((w.window as Window).dataLayer).toEqual([
+      { event: "lx_page_view", page_path: "/en/properties" },
+      { event: "loui_open", lang: "en" },
+    ]);
     const capture = vi.fn();
     fresh.enableAnalytics({ capture });
     expect(capture).toHaveBeenCalledWith("loui_open", { lang: "en" });
+  });
+
+  it("lx_page_view sale antes que listing_step_view; si nunca llega, el evento sale igual a los 3 s", async () => {
+    configured();
+    vi.useFakeTimers();
+    vi.resetModules();
+    const fresh = await import("@/lib/analytics");
+    page("/es/listing/new", "lx_consent=granted");
+    fresh.track(fresh.listingStepEvent(1, "es"));
+    expect((w.window as Window).dataLayer).toBeUndefined();
+    vi.advanceTimersByTime(3000);
+    expect((w.window as Window).dataLayer).toEqual([fresh.listingStepEvent(1, "es")]);
+    // Ruta nueva (navegación sin recarga): vuelve a esperar a su page_view.
+    page("/es/account", "lx_consent=granted");
+    fresh.track({ event: "loui_open", lang: "es" });
+    expect((w.window as Window).dataLayer).toBeUndefined();
+    fresh.markPageview("/es/account");
+    expect((w.window as Window).dataLayer).toEqual([{ event: "loui_open", lang: "es" }]);
+    vi.useRealTimers();
+  });
+
+  it("si se retira el consentimiento mientras espera, lo retenido se descarta", async () => {
+    configured();
+    vi.resetModules();
+    const fresh = await import("@/lib/analytics");
+    page("/en", "lx_consent=granted");
+    fresh.track({ event: "loui_open", lang: "en" });
+    fresh.disableAnalytics();
+    fresh.markPageview("/en");
+    expect((w.window as Window).dataLayer).toBeUndefined();
   });
 
   afterEach(() => {

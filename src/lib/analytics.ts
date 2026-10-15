@@ -25,7 +25,14 @@ export const LISTING_STEP_SLUGS = [
   "payment",
 ] as const;
 
-export type ListingStepEvent = { event: "listing_step_view"; step: number; step_name: string; lang: string };
+export type ListingStepEvent = {
+  event: "listing_step_view";
+  step: number;
+  step_name: string;
+  /** Desde el paso 3 (el plan se elige en el 2). */
+  plan_tier?: PlanTier;
+  lang: string;
+};
 
 export type PlanTier = "essentials" | "pro" | "concierge";
 /** Dónde está el botón que lleva al registro. */
@@ -53,6 +60,7 @@ export type AnalyticsEvent =
   | { event: "listing_resumed"; step: number; source: ListingResumeSource; lang: string }
   | { event: "agreement_signed"; plan_tier?: PlanTier; lang: string }
   | { event: "begin_checkout"; plan_tier: PlanTier; value: number; currency: "USD"; lang: string }
+  | { event: "calculator_used"; home_price_range: HomePriceRange; buyer_commission_pct: number; lang: string }
   // Embudo comprador
   | {
       event: "property_search";
@@ -77,9 +85,23 @@ export type AnalyticsEvent =
   | { event: "phone_click"; location: string; lang: string };
 
 /** Event for viewing step `step` (1-based) of /listing/new. Step names are stable English slugs. */
-export function listingStepEvent(step: number, lang: string): ListingStepEvent {
+export function listingStepEvent(step: number, lang: string, planTier?: string | null): ListingStepEvent {
   const slug = LISTING_STEP_SLUGS[step - 1] ?? `step_${step}`;
-  return { event: "listing_step_view", step, step_name: slug, lang };
+  const e: ListingStepEvent = { event: "listing_step_view", step, step_name: slug, lang };
+  if (step >= 3 && isPlanTier(planTier)) e.plan_tier = planTier;
+  return e;
+}
+
+export type HomePriceRange = "200-400k" | "400-600k" | "600-800k" | "800k-1m" | "1-1.5m" | "1.5-2m";
+
+/** Rango del precio de la calculadora (200k–2M): nunca el valor exacto. */
+export function homePriceRange(price: number): HomePriceRange {
+  if (price < 400_000) return "200-400k";
+  if (price < 600_000) return "400-600k";
+  if (price < 800_000) return "600-800k";
+  if (price < 1_000_000) return "800k-1m";
+  if (price < 1_500_000) return "1-1.5m";
+  return "1.5-2m";
 }
 
 export function isPlanTier(v: unknown): v is PlanTier {
@@ -176,6 +198,7 @@ export function disableAnalytics(): void {
   consentState = false;
   posthogClient = null;
   pendingForPosthog.length = 0;
+  waitingForPageview.length = 0;
 }
 
 export function analyticsEnabled(): boolean {
@@ -204,13 +227,45 @@ function granted(): boolean {
 
 export function track(e: AnalyticsEvent): void {
   if (typeof window === "undefined" || !granted()) return;
-  if (isAnalyticsExcludedPath(window.location?.pathname ?? "")) return;
+  const path = window.location?.pathname ?? "";
+  if (isAnalyticsExcludedPath(path)) return;
+  // Con GTM, el lx_page_view de cada ruta va primero: los eventos que la página emite antes
+  // (sus efectos corren antes que el del banner) esperan a markPageview, como máximo 3 s.
+  if (BUILD_CONFIG.gtmId && pageviewPath !== path) {
+    if (waitingForPageview.length < PENDING_MAX) waitingForPageview.push(e);
+    if (!pageviewTimer) pageviewTimer = setTimeout(flushWaiting, PAGEVIEW_WAIT_MS);
+    return;
+  }
+  send(e);
+}
+
+function send(e: AnalyticsEvent): void {
   window.dataLayer = window.dataLayer ?? [];
   window.dataLayer.push(e);
   const { event, ...props } = e;
   if (posthogClient) posthogClient.capture(event, props);
   // Retener solo si PostHog va a cargar: con GTM solo, no hay a quién entregárselos.
   else if (BUILD_CONFIG.posthogKey && pendingForPosthog.length < PENDING_MAX) pendingForPosthog.push([event, props]);
+}
+
+// Ruta del último lx_page_view enviado, y lo que espera a que salga.
+let pageviewPath: string | null = null;
+const waitingForPageview: AnalyticsEvent[] = [];
+let pageviewTimer: ReturnType<typeof setTimeout> | null = null;
+const PAGEVIEW_WAIT_MS = 3000;
+
+function flushWaiting(): void {
+  if (pageviewTimer) clearTimeout(pageviewTimer);
+  pageviewTimer = null;
+  const events = waitingForPageview.splice(0);
+  if (!granted()) return;
+  for (const e of events) send(e);
+}
+
+/** Lo llama el banner justo después de empujar lx_page_view de `path`. */
+export function markPageview(path: string): void {
+  pageviewPath = path;
+  flushWaiting();
 }
 
 /**

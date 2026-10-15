@@ -19,6 +19,7 @@ import { grantStagingCredits } from "@/lib/staging-credits";
 import { isPricingTierId } from "@/lib/pricing-tiers";
 import { recordServerEvent } from "@/lib/analytics.server";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
+import { sendGa4Purchase } from "@/lib/ga4-mp.server";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -267,12 +268,14 @@ export async function POST(req: Request) {
       // list the property until the money is actually captured.
       if (session.payment_status !== "paid") break;
       await fulfillCheckout(supabase, session);
+      await sendGa4Purchase(session); // nunca lanza; solo con consentimiento + live + Production
       break;
     }
 
     case "checkout.session.async_payment_succeeded": {
       // A delayed payment method cleared — fulfill now.
       await fulfillCheckout(supabase, event.data.object);
+      await sendGa4Purchase(event.data.object);
       break;
     }
 

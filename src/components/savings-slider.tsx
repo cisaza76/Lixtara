@@ -13,7 +13,8 @@
 // dollar inputs come from pricing-tiers.ts (TRADITIONAL_COSTS / PRICING_TIERS) —
 // never hardcode amounts here.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { homePriceRange, track } from "@/lib/analytics";
 import {
   PRICING_TIERS,
   TIER_ORDER,
@@ -59,6 +60,7 @@ interface SavingsCopy {
 }
 
 interface SavingsSliderProps {
+  lang: string;
   copy: SavingsCopy;
   tierNames: Record<"essentials" | "pro" | "concierge", string>;
 }
@@ -87,9 +89,25 @@ function usd(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
-export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
+export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
   const [price, setPrice] = useState(500_000);
   const [buyerPct, setBuyerPct] = useState(3);
+
+  // calculator_used: once the person stops moving the controls (1.5 s), with the price
+  // RANGE (never the exact value) and the buyer-agent %. Again only if the range changes.
+  const touched = useRef(false);
+  const lastSent = useRef<string | null>(null);
+  useEffect(() => {
+    if (!touched.current) return;
+    const timer = setTimeout(() => {
+      const range = homePriceRange(price);
+      const key = `${range}|${buyerPct}`;
+      if (key === lastSent.current) return;
+      lastSent.current = key;
+      track({ event: "calculator_used", home_price_range: range, buyer_commission_pct: buyerPct, lang });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [price, buyerPct, lang]);
 
   // Traditional buyer-agent commission is the FIXED 3% benchmark — it must NOT
   // move with the slider. The slider only changes what YOU offer on Lixtara;
@@ -186,7 +204,10 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
             max={2_000_000}
             step={25_000}
             value={price}
-            onChange={(e) => setPrice(Number.parseInt(e.target.value, 10))}
+            onChange={(e) => {
+              touched.current = true;
+              setPrice(Number.parseInt(e.target.value, 10));
+            }}
             className="w-full accent-gold cursor-pointer"
           />
           <div className="flex justify-between text-[10px] uppercase tracking-[0.18em] text-ink/45">
@@ -204,7 +225,10 @@ export function SavingsSlider({ copy, tierNames }: SavingsSliderProps) {
               <button
                 key={pct}
                 type="button"
-                onClick={() => setBuyerPct(pct)}
+                onClick={() => {
+                  touched.current = true;
+                  setBuyerPct(pct);
+                }}
                 className={`flex-1 px-4 py-3 text-sm font-medium tracking-wide transition-colors border-2 ${
                   buyerPct === pct
                     ? "border-gold bg-gold/10 text-ink"

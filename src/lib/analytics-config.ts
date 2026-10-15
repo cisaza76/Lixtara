@@ -98,6 +98,16 @@ export function isAnalyticsExcludedPath(pathname: string): boolean {
 }
 
 /**
+ * Rutas que Clarity no graba (decisión del owner 2026-10-14, opción "a"): ahí se escriben
+ * dirección, correo, contraseña o datos de la cuenta. El contenedor las excluye en la carga
+ * de página, pero Clarity no tiene cómo detenerse en una navegación sin recarga: a estas
+ * rutas se entra SIEMPRE con carga completa cuando Clarity está activo (RecordingGuard).
+ */
+export function isRecordingExcludedPath(pathname: string): boolean {
+  return /^\/(en|es)\/(listing|account|auth|sign-in|sign-up|dashboard|admin)(\/|$)/.test(pathname);
+}
+
+/**
  * Lo que PostHog recibe en cada evento: URLs y referrers sin parámetros ni fragmento, y sin
  * el título de la página (puede nombrar una propiedad). Se usa como `sanitize_properties`.
  */
