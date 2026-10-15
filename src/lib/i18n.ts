@@ -698,6 +698,7 @@ export const dictionaries = {
       },
       stepErrors: {
         required: "Please fill in all required fields.",
+        checkMarked: "Check the highlighted fields: something is missing or not in the right format.",
         invalid: "Please check the values.",
         invalidType: "Pick a property type.",
         invalidBeds: "Bedrooms must be between 0 and 30.",
@@ -2577,6 +2578,7 @@ export const dictionaries = {
       },
       stepErrors: {
         required: "Completa todos los campos obligatorios.",
+        checkMarked: "Revisa los campos marcados: falta información o el formato no es válido.",
         invalid: "Revisa los valores.",
         invalidType: "Elige un tipo de propiedad.",
         invalidBeds: "Las habitaciones deben estar entre 0 y 30.",
