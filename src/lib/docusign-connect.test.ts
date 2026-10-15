@@ -176,7 +176,7 @@ describe("webhook sin la tabla docusign_events (migración sin aplicar)", () => 
 
 describe("migración docusign_events (#137 b)", () => {
   const sql = readFileSync(
-    join(resolve(__dirname, "../.."), "supabase/migrations/20261007180000_docusign_events.sql"), "utf8");
+    join(resolve(__dirname, "../.."), "supabase/migrations/20261014180000_docusign_events.sql"), "utf8");
   it("solo inserción: la API no escribe; service_role solo SELECT + INSERT", () => {
     expect(sql).toContain("enable row level security");
     expect(sql).toContain("revoke all on public.docusign_events from public, anon, authenticated, service_role");

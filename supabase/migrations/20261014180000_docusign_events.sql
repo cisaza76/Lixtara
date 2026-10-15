@@ -10,6 +10,8 @@
 -- ni siquiera él puede editar o borrar el registro.
 --
 -- Idempotente. Aplicar SOLO con sign-off del owner (`supabase db push`).
+-- Antes 20261007180000 (nunca aplicada en ningún entorno): renombrada para quedar después
+-- de 20261014150000 y que `db push` no la rechace por estar fuera de orden.
 
 begin;
 
