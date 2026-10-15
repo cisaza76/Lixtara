@@ -68,6 +68,7 @@ import { FIRST_TOUCH_COOKIE, parseFirstTouch } from "@/lib/funnel-events";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
+import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
@@ -1265,8 +1266,7 @@ export default async function ListingNewPage({
       .select("pricing_tier")
       .eq("id", id)
       .maybeSingle();
-    const tierId = prop?.pricing_tier as PricingTierId | null;
-    const photosIncluded = !!(tierId && PRICING_TIERS[tierId]?.includesPhotography);
+    const needsOwnPhotos = ownPhotosRequired(prop?.pricing_tier as string | null);
 
     const { count } = await supabase
       .from("property_photos")
@@ -1275,16 +1275,15 @@ export default async function ListingNewPage({
     const photoCount = count ?? 0;
 
     // Pro/Concierge include professional photography, so a seller who uploads
-    // none may skip the 10-photo minimum and the rights box. DIY (Essentials),
-    // and anyone who DID upload, still confirm rights; Essentials still needs 10.
-    const needsOwnPhotos = !photosIncluded;
+    // none may skip the minimum and the rights box. DIY (Essentials), and anyone
+    // who DID upload, still confirm rights; Essentials still needs MIN_OWN_PHOTOS.
     if (
       (needsOwnPhotos || photoCount > 0) &&
       formData.get("photos_rights_confirmed") !== "1"
     ) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=rights_required`);
     }
-    if (needsOwnPhotos && photoCount < 10) {
+    if (needsOwnPhotos && photoCount < MIN_OWN_PHOTOS) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough`);
     }
 
@@ -1555,6 +1554,9 @@ export default async function ListingNewPage({
     redirect(`${back}&verified=1&ev=email_verified_account`);
   }
 
+  // Paso 5: misma regla que nextFromStep5 (src/lib/listing-photos.ts).
+  const photosRequired = ownPhotosRequired(draft?.pricing_tier ?? null);
+
   const errorMessage =
     sp.error === "captcha"
       ? t(lang).auth.errors.captchaFailed
@@ -1589,7 +1591,7 @@ export default async function ListingNewPage({
                           : sp.error === "upload_failed"
                             ? copy.step5.uploadFailed
                             : sp.error === "not_enough"
-                              ? copy.step5.notEnoughPhotos
+                              ? copy.step5.notEnoughPhotos.replace("{min}", String(MIN_OWN_PHOTOS))
                               : sp.error === "no_files"
                                 ? copy.step5.invalidFormat
                                 : sp.error === "save_failed"
@@ -2402,21 +2404,25 @@ export default async function ListingNewPage({
               </h2>
               <span
                 className={`text-[10px] uppercase tracking-[0.22em] ${
-                  photos.length >= copy.minPhotos
-                    ? "text-gold font-semibold"
-                    : "text-ink/55"
+                  photosRequired && photos.length < MIN_OWN_PHOTOS
+                    ? "text-ink/55"
+                    : "text-gold font-semibold"
                 }`}
               >
-                {(photos.length >= copy.minPhotos
-                  ? copy.step5.photoCountReachedLabel
-                  : copy.step5.photoCountLabel
+                {(!photosRequired
+                  ? copy.step5.photoCountOptionalLabel
+                  : photos.length >= MIN_OWN_PHOTOS
+                    ? copy.step5.photoCountReachedLabel
+                    : copy.step5.photoCountLabel
                 )
                   .replace("{count}", String(photos.length))
-                  .replace("{min}", String(copy.minPhotos))}
+                  .replace("{min}", String(MIN_OWN_PHOTOS))}
               </span>
             </div>
             <p className="text-base leading-relaxed text-ink/70">
-              {copy.step5.body}
+              {photosRequired
+                ? copy.step5.body.replace("{min}", String(MIN_OWN_PHOTOS))
+                : copy.step5.bodyPro}
             </p>
           </div>
 
@@ -2453,13 +2459,6 @@ export default async function ListingNewPage({
             </div>
           )}
 
-          {(draft?.pricing_tier === "pro" ||
-            draft?.pricing_tier === "concierge") && (
-            <p className="text-xs text-ink/70 italic border border-gold-soft bg-ivory-strong/40 p-3">
-              {copy.step5.photosOptionalPro}
-            </p>
-          )}
-
           {/* Essentials: optional professional-photography add-on ($495) */}
           {draft?.pricing_tier === "essentials" && draftId && (
             <div className="border border-gold-soft bg-ivory-strong/30 p-5 flex flex-col gap-3">
@@ -2488,16 +2487,12 @@ export default async function ListingNewPage({
             propertyId={draftId ?? ""}
             persistAction={uploadPhotosAction}
             labels={{
-              uploadButton: copy.step5.uploadButton,
               uploading: copy.step5.uploadingNote,
               invalidFormat: copy.step5.invalidFormat,
               genericError: copy.step5.uploadFailed,
               partialFail: copy.step5.photoPartialFail,
               chooseFiles: copy.step5.chooseFiles,
-              noFilesChosen: copy.step5.noFilesChosen,
-              filesChosen: copy.step5.filesChosen,
-              fileChosenOne: copy.step5.fileChosenOne,
-              noFilesPicked: copy.step5.noFilesPicked,
+              autoUploadHint: copy.step5.autoUploadHint,
               notAuthenticated: copy.step5.notAuthenticated,
               tooLarge: copy.step5.uploadTooLarge,
               reasonTooLarge: copy.step5.uploadReasonTooLarge,
@@ -2602,13 +2597,7 @@ export default async function ListingNewPage({
                 type="checkbox"
                 name="photos_rights_confirmed"
                 value="1"
-                required={
-                  photos.length > 0 ||
-                  !(
-                    draft?.pricing_tier === "pro" ||
-                    draft?.pricing_tier === "concierge"
-                  )
-                }
+                required={photos.length > 0 || photosRequired}
                 className="mt-1 accent-gold w-4 h-4 shrink-0"
               />
               <span>{copy.step5.ownershipCheckLabel}</span>
