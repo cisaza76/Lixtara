@@ -474,7 +474,7 @@ export default async function Home({
                   </ul>
 
                   <Link
-                    href={`/${lang}/listing/new?tier=${id}`}
+                    href={`/${lang}/listing/new?suggested_tier=${id}`}
                     className={`inline-flex items-center justify-center px-6 py-4 text-xs font-medium tracking-[0.2em] uppercase transition-colors ${
                       isPopular
                         ? "bg-ivory text-ink hover:bg-ivory-strong"
