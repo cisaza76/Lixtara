@@ -44,4 +44,28 @@ describe("recordFunnelEvent nunca lanza (no puede volver 500 el webhook de Strip
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ is_test: true, event: "listing_paid" }));
     vi.unstubAllEnvs();
   });
+
+  it("sin lang en la metadata (p. ej. broker_countersigned desde el webhook) → el idioma del vendedor", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const leadEq = vi.fn(() => ({ maybeSingle: () => Promise.resolve({ data: { locale: "es" } }) }));
+    createService.mockReturnValue({
+      from: (t: string) =>
+        t === "properties"
+          ? { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { is_test: true, owner_id: "u1" } }) }) }) }
+          : t === "seller_leads"
+            ? { select: () => ({ eq: leadEq }) }
+            : { insert },
+    });
+    await recordFunnelEvent({ event: "broker_countersigned", propertyId: "p1", step: 7 });
+    expect(leadEq).toHaveBeenCalledWith("user_id", "u1");
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ metadata: { lang: "es" }, step: 7 }));
+
+    // Un lang explícito (la página del paso) gana y no se consulta seller_leads.
+    leadEq.mockClear();
+    await recordFunnelEvent({ event: "listing_step_complete", propertyId: "p1", step: 7, metadata: { lang: "en" } });
+    expect(leadEq).not.toHaveBeenCalled();
+    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: { lang: "en" } }));
+    vi.unstubAllEnvs();
+  });
 });
