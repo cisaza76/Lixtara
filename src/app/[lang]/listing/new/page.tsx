@@ -38,8 +38,11 @@ import {
 import {
   PRICING_TIERS,
   TIER_ORDER,
+  TRADITIONAL_COSTS,
+  compareWithTraditional,
   fillPricingCopy,
   fillTierCopy,
+  isPricingTierId,
   type PricingTierId,
 } from "@/lib/pricing-tiers";
 import {
@@ -3123,13 +3126,16 @@ export default async function ListingNewPage({
                 {/* Cost breakdown (item 17) */}
                 {(() => {
                   const buyerPct = Number(draft.buyer_agent_commission ?? 0);
-                  if (buyerPct === 0 || !tier) return null;
+                  if (buyerPct === 0 || !tier || !isPricingTierId(draft.pricing_tier)) return null;
                   const price = draft.list_price ?? 0;
-                  const lixCommission = price * (tier.commissionPct / 100);
-                  const buyerCommission = price * (buyerPct / 100);
-                  const lixTotal = tier.flatFee + lixCommission + buyerCommission;
-                  const traditionalTotal = price * 0.06;
-                  const savings = Math.max(0, traditionalTotal - lixTotal);
+                  // Same comparison as the calculator and the FAQ: the buyer-agent % the
+                  // seller chose goes on both sides (compareWithTraditional).
+                  const cmp = compareWithTraditional(draft.pricing_tier, price, buyerPct);
+                  const lixCommission = cmp.lixtara.sellerCommission;
+                  const buyerCommission = cmp.lixtara.buyerCommission;
+                  const lixTotal = cmp.lixtara.total;
+                  const traditionalTotal = cmp.traditional.total;
+                  const savings = Math.max(0, cmp.savings);
                   return (
                     <div className="border border-gold-soft p-6 flex flex-col gap-4">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
@@ -3163,7 +3169,9 @@ export default async function ListingNewPage({
                           ${Math.round(lixTotal).toLocaleString()}
                         </dd>
                         <dt className="text-ink/55 text-xs">
-                          {copy.step6.costTraditional}
+                          {copy.step6.costTraditional
+                            .replace("{listingPct}", String(TRADITIONAL_COSTS.listingCommissionPct))
+                            .replace("{buyerPct}", String(buyerPct))}
                         </dt>
                         <dd className="text-right text-ink/55 text-sm line-through">
                           ${Math.round(traditionalTotal).toLocaleString()}

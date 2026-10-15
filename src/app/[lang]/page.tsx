@@ -211,7 +211,7 @@ export default async function Home({
                 <h3 className="text-base font-semibold text-ink leading-snug">
                   {p.headline}
                 </h3>
-                <p className="text-sm leading-relaxed text-ink/70">{fillBrokerageCopy(p.body)}</p>
+                <p className="text-sm leading-relaxed text-ink/70">{fillCommissionCopy(fillBrokerageCopy(p.body))}</p>
               </div>
             ))}
           </div>
@@ -362,7 +362,7 @@ export default async function Home({
             {savingsCopy.titleAfter}
           </h2>
           <p className="max-w-2xl text-base leading-relaxed text-ink/70 mb-12 lg:mb-16">
-            {savingsCopy.body}
+            {fillCommissionCopy(savingsCopy.body)}
           </p>
           <SavingsSlider
             lang={lang}
@@ -371,6 +371,7 @@ export default async function Home({
               tipSellerCommission: fillCommissionCopy(
                 savingsCopy.tipSellerCommission,
               ),
+              howToReadBody: fillCommissionCopy(savingsCopy.howToReadBody),
             }}
             tierNames={{
               essentials: prCopy.tiers.essentials.name,
