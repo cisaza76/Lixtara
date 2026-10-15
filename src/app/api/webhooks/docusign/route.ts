@@ -10,13 +10,13 @@
 import { createService } from "@/lib/supabase/service";
 import { handleConnectWebhook } from "@/lib/docusign-connect";
 import { claimWebhookEvent } from "@/lib/webhook-dedup";
-import { refreshAgreement } from "@/lib/agreement-refresh";
+import { refreshAgreementResult } from "@/lib/agreement-refresh";
 
 export async function POST(req: Request) {
   return handleConnectWebhook(req, {
     db: createService,
     claimEvent: (db, eventId, eventType) => claimWebhookEvent(db, "docusign", eventId, eventType),
-    refresh: refreshAgreement,
+    refresh: refreshAgreementResult,
     env: process.env,
   });
 }

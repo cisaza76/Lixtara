@@ -80,8 +80,11 @@ export interface AgreementRow {
 export interface WebhookDeps {
   db: () => SupabaseClient;
   claimEvent: (db: SupabaseClient, eventId: string, eventType?: string) => Promise<"claimed" | "duplicate" | "unavailable">;
-  /** Trae el acuerdo al día desde DocuSign. Devuelve el estado vigente; nunca lanza. */
-  refresh: (agreement: AgreementRow) => Promise<string>;
+  /**
+   * Trae el acuerdo al día desde DocuSign: estado vigente y si DocuSign respondió
+   * (`fetched`). Nunca lanza.
+   */
+  refresh: (agreement: AgreementRow) => Promise<{ status: string; fetched: boolean }>;
   env: NodeJS.ProcessEnv;
 }
 
@@ -109,7 +112,8 @@ export async function handleConnectWebhook(req: Request, deps: WebhookDeps): Pro
   try {
     payload = JSON.parse(raw) as ConnectPayload;
   } catch {
-    return ack({ ok: false, error: "bad_json" });
+    // 400: no se procesó. Connect lo marca como fallido en su registro en vez de "entregado".
+    return ack({ ok: false, error: "bad_json" }, 400);
   }
 
   const db = deps.db();
@@ -131,14 +135,20 @@ export async function handleConnectWebhook(req: Request, deps: WebhookDeps): Pro
 
   if (!envelopeId) {
     await log({ note: "no_envelope_id" });
-    return ack({ ok: false, error: "no_envelope_id" });
+    return ack({ ok: false, error: "no_envelope_id" }, 400);
   }
 
-  const { data: agreement } = await db
+  const { data: agreement, error: lookupError } = await db
     .from("agreements")
     .select("id, property_id, envelope_id, status")
     .eq("envelope_id", envelopeId)
     .maybeSingle();
+  if (lookupError) {
+    // Sin poder leer la base no sabemos si el sobre es nuestro: 503, Connect reintenta.
+    console.error(JSON.stringify({ event: "docusign_connect_lookup_failed", message: lookupError.message }));
+    return ack({ ok: false, error: "lookup_failed" }, 503);
+  }
+  // Sobre de otra integración de la cuenta: 200 a propósito (reintentar no lo haría nuestro).
   if (!agreement) {
     await log({ note: "unknown_envelope" });
     return ack({ ok: true, note: "unknown_envelope" });
@@ -148,7 +158,13 @@ export async function handleConnectWebhook(req: Request, deps: WebhookDeps): Pro
   // idempotente, un reintento nunca queda sin aplicar y el email al vendedor sale una
   // sola vez aunque lleguen entregas en paralelo. Si DocuSign no responde devuelve el
   // estado anterior; el poller del paso 7 y la revisión del admin lo vuelven a intentar.
-  const ourStatus = await deps.refresh(agreement as AgreementRow);
+  const { status: ourStatus, fetched } = await deps.refresh(agreement as AgreementRow);
+  if (!fetched) {
+    // DocuSign no respondió: el acuerdo quedó igual. 503 para que Connect reintente la
+    // entrega (sin reclamarla: el reintento debe procesarse, no contarse como duplicado).
+    await log({ resulting_status: ourStatus, note: "refresh_failed" });
+    return ack({ ok: false, error: "refresh_failed", status: ourStatus }, 503);
+  }
 
   // Deduplicación por entrega (mismo cuerpo = misma entrega reintentada): solo marca el
   // registro; los efectos laterales ya están protegidos dentro de refresh.

@@ -62,7 +62,17 @@ export function resolveAgreementStatus(
  * one when DocuSign can't be reached). Never throws.
  */
 export async function refreshAgreement(a: AgreementRef): Promise<string> {
-  if (!a.envelope_id || isFinalAgreementStatus(a.status)) return a.status;
+  return (await refreshAgreementResult(a)).status;
+}
+
+/**
+ * refreshAgreement plus whether DocuSign could be read (`fetched`). The Connect
+ * webhook answers 503 when it couldn't, so DocuSign retries the delivery.
+ */
+export async function refreshAgreementResult(
+  a: AgreementRef,
+): Promise<{ status: string; fetched: boolean }> {
+  if (!a.envelope_id || isFinalAgreementStatus(a.status)) return { status: a.status, fetched: true };
 
   let next: AgreementStatus;
   let signedAt: string | null = null;
@@ -84,9 +94,9 @@ export async function refreshAgreement(a: AgreementRef): Promise<string> {
     }
   } catch (e) {
     console.error("agreement refresh: DocuSign fetch failed", e instanceof Error ? e.message : e);
-    return a.status;
+    return { status: a.status, fetched: false };
   }
-  if (next === a.status) return a.status;
+  if (next === a.status) return { status: a.status, fetched: true };
 
   const svc = createService();
   const update: Record<string, unknown> = { status: next, updated_at: new Date().toISOString() };
@@ -116,7 +126,7 @@ export async function refreshAgreement(a: AgreementRef): Promise<string> {
   if (won && next === "completed" && countersigned) {
     await recordFunnelEvent({ event: "broker_countersigned", propertyId: a.property_id, step: 7 });
   }
-  return next;
+  return { status: next, fetched: true };
 }
 
 export type PublishGate =

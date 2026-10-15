@@ -77,10 +77,11 @@ function setup(opts: {
   env?: Record<string, string>;
   agreement?: { id: string; property_id: string; envelope_id: string; status: string } | null;
   refreshedStatus?: string;
+  fetched?: boolean;
   claim?: "claimed" | "duplicate" | "unavailable";
 }) {
   const calls: Call[] = [];
-  const refresh = vi.fn(async () => opts.refreshedStatus ?? "completed");
+  const refresh = vi.fn(async () => ({ status: opts.refreshedStatus ?? "completed", fetched: opts.fetched ?? true }));
   const deps: WebhookDeps = {
     db: () =>
       fakeDb(
@@ -149,6 +150,53 @@ describe("webhook /api/webhooks/docusign", () => {
     expect(res.status).toBe(200);
     expect(refresh).not.toHaveBeenCalled();
     expect(calls.find((c) => c.table === "docusign_events")!.payload).toMatchObject({ note: "unknown_envelope" });
+  });
+});
+
+describe("webhook: 4xx/5xx cuando no procesa (Connect lo registra como fallido o reintenta)", () => {
+  it("JSON inválido → 400", async () => {
+    const { deps, refresh } = setup({});
+    const res = await handleConnectWebhook(signed("{nope"), deps);
+    expect(res.status).toBe(400);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("sin envelopeId → 400, registrado con nota", async () => {
+    const { deps, calls, refresh } = setup({});
+    const res = await handleConnectWebhook(signed(JSON.stringify({ event: "envelope-sent", data: {} })), deps);
+    expect(res.status).toBe(400);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(calls.find((c) => c.table === "docusign_events")!.payload).toMatchObject({ note: "no_envelope_id" });
+  });
+
+  it("DocuSign no responde en el refresh → 503 y la entrega NO se reclama (el reintento se procesa)", async () => {
+    const { deps, calls } = setup({ fetched: false, refreshedStatus: "sent" });
+    const claim = vi.fn(async () => "claimed" as const);
+    deps.claimEvent = claim;
+    const res = await handleConnectWebhook(signed(), deps);
+    expect(res.status).toBe(503);
+    expect(claim).not.toHaveBeenCalled();
+    expect(calls.find((c) => c.table === "docusign_events")!.payload).toMatchObject({ note: "refresh_failed" });
+  });
+
+  it("la base no responde al buscar el acuerdo → 503, sin refresh", async () => {
+    const { deps, refresh } = setup({});
+    deps.db = () =>
+      ({
+        from: (t: string) => {
+          const b: Record<string, unknown> = {};
+          b.select = () => b;
+          b.eq = () => b;
+          b.insert = () => Promise.resolve({ data: null, error: null });
+          b.maybeSingle = () => Promise.resolve({ data: null, error: { message: "timeout" } });
+          void t;
+          return b;
+        },
+      }) as unknown as SupabaseClient;
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await handleConnectWebhook(signed(), deps)).status).toBe(503);
+    expect(refresh).not.toHaveBeenCalled();
+    err.mockRestore();
   });
 });
 
