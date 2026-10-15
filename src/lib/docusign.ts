@@ -168,6 +168,61 @@ export interface CreateEnvelopeInput {
    */
   lockedTextTabs?: string[];
   emailSubject?: string;
+  /**
+   * Broker de Lixtara: contrafirma DESPUÉS del vendedor (routingOrder 2) en todo acuerdo
+   * (#137 f). Obligatorio: sin él DocuSign podría completar el sobre con una sola firma.
+   * Nombre y email salen de src/config/brokerage.ts; el rol debe existir en la plantilla
+   * como "Needs to Sign" con nombre y email vacíos (los llena el código).
+   */
+  brokerSigner: { roleName: string; name: string; email: string } | null;
+}
+
+/** Rol del broker de Lixtara en cada plantilla (#137 f; confirmar con scripts/check-docusign-template.ts). */
+export const LIXTARA_BROKER_ROLE = {
+  listingAgreement: "Broker",
+  ca8: "Broker",
+  bba1: "Seller Broker",
+  asIs: "SellerBroker",
+} as const;
+
+export class MissingBrokerSignerError extends Error {
+  constructor() {
+    super("broker_signer_not_configured");
+    this.name = "MissingBrokerSignerError";
+  }
+}
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
+
+/**
+ * Roles del sobre: vendedor (1) y broker de Lixtara (2). Lanza ANTES de cualquier llamada
+ * a DocuSign si falta el broker o su email: ningún acuerdo sale con una sola firma.
+ */
+export function buildTemplateRoles(input: CreateEnvelopeInput, tabs: Record<string, unknown>) {
+  const b = input.brokerSigner;
+  if (!b || !b.roleName.trim() || !b.name.trim() || !EMAIL_RE.test(b.email)) {
+    throw new MissingBrokerSignerError();
+  }
+  if (b.email.trim().toLowerCase() === input.signerEmail.trim().toLowerCase()) {
+    // El vendedor no puede firmar también como broker.
+    throw new MissingBrokerSignerError();
+  }
+  return [
+    {
+      email: input.signerEmail,
+      name: input.signerName,
+      roleName: input.signerRole,
+      clientUserId: input.clientUserId,
+      routingOrder: "1",
+      tabs: Object.keys(tabs).length > 0 ? tabs : undefined,
+    },
+    {
+      email: b.email,
+      name: b.name,
+      roleName: b.roleName,
+      routingOrder: "2",
+    },
+  ];
 }
 
 export interface CreateEnvelopeResult {
@@ -208,9 +263,11 @@ export async function createEnvelopeFromTemplate(
     ],
   };
 
+  // Roles definitivos: vendedor (1) + broker de Lixtara (2). buildTemplateRoles lanza antes
+  // de la llamada si falta la broker (#137 f).
   return authedRequest<CreateEnvelopeResult>("/envelopes", {
     method: "POST",
-    body,
+    body: { ...body, templateRoles: buildTemplateRoles(input, tabs) },
   });
 }
 

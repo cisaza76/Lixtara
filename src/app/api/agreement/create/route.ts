@@ -14,9 +14,11 @@ import { createClient } from "@/lib/supabase/server";
 import {
   createEnvelopeFromTemplate,
   getRecipientView,
+  LIXTARA_BROKER_ROLE,
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
+import { brokerSigner } from "@/config/brokerage";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import { t } from "@/lib/i18n";
@@ -119,6 +121,13 @@ export async function POST(req: Request) {
     let agreementRowId = existing?.id ?? null;
 
     if (!envelopeId) {
+      // Sin el email de firma de la broker no se crea ningún sobre (#137 f).
+      const broker = brokerSigner();
+      if (!broker) {
+        console.error(JSON.stringify({ event: "docusign_broker_signer_missing", propertyId }));
+        return NextResponse.json({ error: "broker_signer_not_configured" }, { status: 503 });
+      }
+
       // Labels MUST match the tabLabel values defined on the DocuSign
       // template (Seller role). Verified via scripts/check-docusign-template.ts
       // against the Lixtara Listing Agreement template
@@ -248,6 +257,8 @@ export async function POST(req: Request) {
         signerEmail,
         signerName,
         clientUserId: propertyId,
+        // La broker contrafirma después del vendedor (routingOrder 2) (#137 f).
+        brokerSigner: { roleName: LIXTARA_BROKER_ROLE.listingAgreement, ...broker },
         textTabs: tabs,
         // System-set economics — the signer must not edit these (they reflect
         // the selected plan exactly). Rendered read-only on the contract.
