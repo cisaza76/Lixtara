@@ -31,6 +31,14 @@ describe("recordFunnelEvent nunca lanza (no puede volver 500 el webhook de Strip
     expect(error).toHaveBeenCalled();
   });
 
+  // funnel_events: insert + la lectura del último evento con lang.
+  function eventsTable(insert: ReturnType<typeof vi.fn>, lastLang: string | null = null) {
+    const q: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "not", "order", "limit"]) q[m] = () => q;
+    q.maybeSingle = () => Promise.resolve({ data: lastLang ? { metadata: { lang: lastLang } } : null });
+    return { ...q, insert };
+  }
+
   it("marca is_test fuera de Production", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     const insert = vi.fn().mockResolvedValue({ error: null });
@@ -38,32 +46,42 @@ describe("recordFunnelEvent nunca lanza (no puede volver 500 el webhook de Strip
       from: (t: string) =>
         t === "properties"
           ? { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { is_test: false } }) }) }) }
-          : { insert },
+          : eventsTable(insert),
     });
     await recordFunnelEvent(input);
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ is_test: true, event: "listing_paid" }));
     vi.unstubAllEnvs();
   });
 
-  it("sin lang en la metadata (p. ej. broker_countersigned desde el webhook) → el idioma del vendedor", async () => {
+  it("sin lang: primero el del último evento del listing, luego el del vendedor (seller_leads)", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
     const insert = vi.fn().mockResolvedValue({ error: null });
-    const leadEq = vi.fn(() => ({ maybeSingle: () => Promise.resolve({ data: { locale: "es" } }) }));
-    createService.mockReturnValue({
+    const leadEq = vi.fn(() => ({ maybeSingle: () => Promise.resolve({ data: { locale: "en" } }) }));
+    const db = (lastLang: string | null) => ({
       from: (t: string) =>
         t === "properties"
           ? { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { is_test: true, owner_id: "u1" } }) }) }) }
           : t === "seller_leads"
             ? { select: () => ({ eq: leadEq }) }
-            : { insert },
+            : eventsTable(insert, lastLang),
     });
-    await recordFunnelEvent({ event: "broker_countersigned", propertyId: "p1", step: 7 });
-    expect(leadEq).toHaveBeenCalledWith("user_id", "u1");
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ metadata: { lang: "es" }, step: 7 }));
 
-    // Un lang explícito (la página del paso) gana y no se consulta seller_leads.
+    // 1) Hay un evento previo con lang (p. ej. checkout_started desde la página): gana.
+    createService.mockReturnValue(db("es"));
+    await recordFunnelEvent({ event: "broker_countersigned", propertyId: "p1", step: 7 });
+    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: { lang: "es" }, step: 7 }));
+    expect(leadEq).not.toHaveBeenCalled();
+
+    // 2) Ningún evento previo con lang: el de seller_leads.
+    createService.mockReturnValue(db(null));
+    await recordFunnelEvent({ event: "agreement_signed", propertyId: "p1", step: 7 });
+    expect(leadEq).toHaveBeenCalledWith("user_id", "u1");
+    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: { lang: "en" } }));
+
+    // 3) Un lang explícito (la página del paso o la metadata de Stripe) gana y no consulta nada.
     leadEq.mockClear();
-    await recordFunnelEvent({ event: "listing_step_complete", propertyId: "p1", step: 7, metadata: { lang: "en" } });
+    createService.mockReturnValue(db("es"));
+    await recordFunnelEvent({ event: "listing_paid", propertyId: "p1", step: 8, metadata: { lang: "en" } });
     expect(leadEq).not.toHaveBeenCalled();
     expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: { lang: "en" } }));
     vi.unstubAllEnvs();
