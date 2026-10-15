@@ -68,6 +68,8 @@ import { FIRST_TOUCH_COOKIE, parseFirstTouch } from "@/lib/funnel-events";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
+import { isCheckoutSessionId } from "@/lib/checkout-guard";
+import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
 
 const TOTAL_STEPS = 8;
@@ -239,6 +241,7 @@ export default async function ListingNewPage({
     status: "pending" | "succeeded" | "failed" | "refunded";
     amount: number;
     tier: string | null;
+    stripe_checkout_session_id: string | null;
   };
   type AgreementRow = {
     status: "pending" | "sent" | "delivered" | "signed" | "completed" | "declined" | "voided" | "expired";
@@ -450,14 +453,43 @@ export default async function ListingNewPage({
     }
 
     if (step === 8) {
-      const { data: payRow } = await supabase
-        .from("payments")
-        .select("status, amount, tier")
-        .eq("property_id", draftId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (payRow) latestPayment = payRow as PaymentRow;
+      const loadPayment = async (): Promise<PaymentRow | null> => {
+        const { data: payRow } = await supabase
+          .from("payments")
+          .select("status, amount, tier, stripe_checkout_session_id")
+          .eq("property_id", draftId)
+          .not("tier", "is", null) // la fotografía (paso 5) también es flat_fee, sin tier
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return (payRow as PaymentRow | null) ?? null;
+      };
+      latestPayment = await loadPayment();
+
+      // Sin depender solo del webhook: al volver de Stripe (?session_id=) o con un pago
+      // pendiente, se lee la sesión en Stripe y, si está pagada, se cumple aquí mismo
+      // (mismo código e idempotencia que el webhook).
+      if (draft && sessionUser && draft.owner_id === sessionUser.id && draft.mls_status === "draft") {
+        const pendingPayment: PaymentRow | null = latestPayment;
+        const candidates = new Set<string>();
+        if (isCheckoutSessionId(sp.session_id)) candidates.add(sp.session_id);
+        if (pendingPayment?.status === "pending" && isCheckoutSessionId(pendingPayment.stripe_checkout_session_id)) {
+          candidates.add(pendingPayment.stripe_checkout_session_id);
+        }
+        for (const sessionId of candidates) {
+          const result = await reconcileTierCheckout({ sessionId, propertyId: draftId, userId: sessionUser.id });
+          if (result === "fulfilled" || result === "already") {
+            latestPayment = await loadPayment();
+            const { data: fresh } = await supabase
+              .from("properties")
+              .select("mls_status")
+              .eq("id", draftId)
+              .maybeSingle();
+            if (fresh?.mls_status) draft = { ...draft, mls_status: fresh.mls_status } as Draft;
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -3475,6 +3507,7 @@ export default async function ListingNewPage({
                     payButton: copy.step8.payButton,
                     redirecting: copy.step8.redirecting,
                     failed: copy.step8.failed,
+                    confirming: copy.step8.confirmingExisting,
                   }}
                 />
 

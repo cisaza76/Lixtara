@@ -293,3 +293,8 @@ export function verifyWebhookSignature(
   if (!signatureHeader) throw new Error("Missing stripe-signature header");
   return client().webhooks.constructEvent(rawBody, signatureHeader, secret);
 }
+
+/** Cierra una sesión de Checkout abierta: deja de poder cobrarse. */
+export async function expireCheckoutSession(sessionId: string): Promise<void> {
+  await client().checkout.sessions.expire(sessionId);
+}
