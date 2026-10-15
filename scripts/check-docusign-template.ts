@@ -1,7 +1,8 @@
 // One-shot: list the text-tab labels defined on the Lixtara listing-agreement
 // template so we can verify they match what /api/agreement/create sends.
 //
-// Run:  pnpm tsx scripts/check-docusign-template.ts
+// Run:  pnpm tsx scripts/check-docusign-template.ts          (listing agreement)
+//       pnpm tsx scripts/check-docusign-template.ts --all    (the 4 templates: broker role only)
 
 // Minimal .env.local loader that supports multi-line quoted values (needed
 // for DOCUSIGN_PRIVATE_KEY which spans 27 lines in PEM format).
@@ -66,6 +67,7 @@ try {
 }
 
 import { getAccessToken, LIXTARA_BROKER_ROLE } from "../src/lib/docusign";
+import { BROKER_SIGNER_EMAIL } from "../src/config/brokerage";
 
 // The labels POST /api/agreement/create currently sends. Order matches the
 // route handler so the diff at the bottom is easy to scan.
@@ -165,7 +167,71 @@ interface RecipientsResponse {
   editors?: Recipient[];
 }
 
+// Plantillas con contrafirma de la broker (#137 f): variable de entorno → clave del rol.
+const TEMPLATES: Array<{ env: string; role: keyof typeof LIXTARA_BROKER_ROLE }> = [
+  { env: "DOCUSIGN_LISTING_AGREEMENT_TEMPLATE_ID", role: "listingAgreement" },
+  { env: "DOCUSIGN_COMMISSION_AGREEMENT_TEMPLATE_ID", role: "ca8" },
+  { env: "DOCUSIGN_COMPENSATION_AGREEMENT_TEMPLATE_ID", role: "bba1" },
+  { env: "DOCUSIGN_AS_IS_CONTRACT_TEMPLATE_ID", role: "asIs" },
+];
+
+async function fetchRecipients(token: string, templateId: string): Promise<RecipientsResponse> {
+  const url = `${process.env.DOCUSIGN_BASE_URI}/restapi/v2.1/accounts/${process.env.DOCUSIGN_ACCOUNT_ID}/templates/${templateId}/recipients`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`DocuSign template fetch failed: ${res.status} ${await res.text()}`);
+  return (await res.json()) as RecipientsResponse;
+}
+
+/**
+ * Solo el rol de la broker en cada plantilla: existe, firma DESPUÉS del vendedor y, si la
+ * plantilla trae un email fijo, es BROKER_SIGNER_EMAIL (no se imprime ningún email).
+ */
+async function checkAllBrokerRoles(): Promise<number> {
+  const token = await getAccessToken();
+  const knownRoles = new Set<string>(Object.values(LIXTARA_BROKER_ROLE));
+  let failures = 0;
+  for (const t of TEMPLATES) {
+    const id = process.env[t.env];
+    const expected = LIXTARA_BROKER_ROLE[t.role];
+    console.log(`\n=== ${t.env} (expected broker role "${expected}") ===`);
+    if (!id) {
+      console.log("✗ env var not set");
+      failures++;
+      continue;
+    }
+    const data = await fetchRecipients(token, id);
+    const signers = data.signers ?? [];
+    for (const r of signers) {
+      console.log(`  • role="${r.roleName ?? "(unnamed)"}" routingOrder=${r.routingOrder ?? "?"}${r.email ? " (fixed email)" : ""}`);
+    }
+    const broker = signers.find((r) => r.roleName === expected);
+    const seller = signers.find((r) => r.roleName === "Seller");
+    const other = signers.find((r) => r.roleName && r.roleName !== expected && knownRoles.has(r.roleName));
+    if (!broker) {
+      console.log(`✗ MISSING signer role "${expected}"${other ? ` (found "${other.roleName}": mapping in LIXTARA_BROKER_ROLE may be wrong)` : ""}`);
+      failures++;
+      continue;
+    }
+    const order = Number(broker.routingOrder ?? NaN);
+    const sellerOrder = Number(seller?.routingOrder ?? NaN);
+    const afterSeller = Number.isFinite(order) && Number.isFinite(sellerOrder) && order > sellerOrder;
+    const emailOk = !broker.email || broker.email.trim().toLowerCase() === (BROKER_SIGNER_EMAIL ?? "").toLowerCase();
+    console.log(
+      `${afterSeller && emailOk ? "✓" : "✗"} role "${expected}" routingOrder=${broker.routingOrder ?? "?"} ` +
+        `(seller=${seller?.routingOrder ?? "?"}: ${afterSeller ? "signs after the seller" : "must sign AFTER the seller"}); ` +
+        `fixed email: ${broker.email ? (emailOk ? "= BROKER_SIGNER_EMAIL" : "≠ BROKER_SIGNER_EMAIL") : "none (code fills it)"}`,
+    );
+    if (!afterSeller || !emailOk) failures++;
+  }
+  console.log(failures === 0 ? "\nAll 4 templates OK." : `\n${failures} template(s) need attention.`);
+  return failures;
+}
+
 async function main() {
+  if (process.argv.includes("--all")) {
+    process.exitCode = (await checkAllBrokerRoles()) > 0 ? 1 : 0;
+    return;
+  }
   const templateId = process.env.DOCUSIGN_LISTING_AGREEMENT_TEMPLATE_ID;
   const accountId = process.env.DOCUSIGN_ACCOUNT_ID;
   const baseUri = process.env.DOCUSIGN_BASE_URI;
@@ -252,7 +318,7 @@ async function main() {
   } else {
     console.log(
       `${brokerRole.routingOrder === "2" ? "✓" : "✗"} role "${brokerRole.roleName}" routingOrder=${brokerRole.routingOrder ?? "?"} (expected 2)` +
-        (brokerRole.email ? `  ⚠ template has a fixed email (${brokerRole.email}); leave it empty — the code fills it` : ""),
+        (brokerRole.email ? "  ⚠ template has a fixed email; leave it empty — the code fills it" : ""),
     );
   }
 
