@@ -118,6 +118,7 @@ Los textos del banner y de la variante con analítica de la política de cookies
 ## Embudo del vendedor y compras (2026-10-14)
 - **dataLayer:** `listing_cta_click`, `listing_step_complete` (1–7), `agreement_signed`, `begin_checkout` (espera el `eventCallback`, máx. 1 s), `listing_step_error`, `listing_resumed`, `calculator_used` (rango de precio, nunca el valor). `listing_step_view` lleva `plan_tier` desde el paso 3. En cada ruta, `lx_page_view` sale **antes** que los eventos de la página (esperan hasta 3 s).
 - **Supabase:** `funnel_events` (con `is_test`) → `listing_funnel_v`, una fila por listing real. `is_test` = entorno distinto de Production, propiedad `is_test` o Stripe `livemode=false`.
+- **`broker_countersigned`** (solo servidor, `funnel_events`, con `is_test`): la broker contrafirmó en DocuSign. Se registra una vez, en la transición del acuerdo a `completed`, y solo si la firma de la broker está verificada. Aún no es columna de `listing_funnel_v` (requiere otra migración).
 - **GA4 `purchase`** desde el webhook de Stripe (Measurement Protocol): solo con consentimiento `granted` guardado en el Checkout, `livemode`, Production y propiedad no `is_test`. `transaction_id` = id de la sesión de Stripe.
 - **Validar el webhook con una compra real reembolsada:** marcar ese listing `is_test` desde el admin **antes** de pagar; así no cuenta en el tablero ni como ingreso en GA4, y se verifica directo en `funnel_events`.
 

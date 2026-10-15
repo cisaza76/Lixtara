@@ -316,9 +316,10 @@ export async function getEnvelopeStatus(envelopeId: string): Promise<EnvelopeSta
   );
 }
 
-interface EnvelopeSigner {
+export interface EnvelopeSigner {
   roleName?: string;
   clientUserId?: string;
+  email?: string;
   status?: string;
 }
 
@@ -336,6 +337,26 @@ export function sellerHasSigned(signers: EnvelopeSigner[], clientUserId: string)
     signers.find((r) => r.roleName?.toLowerCase() === "seller");
   const st = seller?.status?.toLowerCase();
   return st === "completed" || st === "signed";
+}
+
+/**
+ * True when Lixtara's broker countersigned: a signer in one of the broker roles, with the
+ * broker's signing email, that is not the embedded seller and has finished. An envelope
+ * that completed with the seller alone (no broker role) is NOT countersigned.
+ */
+export function brokerHasCountersigned(signers: EnvelopeSigner[], brokerEmail: string | null): boolean {
+  if (!brokerEmail) return false;
+  const roles = new Set(Object.values(LIXTARA_BROKER_ROLE).map((r) => r.toLowerCase()));
+  const email = brokerEmail.trim().toLowerCase();
+  return signers.some((r) => {
+    const st = r.status?.toLowerCase();
+    return (
+      !r.clientUserId &&
+      roles.has(r.roleName?.toLowerCase() ?? "") &&
+      r.email?.trim().toLowerCase() === email &&
+      (st === "completed" || st === "signed")
+    );
+  });
 }
 
 export async function getEnvelopeSigners(envelopeId: string): Promise<EnvelopeSigner[]> {

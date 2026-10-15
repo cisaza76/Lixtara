@@ -11,9 +11,14 @@
 // - The status update is conditioned on the status we read, so when two
 //   refreshes race only one performs the transition, and only that one sends
 //   the "agreement signed" email.
+// - The seller pays as soon as THEY sign ("signed"); the listing is published
+//   (mls_status → active) only once the broker countersigned ("completed" with
+//   the broker's signature verified): checkBrokerCountersigned below.
 
 import { createService } from "@/lib/supabase/service";
+import { BROKER_SIGNER_EMAIL } from "@/config/brokerage";
 import {
+  brokerHasCountersigned,
   getEnvelopeSigners,
   getEnvelopeStatus,
   mapEnvelopeStatus,
@@ -61,6 +66,7 @@ export async function refreshAgreement(a: AgreementRef): Promise<string> {
 
   let next: AgreementStatus;
   let signedAt: string | null = null;
+  let countersigned = false;
   try {
     const env = await getEnvelopeStatus(a.envelope_id);
     if (env.completedDateTime) signedAt = env.completedDateTime;
@@ -70,6 +76,12 @@ export async function refreshAgreement(a: AgreementRef): Promise<string> {
       ? sellerHasSigned(await getEnvelopeSigners(a.envelope_id), a.property_id)
       : false;
     next = resolveAgreementStatus(env.status, signed);
+    if (next === "completed") {
+      // Solo para el embudo: el estado pasa a "completed" aunque esta lectura falle.
+      countersigned = await getEnvelopeSigners(a.envelope_id)
+        .then((s) => brokerHasCountersigned(s, BROKER_SIGNER_EMAIL))
+        .catch(() => false);
+    }
   } catch (e) {
     console.error("agreement refresh: DocuSign fetch failed", e instanceof Error ? e.message : e);
     return a.status;
@@ -99,7 +111,52 @@ export async function refreshAgreement(a: AgreementRef): Promise<string> {
       console.error("agreement refresh: email failed", e instanceof Error ? e.message : e),
     );
   }
+  // Contrafirma de la broker: una vez, en la transición a "completed" (a.status nunca es
+  // final aquí). Evento de servidor; recordFunnelEvent decide is_test y nunca lanza.
+  if (won && next === "completed" && countersigned) {
+    await recordFunnelEvent({ event: "broker_countersigned", propertyId: a.property_id, step: 7 });
+  }
   return next;
+}
+
+export type PublishGate =
+  | { ok: true }
+  | { ok: false; reason: "not_countersigned" | "docusign_unavailable" };
+
+/** Pure: may the listing go active, given the live agreement status and its signers? */
+export function publishGateDecision(
+  status: string | null,
+  signers: Parameters<typeof brokerHasCountersigned>[0] | null,
+  brokerEmail: string | null,
+): PublishGate {
+  if (status !== "completed") return { ok: false, reason: "not_countersigned" };
+  if (signers === null) return { ok: false, reason: "docusign_unavailable" };
+  return brokerHasCountersigned(signers, brokerEmail) ? { ok: true } : { ok: false, reason: "not_countersigned" };
+}
+
+/**
+ * Publication gate (mls_status → active): the latest agreement must be completed in
+ * DocuSign WITH the broker's countersignature. Asks DocuSign live; fails closed when it
+ * can't be reached. Callers must already be staff.
+ */
+export async function checkBrokerCountersigned(propertyId: string): Promise<PublishGate> {
+  const svc = createService();
+  const { data } = await svc
+    .from("agreements")
+    .select("id,envelope_id,property_id,status")
+    .eq("property_id", propertyId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const agreement = (data ?? null) as AgreementRef | null;
+  if (!agreement?.envelope_id) return { ok: false, reason: "not_countersigned" };
+  const status = await refreshAgreement(agreement);
+  if (status !== "completed") return publishGateDecision(status, null, BROKER_SIGNER_EMAIL);
+  const signers = await getEnvelopeSigners(agreement.envelope_id).catch((e) => {
+    console.error("publish gate: DocuSign signers failed", e instanceof Error ? e.message : e);
+    return null;
+  });
+  return publishGateDecision(status, signers, BROKER_SIGNER_EMAIL);
 }
 
 async function notifySellerSigned(propertyId: string) {

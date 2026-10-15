@@ -93,6 +93,10 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   `listing_requests` (`POST /api/listings/[id]/change-request` and `/withdrawal-request`):
   the broker updates Matrix, approves on `/admin/listings/[id]/review`, and only then is the
   change applied. Verified with `pnpm db-check:listing-requests`.
+- The seller pays as soon as they sign the listing agreement (`agreements.status = signed`);
+  the listing goes `active` only after the broker's countersignature (`completed`, broker signer
+  verified live in DocuSign): `checkBrokerCountersigned()` in `src/lib/agreement-refresh.ts`,
+  called by both approve actions (admin home + listing review). Fails closed if DocuSign is down.
 
 ### Test data
 - Tests run in **preview**, not production. If something must be tested in production,
