@@ -20,9 +20,22 @@ export async function recordFunnelEvent(input: {
     const svc = createService();
     const { data: prop } = await svc
       .from("properties")
-      .select("is_test")
+      .select("is_test, owner_id")
       .eq("id", input.propertyId)
       .maybeSingle();
+    const metadata = { ...(input.metadata ?? {}) };
+    // Eventos sin request del vendedor (webhook de DocuSign, revisión del admin): el idioma
+    // es el del vendedor, el que guardó el gate del paso 1 (seller_leads.locale).
+    const ownerId = (prop as { owner_id?: string | null } | null)?.owner_id ?? null;
+    if (metadata.lang === undefined && ownerId) {
+      const { data: lead } = await svc
+        .from("seller_leads")
+        .select("locale")
+        .eq("user_id", ownerId)
+        .maybeSingle();
+      const locale = (lead as { locale?: string } | null)?.locale;
+      if (locale === "es" || locale === "en") metadata.lang = locale;
+    }
     const is_test = funnelIsTest({
       vercelEnv: process.env.VERCEL_ENV,
       propertyIsTest: prop ? Boolean((prop as { is_test: boolean | null }).is_test) : null,
@@ -33,7 +46,7 @@ export async function recordFunnelEvent(input: {
       property_id: input.propertyId,
       user_id: input.userId ?? null,
       step: input.step ?? null,
-      metadata: sanitizeFunnelMetadata(input.metadata ?? {}),
+      metadata: sanitizeFunnelMetadata(metadata),
       is_test,
     });
     if (error) console.error("funnel event insert failed", input.event, error.code, error.message);
