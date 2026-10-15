@@ -5,11 +5,12 @@
 // Persists a `payments` row in 'pending' status with the session id. Returns
 // the Stripe redirect URL — client navigates there.
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createTierCheckoutSession } from "@/lib/stripe";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
+import { recordFunnelEvent } from "@/lib/funnel-events.server";
 
 interface Body {
   property_id?: string;
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
   const tier = property.pricing_tier as PricingTierId;
   try {
-    const { sessionId, url } = await createTierCheckoutSession({
+    const { sessionId, url, livemode } = await createTierCheckoutSession({
       lang,
       tier,
       propertyId,
@@ -126,6 +127,17 @@ export async function POST(req: Request) {
         hint: insErr.hint,
       }));
     }
+
+    after(() =>
+      recordFunnelEvent({
+        event: "checkout_started",
+        propertyId,
+        userId: user.id,
+        step: 8,
+        metadata: { lang, plan_tier: tier },
+        livemode,
+      }),
+    );
 
     return NextResponse.json({ url, session_id: sessionId });
   } catch (e) {

@@ -58,6 +58,8 @@ export interface CreateTierCheckoutInput {
 export interface TierCheckoutResult {
   sessionId: string;
   url: string;
+  /** false = Stripe en modo de prueba (el embudo marca el evento como is_test). */
+  livemode: boolean;
 }
 
 function tierDisplayName(id: PricingTierId): string {
@@ -112,7 +114,7 @@ export async function createTierCheckoutSession(
     throw new Error("Stripe returned a session without a redirect URL");
   }
 
-  return { sessionId: session.id, url: session.url };
+  return { sessionId: session.id, url: session.url, livemode: session.livemode };
 }
 
 export interface ConsultationCheckoutInput {
@@ -158,7 +160,7 @@ export async function createConsultationCheckoutSession(
   if (!session.url) {
     throw new Error("Stripe returned a session without a redirect URL");
   }
-  return { sessionId: session.id, url: session.url };
+  return { sessionId: session.id, url: session.url, livemode: session.livemode };
 }
 
 export interface PhotographyCheckoutInput {
@@ -206,7 +208,7 @@ export async function createPhotographyCheckoutSession(
   if (!session.url) {
     throw new Error("Stripe returned a session without a redirect URL");
   }
-  return { sessionId: session.id, url: session.url };
+  return { sessionId: session.id, url: session.url, livemode: session.livemode };
 }
 
 export interface StagingOverageCheckoutInput {
@@ -258,7 +260,7 @@ export async function createStagingOverageCheckoutSession(
   if (!session.url) {
     throw new Error("Stripe returned a session without a redirect URL");
   }
-  return { sessionId: session.id, url: session.url };
+  return { sessionId: session.id, url: session.url, livemode: session.livemode };
 }
 
 export async function getCheckoutSession(

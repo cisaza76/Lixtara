@@ -26,9 +26,9 @@ export const GRANTED_CONSENT = {
 /**
  * Cookies que las herramientas dejan en NUESTRO dominio y que se borran al rechazar o retirar
  * el consentimiento: GA4 `_ga*`/`_gid`, Google Ads `_gcl_*`, Meta `_fbp`/`_fbc`, Clarity
- * `_clck`/`_clsk`, PostHog `ph_*`.
+ * `_clck`/`_clsk`, PostHog `ph_*`, y nuestra `lx_ft` (UTM de primer contacto, solo con consentimiento).
  */
-export const ANALYTICS_COOKIE_RE = /^(_ga|_gid|_gcl_|_fbp|_fbc|_clck|_clsk|ph_)/;
+export const ANALYTICS_COOKIE_RE = /^(_ga|_gid|_gcl_|_fbp|_fbc|_clck|_clsk|ph_|lx_ft$)/;
 
 export interface AnalyticsConfig {
   gtmId: string | null;

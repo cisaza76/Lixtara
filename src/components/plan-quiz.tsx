@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ListingCtaLink } from "@/components/listing-cta-link";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import {
   recommendTier,
@@ -217,12 +217,15 @@ export function PlanQuiz({
                 )}
               </ul>
             </div>
-            <Link
+            <ListingCtaLink
               href={`/${lang}/listing/new?suggested_tier=${recommended}`}
+              location="plan_quiz"
+              tier={recommended}
+              lang={lang}
               className="mt-2 inline-flex items-center justify-center px-6 py-3 bg-ink text-ivory text-[11px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
             >
               {ctaLabel}
-            </Link>
+            </ListingCtaLink>
           </>
         ) : (
           <div className="m-auto text-center flex flex-col gap-2">

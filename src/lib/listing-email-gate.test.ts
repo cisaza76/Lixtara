@@ -50,5 +50,8 @@ describe("listing email gate helpers", () => {
     expect(resumePath("en", "p1", 1)).toBe("/en/listing/new?id=p1&step=2");
     expect(resumePath("en", "p1", null)).toBe("/en/listing/new?id=p1&step=2");
     expect(resumePath("en", null, 4)).toBe("/en/listing/new");
+    expect(resumePath("es", "p1", 5, "broker_link")).toBe("/es/listing/new?id=p1&step=5&resumed=broker_link");
+    expect(resumePath("en", "p1", null, "email_link")).toBe("/en/listing/new?id=p1&step=2&resumed=email_link");
+    expect(resumePath("en", null, 4, "email_link")).toBe("/en/listing/new");
   });
 });

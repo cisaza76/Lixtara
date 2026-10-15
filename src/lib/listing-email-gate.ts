@@ -52,9 +52,18 @@ export function hmacMatches(expectedHex: string, actualHex: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-/** Path the seller lands on after a magic link: their draft at its last step. */
-export function resumePath(lang: string, propertyId: string | null, step: number | null): string {
+/**
+ * Path the seller lands on after a magic link: their draft at its last step. `source` marks
+ * who sent the link (the seller from /listing/continue, or the broker) for the funnel.
+ */
+export function resumePath(
+  lang: string,
+  propertyId: string | null,
+  step: number | null,
+  source?: "email_link" | "broker_link",
+): string {
   if (!propertyId) return `/${lang}/listing/new`;
   const s = step && step >= 2 && step <= 8 ? step : 2;
-  return `/${lang}/listing/new?id=${encodeURIComponent(propertyId)}&step=${s}`;
+  const marker = source ? `&resumed=${source}` : "";
+  return `/${lang}/listing/new?id=${encodeURIComponent(propertyId)}&step=${s}${marker}`;
 }

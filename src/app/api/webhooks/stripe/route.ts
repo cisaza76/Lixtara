@@ -18,6 +18,7 @@ import { claimWebhookEvent } from "@/lib/webhook-dedup";
 import { grantStagingCredits } from "@/lib/staging-credits";
 import { isPricingTierId } from "@/lib/pricing-tiers";
 import { recordServerEvent } from "@/lib/analytics.server";
+import { recordFunnelEvent } from "@/lib/funnel-events.server";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -152,6 +153,18 @@ async function fulfillCheckout(
     recordServerEvent({
       event: "seller_plan_purchased",
       props: { tier: paidTier && isPricingTierId(paidTier) ? paidTier : "unknown" },
+    });
+    // Embudo (listing_funnel_v): pago con monto; livemode=false lo marca como prueba.
+    await recordFunnelEvent({
+      event: "listing_paid",
+      propertyId,
+      userId: session.metadata?.user_id ?? null,
+      step: 8,
+      metadata: {
+        amount: (session.amount_total ?? 0) / 100,
+        ...(paidTier && isPricingTierId(paidTier) ? { plan_tier: paidTier } : {}),
+      },
+      livemode: session.livemode,
     });
 
     // Best-effort emails — never block the webhook on email failure.
