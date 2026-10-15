@@ -34,6 +34,7 @@ import {
   type AuditPort,
 } from "@/lib/creative-studio/source-audit";
 import { checkVideoAccess, videoVisibilityDenial, type CheckVideoAccess } from "@/lib/creative-studio/video-access-guard";
+import { isVerifiedUser } from "@/lib/auth/verified-user";
 
 interface Body {
   listingId?: unknown;
@@ -66,7 +67,8 @@ function defaultDeps(): CompleteSourceDeps {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      return user ? { id: user.id } : null;
+      // Anonymous listing-flow sessions are not a verified person: treat as signed out.
+      return isVerifiedUser(user) ? { id: user.id } : null;
     },
     async loadProperty(propertyId) {
       const supabase = await client();

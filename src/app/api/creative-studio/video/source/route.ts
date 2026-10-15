@@ -21,6 +21,7 @@ import {
   VIDEO_SOURCE_REMOVED_ACTION,
   type SourceRemovalDeps,
 } from "@/lib/creative-studio/source-removal";
+import { isVerifiedUser } from "@/lib/auth/verified-user";
 
 interface PropertyRow {
   id: string;
@@ -46,7 +47,8 @@ function defaultDeps(): SourceReadDeps {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      return user ? { id: user.id } : null;
+      // Anonymous listing-flow sessions are not a verified person: treat as signed out.
+      return isVerifiedUser(user) ? { id: user.id } : null;
     },
     async loadProperty(listingId) {
       const supabase = await client();

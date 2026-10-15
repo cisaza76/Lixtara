@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireVerifiedUser } from "@/lib/auth/verified-user";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getTourProcessor } from "@/lib/tour";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
@@ -34,12 +35,8 @@ function serviceClient() {
 
 export async function POST(req: Request) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
-  }
+  const { user, response: unauthorized } = await requireVerifiedUser(supabase);
+  if (unauthorized) return unauthorized;
 
   // Video generation costs real money — cap tightly.
   const limited = await enforceLimit(

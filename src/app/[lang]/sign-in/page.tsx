@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { returnListingSessionToDraft } from "@/lib/auth/listing-session.server";
 import { SITE_URL } from "@/lib/config";
 import { postSignInPath, safeNextPath } from "@/lib/auth/safe-redirect";
 import { isStaff } from "@/lib/admin-auth";
@@ -30,6 +31,7 @@ export default async function SignInPage({
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  await returnListingSessionToDraft(lang);
   const sp = await searchParams;
   const authCopy = t(lang).auth;
   const copy = authCopy.signIn;

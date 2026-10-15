@@ -11,6 +11,8 @@ interface Props {
   langCode: string;
   user: boolean;
   firstName: string | null;
+  /** Set for a seller still in the listing flow: replaces Sign in and the CTA. */
+  continueHref: string | null;
   nav: {
     buy: string;
     sell: string;
@@ -25,6 +27,7 @@ interface Props {
     account: string;
     signOut: string;
     signIn: string;
+    continueListing: string;
   };
   cta: string;
   switchLanguageLabel: string;
@@ -38,6 +41,7 @@ export function MobileMenu({
   langCode,
   user,
   firstName,
+  continueHref,
   nav,
   auth,
   cta,
@@ -120,7 +124,7 @@ export function MobileMenu({
                     </button>
                   </form>
                 </>
-              ) : (
+              ) : continueHref ? null : (
                 <Link
                   href={`/${lang}/sign-in`}
                   className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55"
@@ -129,15 +133,25 @@ export function MobileMenu({
                 </Link>
               )}
             </div>
-            <ListingCtaLink
-              href={`/${lang}/listing/new`}
-              location="header"
-              lang={lang}
-              onClick={() => setOpen(false)}
-              className="mt-4 inline-flex items-center justify-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase"
-            >
-              {cta}
-            </ListingCtaLink>
+            {continueHref ? (
+              <Link
+                href={continueHref}
+                onClick={() => setOpen(false)}
+                className="mt-4 inline-flex items-center justify-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase"
+              >
+                {auth.continueListing}
+              </Link>
+            ) : (
+              <ListingCtaLink
+                href={`/${lang}/listing/new`}
+                location="header"
+                lang={lang}
+                onClick={() => setOpen(false)}
+                className="mt-4 inline-flex items-center justify-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase"
+              >
+                {cta}
+              </ListingCtaLink>
+            )}
           </div>
         </div>
       )}
