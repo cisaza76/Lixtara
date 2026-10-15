@@ -1,7 +1,8 @@
 // POST /api/webhooks/stripe
-// Stripe POSTs payment lifecycle events here. We trust this endpoint as the
-// canonical signal — never flip a payment to 'succeeded' from any other code
-// path. On a PAID checkout we mark the payment row succeeded and flip the
+// Stripe POSTs payment lifecycle events here. A plan payment is flipped to
+// 'succeeded' only by fulfillTierCheckout (src/lib/tier-fulfillment.server.ts),
+// shared with the seller's return from Checkout, which re-reads the session from
+// Stripe itself. On a PAID checkout we mark the payment row succeeded and flip the
 // property's mls_status from 'draft' to 'pending_approval'.
 //
 // NOTE: this route bypasses Next's body parsing because we need the RAW body
@@ -12,14 +13,10 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { verifyWebhookSignature } from "@/lib/stripe";
-import { sendPaymentReceipt, sendBrokerNewPending } from "@/lib/email";
-import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { claimWebhookEvent } from "@/lib/webhook-dedup";
 import { grantStagingCredits } from "@/lib/staging-credits";
-import { isPricingTierId } from "@/lib/pricing-tiers";
-import { recordServerEvent } from "@/lib/analytics.server";
-import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { sendGa4Purchase } from "@/lib/ga4-mp.server";
+import { fulfillTierCheckout, isTierSession } from "@/lib/tier-fulfillment.server";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -93,136 +90,8 @@ async function fulfillCheckout(
     return;
   }
 
-  const sessionId = session.id;
-  const paymentIntentId =
-    typeof session.payment_intent === "string"
-      ? session.payment_intent
-      : session.payment_intent?.id ?? null;
-  const propertyId = session.metadata?.property_id ?? null;
-
-  const { data: updatedRows, error: payErr } = await supabase
-    .from("payments")
-    .update({
-      status: "succeeded",
-      stripe_payment_intent_id: paymentIntentId,
-      completed_at: new Date().toISOString(),
-    })
-    .eq("stripe_checkout_session_id", sessionId)
-    .select("id, property_id");
-  if (payErr) {
-    console.error("stripe webhook: payment update failed", payErr);
-  }
-
-  // If the payment row didn't exist yet (e.g. our insert failed earlier but
-  // Stripe still completed) create it now from session metadata.
-  if ((!updatedRows || updatedRows.length === 0) && propertyId) {
-    const tier = session.metadata?.tier ?? null;
-    const userId = session.metadata?.user_id ?? null;
-    if (tier && userId) {
-      await supabase.from("payments").insert({
-        property_id: propertyId,
-        user_id: userId,
-        vendor: "stripe",
-        tier,
-        payment_type: "flat_fee",
-        stripe_checkout_session_id: sessionId,
-        stripe_payment_intent_id: paymentIntentId,
-        amount: (session.amount_total ?? 0) / 100,
-        currency: session.currency ?? "usd",
-        status: "succeeded",
-        completed_at: new Date().toISOString(),
-      });
-    }
-  }
-
-  // Flip the property to pending_approval so the broker queue picks it up. The tier is
-  // set from what Stripe actually charged (session metadata), not trusted from the row: the
-  // seller can edit pricing_tier while the listing is a draft, i.e. until this exact moment.
-  if (propertyId) {
-    const paidTier = session.metadata?.tier;
-    await supabase
-      .from("properties")
-      .update(
-        paidTier && isPricingTierId(paidTier)
-          ? { mls_status: "pending_approval", pricing_tier: paidTier }
-          : { mls_status: "pending_approval" },
-      )
-      .eq("id", propertyId)
-      .eq("mls_status", "draft");
-
-    // Evento comercial verificable (embudo vendedor), solo en nuestros logs. Nunca bloquea.
-    recordServerEvent({
-      event: "seller_plan_purchased",
-      props: { tier: paidTier && isPricingTierId(paidTier) ? paidTier : "unknown" },
-    });
-    // Embudo (listing_funnel_v): pago con monto; livemode=false lo marca como prueba.
-    await recordFunnelEvent({
-      event: "listing_paid",
-      propertyId,
-      userId: session.metadata?.user_id ?? null,
-      step: 8,
-      metadata: {
-        amount: (session.amount_total ?? 0) / 100,
-        ...(paidTier && isPricingTierId(paidTier) ? { plan_tier: paidTier } : {}),
-      },
-      livemode: session.livemode,
-    });
-
-    // Best-effort emails — never block the webhook on email failure.
-    try {
-      const { data: prop } = await supabase
-        .from("properties")
-        .select(
-          "address_street,address_city,address_state,address_zip,list_price,pricing_tier,owner_id",
-        )
-        .eq("id", propertyId)
-        .maybeSingle();
-      if (prop) {
-        const address = `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`;
-        const tier = (prop.pricing_tier ?? session.metadata?.tier ?? "pro") as string;
-        const amount = (session.amount_total ?? 0) / 100;
-        const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
-        const { data: sellerAuth } = await supabase.auth.admin.getUserById(
-          prop.owner_id,
-        );
-        const sellerEmail = sellerAuth.user?.email;
-        const { data: sellerProfile } = await supabase
-          .from("users")
-          .select("first_name,last_name")
-          .eq("id", prop.owner_id)
-          .maybeSingle();
-        const sellerName =
-          [sellerProfile?.first_name, sellerProfile?.last_name]
-            .filter(Boolean)
-            .join(" ")
-            .trim() || sellerEmail || "Seller";
-
-        if (sellerEmail) {
-          // Idioma del vendedor si lo conocemos (seller_leads.locale); si no, inglés.
-          const sellerLang = (await lookupRecipientLang(prop.owner_id)) ?? "en";
-          await sendPaymentReceipt({
-            to: sellerEmail,
-            lang: sellerLang,
-            amount,
-            tier,
-            propertyAddress: address,
-            dashboardUrl: `${origin}/${sellerLang}/dashboard`,
-          });
-        }
-        // Notify the broker queue (Camilo while in test mode).
-        await sendBrokerNewPending({
-          to: process.env.BROKER_NOTIFICATION_EMAIL ?? "camilo.isaza@gmail.com",
-          sellerName,
-          propertyAddress: address,
-          tier,
-          listPrice: prop.list_price ?? 0,
-          adminUrl: `${origin}/en/admin`,
-        });
-      }
-    } catch (e) {
-      console.error("stripe webhook email side-effects failed:", e);
-    }
-  }
+  // Plan (tier): idempotente por sesión, compartido con el regreso desde Checkout.
+  await fulfillTierCheckout(supabase, session, { requirePaid: false });
 }
 
 export async function POST(req: Request) {
@@ -268,14 +137,15 @@ export async function POST(req: Request) {
       // list the property until the money is actually captured.
       if (session.payment_status !== "paid") break;
       await fulfillCheckout(supabase, session);
-      await sendGa4Purchase(session); // nunca lanza; solo con consentimiento + live + Production
+      // El plan manda GA4 dentro de fulfillTierCheckout (una vez por sesión).
+      if (!isTierSession(session)) await sendGa4Purchase(session);
       break;
     }
 
     case "checkout.session.async_payment_succeeded": {
       // A delayed payment method cleared — fulfill now.
       await fulfillCheckout(supabase, event.data.object);
-      await sendGa4Purchase(event.data.object);
+      if (!isTierSession(event.data.object)) await sendGa4Purchase(event.data.object);
       break;
     }
 

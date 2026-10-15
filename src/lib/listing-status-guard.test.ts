@@ -133,7 +133,7 @@ describe("mls_status solo lo escribe quien debe", () => {
 
   // Módulos autorizados a CAMBIAR mls_status (no a insertarlo como draft):
   const PERMITIDOS = [
-    "app/api/webhooks/stripe/route.ts",               // service_role: draft → pending_approval
+    "lib/tier-fulfillment.server.ts",                 // service_role: draft → pending_approval (webhook de Stripe y regreso del paso 8)
     "app/[lang]/admin/page.tsx",                      // broker/admin: aprobación rápida
     "app/[lang]/admin/listings/[id]/review/page.tsx", // broker/admin: aprobar/rechazar/cambios
   ];

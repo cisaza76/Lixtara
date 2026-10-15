@@ -12,6 +12,9 @@ import { checkoutAttribution } from "@/lib/ga4-attribution";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
+import { createService } from "@/lib/supabase/service";
+import { decideCheckout, type ExistingPayment } from "@/lib/checkout-guard";
+import { checkoutGuardDeps } from "@/lib/checkout-return.server";
 
 interface Body {
   property_id?: string;
@@ -95,6 +98,38 @@ export async function POST(req: Request) {
 
   const origin = new URL(req.url).origin;
   const tier = property.pricing_tier as PricingTierId;
+
+  // Doble cobro: con una sesión abierta se reutiliza su URL; con una completada no se
+  // crea otra ("Estamos confirmando tu pago"). Lectura con la clave de servidor para que
+  // ninguna política de RLS esconda un pago previo.
+  const { data: prior, error: priorErr } = await createService()
+    .from("payments")
+    .select("status, stripe_checkout_session_id")
+    .eq("property_id", propertyId)
+    .eq("payment_type", "flat_fee")
+    .not("tier", "is", null) // la fotografía también es flat_fee, con tier null
+    .in("status", ["pending", "succeeded"])
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (priorErr) {
+    console.error(JSON.stringify({ event: "checkout_tier_prior_lookup_failed", property_id: propertyId, message: priorErr.message }));
+    return NextResponse.json({ error: "payment_check_unavailable" }, { status: 503 });
+  }
+  const decision = await decideCheckout(
+    (prior ?? []) as ExistingPayment[],
+    tier,
+    checkoutGuardDeps(propertyId, user.id),
+  );
+  if (decision.action === "confirming") {
+    return NextResponse.json({ error: "payment_confirming" }, { status: 409 });
+  }
+  if (decision.action === "unavailable") {
+    return NextResponse.json({ error: "payment_check_unavailable" }, { status: 503 });
+  }
+  if (decision.action === "reuse") {
+    return NextResponse.json({ url: decision.url, session_id: decision.sessionId, reused: true });
+  }
+
   try {
     const { sessionId, url, livemode } = await createTierCheckoutSession({
       attribution: checkoutAttribution(req.headers.get("cookie"), process.env.GA4_MEASUREMENT_ID, lang),
@@ -144,6 +179,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ url, session_id: sessionId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "stripe_error";
+    // Sin esto el 502 no deja rastro en los logs de Vercel (solo viaja en la respuesta).
+    console.error(
+      JSON.stringify({
+        event: "checkout_tier_session_failed",
+        property_id: propertyId,
+        tier,
+        message: msg,
+        type: (e as { type?: string })?.type ?? null,
+        code: (e as { code?: string })?.code ?? null,
+        request_id: (e as { requestId?: string })?.requestId ?? null,
+      }),
+    );
     return NextResponse.json(
       { error: "stripe_session_failed", detail: msg },
       { status: 502 },
