@@ -105,7 +105,7 @@ El sitio solo carga GTM cuando la persona ya aceptó, pero **lo que hace cada et
 2. **URLs con identificadores.** Los píxeles leen la URL completa por su cuenta: en `/listing/new` la URL puede llevar `id` (propiedad) y `session_id` (Stripe), y en el resto del flujo de cuenta, parámetros de estado. Nuestro `sanitizeUrl` solo limpia los eventos que enviamos nosotros. Por eso:
    - GA4: usar `page_location` = `{{DLV page_location}}` (ya sin parámetros) y `send_page_view = false`, como arriba;
    - Meta Pixel y Google Ads: agregar una **excepción de disparador** para `Page Path` que empiece con `/en/listing/`, `/es/listing/`, `/en/account`, `/es/account`, `/en/auth`, `/es/auth`, o bien pasar la URL sin parámetros en el campo de URL de la etiqueta;
-   - Clarity: **masking "Strict"** y excluir las mismas rutas (o al menos `/listing/new`, donde se escriben dirección, email y datos del plan).
+   - Clarity: **masking "Strict"** y excluir en la carga de página `/listing`, `/account`, `/auth`, `/sign-in`, `/sign-up`, `/dashboard` y `/admin` (en y es). Como Clarity no se puede detener en una navegación sin recarga, el sitio entra a esas rutas con **carga completa** mientras `window.clarity` existe (`src/components/recording-guard.tsx`, decisión del owner 2026-10-14, opción "a"; rutas en `isRecordingExcludedPath`).
 3. **`/admin`** nunca carga GTM (lo impide el código).
 4. **Antes de publicar etiquetas de publicidad:** la política de privacidad dice que Lixtara "no comparte información personal para publicidad conductual de contexto cruzado" (sección de California). Con remarketing de Meta/Google eso deja de ser cierto: el abogado tiene que actualizar ese párrafo ese mismo día. La política de **cookies** ya cambia sola a la variante con publicidad cuando `NEXT_PUBLIC_GTM_ID` está configurado (borrador pendiente de revisión).
 
@@ -114,3 +114,10 @@ Borrar `NEXT_PUBLIC_GTM_ID` y `NEXT_PUBLIC_POSTHOG_KEY` en Vercel y hacer Redepl
 
 ## Pendiente de revisión legal
 Los textos del banner y de la variante con analítica de la política de cookies son un **borrador**. Están en el paquete del abogado: `docs/planning/2026-10-compradores/05-textos-consentimiento-cookies.md` (pregunta 17 del brief).
+
+## Embudo del vendedor y compras (2026-10-14)
+- **dataLayer:** `listing_cta_click`, `listing_step_complete` (1–7), `agreement_signed`, `begin_checkout` (espera el `eventCallback`, máx. 1 s), `listing_step_error`, `listing_resumed`, `calculator_used` (rango de precio, nunca el valor). `listing_step_view` lleva `plan_tier` desde el paso 3. En cada ruta, `lx_page_view` sale **antes** que los eventos de la página (esperan hasta 3 s).
+- **Supabase:** `funnel_events` (con `is_test`) → `listing_funnel_v`, una fila por listing real. `is_test` = entorno distinto de Production, propiedad `is_test` o Stripe `livemode=false`.
+- **GA4 `purchase`** desde el webhook de Stripe (Measurement Protocol): solo con consentimiento `granted` guardado en el Checkout, `livemode`, Production y propiedad no `is_test`. `transaction_id` = id de la sesión de Stripe.
+- **Validar el webhook con una compra real reembolsada:** marcar ese listing `is_test` desde el admin **antes** de pagar; así no cuenta en el tablero ni como ingreso en GA4, y se verifica directo en `funnel_events`.
+

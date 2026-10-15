@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createStagingOverageCheckoutSession } from "@/lib/stripe";
+import { checkoutAttribution } from "@/lib/ga4-attribution";
 import { STAGING_MAX_PURCHASE } from "@/lib/staging";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
 
   try {
     const { url } = await createStagingOverageCheckoutSession({
+      attribution: checkoutAttribution(req.headers.get("cookie"), process.env.GA4_MEASUREMENT_ID, lang),
       lang,
       quantity,
       userId: user.id,

@@ -84,7 +84,9 @@ export function ListingFunnelEvents({
   }, [step, lang, planTier, photosCount, agreementSigned, errorField]);
 
   useEffect(() => {
-    track(listingStepEvent(step, lang));
+    track(listingStepEvent(step, lang, planTier));
+    // Una vista por paso mostrado: el plan va como dato, no como motivo para repetirla.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, lang]);
 
   return null;

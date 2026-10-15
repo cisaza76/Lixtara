@@ -8,6 +8,7 @@
 import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createTierCheckoutSession } from "@/lib/stripe";
+import { checkoutAttribution } from "@/lib/ga4-attribution";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
@@ -96,6 +97,7 @@ export async function POST(req: Request) {
   const tier = property.pricing_tier as PricingTierId;
   try {
     const { sessionId, url, livemode } = await createTierCheckoutSession({
+      attribution: checkoutAttribution(req.headers.get("cookie"), process.env.GA4_MEASUREMENT_ID, lang),
       lang,
       tier,
       propertyId,

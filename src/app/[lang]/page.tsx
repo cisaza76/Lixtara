@@ -365,6 +365,7 @@ export default async function Home({
             {savingsCopy.body}
           </p>
           <SavingsSlider
+            lang={lang}
             copy={{
               ...savingsCopy,
               tipSellerCommission: fillCommissionCopy(

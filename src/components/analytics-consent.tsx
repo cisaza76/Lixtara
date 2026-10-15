@@ -29,7 +29,7 @@ import {
   sanitizeUrl,
   type ConsentChoice,
 } from "@/lib/analytics-config";
-import { disableAnalytics, enableAnalytics } from "@/lib/analytics";
+import { disableAnalytics, enableAnalytics, markPageview } from "@/lib/analytics";
 
 interface Props {
   lang: string;
@@ -218,6 +218,8 @@ function pageview(): void {
     w.dataLayer = w.dataLayer ?? [];
     w.dataLayer.push({ event: "lx_page_view", page_location, page_path: path });
   }
+  // Los eventos de la página que esperaban este page_view salen ahora, después de él.
+  markPageview(path);
   if (posthogInstance && lastPosthogPath !== path) {
     lastPosthogPath = path;
     posthogInstance.capture("$pageview", { $current_url: page_location });

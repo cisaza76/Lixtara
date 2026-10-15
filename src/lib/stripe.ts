@@ -1,3 +1,4 @@
+import type { CheckoutAttribution } from "@/lib/ga4-attribution";
 import Stripe from "stripe";
 import {
   PRICING_TIERS,
@@ -53,6 +54,8 @@ export interface CreateTierCheckoutInput {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
+  /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
+  attribution?: CheckoutAttribution;
 }
 
 export interface TierCheckoutResult {
@@ -99,6 +102,7 @@ export async function createTierCheckoutSession(
       statement_descriptor_suffix: "LISTING FEE",
     },
     metadata: {
+      ...input.attribution,
       property_id: input.propertyId,
       tier: input.tier,
       user_id: input.userId,
@@ -124,6 +128,8 @@ export interface ConsultationCheckoutInput {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
+  /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
+  attribution?: CheckoutAttribution;
 }
 
 export async function createConsultationCheckoutSession(
@@ -148,6 +154,7 @@ export async function createConsultationCheckoutSession(
     payment_intent_data: { statement_descriptor_suffix: "CONSULT" },
     // kind=consultation tells the webhook to grant hour tokens (not list a property).
     metadata: {
+      ...input.attribution,
       kind: "consultation",
       product: input.product,
       user_id: input.userId,
@@ -170,6 +177,8 @@ export interface PhotographyCheckoutInput {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
+  /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
+  attribution?: CheckoutAttribution;
 }
 
 export async function createPhotographyCheckoutSession(
@@ -198,6 +207,7 @@ export async function createPhotographyCheckoutSession(
     payment_intent_data: { statement_descriptor_suffix: "PHOTOGRAPHY" },
     // kind=photography tells the webhook to mark the add-on paid (no listing flip).
     metadata: {
+      ...input.attribution,
       kind: "photography",
       property_id: input.propertyId,
       user_id: input.userId,
@@ -219,6 +229,8 @@ export interface StagingOverageCheckoutInput {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
+  /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
+  attribution?: CheckoutAttribution;
 }
 
 export async function createStagingOverageCheckoutSession(
@@ -250,6 +262,7 @@ export async function createStagingOverageCheckoutSession(
     payment_intent_data: { statement_descriptor_suffix: "STAGING" },
     // kind=staging_overage tells the webhook to grant `credits` staging credits.
     metadata: {
+      ...input.attribution,
       kind: "staging_overage",
       user_id: input.userId,
       credits: String(qty),

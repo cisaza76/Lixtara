@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LouiWidget } from "@/components/loui-widget";
 import { CookieNotice } from "@/components/cookie-notice";
 import { AnalyticsConsent, CookieSettingsLink } from "@/components/analytics-consent";
+import { RecordingGuard } from "@/components/recording-guard";
 import { analyticsConfig, consentTools } from "@/lib/analytics-config";
 import { MobileMenu } from "@/components/mobile-menu";
 import { Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
@@ -429,6 +430,8 @@ export default async function RootLayout({
         />
         {/* Con analítica configurada: banner de consentimiento (nada se carga sin aceptar).
             Sin ella: el aviso informativo de siempre (solo cookies esenciales). */}
+        {/* Clarity no graba /listing, /account, /auth…: ahí se entra con carga completa. */}
+        {analytics.gtmId && <RecordingGuard />}
         {analytics.enabled ? (
           <AnalyticsConsent
             lang={lang}
