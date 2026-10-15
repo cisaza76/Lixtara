@@ -1355,17 +1355,23 @@ export default async function ListingNewPage({
 
     // Email already confirmed with the step-1 code: no second code, just set
     // the name and password on the same account.
+    //
+    // Through the seller's OWN session, never admin.updateUserById: a password
+    // set by the admin API logs the user out of every session (Supabase Auth
+    // `UpdatePassword(tx, nil)` → `Logout`), so the very next step-7 action found
+    // no user and bounced the seller to /sign-in with their draft orphaned
+    // (production test 2026-10-15 02:43Z). updateUser keeps the current session.
     if (user.email && user.user_metadata?.account_pending === true) {
-      const svc = createService();
-      const { error: pwError } = await svc.auth.admin.updateUserById(user.id, {
+      const { error: pwError } = await supabase.auth.updateUser({
         password,
-        user_metadata: {
+        data: {
           first_name: firstName,
           last_name: lastName,
           account_pending: false,
         },
       });
       if (pwError) redirect(`${back}&aerror=failed`);
+      const svc = createService();
       await svc
         .from("users")
         .upsert(

@@ -10,6 +10,7 @@ import { isLocale, locales, t, type Locale } from "@/lib/i18n";
 import { BROKERAGE_LOCATION } from "@/lib/broker";
 import { brokerageLicenseLine, brokerageLicenseLineShort } from "@/config/brokerage";
 import { createClient } from "@/lib/supabase/server";
+import { isListingSession, listingResumeHref } from "@/lib/auth/verified-user";
 import { LouiWidget } from "@/components/loui-widget";
 import { CookieNotice } from "@/components/cookie-notice";
 import { AnalyticsConsent, CookieSettingsLink } from "@/components/analytics-consent";
@@ -83,8 +84,16 @@ export default async function RootLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
+  // The anonymous step-1 session (and a step-1 account still owing its name and
+  // password) is not a signed-in account: no Dashboard / Account / Sign out —
+  // signing out would orphan the draft. Offer the way back to it instead.
+  const listingSession = isListingSession(user);
+  const signedIn = !!user && !listingSession;
+  const continueHref =
+    user && listingSession ? await listingResumeHref(supabase, user.id, lang) : null;
+
   let firstName: string | null = null;
-  if (user) {
+  if (signedIn) {
     const { data: profile } = await supabase
       .from("users")
       .select("first_name")
@@ -150,7 +159,7 @@ export default async function RootLayout({
 
             {/* Zone 2 (greeting) + Zone 3 (actions) — desktop */}
             <div className="hidden md:flex items-center gap-5">
-              {user && firstName && (
+              {signedIn && firstName && (
                 <span className="text-[11px] tracking-wide text-ink/80">
                   {authNavCopy.greetingPrefix} {firstName}
                 </span>
@@ -164,7 +173,7 @@ export default async function RootLayout({
                   <Globe className="w-4 h-4" />
                   {langCode}
                 </Link>
-                {user ? (
+                {signedIn ? (
                   <>
                     <Link
                       href={`/${lang}/dashboard`}
@@ -193,7 +202,7 @@ export default async function RootLayout({
                       </button>
                     </form>
                   </>
-                ) : (
+                ) : continueHref ? null : (
                   <Link
                     href={`/${lang}/sign-in`}
                     className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55 hover:text-gold transition-colors"
@@ -202,7 +211,14 @@ export default async function RootLayout({
                   </Link>
                 )}
               </div>
-              {!user && (
+              {continueHref ? (
+                <Link
+                  href={continueHref}
+                  className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-semibold tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
+                >
+                  {authNavCopy.continueListing}
+                </Link>
+              ) : !signedIn && (
                 <ListingCtaLink
                   href={`/${lang}/listing/new`}
                   location="header"
@@ -219,8 +235,9 @@ export default async function RootLayout({
               lang={lang}
               altLang={altLang}
               langCode={langCode}
-              user={!!user}
+              user={signedIn}
               firstName={firstName}
+              continueHref={continueHref}
               nav={{
                 buy: navCopy.buy,
                 sell: navCopy.sell,
@@ -235,6 +252,7 @@ export default async function RootLayout({
                 account: authNavCopy.account,
                 signOut: authNavCopy.signOut,
                 signIn: authNavCopy.signIn,
+                continueListing: authNavCopy.continueListing,
               }}
               cta={navCopy.cta}
               switchLanguageLabel={navCopy.switchLanguage}

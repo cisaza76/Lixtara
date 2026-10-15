@@ -5,6 +5,7 @@
 // v1 produces NO real media; every deliverable is mock.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireVerifiedUser } from "@/lib/auth/verified-user";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { runMediaAgent, type AgentDeps } from "@/lib/media-intelligence/agent";
@@ -40,10 +41,8 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
-  }
+  const { user, response: unauthorized } = await requireVerifiedUser(supabase);
+  if (unauthorized) return unauthorized;
 
   const limited = await enforceLimit(
     apiLimiter("media-agent:generate", 3, "1 h"),

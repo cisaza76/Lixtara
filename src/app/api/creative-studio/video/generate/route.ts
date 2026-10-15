@@ -46,6 +46,7 @@ import {
   auditQuotaConsumed,
   type ActivityLogPort,
 } from "@/lib/creative-studio/video-access-audit";
+import { isVerifiedUser } from "@/lib/auth/verified-user";
 
 export function isCreativeStudioVideoEnabled(): boolean {
   return process.env.CREATIVE_STUDIO_VIDEO_ENABLED === "true";
@@ -110,7 +111,8 @@ function defaultDeps(): GenerateVideoDeps {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      return user ? { id: user.id } : null;
+      // Anonymous listing-flow sessions are not a verified person: treat as signed out.
+      return isVerifiedUser(user) ? { id: user.id } : null;
     },
     async loadProperty(propertyId) {
       const supabase = await client();

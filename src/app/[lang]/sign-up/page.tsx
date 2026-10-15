@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { returnListingSessionToDraft } from "@/lib/auth/listing-session.server";
 import { SITE_URL } from "@/lib/config";
+import { SIGNUP_EMAIL_COOKIE } from "@/lib/auth/signup-code";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
 import {
@@ -21,6 +24,7 @@ export default async function SignUpPage({
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
+  await returnListingSessionToDraft(lang);
   const sp = await searchParams;
   const authCopy = t(lang).auth;
   const copy = authCopy.signUp;
@@ -69,6 +73,15 @@ export default async function SignUpPage({
       );
     }
 
+    // The confirmation email carries a 6-digit code; /auth/verify asks for it
+    // with the address prefilled from this cookie (never in the URL).
+    (await cookies()).set(SIGNUP_EMAIL_COOKIE, email.toLowerCase(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: `/${lang}/auth/verify`,
+      maxAge: 60 * 60,
+    });
     redirect(`/${lang}/auth/verify`);
   }
 

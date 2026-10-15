@@ -2,6 +2,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, tool, convertToModelMessages, type UIMessage } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { isVerifiedUser } from "@/lib/auth/verified-user";
 import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
 import { louiLimiter, clientIp, enforceLimit } from "@/lib/ratelimit";
 import { validateLouiMessages } from "@/lib/loui-request";
@@ -80,8 +81,11 @@ export async function POST(req: Request) {
 
   const supabase = await createClient();
   const {
-    data: { user },
+    data: { user: sessionUser },
   } = await supabase.auth.getUser();
+  // An anonymous listing-flow session (no confirmed email) is a visitor here:
+  // visitor rate limit, and no account tools (schedule requests, offers).
+  const user = isVerifiedUser(sessionUser) ? sessionUser : null;
 
   // Rate-limit gate. Identity = user id when signed in, client IP otherwise.
   // Anonymous callers get a tighter window since they're the abuse vector.

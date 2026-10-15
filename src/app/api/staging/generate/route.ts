@@ -14,6 +14,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireVerifiedUser } from "@/lib/auth/verified-user";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { startImageEdit, waitForCompletion } from "@/lib/luma";
 import {
@@ -42,12 +43,8 @@ function serviceClient() {
 
 export async function POST(req: Request) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
-  }
+  const { user, response: unauthorized } = await requireVerifiedUser(supabase);
+  if (unauthorized) return unauthorized;
 
   // 10 staging calls/hour/user — each one costs real Luma credits.
   const limited = await enforceLimit(
