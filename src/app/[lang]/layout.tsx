@@ -457,13 +457,10 @@ export default async function RootLayout({
             posthogKey={analytics.posthogKey}
             posthogHost={analytics.posthogHost}
             labels={{
-              // Con GTM el permiso cubre también publicidad (opt-in, decisión del owner 2026-10-13).
-              message: (analytics.gtmId ? cookieCopy.consentMessageAds : cookieCopy.consentMessage).replace(
-                "{tools}",
-                consentTools(analytics, lang),
-              ),
+              // Solo analítica: Google Ads y Meta no están aprobados (2026-10-15).
+              message: cookieCopy.consentMessage.replace("{tools}", consentTools(analytics, lang)),
               learnMore: cookieCopy.learnMore,
-              accept: analytics.gtmId ? cookieCopy.consentAcceptAll : cookieCopy.consentAccept,
+              accept: cookieCopy.consentAccept,
               reject: cookieCopy.consentReject,
               regionLabel: cookieCopy.regionLabel,
             }}
