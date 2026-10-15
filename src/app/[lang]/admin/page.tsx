@@ -6,6 +6,7 @@ import { SuccessBanner, ErrorBanner } from "@/components/auth-shell";
 import { sendListingApproved } from "@/lib/email";
 import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
+import { checkBrokerCountersigned } from "@/lib/agreement-refresh";
 import {
   ensureEnterMlsNumberTask,
   mapMlsNumberWriteError,
@@ -163,6 +164,10 @@ export default async function AdminPage({
       redirect(`/${lang}/admin?error=mls_number_invalid`);
     }
 
+    // Sin la contrafirma de la broker en DocuSign no se publica (el vendedor ya pagó al firmar).
+    const gate = await checkBrokerCountersigned(id);
+    if (!gate.ok) redirect(`/${lang}/admin?error=${gate.reason}`);
+
     const { data: prop, error } = await supabase
       .from("properties")
       .update(mls.ok ? { mls_status: "active", mls_number: mls.value } : { mls_status: "active" })
@@ -248,6 +253,16 @@ export default async function AdminPage({
         {sp.error === "mls_number_taken" && (
           <div className="mb-8">
             <ErrorBanner message={copy.mlsNumberTaken} />
+          </div>
+        )}
+        {sp.error === "not_countersigned" && (
+          <div className="mb-8">
+            <ErrorBanner message={copy.approveNeedsCountersign} />
+          </div>
+        )}
+        {sp.error === "docusign_unavailable" && (
+          <div className="mb-8">
+            <ErrorBanner message={copy.approveDocusignUnavailable} />
           </div>
         )}
 

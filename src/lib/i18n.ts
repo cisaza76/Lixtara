@@ -956,6 +956,9 @@ export const dictionaries = {
       mlsNumberHint: "Leave blank if it isn't in Matrix yet; a task will remind you.",
       mlsNumberInvalid: "That MLS number doesn't look right (e.g. A11234567). Nothing was approved.",
       mlsNumberTaken: "That MLS number is already on another listing. Nothing was approved.",
+      approveNeedsCountersign:
+        "The broker hasn't countersigned the listing agreement in DocuSign yet. Nothing was approved.",
+      approveDocusignUnavailable: "Could not confirm the countersignature with DocuSign. Nothing was approved; try again.",
       noPayments: "No payments yet.",
       paymentAmount: "Amount",
       paymentStatus: "Status",
@@ -2824,6 +2827,9 @@ export const dictionaries = {
       mlsNumberHint: "Déjalo vacío si aún no está en Matrix; una tarea te lo recordará.",
       mlsNumberInvalid: "Ese número MLS no parece válido (p. ej. A11234567). No se aprobó nada.",
       mlsNumberTaken: "Ese número MLS ya está en otro listado. No se aprobó nada.",
+      approveNeedsCountersign:
+        "La broker aún no ha contrafirmado el acuerdo de listing en DocuSign. No se aprobó nada.",
+      approveDocusignUnavailable: "No pudimos confirmar la contrafirma con DocuSign. No se aprobó nada; inténtalo de nuevo.",
       noPayments: "Sin pagos aún.",
       paymentAmount: "Monto",
       paymentStatus: "Estado",

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import { assertStaffWithUser } from "@/lib/admin-auth";
 import {
+  checkBrokerCountersigned,
   isFinalAgreementStatus,
   refreshAgreement,
   type AgreementRef,
@@ -106,6 +107,13 @@ async function transition(
     supabase.rpc("has_role", { _role: "broker" }),
   ]);
   if (a !== true && b !== true) redirect(`/${lang}/dashboard`);
+
+  // El vendedor paga al firmar, pero el listing no se publica sin la contrafirma de la
+  // broker en DocuSign (se consulta en vivo; si DocuSign no responde, no se publica).
+  if (newStatus === "active") {
+    const gate = await checkBrokerCountersigned(id);
+    if (!gate.ok) redirect(`/${lang}/admin/listings/${id}/review?error=${gate.reason}`);
+  }
 
   const { error: updateError } = await supabase
     .from("properties")
@@ -224,6 +232,8 @@ export default async function ListingReviewPage({
     matrix_required: "Confirm you already made this change in Matrix.",
     not_pending: "That request was already handled.",
     apply_failed: "Could not apply the request to the listing. Try again.",
+    not_countersigned: "The broker hasn't countersigned the listing agreement in DocuSign yet.",
+    docusign_unavailable: "Could not confirm the broker's countersignature with DocuSign. Try again.",
   };
 
   async function approve(formData: FormData) {
@@ -307,6 +317,7 @@ export default async function ListingReviewPage({
   const fullAddress = `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`;
   const agreementSigned =
     agreement?.status === "signed" || agreement?.status === "completed";
+  const awaitingCountersign = agreement?.status === "signed";
 
   return (
     <div className="flex flex-col gap-8">
@@ -580,8 +591,14 @@ export default async function ListingReviewPage({
         )}
         {!agreementSigned && (
           <p className="text-xs text-amber-700">
-            ⚠️ Seller hasn&apos;t completed the listing agreement. Approving is
-            not advisable until it&apos;s signed.
+            ⚠️ Seller hasn&apos;t signed the listing agreement. Approval stays
+            blocked until the seller signs and the broker countersigns.
+          </p>
+        )}
+        {awaitingCountersign && (
+          <p className="text-xs text-amber-700">
+            ⚠️ Seller signed; waiting for the broker&apos;s countersignature in
+            DocuSign. Approval stays blocked until then.
           </p>
         )}
       </section>

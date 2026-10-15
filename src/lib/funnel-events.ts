@@ -4,6 +4,7 @@
 export type FunnelEventName =
   | "listing_step_complete"
   | "agreement_signed"
+  | "broker_countersigned"
   | "checkout_started"
   | "listing_paid"
   | "listing_resumed";
