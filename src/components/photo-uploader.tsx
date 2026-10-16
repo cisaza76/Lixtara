@@ -13,20 +13,16 @@ interface PhotoUploaderProps {
   /** Server action that takes a list of URLs and persists property_photos rows. */
   persistAction: (formData: FormData) => Promise<void>;
   labels: {
-    uploadButton: string;
     uploading: string;
     invalidFormat: string;
     genericError: string;
     /** template: "{failed} of {total} photos couldn't upload ({reason})" */
     partialFail: string;
-    /** The native file input is hidden: its button and "no file chosen" text
-     *  follow the BROWSER language, not the page's. These replace them. */
+    /** The native file input is hidden: its button follows the BROWSER language,
+     *  not the page's. This replaces it. */
     chooseFiles: string;
-    noFilesChosen: string;
-    /** template: "{n} photos selected" */
-    filesChosen: string;
-    fileChosenOne: string;
-    noFilesPicked: string;
+    /** Under the button: photos upload as soon as they are chosen. */
+    autoUploadHint: string;
     notAuthenticated: string;
     /** Every photo failed because of its size. */
     tooLarge: string;
@@ -44,30 +40,26 @@ function isTooLarge(message: string): boolean {
   return /exceed|too large|maximum allowed size|payload/i.test(message);
 }
 
+// Photos upload the moment they are chosen. There used to be a separate "Upload
+// photos" button, and a seller who chose photos and pressed "Next" lost them.
 export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUploaderProps) {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [chosenCount, setChosenCount] = useState(0);
   const [, startTransition] = useTransition();
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function uploadFiles(input: HTMLInputElement) {
     setError(null);
     setWarning(null);
 
-    const formEl = e.currentTarget;
-    const fileInput = formEl.elements.namedItem("photos") as HTMLInputElement;
-    const files = Array.from(fileInput.files ?? []).filter((f) => f.size > 0);
-    if (files.length === 0) {
-      setError(labels.noFilesPicked);
-      return;
-    }
+    const files = Array.from(input.files ?? []).filter((f) => f.size > 0);
+    if (files.length === 0) return;
 
     const invalid = files.find((f) => !ACCEPTED.includes(f.type));
     if (invalid) {
       setError(labels.invalidFormat);
+      input.value = "";
       return;
     }
 
@@ -81,6 +73,7 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
     if (!user) {
       setError(labels.notAuthenticated);
       setIsUploading(false);
+      setProgress(null);
       return;
     }
 
@@ -108,6 +101,7 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
       uploadedUrls.push(pub.publicUrl);
       setProgress((p) => p && { ...p, done: p.done + 1 });
     }
+    input.value = "";
 
     if (uploadedUrls.length === 0) {
       setError(
@@ -116,6 +110,7 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
           : labels.genericError,
       );
       setIsUploading(false);
+      setProgress(null);
       return;
     }
     if (failures.length > 0) {
@@ -143,16 +138,11 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
       }
       setIsUploading(false);
       setProgress(null);
-      formEl.reset();
-      setChosenCount(0);
     });
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-4 border border-gold-soft p-5"
-    >
+    <div className="flex flex-col gap-3 border border-gold-soft p-5">
       <label
         className={`flex flex-wrap items-center gap-4 text-sm text-ink ${
           isUploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
@@ -164,38 +154,22 @@ export function PhotoUploader({ propertyId, persistAction, labels }: PhotoUpload
           multiple
           accept="image/jpeg,image/png,image/webp"
           disabled={isUploading}
-          onChange={(e) => {
-            setError(null);
-            setChosenCount(e.currentTarget.files?.length ?? 0);
-          }}
+          onChange={(e) => void uploadFiles(e.currentTarget)}
           className="peer sr-only"
         />
-        <span className="py-2 px-4 border border-gold-soft bg-ivory text-ink text-[10px] font-semibold uppercase tracking-[0.22em] hover:border-gold peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-gold">
-          {labels.chooseFiles}
-        </span>
-        <span className="text-ink/70">
-          {chosenCount === 0
-            ? labels.noFilesChosen
-            : chosenCount === 1
-              ? labels.fileChosenOne
-              : labels.filesChosen.replace("{n}", String(chosenCount))}
+        <span className="py-3 px-6 bg-ink text-ivory text-[10px] font-medium uppercase tracking-[0.2em] hover:bg-ink/85 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-gold">
+          {isUploading
+            ? progress
+              ? `${labels.uploading} ${progress.done}/${progress.total}`
+              : labels.uploading
+            : labels.chooseFiles}
         </span>
       </label>
-      <button
-        type="submit"
-        disabled={isUploading}
-        className="self-start inline-flex items-center justify-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {isUploading
-          ? progress
-            ? `${labels.uploading} ${progress.done}/${progress.total}`
-            : labels.uploading
-          : labels.uploadButton}
-      </button>
-      {error && <p className="text-xs italic text-red-700">{error}</p>}
+      {!isUploading && <p className="text-xs text-ink/60">{labels.autoUploadHint}</p>}
+      {error && <p role="alert" className="text-xs italic text-red-700">{error}</p>}
       {warning && (
         <p className="text-xs italic text-amber-700">{warning}</p>
       )}
-    </form>
+    </div>
   );
 }
