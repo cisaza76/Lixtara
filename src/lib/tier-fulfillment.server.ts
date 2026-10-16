@@ -112,6 +112,9 @@ export async function fulfillTierCheckout(
     metadata: {
       amount: (session.amount_total ?? 0) / 100,
       ...(paidTier && isPricingTierId(paidTier) ? { plan_tier: paidTier } : {}),
+      // Idioma de la página que abrió el Checkout (metadata puesta por checkoutAttribution,
+      // siempre presente, con o sin consentimiento).
+      ...(session.metadata?.lang === "es" || session.metadata?.lang === "en" ? { lang: session.metadata.lang } : {}),
     },
     livemode: session.livemode,
   });

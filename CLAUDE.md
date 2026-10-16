@@ -196,11 +196,12 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   `onboarding@resend.dev`, which only delivers to the Resend account owner.
   `EMAIL_DEV_OVERRIDE_TO` reroutes all mail to one address (debug only, never Production).
 - `NEXT_PUBLIC_GTM_ID` / `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` — public, Production
-  only. GTM (the CMO's container `GTM-5KGLHNL4`: GA4, Microsoft Clarity, Google Ads, Meta) and PostHog
+  only. GTM (the CMO's container `GTM-5KGLHNL4`: GA4 and Microsoft Clarity) and PostHog
   (product). **Independent:** each tool turns on with its own valid variable; neither set = nothing loads,
   `track()` is a no-op and the informational cookie notice stays. Any set = consent banner, **opt-in in every
-  region** (owner decision 2026-10-13): nothing loads before "Accept", and accepting grants analytics AND
-  advertising (Consent Mode v2). No `<noscript>` GTM iframe. PostHog without autocapture or session replay;
+  region** (owner decision 2026-10-13): nothing loads before "Accept", and accepting grants analytics ONLY
+  (Consent Mode v2 ad_* stay denied: Google Ads and Meta are not approved, 2026-10-15). Sentry (client)
+  is declared in the cookie policy as a technical tool: no cookies, not consent-gated. No `<noscript>` GTM iframe. PostHog without autocapture or session replay;
   our events carry URLs without query strings; the cookie policy switches to the variant for the configured
   tools. Event catalog, container requirements and setup: `docs/superpowers/runbooks/2026-10-11-analitica.md`.
 - Never commit `.env.local` (already in `.gitignore`). Mirror new vars to Vercel via

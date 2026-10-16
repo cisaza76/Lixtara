@@ -60,8 +60,8 @@ function loadGtm(gtmId: string): void {
   gtag("consent", "default", {
     ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "denied",
   });
-  // Solo se llega aquí con `lx_consent=granted`: el banner pide permiso para analítica Y
-  // publicidad (Google Ads, Meta, Clarity vía GTM), y así lo dice la política de cookies.
+  // Solo se llega aquí con `lx_consent=granted`: el banner pide permiso para analítica
+  // (GA4 y Clarity vía GTM). La publicidad no está aprobada: GRANTED_CONSENT la deja denegada.
   gtag("consent", "update", GRANTED_CONSENT);
   w.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
   const s = document.createElement("script");
@@ -98,7 +98,7 @@ async function loadPosthog(key: string, host: string, lang: string): Promise<Pos
 
 /**
  * Al rechazar o retirar el consentimiento: borra lo que las herramientas hubieran dejado en
- * NUESTRO dominio (GA4 `_ga*`/`_gid`, Google Ads `_gcl_*`, Meta `_fbp`/`_fbc`, Clarity
+ * NUESTRO dominio (GA4 `_ga*`/`_gid`, y por si acaso `_gcl_*`/`_fbp`/`_fbc`, Clarity
  * `_clck`/`_clsk`, PostHog `ph_*` y su almacenamiento local). Las cookies que esos
  * proveedores guardan en sus propios dominios no son accesibles desde aquí.
  */

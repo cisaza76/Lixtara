@@ -71,6 +71,15 @@ import { FIRST_TOUCH_COOKIE, parseFirstTouch } from "@/lib/funnel-events";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
+import {
+  STEP1_FORM_COOKIE,
+  STEP1_FORM_MAX_AGE_S,
+  decodeStep1Form,
+  encodeStep1Form,
+  suggestedTierParam,
+} from "@/lib/listing-step1-form";
+import { AppFormValidation } from "@/components/app-form-validation";
+import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
@@ -211,6 +220,13 @@ export default async function ListingNewPage({
 
   const sp = await searchParams;
   const step = clampStep(Number.parseInt(sp.step ?? "1", 10) || 1);
+  // Paso 1 que volvió con error: lo que el vendedor había escrito (ver backToStep1).
+  const step1Saved =
+    step === 1 && sp.error ? decodeStep1Form((await cookies()).get(STEP1_FORM_COOKIE)?.value) : null;
+  const savedCoord = (v: string | undefined): number | null => {
+    const n = v ? Number.parseFloat(v) : Number.NaN;
+    return Number.isFinite(n) ? n : null;
+  };
   const draftId = sp.id ?? null;
   const copy = t(lang).listingForm;
 
@@ -517,11 +533,37 @@ export default async function ListingNewPage({
       .trim();
     const street = unit ? `${baseStreet}, Unit ${unit}` : rawStreet;
 
+    // Error en el paso 1: volver con lo escrito (dirección y correo en una cookie httpOnly
+    // corta, nunca en la URL) y con el plan sugerido en la URL, como llegó.
+    const backToStep1 = async (error: string): Promise<never> => {
+      (await cookies()).set(
+        STEP1_FORM_COOKIE,
+        encodeStep1Form({
+          street: rawStreet,
+          unit,
+          city,
+          zip,
+          lat: latRaw,
+          lng: lngRaw,
+          email: String(formData.get("email") ?? ""),
+        }),
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: `/${lang}/listing/new`,
+          maxAge: STEP1_FORM_MAX_AGE_S,
+        },
+      );
+      const tierParam = suggestedTierParam(formData.get("suggested_tier"), ["essentials", "pro", "concierge"]);
+      redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}${tierParam}&error=${error}`);
+    };
+
     if (!baseStreet || !city || !zip) {
-      redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=required`);
+      await backToStep1("required");
     }
     if (state !== "FL") {
-      redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=fl_only`);
+      await backToStep1("fl_only");
     }
 
     // Email gate: only asked while the session has no confirmed email.
@@ -533,10 +575,10 @@ export default async function ListingNewPage({
     const gateEmail = normalizeEmail(formData.get("email"));
     if (askEmail) {
       if (!isValidEmail(gateEmail)) {
-        redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email`);
+        await backToStep1("email");
       }
       if (await emailTakenByAnotherUser(gateEmail, currentUser?.id ?? null)) {
-        redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email_exists`);
+        await backToStep1("email_exists");
       }
     }
     // After saving the address (step 1 complete): send the code, or go straight to step 2.
@@ -544,6 +586,7 @@ export default async function ListingNewPage({
     // cookie lx_ft, y se comprueba igual).
     const continueTo = async (propertyId: string, uid: string): Promise<never> => {
       const jar = await cookies();
+      jar.delete({ name: STEP1_FORM_COOKIE, path: `/${lang}/listing/new` });
       const firstTouch =
         jar.get(CONSENT_COOKIE)?.value === "granted"
           ? parseFirstTouch(jar.get(FIRST_TOUCH_COOKIE)?.value)
@@ -587,9 +630,7 @@ export default async function ListingNewPage({
           options: { captchaToken: captchaTokenFrom(formData) },
         });
       if (isCaptchaError(anonError)) {
-        redirect(
-          `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=captcha`,
-        );
+        await backToStep1("captcha");
       }
       user = anon.user ?? null;
     }
@@ -611,7 +652,7 @@ export default async function ListingNewPage({
         .eq("id", id)
         .eq("owner_id", user.id);
       if (error) {
-        redirect(`/${lang}/listing/new?step=1&id=${id}&error=save_failed`);
+        await backToStep1("save_failed");
       }
       await continueTo(id, user.id);
     }
@@ -640,9 +681,9 @@ export default async function ListingNewPage({
       .select("id")
       .single();
     if (error || !created) {
-      redirect(`/${lang}/listing/new?step=1&error=save_failed`);
+      await backToStep1("save_failed");
     }
-    await continueTo(created.id, user.id);
+    await continueTo(created!.id, user.id);
   }
 
   // Step 1 email code: confirm, or resend.
@@ -725,7 +766,8 @@ export default async function ListingNewPage({
     );
     const sqft = Number.parseInt(String(formData.get("sqft") ?? "0"), 10);
     const lotSizeRaw = String(formData.get("lot_size") ?? "").trim();
-    const lotSize = lotSizeRaw === "" ? null : Number.parseInt(lotSizeRaw, 10);
+    const lotSizeParsed = lotSizeRaw === "" ? null : Number.parseInt(lotSizeRaw, 10);
+    const lotSize = lotSizeParsed !== null && Number.isFinite(lotSizeParsed) ? lotSizeParsed : null;
     const yearBuilt = Number.parseInt(
       String(formData.get("year_built") ?? "0"),
       10,
@@ -791,19 +833,20 @@ export default async function ListingNewPage({
     ) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_type`);
     }
-    if (bedrooms < 0 || bedrooms > 30) {
+    // NaN (campo vacío o no numérico) nunca pasa: el formulario es noValidate.
+    if (!Number.isFinite(bedrooms) || bedrooms < 0 || bedrooms > 30) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_beds`);
     }
-    if (bathrooms <= 0 || bathrooms > 30) {
+    if (!Number.isFinite(bathrooms) || bathrooms <= 0 || bathrooms > 30) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_baths`);
     }
-    if (sqft <= 0 || sqft > 100000) {
+    if (!Number.isFinite(sqft) || sqft <= 0 || sqft > 100000) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_sqft`);
     }
-    if (yearBuilt < 1800 || yearBuilt > new Date().getFullYear() + 2) {
+    if (!Number.isFinite(yearBuilt) || yearBuilt < 1800 || yearBuilt > new Date().getFullYear() + 2) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_year`);
     }
-    if (listPrice <= 0 || listPrice > 1000000000) {
+    if (!Number.isFinite(listPrice) || listPrice <= 0 || listPrice > 1000000000) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_price`);
     }
     if (
@@ -1268,8 +1311,7 @@ export default async function ListingNewPage({
       .select("pricing_tier")
       .eq("id", id)
       .maybeSingle();
-    const tierId = prop?.pricing_tier as PricingTierId | null;
-    const photosIncluded = !!(tierId && PRICING_TIERS[tierId]?.includesPhotography);
+    const needsOwnPhotos = ownPhotosRequired(prop?.pricing_tier as string | null);
 
     const { count } = await supabase
       .from("property_photos")
@@ -1278,16 +1320,15 @@ export default async function ListingNewPage({
     const photoCount = count ?? 0;
 
     // Pro/Concierge include professional photography, so a seller who uploads
-    // none may skip the 10-photo minimum and the rights box. DIY (Essentials),
-    // and anyone who DID upload, still confirm rights; Essentials still needs 10.
-    const needsOwnPhotos = !photosIncluded;
+    // none may skip the minimum and the rights box. DIY (Essentials), and anyone
+    // who DID upload, still confirm rights; Essentials still needs MIN_OWN_PHOTOS.
     if (
       (needsOwnPhotos || photoCount > 0) &&
       formData.get("photos_rights_confirmed") !== "1"
     ) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=rights_required`);
     }
-    if (needsOwnPhotos && photoCount < 10) {
+    if (needsOwnPhotos && photoCount < MIN_OWN_PHOTOS) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough`);
     }
 
@@ -1558,6 +1599,9 @@ export default async function ListingNewPage({
     redirect(`${back}&verified=1&ev=email_verified_account`);
   }
 
+  // Paso 5: misma regla que nextFromStep5 (src/lib/listing-photos.ts).
+  const photosRequired = ownPhotosRequired(draft?.pricing_tier ?? null);
+
   const errorMessage =
     sp.error === "captcha"
       ? t(lang).auth.errors.captchaFailed
@@ -1592,7 +1636,7 @@ export default async function ListingNewPage({
                           : sp.error === "upload_failed"
                             ? copy.step5.uploadFailed
                             : sp.error === "not_enough"
-                              ? copy.step5.notEnoughPhotos
+                              ? copy.step5.notEnoughPhotos.replace("{min}", String(MIN_OWN_PHOTOS))
                               : sp.error === "no_files"
                                 ? copy.step5.invalidFormat
                                 : sp.error === "save_failed"
@@ -1684,6 +1728,7 @@ export default async function ListingNewPage({
             />
           ) : (
           <form action={saveStep1} className="flex flex-col gap-6">
+            <AppFormValidation step={1} lang={lang} message={copy.stepErrors.checkMarked} />
             {draftId && <input type="hidden" name="id" value={draftId} />}
             {sp.suggested_tier && (
               <input
@@ -1699,11 +1744,12 @@ export default async function ListingNewPage({
               cityLabel={copy.step1.cityLabel}
               stateLabel={copy.step1.stateLabel}
               zipLabel={copy.step1.zipLabel}
-              defaultStreet={draft?.address_street ?? ""}
-              defaultCity={draft?.address_city ?? "Miami"}
-              defaultZip={draft?.address_zip ?? ""}
-              defaultLat={draft?.latitude ?? null}
-              defaultLng={draft?.longitude ?? null}
+              defaultStreet={step1Saved?.street || draft?.address_street || ""}
+              defaultUnit={step1Saved?.unit ?? ""}
+              defaultCity={step1Saved?.city || draft?.address_city || "Miami"}
+              defaultZip={step1Saved?.zip || draft?.address_zip || ""}
+              defaultLat={step1Saved ? savedCoord(step1Saved.lat) : (draft?.latitude ?? null)}
+              defaultLng={step1Saved ? savedCoord(step1Saved.lng) : (draft?.longitude ?? null)}
               verifiedNote={copy.step1.verifiedNote}
               language={lang}
               mapsLoadingLabel={copy.step1.mapsLoading}
@@ -1720,6 +1766,7 @@ export default async function ListingNewPage({
                 // seller's saved home address, overwriting the property's.
                 autoComplete="section-seller email"
                 required
+                defaultValue={step1Saved?.email || undefined}
                 help={copy.step1.emailHelp}
               />
             )}
@@ -1753,6 +1800,7 @@ export default async function ListingNewPage({
           </div>
           {errorMessage && <ErrorBanner message={errorMessage} />}
           <form action={saveStep2} className="flex flex-col gap-6">
+            <AppFormValidation step={2} lang={lang} message={copy.stepErrors.checkMarked} />
             <input type="hidden" name="id" value={draftId ?? ""} />
             <div className="flex flex-col gap-4">
               {TIER_ORDER.map((tierId) => {
@@ -2040,6 +2088,7 @@ export default async function ListingNewPage({
 
           {errorMessage && <ErrorBanner message={errorMessage} />}
           <form action={saveStep3} className="flex flex-col gap-6">
+            <AppFormValidation step={3} lang={lang} message={copy.stepErrors.checkMarked} />
             <input type="hidden" name="id" value={draftId ?? ""} />
 
             <label className="flex flex-col gap-2">
@@ -2145,6 +2194,7 @@ export default async function ListingNewPage({
                   label={copy.step3.parkingLabel}
                   name="parking_spaces"
                   type="text"
+                  required={false}
                   defaultValue={
                     draft?.parking_spaces != null
                       ? String(draft.parking_spaces)
@@ -2155,6 +2205,7 @@ export default async function ListingNewPage({
                   label={copy.step3.hoaLabel}
                   name="hoa_fee"
                   type="text"
+                  required={false}
                   defaultValue={
                     draft?.hoa_fee != null ? String(draft.hoa_fee) : ""
                   }
@@ -2163,6 +2214,7 @@ export default async function ListingNewPage({
                   label={copy.step3.taxLabel}
                   name="tax_annual_amount"
                   type="text"
+                  required={false}
                   defaultValue={
                     draft?.tax_annual_amount != null
                       ? String(draft.tax_annual_amount)
@@ -2345,6 +2397,7 @@ export default async function ListingNewPage({
             <SuccessBanner message={copy.step4.improvedShowingNotice} />
           )}
           <form action={saveStep4} className="flex flex-col gap-8">
+            <AppFormValidation step={4} lang={lang} message={copy.stepErrors.checkMarked} />
             <input type="hidden" name="id" value={draftId ?? ""} />
 
             {/* Description block + per-field improve button */}
@@ -2405,21 +2458,25 @@ export default async function ListingNewPage({
               </h2>
               <span
                 className={`text-[10px] uppercase tracking-[0.22em] ${
-                  photos.length >= copy.minPhotos
-                    ? "text-gold font-semibold"
-                    : "text-ink/55"
+                  photosRequired && photos.length < MIN_OWN_PHOTOS
+                    ? "text-ink/55"
+                    : "text-gold font-semibold"
                 }`}
               >
-                {(photos.length >= copy.minPhotos
-                  ? copy.step5.photoCountReachedLabel
-                  : copy.step5.photoCountLabel
+                {(!photosRequired
+                  ? copy.step5.photoCountOptionalLabel
+                  : photos.length >= MIN_OWN_PHOTOS
+                    ? copy.step5.photoCountReachedLabel
+                    : copy.step5.photoCountLabel
                 )
                   .replace("{count}", String(photos.length))
-                  .replace("{min}", String(copy.minPhotos))}
+                  .replace("{min}", String(MIN_OWN_PHOTOS))}
               </span>
             </div>
             <p className="text-base leading-relaxed text-ink/70">
-              {copy.step5.body}
+              {photosRequired
+                ? copy.step5.body.replace("{min}", String(MIN_OWN_PHOTOS))
+                : copy.step5.bodyPro}
             </p>
           </div>
 
@@ -2456,13 +2513,6 @@ export default async function ListingNewPage({
             </div>
           )}
 
-          {(draft?.pricing_tier === "pro" ||
-            draft?.pricing_tier === "concierge") && (
-            <p className="text-xs text-ink/70 italic border border-gold-soft bg-ivory-strong/40 p-3">
-              {copy.step5.photosOptionalPro}
-            </p>
-          )}
-
           {/* Essentials: optional professional-photography add-on ($495) */}
           {draft?.pricing_tier === "essentials" && draftId && (
             <div className="border border-gold-soft bg-ivory-strong/30 p-5 flex flex-col gap-3">
@@ -2491,16 +2541,12 @@ export default async function ListingNewPage({
             propertyId={draftId ?? ""}
             persistAction={uploadPhotosAction}
             labels={{
-              uploadButton: copy.step5.uploadButton,
               uploading: copy.step5.uploadingNote,
               invalidFormat: copy.step5.invalidFormat,
               genericError: copy.step5.uploadFailed,
               partialFail: copy.step5.photoPartialFail,
               chooseFiles: copy.step5.chooseFiles,
-              noFilesChosen: copy.step5.noFilesChosen,
-              filesChosen: copy.step5.filesChosen,
-              fileChosenOne: copy.step5.fileChosenOne,
-              noFilesPicked: copy.step5.noFilesPicked,
+              autoUploadHint: copy.step5.autoUploadHint,
               notAuthenticated: copy.step5.notAuthenticated,
               tooLarge: copy.step5.uploadTooLarge,
               reasonTooLarge: copy.step5.uploadReasonTooLarge,
@@ -2534,6 +2580,7 @@ export default async function ListingNewPage({
             action={nextFromStep5}
             className="border border-gold-soft p-5 lg:p-6 flex flex-col gap-6 bg-ivory"
           >
+            <AppFormValidation step={5} lang={lang} message={copy.stepErrors.checkMarked} />
             <input type="hidden" name="id" value={draftId ?? ""} />
             {photos.length === 0 ? (
               <p className="text-sm text-ink/60 italic">
@@ -2605,13 +2652,7 @@ export default async function ListingNewPage({
                 type="checkbox"
                 name="photos_rights_confirmed"
                 value="1"
-                required={
-                  photos.length > 0 ||
-                  !(
-                    draft?.pricing_tier === "pro" ||
-                    draft?.pricing_tier === "concierge"
-                  )
-                }
+                required={photos.length > 0 || photosRequired}
                 className="mt-1 accent-gold w-4 h-4 shrink-0"
               />
               <span>{copy.step5.ownershipCheckLabel}</span>

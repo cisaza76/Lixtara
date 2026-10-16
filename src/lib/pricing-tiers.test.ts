@@ -162,9 +162,9 @@ describe("fillPricingCopy", () => {
   it("derives the FAQ / Loui example from compareWithTraditional (same buyer-agent % both sides)", () => {
     expect(
       fillPricingCopy(
-        "{exampleSalePrice} home, {exampleBuyerPct}% to the buyer agent: {traditionalExample} vs {proTotalExample}, you keep {proSavingsExample} ({traditionalListingPct}% / {traditionalTypicalPct}%)",
+        "{exampleSalePrice} home, {exampleBuyerPct}% to the buyer agent: {traditionalExample} vs {proTotalExample}, you keep {proSavingsExample} ({traditionalListingPct}% + {traditionalBuyerPct}% = {traditionalTypicalPct}%)",
       ),
-    ).toBe("$500,000 home, 2.5% to the buyer agent: $27,500 vs $17,995, you keep $9,505 (3% / 6%)");
+    ).toBe("$500,000 home, 2.5% to the buyer agent: $27,500 vs $17,995, you keep $9,505 (3% + 3% = 6%)");
   });
 
   it("formats the quiz home-value thresholds", () => {

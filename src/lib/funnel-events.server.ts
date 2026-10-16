@@ -24,8 +24,21 @@ export async function recordFunnelEvent(input: {
       .eq("id", input.propertyId)
       .maybeSingle();
     const metadata = { ...(input.metadata ?? {}) };
-    // Eventos sin request del vendedor (webhook de DocuSign, revisión del admin): el idioma
-    // es el del vendedor, el que guardó el gate del paso 1 (seller_leads.locale).
+    // Eventos sin request del vendedor (webhook de DocuSign o Stripe, revisión del admin):
+    // 1) el idioma del último evento de este listing que lo tenga (la página del paso);
+    // 2) si no hay, el del gate del paso 1 (seller_leads.locale).
+    if (metadata.lang === undefined) {
+      const { data: last } = await svc
+        .from("funnel_events")
+        .select("metadata")
+        .eq("property_id", input.propertyId)
+        .not("metadata->>lang", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const lastLang = (last as { metadata?: { lang?: unknown } } | null)?.metadata?.lang;
+      if (lastLang === "es" || lastLang === "en") metadata.lang = lastLang;
+    }
     const ownerId = (prop as { owner_id?: string | null } | null)?.owner_id ?? null;
     if (metadata.lang === undefined && ownerId) {
       const { data: lead } = await svc

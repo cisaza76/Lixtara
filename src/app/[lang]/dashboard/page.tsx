@@ -18,6 +18,7 @@ import { SourceVideoSection } from "@/components/source-video-section";
 import { resolveVisibleVideoListings } from "@/lib/creative-studio/video-access-guard";
 import { canRequest } from "@/lib/listing-requests";
 import { REQUESTS_COPY } from "@/lib/listing-requests-copy";
+import { inProgressCount } from "@/lib/dashboard-stats";
 
 interface ListingRow {
   id: string;
@@ -334,7 +335,7 @@ export default async function DashboardPage({
 
   // Portfolio metrics (derived from the listings already fetched — no extra query).
   const activeCount = listings.filter((l) => l.mls_status === "active").length;
-  const draftCount = listings.filter((l) => l.mls_status === "draft").length;
+  const draftCount = inProgressCount(listings);
   const portfolioValue = listings.reduce((sum, l) => sum + (l.list_price ?? 0), 0);
 
   return (

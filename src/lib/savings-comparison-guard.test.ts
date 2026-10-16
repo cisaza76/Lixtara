@@ -36,6 +36,13 @@ describe("comparaciones de ahorro: una sola fuente y el mismo % al comprador", (
     }
   });
 
+  it("la FAQ del 6% abre explicando que suma el lado vendedor y el lado comprador", () => {
+    const answer = (lang: "en" | "es") =>
+      fillPricingCopy(t(lang).faq.items.find((i) => i.q.includes("6%"))!.a);
+    expect(answer("en")).toMatch(/^The typical 6% is 3% for the seller's side plus 3% for the buyer's side\. /);
+    expect(answer("es")).toMatch(/^El 6% típico suma 3% del lado vendedor y 3% del lado comprador\. /);
+  });
+
   it("ningún texto promete el 6 % completo ni 'decenas de miles'", () => {
     for (const lang of ["en", "es"] as const) {
       const all = JSON.stringify(t(lang));

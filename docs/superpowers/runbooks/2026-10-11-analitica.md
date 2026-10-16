@@ -2,7 +2,7 @@
 
 **Estado:** código listo y apagado.
 - **Cada herramienta por su lado (desde 2026-10-13):** `NEXT_PUBLIC_GTM_ID` activa GTM y `NEXT_PUBLIC_POSTHOG_KEY` activa PostHog, independientes. Una variable con forma inválida se ignora sola. Sin ninguna válida no se carga nada, `track()` no hace nada y queda el aviso de cookies de siempre.
-- **Opt-in en todas las regiones (decisión del owner, 2026-10-13):** el contenedor del CMO (`GTM-5KGLHNL4`) trae GA4, Microsoft Clarity y publicidad (Google Ads, Meta). Nada de eso se carga antes de "Aceptar"; al aceptar se concede analítica **y** publicidad. Se descartó el modelo opt-out por región que propuso el CMO (GTM cargado para todos, concedido por defecto fuera de UE/UK/CH) y el `<noscript>` (se saltaría el consentimiento).
+- **Opt-in en todas las regiones (decisión del owner, 2026-10-13):** el contenedor del CMO (`GTM-5KGLHNL4`) trae GA4 y Microsoft Clarity. Nada de eso se carga antes de "Aceptar"; al aceptar se concede **solo analítica**. **Google Ads y Meta no están aprobados (2026-10-15):** las señales `ad_*` de Consent Mode quedan denegadas, no aparecen en el banner ni en la política, y sus etiquetas deben quedar pausadas o eliminadas en el contenedor. Se descartó el modelo opt-out por región que propuso el CMO (GTM cargado para todos, concedido por defecto fuera de UE/UK/CH) y el `<noscript>` (se saltaría el consentimiento).
 - Activar = crear las cuentas + poner las variables en Vercel (Production) + redeploy, **con autorización del owner**.
 
 **Decisión del owner (2026-10-11):**
@@ -97,7 +97,7 @@ Después, **Redeploy**: son variables `NEXT_PUBLIC_` y se incrustan en el build.
 3. **"Configurar cookies" (pie) → Aceptar:** carga GTM y PostHog. GA4 DebugView y PostHog Live events muestran el pageview y los eventos.
 4. **En PostHog y en GA4 DebugView, revisar las URLs** (`$current_url`, `page_location`): no deben tener `?…`, y no debe aparecer texto ni datos personales. En GA4 debe haber **un** page_view por página.
 5. **Entrar a `/en/admin`:** no debe haber peticiones a Google ni a PostHog.
-6. **La política de cookies** (`/en/cookies`) debe mostrar en 3.4 las herramientas configuradas (GA4 y Clarity con GTM; PostHog con su variable) y en 3.5 Google Ads y Meta Pixel solo con GTM.
+6. **La política de cookies** (`/en/cookies`) debe mostrar en 3.4 las herramientas configuradas (GA4 y Clarity con GTM; PostHog con su variable), en 3.5 que no se usa publicidad, y en 3.3 Sentry como herramienta técnica.
 
 ### Contenedor del CMO (`GTM-5KGLHNL4`, 2026-10-13) — requisitos antes de publicar etiquetas
 El sitio solo carga GTM cuando la persona ya aceptó, pero **lo que hace cada etiqueta lo decide la configuración del contenedor**. Antes de publicar GA4, Meta, Ads o Clarity:
