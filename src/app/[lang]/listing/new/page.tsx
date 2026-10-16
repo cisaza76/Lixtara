@@ -2186,6 +2186,7 @@ export default async function ListingNewPage({
                   label={copy.step3.parkingLabel}
                   name="parking_spaces"
                   type="text"
+                  required={false}
                   defaultValue={
                     draft?.parking_spaces != null
                       ? String(draft.parking_spaces)
@@ -2196,6 +2197,7 @@ export default async function ListingNewPage({
                   label={copy.step3.hoaLabel}
                   name="hoa_fee"
                   type="text"
+                  required={false}
                   defaultValue={
                     draft?.hoa_fee != null ? String(draft.hoa_fee) : ""
                   }
@@ -2204,6 +2206,7 @@ export default async function ListingNewPage({
                   label={copy.step3.taxLabel}
                   name="tax_annual_amount"
                   type="text"
+                  required={false}
                   defaultValue={
                     draft?.tax_annual_amount != null
                       ? String(draft.tax_annual_amount)
