@@ -78,6 +78,7 @@ import {
   encodeStep1Form,
   suggestedTierParam,
 } from "@/lib/listing-step1-form";
+import { AppFormValidation } from "@/components/app-form-validation";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
@@ -764,7 +765,8 @@ export default async function ListingNewPage({
     );
     const sqft = Number.parseInt(String(formData.get("sqft") ?? "0"), 10);
     const lotSizeRaw = String(formData.get("lot_size") ?? "").trim();
-    const lotSize = lotSizeRaw === "" ? null : Number.parseInt(lotSizeRaw, 10);
+    const lotSizeParsed = lotSizeRaw === "" ? null : Number.parseInt(lotSizeRaw, 10);
+    const lotSize = lotSizeParsed !== null && Number.isFinite(lotSizeParsed) ? lotSizeParsed : null;
     const yearBuilt = Number.parseInt(
       String(formData.get("year_built") ?? "0"),
       10,
@@ -830,19 +832,20 @@ export default async function ListingNewPage({
     ) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_type`);
     }
-    if (bedrooms < 0 || bedrooms > 30) {
+    // NaN (campo vacío o no numérico) nunca pasa: el formulario es noValidate.
+    if (!Number.isFinite(bedrooms) || bedrooms < 0 || bedrooms > 30) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_beds`);
     }
-    if (bathrooms <= 0 || bathrooms > 30) {
+    if (!Number.isFinite(bathrooms) || bathrooms <= 0 || bathrooms > 30) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_baths`);
     }
-    if (sqft <= 0 || sqft > 100000) {
+    if (!Number.isFinite(sqft) || sqft <= 0 || sqft > 100000) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_sqft`);
     }
-    if (yearBuilt < 1800 || yearBuilt > new Date().getFullYear() + 2) {
+    if (!Number.isFinite(yearBuilt) || yearBuilt < 1800 || yearBuilt > new Date().getFullYear() + 2) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_year`);
     }
-    if (listPrice <= 0 || listPrice > 1000000000) {
+    if (!Number.isFinite(listPrice) || listPrice <= 0 || listPrice > 1000000000) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_price`);
     }
     if (
@@ -1723,6 +1726,7 @@ export default async function ListingNewPage({
             />
           ) : (
           <form action={saveStep1} className="flex flex-col gap-6">
+            <AppFormValidation step={1} lang={lang} message={copy.stepErrors.checkMarked} />
             {draftId && <input type="hidden" name="id" value={draftId} />}
             {sp.suggested_tier && (
               <input
@@ -1794,6 +1798,7 @@ export default async function ListingNewPage({
           </div>
           {errorMessage && <ErrorBanner message={errorMessage} />}
           <form action={saveStep2} className="flex flex-col gap-6">
+            <AppFormValidation step={2} lang={lang} message={copy.stepErrors.checkMarked} />
             <input type="hidden" name="id" value={draftId ?? ""} />
             <div className="flex flex-col gap-4">
               {TIER_ORDER.map((tierId) => {
@@ -2081,6 +2086,7 @@ export default async function ListingNewPage({
 
           {errorMessage && <ErrorBanner message={errorMessage} />}
           <form action={saveStep3} className="flex flex-col gap-6">
+            <AppFormValidation step={3} lang={lang} message={copy.stepErrors.checkMarked} />
             <input type="hidden" name="id" value={draftId ?? ""} />
 
             <label className="flex flex-col gap-2">
@@ -2389,6 +2395,7 @@ export default async function ListingNewPage({
             <SuccessBanner message={copy.step4.improvedShowingNotice} />
           )}
           <form action={saveStep4} className="flex flex-col gap-8">
+            <AppFormValidation step={4} lang={lang} message={copy.stepErrors.checkMarked} />
             <input type="hidden" name="id" value={draftId ?? ""} />
 
             {/* Description block + per-field improve button */}
@@ -2578,6 +2585,7 @@ export default async function ListingNewPage({
             action={nextFromStep5}
             className="border border-gold-soft p-5 lg:p-6 flex flex-col gap-6 bg-ivory"
           >
+            <AppFormValidation step={5} lang={lang} message={copy.stepErrors.checkMarked} />
             <input type="hidden" name="id" value={draftId ?? ""} />
             {photos.length === 0 ? (
               <p className="text-sm text-ink/60 italic">
