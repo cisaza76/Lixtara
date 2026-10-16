@@ -71,6 +71,13 @@ import { FIRST_TOUCH_COOKIE, parseFirstTouch } from "@/lib/funnel-events";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
+import {
+  STEP1_FORM_COOKIE,
+  STEP1_FORM_MAX_AGE_S,
+  decodeStep1Form,
+  encodeStep1Form,
+  suggestedTierParam,
+} from "@/lib/listing-step1-form";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
@@ -211,6 +218,13 @@ export default async function ListingNewPage({
 
   const sp = await searchParams;
   const step = clampStep(Number.parseInt(sp.step ?? "1", 10) || 1);
+  // Paso 1 que volvió con error: lo que el vendedor había escrito (ver backToStep1).
+  const step1Saved =
+    step === 1 && sp.error ? decodeStep1Form((await cookies()).get(STEP1_FORM_COOKIE)?.value) : null;
+  const savedCoord = (v: string | undefined): number | null => {
+    const n = v ? Number.parseFloat(v) : Number.NaN;
+    return Number.isFinite(n) ? n : null;
+  };
   const draftId = sp.id ?? null;
   const copy = t(lang).listingForm;
 
@@ -517,11 +531,37 @@ export default async function ListingNewPage({
       .trim();
     const street = unit ? `${baseStreet}, Unit ${unit}` : rawStreet;
 
+    // Error en el paso 1: volver con lo escrito (dirección y correo en una cookie httpOnly
+    // corta, nunca en la URL) y con el plan sugerido en la URL, como llegó.
+    const backToStep1 = async (error: string): Promise<never> => {
+      (await cookies()).set(
+        STEP1_FORM_COOKIE,
+        encodeStep1Form({
+          street: rawStreet,
+          unit,
+          city,
+          zip,
+          lat: latRaw,
+          lng: lngRaw,
+          email: String(formData.get("email") ?? ""),
+        }),
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: `/${lang}/listing/new`,
+          maxAge: STEP1_FORM_MAX_AGE_S,
+        },
+      );
+      const tierParam = suggestedTierParam(formData.get("suggested_tier"), ["essentials", "pro", "concierge"]);
+      redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}${tierParam}&error=${error}`);
+    };
+
     if (!baseStreet || !city || !zip) {
-      redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=required`);
+      await backToStep1("required");
     }
     if (state !== "FL") {
-      redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=fl_only`);
+      await backToStep1("fl_only");
     }
 
     // Email gate: only asked while the session has no confirmed email.
@@ -533,10 +573,10 @@ export default async function ListingNewPage({
     const gateEmail = normalizeEmail(formData.get("email"));
     if (askEmail) {
       if (!isValidEmail(gateEmail)) {
-        redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email`);
+        await backToStep1("email");
       }
       if (await emailTakenByAnotherUser(gateEmail, currentUser?.id ?? null)) {
-        redirect(`/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=email_exists`);
+        await backToStep1("email_exists");
       }
     }
     // After saving the address (step 1 complete): send the code, or go straight to step 2.
@@ -544,6 +584,7 @@ export default async function ListingNewPage({
     // cookie lx_ft, y se comprueba igual).
     const continueTo = async (propertyId: string, uid: string): Promise<never> => {
       const jar = await cookies();
+      jar.delete({ name: STEP1_FORM_COOKIE, path: `/${lang}/listing/new` });
       const firstTouch =
         jar.get(CONSENT_COOKIE)?.value === "granted"
           ? parseFirstTouch(jar.get(FIRST_TOUCH_COOKIE)?.value)
@@ -587,9 +628,7 @@ export default async function ListingNewPage({
           options: { captchaToken: captchaTokenFrom(formData) },
         });
       if (isCaptchaError(anonError)) {
-        redirect(
-          `/${lang}/listing/new?step=1${id ? `&id=${id}` : ""}&error=captcha`,
-        );
+        await backToStep1("captcha");
       }
       user = anon.user ?? null;
     }
@@ -611,7 +650,7 @@ export default async function ListingNewPage({
         .eq("id", id)
         .eq("owner_id", user.id);
       if (error) {
-        redirect(`/${lang}/listing/new?step=1&id=${id}&error=save_failed`);
+        await backToStep1("save_failed");
       }
       await continueTo(id, user.id);
     }
@@ -640,9 +679,9 @@ export default async function ListingNewPage({
       .select("id")
       .single();
     if (error || !created) {
-      redirect(`/${lang}/listing/new?step=1&error=save_failed`);
+      await backToStep1("save_failed");
     }
-    await continueTo(created.id, user.id);
+    await continueTo(created!.id, user.id);
   }
 
   // Step 1 email code: confirm, or resend.
@@ -1699,11 +1738,12 @@ export default async function ListingNewPage({
               cityLabel={copy.step1.cityLabel}
               stateLabel={copy.step1.stateLabel}
               zipLabel={copy.step1.zipLabel}
-              defaultStreet={draft?.address_street ?? ""}
-              defaultCity={draft?.address_city ?? "Miami"}
-              defaultZip={draft?.address_zip ?? ""}
-              defaultLat={draft?.latitude ?? null}
-              defaultLng={draft?.longitude ?? null}
+              defaultStreet={step1Saved?.street || draft?.address_street || ""}
+              defaultUnit={step1Saved?.unit ?? ""}
+              defaultCity={step1Saved?.city || draft?.address_city || "Miami"}
+              defaultZip={step1Saved?.zip || draft?.address_zip || ""}
+              defaultLat={step1Saved ? savedCoord(step1Saved.lat) : (draft?.latitude ?? null)}
+              defaultLng={step1Saved ? savedCoord(step1Saved.lng) : (draft?.longitude ?? null)}
               verifiedNote={copy.step1.verifiedNote}
               language={lang}
               mapsLoadingLabel={copy.step1.mapsLoading}
@@ -1720,6 +1760,7 @@ export default async function ListingNewPage({
                 // seller's saved home address, overwriting the property's.
                 autoComplete="section-seller email"
                 required
+                defaultValue={step1Saved?.email || undefined}
                 help={copy.step1.emailHelp}
               />
             )}
