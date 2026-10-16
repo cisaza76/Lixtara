@@ -175,7 +175,7 @@ function formatThousands(amount: number): string {
 //   {proFlatFee}            → "$495"   {proCommissionPct} → "1"
 //   {exampleSalePrice}      → "$500,000"
 //   {exampleBuyerPct}       → "2.5" (DEFAULT_BUYER_COMMISSION_PCT)
-//   {traditionalListingPct} → "3"   {traditionalTypicalPct} → "6"
+//   {traditionalListingPct} → "3"   {traditionalBuyerPct} → "3"   {traditionalTypicalPct} → "6"
 //   {traditionalExample}    → traditional total on the example price, same buyer-agent % as Lixtara
 //   {proTotalExample}       → Pro total on the example price (fee + Pro % + buyer-agent %)
 //   {proSavingsExample}     → the difference (compareWithTraditional)
@@ -189,6 +189,7 @@ export function fillPricingCopy(text: string): string {
     .replaceAll("{exampleSalePrice}", formatPrice(EXAMPLE_SALE_PRICE))
     .replaceAll("{exampleBuyerPct}", String(DEFAULT_BUYER_COMMISSION_PCT))
     .replaceAll("{traditionalListingPct}", String(TRADITIONAL_COSTS.listingCommissionPct))
+    .replaceAll("{traditionalBuyerPct}", String(TRADITIONAL_COSTS.typicalBuyerCommissionPct))
     .replaceAll("{traditionalTypicalPct}", String(TRADITIONAL_TYPICAL_TOTAL_PCT))
     .replaceAll("{traditionalExample}", formatPrice(example.traditional.total))
     .replaceAll("{proTotalExample}", formatPrice(example.lixtara.total))

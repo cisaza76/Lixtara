@@ -1649,7 +1649,7 @@ export const dictionaries = {
         },
         {
           q: "How is Lixtara different from a traditional 6% agent?",
-          a: "A traditional listing agent charges about {traditionalListingPct}% for the listing side. Lixtara's Pro plan charges {proFlatFee} flat plus {proCommissionPct}% at closing, only if your home sells. Example on a {exampleSalePrice} home, offering the buyer's agent {exampleBuyerPct}% in both cases: {traditionalExample} with a traditional agent versus {proTotalExample} with Lixtara Pro, so you keep {proSavingsExample}. Your home goes on the same MLS and the same sites, with licensed broker support.",
+          a: "The typical {traditionalTypicalPct}% is {traditionalListingPct}% for the seller's side plus {traditionalBuyerPct}% for the buyer's side. A traditional listing agent charges about {traditionalListingPct}% for the listing side. Lixtara's Pro plan charges {proFlatFee} flat plus {proCommissionPct}% at closing, only if your home sells. Example on a {exampleSalePrice} home, offering the buyer's agent {exampleBuyerPct}% in both cases: {traditionalExample} with a traditional agent versus {proTotalExample} with Lixtara Pro, so you keep {proSavingsExample}. Your home goes on the same MLS and the same sites, with licensed broker support.",
         },
         {
           q: "Which plan should I pick?",
@@ -3522,7 +3522,7 @@ export const dictionaries = {
         },
         {
           q: "¿En qué se diferencia Lixtara de un agente tradicional del 6%?",
-          a: "Un agente tradicional cobra cerca del {traditionalListingPct}% por el lado vendedor. El plan Pro de Lixtara cobra {proFlatFee} fijo más {proCommissionPct}% al cierre, solo si tu casa se vende. Ejemplo con una casa de {exampleSalePrice}, ofreciendo {exampleBuyerPct}% al agente del comprador en los dos casos: {traditionalExample} con un agente tradicional frente a {proTotalExample} con Lixtara Pro, así que te quedas con {proSavingsExample}. Tu casa sale en el mismo MLS y en los mismos sitios, con respaldo de broker licenciado.",
+          a: "El {traditionalTypicalPct}% típico suma {traditionalListingPct}% del lado vendedor y {traditionalBuyerPct}% del lado comprador. Un agente tradicional cobra cerca del {traditionalListingPct}% por el lado vendedor. El plan Pro de Lixtara cobra {proFlatFee} fijo más {proCommissionPct}% al cierre, solo si tu casa se vende. Ejemplo con una casa de {exampleSalePrice}, ofreciendo {exampleBuyerPct}% al agente del comprador en los dos casos: {traditionalExample} con un agente tradicional frente a {proTotalExample} con Lixtara Pro, así que te quedas con {proSavingsExample}. Tu casa sale en el mismo MLS y en los mismos sitios, con respaldo de broker licenciado.",
         },
         {
           q: "¿Qué plan debería elegir?",
