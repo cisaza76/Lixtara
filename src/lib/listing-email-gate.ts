@@ -67,3 +67,11 @@ export function resumePath(
   const marker = source ? `&resumed=${source}` : "";
   return `/${lang}/listing/new?id=${encodeURIComponent(propertyId)}&step=${s}${marker}`;
 }
+
+/**
+ * Preview y Production comparten la base: un lead escrito fuera de Production es una prueba
+ * (seller_leads.is_test) y /admin/seller-leads lo oculta por defecto.
+ */
+export function sellerLeadIsTest(vercelEnv: string | undefined): boolean {
+  return vercelEnv !== "production";
+}

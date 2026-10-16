@@ -26,6 +26,7 @@ import {
   hmacMatches,
   isCodeFormat,
   resumePath,
+  sellerLeadIsTest,
 } from "@/lib/listing-email-gate";
 
 type Lang = "en" | "es";
@@ -204,6 +205,7 @@ export async function verifyEmailChallenge(input: {
       status: "email_captured",
       current_step: 1,
       last_step_at: new Date().toISOString(),
+      is_test: sellerLeadIsTest(process.env.VERCEL_ENV),
     },
     { onConflict: "user_id" },
   );

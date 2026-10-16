@@ -45,12 +45,15 @@ function Section({ section, level }: { section: LegalSection; level: number }) {
 export function LegalDocument({
   lang,
   doc,
+  updatedOn = LEGAL_LAST_UPDATED,
 }: {
   lang: Locale;
   doc: LegalDoc;
+  /** YYYY-MM-DD. Un documento que cambió después de los demás lleva su propia fecha. */
+  updatedOn?: string;
 }) {
   const copy = t(lang).legal;
-  const lastUpdated = new Date(`${LEGAL_LAST_UPDATED}T00:00:00`).toLocaleDateString(
+  const lastUpdated = new Date(`${updatedOn}T00:00:00`).toLocaleDateString(
     lang,
     { year: "numeric", month: "long", day: "numeric" },
   );

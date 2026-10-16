@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { decodeStep1Form, encodeStep1Form, suggestedTierParam } from "@/lib/listing-step1-form";
+import {
+  STEP1_FORM_MAX_AGE_S,
+  decodeStep1Form,
+  encodeStep1Form,
+  step1SignInHref,
+  suggestedTierParam,
+} from "@/lib/listing-step1-form";
 
 describe("paso 1: lo escrito sobrevive a un error", () => {
   it("ida y vuelta por la cookie", () => {
@@ -28,5 +34,22 @@ describe("paso 1: lo escrito sobrevive a un error", () => {
     expect(suggestedTierParam("pro", tiers)).toBe("&suggested_tier=pro");
     expect(suggestedTierParam("gold", tiers)).toBe("");
     expect(suggestedTierParam(null, tiers)).toBe("");
+  });
+});
+
+describe("paso 1: 'Iniciar sesión' desde el error de correo existente", () => {
+  it("el regreso lleva el idioma, el plan sugerido y restore=1, codificado en next", () => {
+    const href = step1SignInHref("es", "pro");
+    expect(href.startsWith("/es/sign-in?next=")).toBe(true);
+    const next = decodeURIComponent(href.split("next=")[1]!);
+    expect(next).toBe("/es/listing/new?step=1&suggested_tier=pro&restore=1");
+    // Codificado: el & de next no se confunde con un parámetro de /sign-in.
+    expect(new URL(href, "https://x.test").searchParams.get("next")).toBe(next);
+  });
+  it("sin plan válido no inventa uno", () => {
+    expect(decodeURIComponent(step1SignInHref("en", "gold"))).toContain("/en/listing/new?step=1&restore=1");
+  });
+  it("la cookie alcanza para iniciar sesión", () => {
+    expect(STEP1_FORM_MAX_AGE_S).toBe(30 * 60);
   });
 });

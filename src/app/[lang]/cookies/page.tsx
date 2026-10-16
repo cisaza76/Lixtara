@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { LegalDocument } from "@/components/legal-document";
+import { COOKIES_LAST_UPDATED } from "@/lib/legal/types";
 import { cookiesDoc, cookiesDocFor } from "@/lib/legal/cookies";
 import { analyticsConfig } from "@/lib/analytics-config";
 
@@ -32,6 +33,7 @@ export default async function CookiesPage({
     <LegalDocument
       lang={lang as Locale}
       doc={cookiesDocFor(lang as Locale, { gtm: gtmId !== null, posthog: posthogKey !== null })}
+      updatedOn={COOKIES_LAST_UPDATED}
     />
   );
 }

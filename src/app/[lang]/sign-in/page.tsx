@@ -67,7 +67,9 @@ export default async function SignInPage({
       if (/invalid login credentials/i.test(error.message)) key = "invalid";
       else if (/email not confirmed/i.test(error.message)) key = "not_confirmed";
       else if (isCaptchaError(error)) key = "captcha";
-      redirect(`/${lang}/sign-in?error=${key}`);
+      // Un intento fallido no pierde el destino (p. ej. volver al paso 1 con lo escrito).
+      const keepNext = next === `/${lang}` ? "" : `&next=${encodeURIComponent(next)}`;
+      redirect(`/${lang}/sign-in?error=${key}${keepNext}`);
     }
 
     redirect(postSignInPath(next, lang, await isStaff(supabase)));

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { requireAdminOrBroker } from "@/lib/admin-auth";
@@ -16,7 +17,8 @@ interface LeadRow {
   current_step: number | null;
   last_step_at: string | null;
   property_id: string | null;
-  properties: { address_street: string; address_city: string; mls_status: string } | null;
+  is_test: boolean;
+  properties: { address_street: string; address_city: string; mls_status: string; is_test: boolean } | null;
 }
 
 const STEP_NAMES = ["Address", "Plan", "Details", "Description", "Photos", "Review", "Agreement", "Payment"];
@@ -26,7 +28,7 @@ export default async function AdminSellerLeadsPage({
   searchParams,
 }: {
   params: Promise<{ lang: string }>;
-  searchParams: Promise<{ sent?: string; error?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string; test?: string }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
@@ -43,15 +45,22 @@ export default async function AdminSellerLeadsPage({
     redirect(`/${lang}/admin/seller-leads?${result === "sent" ? "sent=1" : "error=1"}`);
   }
 
+  // Preview comparte esta base: sus leads (is_test) y los de propiedades de prueba se
+  // ocultan salvo con ?test=1.
+  const showTest = sp.test === "1";
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("seller_leads")
     .select(
-      "user_id,email,locale,status,current_step,last_step_at,property_id,properties(address_street,address_city,mls_status)",
+      "user_id,email,locale,status,current_step,last_step_at,property_id,is_test,properties(address_street,address_city,mls_status,is_test)",
     )
     .order("last_step_at", { ascending: false, nullsFirst: false })
     .limit(200);
-  const leads = (data ?? []) as unknown as LeadRow[];
+  if (!showTest) query = query.eq("is_test", false);
+  const { data, error } = await query;
+  const leads = ((data ?? []) as unknown as LeadRow[]).filter(
+    (l) => showTest || !l.properties?.is_test,
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -63,6 +72,12 @@ export default async function AdminSellerLeadsPage({
           email with a link that signs them in and opens their draft where they
           left off.
         </p>
+        <Link
+          href={showTest ? `/${lang}/admin/seller-leads` : `/${lang}/admin/seller-leads?test=1`}
+          className="self-start text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
+        >
+          {showTest ? "Hide test leads" : "Show test leads"}
+        </Link>
       </div>
 
       {sp.sent === "1" && (
@@ -97,6 +112,11 @@ export default async function AdminSellerLeadsPage({
                   <tr key={l.user_id} className="border-b border-gold-soft/50">
                     <td className="py-3 pr-4 text-ink">
                       {l.email}
+                      {(l.is_test || l.properties?.is_test) && (
+                        <span className="ml-2 text-[9px] uppercase tracking-[0.18em] text-ink/55 border border-gold-soft px-1.5 py-0.5">
+                          Test
+                        </span>
+                      )}
                       <span className="block text-xs text-ink/50 uppercase">{l.locale}</span>
                     </td>
                     <td className="py-3 pr-4 text-ink/80">
