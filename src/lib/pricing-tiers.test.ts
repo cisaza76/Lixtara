@@ -9,6 +9,9 @@ import {
   tierTotalCost,
   tierSavingsVsTraditional,
   tierCostBreakdown,
+  compareWithTraditional,
+  DEFAULT_BUYER_COMMISSION_PCT,
+  TRADITIONAL_TYPICAL_TOTAL_PCT,
   fillTierCopy,
   fillCommissionCopy,
   fillPricingCopy,
@@ -49,9 +52,11 @@ describe("PRICING_TIERS catalog", () => {
 describe("TRADITIONAL_COSTS (Radical Transparency comparison baseline)", () => {
   it("holds the canonical traditional-agent comparison values", () => {
     expect(TRADITIONAL_COSTS.listingCommissionPct).toBe(3);
-    expect(TRADITIONAL_COSTS.buyerCommissionPct).toBe(3);
-    expect(TRADITIONAL_COSTS.photography).toBe(300);
-    expect(TRADITIONAL_COSTS.docContracts).toBe(40);
+    expect(TRADITIONAL_COSTS.typicalBuyerCommissionPct).toBe(3);
+    expect(TRADITIONAL_TYPICAL_TOTAL_PCT).toBe(6);
+    expect(DEFAULT_BUYER_COMMISSION_PCT).toBe(2.5);
+    // No photo / document fees on the traditional side: a listing agent includes them.
+    expect(Object.keys(TRADITIONAL_COSTS).sort()).toEqual(["listingCommissionPct", "typicalBuyerCommissionPct"]);
   });
 });
 
@@ -81,14 +86,39 @@ describe("tierTotalCost", () => {
   });
 });
 
-describe("tierSavingsVsTraditional", () => {
-  it("compares total cost against a 6% traditional commission", () => {
-    // traditional = 30_000; pro total = 495 + 5_000 = 5_495
-    expect(tierSavingsVsTraditional("pro", 500_000)).toBe(30_000 - 5_495);
+describe("compareWithTraditional / tierSavingsVsTraditional (misma compensación al comprador en ambos lados)", () => {
+  it("Pro, $500K, 2.5% al comprador por defecto: $27,500 frente a $17,995, ahorro $9,505", () => {
+    const c = compareWithTraditional("pro", 500_000);
+    expect(c.buyerCommissionPct).toBe(2.5);
+    expect(c.traditional).toEqual({ listingCommission: 15_000, buyerCommission: 12_500, total: 27_500 });
+    expect(c.lixtara.total).toBe(495 + 5_000 + 12_500);
+    expect(c.savings).toBe(9_505);
+    expect(tierSavingsVsTraditional("pro", 500_000)).toBe(9_505);
   });
 
-  it("never goes negative (tiny sale where the flat fee dwarfs 6%)", () => {
-    // 6% of 1_000 = 60, below the essentials flat fee + commission
+  it("REGLA: el agente del comprador recibe lo mismo en los dos lados, para cualquier plan, precio y %", () => {
+    for (const id of TIER_ORDER) {
+      for (const price of [200_000, 500_000, 1_250_000, 2_000_000]) {
+        for (const pct of [2, 2.5, 3]) {
+          const c = compareWithTraditional(id, price, pct);
+          expect(c.traditional.buyerCommission, `${id} ${price} ${pct}`).toBe(c.lixtara.buyerCommission);
+          expect(c.lixtara.buyerCommission).toBe((price * pct) / 100);
+        }
+      }
+    }
+  });
+
+  it("el ahorro solo refleja el lado vendedor: no cambia con el % al comprador", () => {
+    for (const id of TIER_ORDER) {
+      const base = compareWithTraditional(id, 800_000, 2).savings;
+      expect(compareWithTraditional(id, 800_000, 2.5).savings).toBe(base);
+      expect(compareWithTraditional(id, 800_000, 3).savings).toBe(base);
+      const t = PRICING_TIERS[id];
+      expect(base).toBe((800_000 * (TRADITIONAL_COSTS.listingCommissionPct - t.commissionPct)) / 100 - t.flatFee);
+    }
+  });
+
+  it("never goes negative (tiny sale where the flat fee dwarfs the listing side)", () => {
     expect(tierSavingsVsTraditional("essentials", 1_000)).toBe(0);
   });
 });
@@ -129,12 +159,12 @@ describe("fillPricingCopy", () => {
     );
   });
 
-  it("derives the FAQ cost example from the Pro tier and the traditional 6%", () => {
+  it("derives the FAQ / Loui example from compareWithTraditional (same buyer-agent % both sides)", () => {
     expect(
       fillPricingCopy(
-        "up to {traditionalExample} on a {exampleSalePrice} home; {proFlatFee} flat plus {proCommissionPct}% ({proTotalExample} total)",
+        "{exampleSalePrice} home, {exampleBuyerPct}% to the buyer agent: {traditionalExample} vs {proTotalExample}, you keep {proSavingsExample} ({traditionalListingPct}% / {traditionalTypicalPct}%)",
       ),
-    ).toBe("up to $30,000 on a $500,000 home; $495 flat plus 1% ($5,495 total)");
+    ).toBe("$500,000 home, 2.5% to the buyer agent: $27,500 vs $17,995, you keep $9,505 (3% / 6%)");
   });
 
   it("formats the quiz home-value thresholds", () => {

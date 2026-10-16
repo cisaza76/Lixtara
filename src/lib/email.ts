@@ -23,6 +23,7 @@ import {
   type CommercialSenderIdentity,
 } from "@/lib/email-compliance";
 import { escapeHtml } from "@/lib/contact-form";
+import { PRICING_TIERS, isPricingTierId } from "@/lib/pricing-tiers";
 
 let _client: Resend | null = null;
 function client(): Resend | null {
@@ -142,6 +143,16 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
   const lang = input.lang ?? "en";
   const isEs = lang === "es";
   const tierName = input.tier.charAt(0).toUpperCase() + input.tier.slice(1);
+  // The flat fee is not the whole price: the plan's % is due at closing, only if it sells.
+  const commissionPct = isPricingTierId(input.tier) ? PRICING_TIERS[input.tier].commissionPct : null;
+  const commissionLine = commissionPct === null
+    ? ""
+    : isEs
+      ? `Además de esta tarifa, tu plan incluye una comisión Lixtara del ${commissionPct}% del precio de venta, que se paga al cierre y solo si tu propiedad se vende.`
+      : `In addition to this fee, your plan includes a ${commissionPct}% Lixtara commission on the sale price, paid at closing and only if your property sells.`;
+  const commissionHtml = commissionLine
+    ? `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${commissionLine}</p>`
+    : "";
   const subject = isEs
     ? `Pago recibido por tu listing ${tierName} de Lixtara`
     : `Payment received for your ${tierName} Lixtara listing`;
@@ -150,6 +161,7 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
     ? `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Tu pago llegó. ✓</p>
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Gracias. Acabamos de procesar tu tarifa de listing <strong>${tierName}</strong> ($${input.amount.toLocaleString()}). Tu propiedad en <strong>${input.propertyAddress}</strong> está ahora en la cola de revisión del broker.</p>
+    ${commissionHtml}
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Nuestro broker la revisa típicamente dentro de un día hábil. Te avisamos por email apenas esté live en MLS.</p>
     ${button(input.dashboardUrl, "Ver mi dashboard")}
     <p style="font-size:12px;line-height:1.6;color:#666;">Recibo de pago${input.receiptUrl ? `: <a href="${input.receiptUrl}" style="color:#a18943;">ver en Stripe</a>` : " disponible en tu dashboard"}.</p>
@@ -157,14 +169,15 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
     : `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Payment confirmed. ✓</p>
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Thank you. We've processed your <strong>${tierName}</strong> listing fee of $${input.amount.toLocaleString()}. Your property at <strong>${input.propertyAddress}</strong> is now in our broker review queue.</p>
+    ${commissionHtml}
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Our broker typically reviews within one business day. We'll email you the moment it goes live on MLS.</p>
     ${button(input.dashboardUrl, "View my dashboard")}
     <p style="font-size:12px;line-height:1.6;color:#666;">Payment receipt${input.receiptUrl ? `: <a href="${input.receiptUrl}" style="color:#a18943;">view on Stripe</a>` : " available in your dashboard"}.</p>
   `;
 
   const text = isEs
-    ? `Pago recibido por $${input.amount.toLocaleString()} (${tierName}). Tu listing en ${input.propertyAddress} está en revisión del broker. Ver dashboard: ${input.dashboardUrl}`
-    : `Payment received: $${input.amount.toLocaleString()} (${tierName}). Your listing at ${input.propertyAddress} is in broker review. Dashboard: ${input.dashboardUrl}`;
+    ? `Pago recibido por $${input.amount.toLocaleString()} (${tierName}). Tu listing en ${input.propertyAddress} está en revisión del broker. ${commissionLine} Ver dashboard: ${input.dashboardUrl}`
+    : `Payment received: $${input.amount.toLocaleString()} (${tierName}). Your listing at ${input.propertyAddress} is in broker review. ${commissionLine} Dashboard: ${input.dashboardUrl}`;
 
   return send({
     to: input.to,

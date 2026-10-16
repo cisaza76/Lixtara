@@ -8,18 +8,19 @@
 //     subtotal — paid from sale proceeds, so only if the home sells
 //   - Total cost + you-save-vs-traditional + a dynamic key-insight callout
 //
-// The buyer-agent commission applies to BOTH columns (you offer it either way),
-// so the savings reflect only what Lixtara replaces on the seller side. All
-// dollar inputs come from pricing-tiers.ts (TRADITIONAL_COSTS / PRICING_TIERS) —
-// never hardcode amounts here.
+// The buyer-agent commission the seller picks applies to BOTH columns (you offer it
+// either way), so the savings reflect only what Lixtara replaces on the seller side.
+// Every number comes from compareWithTraditional (pricing-tiers.ts) — the same
+// function the FAQ, Loui and step 6 use. Never hardcode amounts here.
 
 import { useEffect, useRef, useState } from "react";
 import { homePriceRange, track } from "@/lib/analytics";
 import {
+  DEFAULT_BUYER_COMMISSION_PCT,
   PRICING_TIERS,
   TIER_ORDER,
   TRADITIONAL_COSTS,
-  tierCostBreakdown,
+  compareWithTraditional,
 } from "@/lib/pricing-tiers";
 import { InfoTip } from "@/components/info-tip";
 
@@ -91,7 +92,7 @@ function usd(n: number): string {
 
 export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
   const [price, setPrice] = useState(500_000);
-  const [buyerPct, setBuyerPct] = useState(3);
+  const [buyerPct, setBuyerPct] = useState(DEFAULT_BUYER_COMMISSION_PCT);
 
   // calculator_used: once the person stops moving the controls (1.5 s), with the price
   // RANGE (never the exact value) and the buyer-agent %. Again only if the range changes.
@@ -109,40 +110,33 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
     return () => clearTimeout(timer);
   }, [price, buyerPct, lang]);
 
-  // Traditional buyer-agent commission is the FIXED 3% benchmark — it must NOT
-  // move with the slider. The slider only changes what YOU offer on Lixtara;
-  // the traditional column stays put so the comparison is a stable comparable.
-  const tradBuyerComm = price * (TRADITIONAL_COSTS.buyerCommissionPct / 100);
-
-  const tradSellerComm = price * (TRADITIONAL_COSTS.listingCommissionPct / 100);
-  // A traditional agent's commission is also paid from proceeds at closing;
-  // only photo + document fees are out of pocket at listing.
-  const tradUpfront = TRADITIONAL_COSTS.photography + TRADITIONAL_COSTS.docContracts;
-  const tradClosing = tradSellerComm + tradBuyerComm;
-  const tradTotal = tradUpfront + tradClosing;
+  // One comparison per plan (compareWithTraditional): the buyer-agent % the seller picks
+  // goes on BOTH sides, so "You save" is only the listing-side difference. Photos and
+  // documents are not charged on the traditional side: a listing agent includes them.
+  const comparisons = TIER_ORDER.map((id) => ({ id, cmp: compareWithTraditional(id, price, buyerPct) }));
+  const trad = comparisons[0]!.cmp.traditional;
 
   const columns: Column[] = [
     {
       key: "traditional",
-      label: copy.traditionalLabel,
+      label: copy.traditionalLabel.replace("{pct}", String(TRADITIONAL_COSTS.listingCommissionPct)),
       isTraditional: true,
       listingFee: 0,
-      sellerComm: tradSellerComm,
+      sellerComm: trad.listingCommission,
       sellerPct: TRADITIONAL_COSTS.listingCommissionPct,
-      photos: TRADITIONAL_COSTS.photography,
-      photosText: "",
-      docusign: TRADITIONAL_COSTS.docContracts,
-      upfront: tradUpfront,
-      buyer: tradBuyerComm,
-      closing: tradClosing,
-      buyerPctShown: TRADITIONAL_COSTS.buyerCommissionPct,
-      total: tradTotal,
+      photos: null,
+      photosText: copy.included,
+      docusign: null,
+      upfront: 0,
+      buyer: trad.buyerCommission,
+      closing: trad.total,
+      buyerPctShown: buyerPct,
+      total: trad.total,
       savings: 0,
     },
-    ...TIER_ORDER.map((id): Column => {
+    ...comparisons.map(({ id, cmp }): Column => {
       const tier = PRICING_TIERS[id];
-      // photos + docusign are $0 on Lixtara, so upfront is the flat fee only
-      const cost = tierCostBreakdown(id, price, buyerPct);
+      const cost = cmp.lixtara;
       return {
         key: id,
         label: tierNames[id],
@@ -158,7 +152,7 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
         closing: cost.closing,
         buyerPctShown: buyerPct,
         total: cost.total,
-        savings: tradTotal - cost.total,
+        savings: cmp.savings,
       };
     }),
   ];

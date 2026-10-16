@@ -21,18 +21,24 @@ export const PRICING_TIERS: Record<PricingTierId, PricingTier> = {
   concierge: { id: "concierge", flatFee: 995, commissionPct: 1.5, termMonths: 24, includesPhotography: true },
 };
 
-// Baseline costs of the traditional-agent comparison, in USD (flat) or percent.
-// Single source for the Radical Transparency table — never hardcode in the UI.
+// Baseline of the traditional-agent comparison. Single source — never hardcode in the UI.
+// Only the LISTING side differs between a traditional agent and Lixtara: the buyer-agent
+// compensation is the seller's choice either way, so every comparison puts the SAME
+// buyer-agent % on both sides (compareWithTraditional). Photos and documents are not
+// added to the traditional side: a traditional listing agent normally includes them.
 export const TRADITIONAL_COSTS = {
   /** listing-side commission a traditional agent charges (the part Lixtara replaces) */
   listingCommissionPct: 3,
-  /** typical buyer-agent commission in the traditional 6% model */
-  buyerCommissionPct: 3,
-  /** typical out-of-pocket photography fee */
-  photography: 300,
-  /** typical document / e-signature fee */
-  docContracts: 40,
+  /** typical buyer-agent commission; only for the "typical 6%" wording, never in a calculation */
+  typicalBuyerCommissionPct: 3,
 } as const;
+
+/** "Typical 6%" = listing side + typical buyer side, for copy only. */
+export const TRADITIONAL_TYPICAL_TOTAL_PCT =
+  TRADITIONAL_COSTS.listingCommissionPct + TRADITIONAL_COSTS.typicalBuyerCommissionPct;
+
+/** Buyer-agent % used where the seller hasn't chosen one (FAQ, Loui, the calculator's start). */
+export const DEFAULT_BUYER_COMMISSION_PCT = 2.5;
 
 // Standalone professional-photography add-on (USD). Included in Pro/Concierge;
 // sellers on Essentials can purchase it separately. Single source of truth.
@@ -76,16 +82,43 @@ export function tierTotalCost(
   return t.flatFee + (salePrice * t.commissionPct) / 100;
 }
 
+export interface TraditionalComparison {
+  /** buyer-agent % used on BOTH sides */
+  buyerCommissionPct: number;
+  traditional: { listingCommission: number; buyerCommission: number; total: number };
+  lixtara: TierCostBreakdown;
+  /** traditional.total − lixtara.total: only the listing-side difference */
+  savings: number;
+}
+
+// THE comparison against a traditional agent (calculator, FAQ, Loui, step 6). Same
+// buyer-agent compensation on both sides, so the savings reflect only the listing side:
+// traditional listing % − Lixtara %, minus the flat fee.
+export function compareWithTraditional(
+  tierId: PricingTierId,
+  salePrice: number,
+  buyerCommissionPct: number = DEFAULT_BUYER_COMMISSION_PCT,
+): TraditionalComparison {
+  const lixtara = tierCostBreakdown(tierId, salePrice, buyerCommissionPct);
+  const listingCommission = (salePrice * TRADITIONAL_COSTS.listingCommissionPct) / 100;
+  // The very same buyer-agent amount Lixtara's side carries.
+  const buyerCommission = lixtara.buyerCommission;
+  const traditionalTotal = listingCommission + buyerCommission;
+  return {
+    buyerCommissionPct,
+    traditional: { listingCommission, buyerCommission, total: traditionalTotal },
+    lixtara,
+    savings: traditionalTotal - lixtara.total,
+  };
+}
+
+/** Savings vs a traditional agent with the same buyer-agent %; never below 0. */
 export function tierSavingsVsTraditional(
   tierId: PricingTierId,
   salePrice: number,
+  buyerCommissionPct: number = DEFAULT_BUYER_COMMISSION_PCT,
 ): number {
-  const traditional =
-    (salePrice *
-      (TRADITIONAL_COSTS.listingCommissionPct +
-        TRADITIONAL_COSTS.buyerCommissionPct)) /
-    100;
-  return Math.max(0, traditional - tierTotalCost(tierId, salePrice));
+  return Math.max(0, compareWithTraditional(tierId, salePrice, buyerCommissionPct).savings);
 }
 
 export interface TierCostBreakdown {
@@ -141,25 +174,25 @@ function formatThousands(amount: number): string {
 //   {photoAddonPrice}       → "$495"   (PHOTOGRAPHY_ADDON_PRICE)
 //   {proFlatFee}            → "$495"   {proCommissionPct} → "1"
 //   {exampleSalePrice}      → "$500,000"
-//   {traditionalExample}    → 6% (listing + buyer) of the example price
-//   {proTotalExample}       → Pro flat fee + Pro commission on the example price
+//   {exampleBuyerPct}       → "2.5" (DEFAULT_BUYER_COMMISSION_PCT)
+//   {traditionalListingPct} → "3"   {traditionalTypicalPct} → "6"
+//   {traditionalExample}    → traditional total on the example price, same buyer-agent % as Lixtara
+//   {proTotalExample}       → Pro total on the example price (fee + Pro % + buyer-agent %)
+//   {proSavingsExample}     → the difference (compareWithTraditional)
 //   {quizMidMin} / {quizConciergeMin} → "$300K" / "$700K"
 export function fillPricingCopy(text: string): string {
-  const traditionalPct =
-    TRADITIONAL_COSTS.listingCommissionPct + TRADITIONAL_COSTS.buyerCommissionPct;
+  const example = compareWithTraditional("pro", EXAMPLE_SALE_PRICE, DEFAULT_BUYER_COMMISSION_PCT);
   return text
     .replaceAll("{photoAddonPrice}", formatPrice(PHOTOGRAPHY_ADDON_PRICE))
     .replaceAll("{proFlatFee}", formatPrice(PRICING_TIERS.pro.flatFee))
     .replaceAll("{proCommissionPct}", String(PRICING_TIERS.pro.commissionPct))
     .replaceAll("{exampleSalePrice}", formatPrice(EXAMPLE_SALE_PRICE))
-    .replaceAll(
-      "{traditionalExample}",
-      formatPrice((EXAMPLE_SALE_PRICE * traditionalPct) / 100),
-    )
-    .replaceAll(
-      "{proTotalExample}",
-      formatPrice(tierTotalCost("pro", EXAMPLE_SALE_PRICE)),
-    )
+    .replaceAll("{exampleBuyerPct}", String(DEFAULT_BUYER_COMMISSION_PCT))
+    .replaceAll("{traditionalListingPct}", String(TRADITIONAL_COSTS.listingCommissionPct))
+    .replaceAll("{traditionalTypicalPct}", String(TRADITIONAL_TYPICAL_TOTAL_PCT))
+    .replaceAll("{traditionalExample}", formatPrice(example.traditional.total))
+    .replaceAll("{proTotalExample}", formatPrice(example.lixtara.total))
+    .replaceAll("{proSavingsExample}", formatPrice(example.savings))
     .replaceAll("{quizMidMin}", formatThousands(QUIZ_HOME_VALUE_THRESHOLDS.midMin))
     .replaceAll(
       "{quizConciergeMin}",
