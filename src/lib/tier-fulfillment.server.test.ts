@@ -65,7 +65,7 @@ const session = (over: Partial<Stripe.Checkout.Session> = {}) =>
     amount_total: 49500,
     currency: "usd",
     livemode: false,
-    metadata: { property_id: "p1", tier: "pro", user_id: "u1" },
+    metadata: { property_id: "p1", tier: "pro", user_id: "u1", lang: "es" },
     ...over,
   }) as Stripe.Checkout.Session;
 
@@ -77,6 +77,10 @@ describe("fulfillTierCheckout: una vez por sesión (webhook + regreso del paso 8
     expect(await fulfillTierCheckout(db, session())).toBe("fulfilled");
     expect(ops.some((o) => o.table === "properties" && o.op === "update")).toBe(true);
     expect(recordFunnelEvent).toHaveBeenCalledOnce();
+    // lang de la metadata de Stripe (checkoutAttribution), no de seller_leads.
+    expect(recordFunnelEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "listing_paid", metadata: expect.objectContaining({ lang: "es" }) }),
+    );
     expect(sendPaymentReceipt).toHaveBeenCalledOnce();
     expect(sendGa4Purchase).toHaveBeenCalledOnce();
   });
