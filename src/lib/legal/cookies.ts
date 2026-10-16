@@ -69,10 +69,12 @@ export const cookiesDoc: LegalContent = {
             heading: "3.3 Security & Rate-Limiting",
             body: [
               "These technologies support measures that help protect the platform from abuse, including rate-limiting mechanisms (for example, those powered by Upstash) that limit how often certain actions can be performed.",
+              "We also use Sentry (Functional Software, Inc.) as a technical error-monitoring tool. It does not set cookies or use local storage, and it is not used for analytics or advertising. When an error occurs in your browser, it sends technical details about that error (such as the error message, the page address and the browser type) so we can detect and fix failures, and an anonymous signal per visit to measure the site's stability. We configure it not to send personal data such as cookies, form contents or the text you type. Because it is necessary to keep the service working, it does not depend on the cookie banner.",
             ],
             bullets: [
               "Help detect and limit abusive or automated activity.",
               "Support the integrity and availability of the service.",
+              "Sentry: error monitoring, without cookies; not used for analytics or advertising.",
             ],
           },
           {
@@ -232,10 +234,12 @@ export const cookiesDoc: LegalContent = {
             heading: "3.3 Seguridad y Limitación de Frecuencia",
             body: [
               "Estas tecnologías respaldan medidas que ayudan a proteger la plataforma frente a abusos, incluidos los mecanismos de limitación de frecuencia (por ejemplo, los impulsados por Upstash) que limitan la frecuencia con la que pueden realizarse ciertas acciones.",
+              "También usamos Sentry (Functional Software, Inc.) como herramienta técnica de monitoreo de errores. No establece cookies ni usa almacenamiento local, y no se usa para analítica ni publicidad. Cuando ocurre un error en su navegador, envía datos técnicos de ese error (como el mensaje de error, la dirección de la página y el tipo de navegador) para que podamos detectar y corregir fallas, y una señal anónima por visita para medir la estabilidad del sitio. Lo configuramos para que no envíe datos personales como cookies, el contenido de formularios o el texto que usted escribe. Como es necesario para que el servicio funcione, no depende del banner de cookies.",
             ],
             bullets: [
               "Ayudan a detectar y limitar la actividad abusiva o automatizada.",
               "Respaldan la integridad y la disponibilidad del servicio.",
+              "Sentry: monitoreo de errores, sin cookies; no se usa para analítica ni publicidad.",
             ],
           },
           {
@@ -329,15 +333,17 @@ export const cookiesDoc: LegalContent = {
   },
 };
 
-// ── Variante con analítica y publicidad (2026-10-11, ampliada 2026-10-13) ─────────────
+// ── Variante con analítica (2026-10-11; publicidad retirada 2026-10-15) ───────────────
 // La política tiene que ser cierta en cada estado del sitio. Sin herramientas configuradas
 // (sin NEXT_PUBLIC_GTM_ID ni NEXT_PUBLIC_POSTHOG_KEY) se muestra el texto de arriba tal cual.
 // Con alguna, estos párrafos se reemplazan por la descripción real, SOLO con consentimiento
 // (opt-in en todas las regiones):
-//   - GTM (contenedor del CMO): GA4, Microsoft Clarity y publicidad (Google Ads, Meta).
+//   - GTM (contenedor del CMO): GA4 y Microsoft Clarity.
 //   - PostHog: analítica de producto.
-// BORRADOR pendiente de revisión legal. La política de privacidad (California, "share" para
-// publicidad conductual) se revisa aparte, ANTES de publicar etiquetas de publicidad.
+// Google Ads y Meta NO están aprobados: la sección 3.5 sigue diciendo que no se usa
+// publicidad, en todas las variantes. Si se aprueban, esta variante y la política de
+// privacidad (California, "share" para publicidad conductual) se revisan ANTES de publicarlas.
+// BORRADOR pendiente de revisión legal.
 
 export interface CookieTools {
   gtm: boolean;
@@ -354,9 +360,6 @@ const SOURCES = {
       "We do not currently use analytics or performance cookies. If, in the future, we add privacy-respecting product or marketing analytics, this policy will be updated and, where required by applicable law, we will obtain your consent before such non-essential cookies are set.",
     analyticsBullet1: "Not currently in use.",
     analyticsBullet2: "Any future use will be disclosed here and, where required, consent-based.",
-    adsBody:
-      "We do not use advertising or targeting cookies. Lixtara does not serve third-party advertising and does not use cookies to build advertising profiles or track you across unrelated websites.",
-    adsBullet: "Not used.",
     notice:
       "When you first visit Lixtara, we show a lightweight cookie notice that informs you about our use of cookies and points you to this policy.",
     future:
@@ -369,9 +372,6 @@ const SOURCES = {
       "Actualmente no utilizamos cookies de análisis ni de rendimiento. Si, en el futuro, incorporamos análisis de producto o de marketing que respeten la privacidad, esta política se actualizará y, cuando lo exija la ley aplicable, obtendremos su consentimiento antes de que se establezcan dichas cookies no esenciales.",
     analyticsBullet1: "No se utilizan actualmente.",
     analyticsBullet2: "Cualquier uso futuro se divulgará aquí y, cuando se requiera, se basará en el consentimiento.",
-    adsBody:
-      "No utilizamos cookies de publicidad ni de segmentación. Lixtara no muestra publicidad de terceros y no utiliza cookies para crear perfiles publicitarios ni para rastrearle a través de sitios web no relacionados.",
-    adsBullet: "No se utilizan.",
     notice:
       "Cuando visita Lixtara por primera vez, le mostramos un aviso de cookies ligero que le informa sobre nuestro uso de cookies y le remite a esta política.",
     future:
@@ -381,9 +381,8 @@ const SOURCES = {
 
 function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
   const src = SOURCES[lang];
-  const ads = t.gtm; // la publicidad solo entra por GTM
   if (lang === "en") {
-    const kinds = ads ? "analytics and advertising" : "analytics";
+    const kinds = "analytics";
     const tools = [
       t.gtm && "Google Analytics 4 (loaded through Google Tag Manager) to measure traffic sources and campaigns",
       t.gtm &&
@@ -395,9 +394,7 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
       [src.intro, `Non-essential ${kinds} cookies are used only if you accept them through the consent banner described in this policy.`],
       [
         src.how,
-        ads
-          ? "With your consent, we use analytics cookies to understand how the site is used and advertising cookies to measure and improve our marketing campaigns, as described in Sections 3.4 and 3.5. Without your consent, these tools are not loaded."
-          : "We do not use cookies for advertising. With your consent, we use analytics cookies to understand how the site is used, as described in Section 3.4.",
+        "We do not use cookies for advertising. With your consent, we use analytics cookies to understand how the site is used, as described in Section 3.4.",
       ],
       [
         src.analyticsBody,
@@ -414,15 +411,6 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
         (t.gtm && t.posthog ? "PostHog (cookies and local storage such as ph_*), only with your consent. " : "") +
           "You can change your choice at any time through \"Cookie settings\" in the site footer.",
       ],
-      ...(ads
-        ? ([
-            [
-              src.adsBody,
-              "Only if you accept in the consent banner, we load advertising tags from Google (Google Ads) and Meta (Facebook and Instagram) through Google Tag Manager. They let us measure which of our ads lead to visits and inquiries and show our ads to people who have visited Lixtara (remarketing). These providers may combine this information with other data they hold about you, under their own privacy policies. Lixtara does not display third-party advertising on its site. If you reject, these tags are not loaded.",
-            ],
-            [src.adsBullet, "Google Ads (cookies such as _gcl_au) and Meta Pixel (cookies such as _fbp), only with your consent."],
-          ] as Pairs)
-        : []),
       [
         src.notice,
         `When you first visit Lixtara, we show a cookie banner that lets you accept or reject ${kinds} cookies, with both options equally available, and points you to this policy.`,
@@ -433,7 +421,7 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
       ],
     ];
   }
-  const kinds = ads ? "de analítica y de publicidad" : "de analítica";
+  const kinds = "de analítica";
   const tools = [
     t.gtm && "Google Analytics 4 (cargado a través de Google Tag Manager) para medir fuentes de tráfico y campañas",
     t.gtm &&
@@ -445,9 +433,7 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
     [src.intro, `Las cookies ${kinds}, que no son esenciales, solo se usan si usted las acepta en el banner de consentimiento descrito en esta política.`],
     [
       src.how,
-      ads
-        ? "Con su consentimiento, usamos cookies de analítica para entender cómo se usa el sitio y cookies de publicidad para medir y mejorar nuestras campañas de marketing, según se describe en las Secciones 3.4 y 3.5. Sin su consentimiento, estas herramientas no se cargan."
-        : "No utilizamos cookies con fines publicitarios. Con su consentimiento, usamos cookies de analítica para entender cómo se usa el sitio, según se describe en la Sección 3.4.",
+      "No utilizamos cookies con fines publicitarios. Con su consentimiento, usamos cookies de analítica para entender cómo se usa el sitio, según se describe en la Sección 3.4.",
     ],
     [
       src.analyticsBody,
@@ -464,15 +450,6 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
       (t.gtm && t.posthog ? "PostHog (cookies y almacenamiento local como ph_*), solo con su consentimiento. " : "") +
         "Puede cambiar su elección en cualquier momento en \"Configurar cookies\", en el pie del sitio.",
     ],
-    ...(ads
-      ? ([
-          [
-            src.adsBody,
-            "Solo si usted acepta en el banner de consentimiento, cargamos etiquetas de publicidad de Google (Google Ads) y de Meta (Facebook e Instagram) a través de Google Tag Manager. Nos permiten medir qué anuncios nuestros generan visitas y consultas, y mostrar nuestros anuncios a personas que visitaron Lixtara (remarketing). Estos proveedores pueden combinar esta información con otros datos que tengan sobre usted, según sus propias políticas de privacidad. Lixtara no muestra publicidad de terceros en su sitio. Si rechaza, estas etiquetas no se cargan.",
-          ],
-          [src.adsBullet, "Google Ads (cookies como _gcl_au) y Meta Pixel (cookies como _fbp), solo con su consentimiento."],
-        ] as Pairs)
-      : []),
     [
       src.notice,
       `Cuando visita Lixtara por primera vez, le mostramos un banner de cookies que le permite aceptar o rechazar las cookies ${kinds}, con ambas opciones igual de accesibles, y le remite a esta política.`,

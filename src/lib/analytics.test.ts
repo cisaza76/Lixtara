@@ -253,9 +253,9 @@ describe("Clarity: rutas que nunca graba (se entra con carga completa)", () => {
 });
 
 describe("consentimiento: lo que concede 'Aceptar' y lo que se borra al rechazar", () => {
-  it("aceptar concede analítica y publicidad (opt-in: antes de aceptar no se carga nada)", () => {
+  it("aceptar concede SOLO analítica: Google Ads y Meta no están aprobados (2026-10-15)", () => {
     expect(GRANTED_CONSENT).toEqual({
-      ad_storage: "granted", ad_user_data: "granted", ad_personalization: "granted", analytics_storage: "granted",
+      ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "granted",
     });
   });
 
@@ -271,8 +271,8 @@ describe("consentimiento: lo que concede 'Aceptar' y lo que se borra al rechazar
   it("el banner nombra solo las herramientas configuradas", () => {
     const gtm = "GTM-ABC1234";
     const key = "phc_" + "a".repeat(40);
-    expect(consentTools({ gtmId: gtm, posthogKey: null }, "en")).toBe("Google Analytics, Microsoft Clarity, Google Ads and Meta");
-    expect(consentTools({ gtmId: gtm, posthogKey: key }, "es")).toBe("Google Analytics, Microsoft Clarity, Google Ads, Meta y PostHog");
+    expect(consentTools({ gtmId: gtm, posthogKey: null }, "en")).toBe("Google Analytics and Microsoft Clarity");
+    expect(consentTools({ gtmId: gtm, posthogKey: key }, "es")).toBe("Google Analytics, Microsoft Clarity y PostHog");
     expect(consentTools({ gtmId: null, posthogKey: key }, "en")).toBe("PostHog");
   });
 });
@@ -438,25 +438,29 @@ describe("política de cookies según el estado real", () => {
     }
   });
 
-  it("nombra exactamente lo que el sitio carga: publicidad y Clarity solo con GTM, PostHog solo con su variable", async () => {
-    const { cookiesDocFor } = await import("@/lib/legal/cookies");
+  it("nombra exactamente lo que el sitio carga: GA4 y Clarity con GTM, PostHog con su variable, nunca publicidad", async () => {
+    const { cookiesDoc, cookiesDocFor } = await import("@/lib/legal/cookies");
+    const noAds = { en: /We do not use advertising or targeting cookies/, es: /No utilizamos cookies de publicidad/ };
     for (const lang of ["en", "es"] as const) {
       const ambos = JSON.stringify(cookiesDocFor(lang, { gtm: true, posthog: true }));
       expect(ambos).toMatch(/Google Analytics 4/);
       expect(ambos).toMatch(/Microsoft Clarity/);
-      expect(ambos).toMatch(/Google Ads/);
-      expect(ambos).toMatch(/Meta Pixel/);
       expect(ambos).toMatch(/PostHog/);
 
       const soloGtm = JSON.stringify(cookiesDocFor(lang, { gtm: true, posthog: false }));
-      expect(soloGtm).toMatch(/Meta Pixel/);
       expect(soloGtm).not.toMatch(/PostHog/);
 
       const soloPosthog = JSON.stringify(cookiesDocFor(lang, { gtm: false, posthog: true }));
       expect(soloPosthog).toMatch(/PostHog/);
-      for (const ausente of [/Google Analytics/, /Clarity/, /Google Ads/, /Meta/]) expect(soloPosthog).not.toMatch(ausente);
-      // Sin GTM, la sección de publicidad sigue diciendo que no se usa.
-      expect(soloPosthog).toMatch(lang === "en" ? /We do not use advertising or targeting cookies/ : /No utilizamos cookies de publicidad/);
+      for (const ausente of [/Google Analytics/, /Clarity/]) expect(soloPosthog).not.toMatch(ausente);
+
+      // Google Ads y Meta no aparecen en ninguna variante, y 3.5 siempre dice que no hay publicidad.
+      for (const doc of [ambos, soloGtm, soloPosthog, JSON.stringify(cookiesDoc[lang])]) {
+        expect(doc).not.toMatch(/Google Ads|Meta Pixel|Meta \(|_gcl_au|_fbp/);
+        expect(doc).toMatch(noAds[lang]);
+        // Sentry declarado como herramienta técnica, en todas las variantes.
+        expect(doc).toMatch(/Sentry \(Functional Software, Inc\.\)/);
+      }
     }
   });
 });

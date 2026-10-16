@@ -1,8 +1,11 @@
 // Configuración de analítica (decisiones del owner):
 //   - 2026-10-11: GA4 vía Google Tag Manager → marketing y adquisición; PostHog → producto.
-//   - 2026-10-13: GTM (contenedor del CMO) también trae etiquetas de PUBLICIDAD (Google Ads,
-//     Meta) y Microsoft Clarity. Modelo OPT-IN en todas las regiones: nada se carga antes de
-//     "Aceptar". GTM y PostHog son independientes: cada uno se activa con su propia variable.
+//   - 2026-10-13: GTM (contenedor del CMO) trae Microsoft Clarity. Modelo OPT-IN en todas las
+//     regiones: nada se carga antes de "Aceptar". GTM y PostHog son independientes: cada uno
+//     se activa con su propia variable.
+//   - 2026-10-15: Google Ads y Meta NO están aprobados. "Aceptar" concede solo analítica
+//     (analytics_storage); las señales de publicidad de Consent Mode quedan denegadas, así
+//     que una etiqueta de anuncios que quedara en el contenedor no recibe consentimiento.
 // Sin variables no se carga nada: el sitio queda exactamente como antes.
 //
 // PURO: sin I/O. Lo lee el layout (servidor) y pasa el resultado al banner (cliente).
@@ -13,20 +16,21 @@ export type ConsentChoice = "granted" | "denied";
 export const CONSENT_MAX_AGE_S = 365 * 24 * 60 * 60;
 
 /**
- * Lo que concede "Aceptar" en Consent Mode v2: analítica y publicidad. El banner pide permiso
- * para las dos y la política de cookies lo dice; antes de aceptar no se carga nada.
+ * Lo que concede "Aceptar" en Consent Mode v2: SOLO analítica (GA4, Clarity). La publicidad
+ * (Google Ads, Meta) no está aprobada: sus señales siguen denegadas aunque el visitante acepte.
  */
 export const GRANTED_CONSENT = {
-  ad_storage: "granted",
-  ad_user_data: "granted",
-  ad_personalization: "granted",
+  ad_storage: "denied",
+  ad_user_data: "denied",
+  ad_personalization: "denied",
   analytics_storage: "granted",
 } as const;
 
 /**
  * Cookies que las herramientas dejan en NUESTRO dominio y que se borran al rechazar o retirar
- * el consentimiento: GA4 `_ga*`/`_gid`, Google Ads `_gcl_*`, Meta `_fbp`/`_fbc`, Clarity
- * `_clck`/`_clsk`, PostHog `ph_*`, y nuestra `lx_ft` (UTM de primer contacto, solo con consentimiento).
+ * el consentimiento: GA4 `_ga*`/`_gid`, Clarity `_clck`/`_clsk`, PostHog `ph_*` y nuestra
+ * `lx_ft` (UTM de primer contacto, solo con consentimiento). También `_gcl_*` y `_fbp`/`_fbc`
+ * (Google Ads, Meta): no están aprobados, pero si una etiqueta del contenedor los dejara, se borran.
  */
 export const ANALYTICS_COOKIE_RE = /^(_ga|_gid|_gcl_|_fbp|_fbc|_clck|_clsk|ph_|lx_ft$)/;
 
@@ -59,11 +63,11 @@ export function analyticsConfig(env: {
 
 /**
  * Las herramientas que nombra el banner, según lo configurado. Con GTM entran las del
- * contenedor del CMO (analítica, Clarity y publicidad); PostHog solo si está su variable.
+ * contenedor del CMO aprobadas (GA4 y Clarity); PostHog solo si está su variable.
  */
 export function consentTools(c: Pick<AnalyticsConfig, "gtmId" | "posthogKey">, lang: "en" | "es"): string {
   const tools = [
-    ...(c.gtmId ? ["Google Analytics", "Microsoft Clarity", "Google Ads", "Meta"] : []),
+    ...(c.gtmId ? ["Google Analytics", "Microsoft Clarity"] : []),
     ...(c.posthogKey ? ["PostHog"] : []),
   ];
   const and = lang === "es" ? " y " : " and ";
