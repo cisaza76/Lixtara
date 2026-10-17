@@ -4,20 +4,47 @@ import { join, resolve } from "node:path";
 import { fillPricingCopy } from "@/lib/pricing-tiers";
 import { t } from "@/lib/i18n";
 
-// Toda comparación con un agente tradicional pasa por compareWithTraditional (misma
-// compensación al agente del comprador en ambos lados). Este test falla si una superficie
+// Toda comparación con un agente tradicional pasa por compareWithTraditional o por
+// compareWithOffer (src/lib/buyer-comp.ts: la misma regla para 0%, % o monto fijo): misma
+// compensación al agente del comprador en ambos lados. Este test falla si una superficie
 // vuelve a calcular su propio "tradicional" o a usar un 6 % escrito a mano.
 const root = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
 
 const SURFACES = {
   calculator: "src/components/savings-slider.tsx",
-  step6: "src/app/[lang]/listing/new/page.tsx",
+  step6: "src/components/buyer-comp-step.tsx",
+  wizard: "src/app/[lang]/listing/new/page.tsx",
 };
 
 describe("comparaciones de ahorro: una sola fuente y el mismo % al comprador", () => {
-  it.each(Object.entries(SURFACES))("%s usa compareWithTraditional", (_, path) => {
-    expect(read(path)).toContain("compareWithTraditional(");
+  it.each([["calculator", SURFACES.calculator], ["step6", SURFACES.step6]])("%s usa compareWithOffer", (_, path) => {
+    expect(read(path)).toContain("compareWithOffer(");
+  });
+
+  it("compareWithOffer da lo mismo que compareWithTraditional con un porcentaje", async () => {
+    const { compareWithOffer } = await import("@/lib/buyer-comp");
+    const { compareWithTraditional, TIER_ORDER } = await import("@/lib/pricing-tiers");
+    for (const tier of TIER_ORDER) {
+      for (const pct of [0, 2, 2.5, 3, 4.25]) {
+        for (const price of [250_000, 500_000, 1_750_000]) {
+          const a = compareWithOffer(tier, price, pct ? { type: "percent", pct } : { type: "none" });
+          const b = compareWithTraditional(tier, price, pct);
+          expect(a.lixtaraTotal).toBeCloseTo(b.lixtara.total, 6);
+          expect(a.traditionalTotal).toBeCloseTo(b.traditional.total, 6);
+          expect(a.savings).toBeCloseTo(b.savings, 6);
+        }
+      }
+    }
+  });
+
+  it("con monto fijo, el mismo monto en los dos lados: el ahorro no cambia", async () => {
+    const { compareWithOffer } = await import("@/lib/buyer-comp");
+    const none = compareWithOffer("pro", 600_000, { type: "none" });
+    const amount = compareWithOffer("pro", 600_000, { type: "amount", amount: 12_000 });
+    expect(amount.lixtaraTotal - none.lixtaraTotal).toBe(12_000);
+    expect(amount.traditionalTotal - none.traditionalTotal).toBe(12_000);
+    expect(amount.savings).toBe(none.savings);
   });
 
   it.each(Object.entries(SURFACES))("%s no calcula su propio tradicional", (_, path) => {
@@ -62,15 +89,13 @@ describe("comparaciones de ahorro: una sola fuente y el mismo % al comprador", (
   });
 
   it("decimales con punto también en español (2.5, no 2,5)", () => {
-    for (const k of ["howToReadBody", "tipBuyerCommission"] as const) {
-      expect(t("es").savings[k]).toContain("2.5");
-      expect(t("es").savings[k]).not.toContain("2,5");
-    }
+    expect(t("es").savings.tipBuyerCommission).toContain("2.5");
+    expect(JSON.stringify(t("es"))).not.toMatch(/\d,\d+ ?%/);
   });
 
   it("la ayuda de la calculadora dice lo que el cálculo hace (mismo % en las dos columnas)", () => {
-    expect(t("en").savings.tipBuyerCommission).toMatch(/same % in both columns/);
-    expect(t("es").savings.tipBuyerCommission).toMatch(/mismo % en las dos columnas/);
+    expect(t("en").savings.tipBuyerCommission).toMatch(/same compensation in both columns/);
+    expect(t("es").savings.tipBuyerCommission).toMatch(/misma compensación en las dos columnas/);
     for (const lang of ["en", "es"] as const) {
       expect(t(lang).savings.howToReadBody, lang).not.toMatch(/\$300|\$40/);
     }
