@@ -42,6 +42,9 @@ async function fulfillCheckout(
   if (session.metadata?.kind === "consultation") {
     const buyerId = session.metadata?.user_id ?? null;
     const realtorHours = Number(session.metadata?.realtor_hours ?? 0);
+    // LEGADO: desde 2026-10-16 Lixtara no vende horas de abogado y ninguna sesión nueva lleva
+    // attorney_hours. Solo una sesión abierta antes de ese despliegue (vencen en 24 h) podría
+    // traerlo: la persona ya pagó, así que se registra igual (ver "Requiere decisión humana").
     const attorneyHours = Number(session.metadata?.attorney_hours ?? 0);
     if (buyerId) {
       const rows: Array<{

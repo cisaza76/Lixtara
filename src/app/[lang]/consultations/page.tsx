@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import {
-  ATTORNEY_HOURLY,
   REALTOR_HOURLY,
   REALTOR_TIERS,
-  BEST_VALUE,
-  bestValueTotals,
   type ConsultationProduct,
 } from "@/lib/consultations";
+import { legalReferralBullet } from "@/config/legalPartner";
+import { FootnoteText } from "@/components/footnote-text";
+import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
 import { ConsultationCheckoutButton } from "@/components/consultation-checkout-button";
 
 export default async function ConsultationsPage({
@@ -21,7 +21,6 @@ export default async function ConsultationsPage({
   if (!isLocale(lang)) notFound();
   const { purchased, error } = await searchParams;
   const copy = t(lang).consultations;
-  const { totalValue, save, savePct } = bestValueTotals();
   const usd = (n: number) => `$${n.toLocaleString()}`;
   const btnLabels = { redirecting: copy.redirecting, failed: copy.failed };
 
@@ -51,37 +50,6 @@ export default async function ConsultationsPage({
             <p className="text-sm text-ink/70">{copy.cancelledNotice}</p>
           </div>
         )}
-
-        {/* Best Value package */}
-        <div className="border-2 border-gold bg-gold/5 p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="flex flex-col gap-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
-              {copy.bestValueEyebrow}
-            </p>
-            <h2 className="font-display text-3xl text-ink">
-              {copy.bestValueTitle}: {usd(BEST_VALUE.price)}
-            </h2>
-            <p className="text-sm text-ink/70">
-              {copy.bestValueDesc
-                .replace("{realtor}", String(BEST_VALUE.realtorHours))
-                .replace("{attorney}", String(BEST_VALUE.attorneyHours))}
-            </p>
-            <p className="text-sm text-ink">
-              {copy.totalValue}: <strong>{usd(totalValue)}</strong> ·{" "}
-              <span className="text-gold font-semibold">
-                {copy.youSave} {usd(save)} ({savePct}% {copy.off})
-              </span>
-            </p>
-          </div>
-          <ConsultationCheckoutButton
-            product="best_value"
-            lang={lang}
-            label={copy.ctaBuy}
-            variant="primary"
-            className="self-start lg:self-center"
-            labels={btnLabels}
-          />
-        </div>
 
         {/* Per-service */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -126,27 +94,15 @@ export default async function ConsultationsPage({
             </ul>
           </div>
 
-          {/* Attorney */}
+          {/* Abogado: Lixtara no vende servicios legales; solo refiere a una firma independiente
+              a la que el cliente contrata y paga directamente (src/config/legalPartner.ts). */}
           <div className="border border-gold-soft p-6 flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <h3 className="font-display text-2xl text-ink">
-                {copy.attorneyTitle}
-              </h3>
-              <p className="text-sm text-ink/70">
-                {usd(ATTORNEY_HOURLY)} {copy.perHour}
-              </p>
-            </div>
+            <h3 className="font-display text-2xl text-ink">{copy.legalTitle}</h3>
             <p className="text-sm text-ink/70 leading-relaxed">
-              {copy.attorneyDesc}
+              {/* El título ya hace la pregunta: el cuerpo empieza en el referido. */}
+              <FootnoteText text={legalReferralBullet(lang).replace(/^[^?]*\?\s*/, "")} lang={lang} />
             </p>
-            <ConsultationCheckoutButton
-              product="attorney_1"
-              lang={lang}
-              label={copy.ctaBuy}
-              variant="secondary"
-              className="self-start"
-              labels={btnLabels}
-            />
+            <LegalServicesDisclosure lang={lang} anchor />
           </div>
         </div>
 

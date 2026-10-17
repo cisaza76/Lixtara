@@ -22,7 +22,9 @@ export default async function AdminLayout({
         <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 text-xs text-amber-900 leading-snug">
           ⚖️ <strong>Reminder:</strong> We are a licensed real estate brokerage,
           not attorneys. Never provide legal advice. When sellers or buyers ask
-          legal questions, offer an attorney consultation ($450/hr).
+          legal questions, refer them to an independent Florida real estate
+          attorney: they hire and pay the law firm directly, and Lixtara never
+          sells, bills or includes legal services.
         </div>
         <main className="flex-1 overflow-y-auto p-6 sm:p-8">
           <div className="mx-auto w-full max-w-7xl">{children}</div>

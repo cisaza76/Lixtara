@@ -1,16 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
-  ATTORNEY_HOURLY,
+  CONSULTATION_PRODUCTS,
   REALTOR_HOURLY,
   TOKEN_VALIDITY_DAYS,
   REALTOR_TIERS,
-  BEST_VALUE,
-  bestValueTotals,
+  isConsultationProduct,
 } from "@/lib/consultations";
 
 describe("consultation pricing", () => {
-  it("holds the canonical hourly rates + validity", () => {
-    expect(ATTORNEY_HOURLY).toBe(450);
+  it("holds the canonical hourly rate + validity", () => {
     expect(REALTOR_HOURLY).toBe(150);
     expect(TOKEN_VALIDITY_DAYS).toBe(90);
   });
@@ -23,12 +21,14 @@ describe("consultation pricing", () => {
     ]);
   });
 
-  it("computes the Best Value package: $2,700 value, save $1,250 (46% off)", () => {
-    expect(BEST_VALUE.price).toBe(1450);
-    expect(bestValueTotals()).toEqual({
-      totalValue: 2700,
-      save: 1250,
-      savePct: 46,
-    });
+  it("Lixtara no vende servicios legales: solo productos de Realtor, sin horas de abogado", () => {
+    expect(Object.keys(CONSULTATION_PRODUCTS).sort()).toEqual(["realtor_1", "realtor_10", "realtor_5"]);
+    for (const p of Object.values(CONSULTATION_PRODUCTS)) {
+      expect(p).not.toHaveProperty("attorneyHours");
+      expect(p.name).not.toMatch(/attorney|abogad/i);
+    }
+    for (const retired of ["attorney_1", "best_value", "toString", "__proto__"]) {
+      expect(isConsultationProduct(retired), retired).toBe(false);
+    }
   });
 });

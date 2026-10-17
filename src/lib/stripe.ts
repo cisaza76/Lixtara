@@ -38,12 +38,11 @@ function checkoutLocale(lang: CheckoutLang | undefined): { locale?: "en" | "es" 
   return lang ? { locale: lang } : {};
 }
 
+// Solo consultas con un Realtor: Lixtara no cobra servicios legales (src/lib/consultations.ts).
 const CONSULTATION_NAME_ES: Record<ConsultationProduct, string> = {
-  best_value: "Paquete Mejor Valor (15 h Realtor + 1 h abogado)",
   realtor_1: "Consulta con Realtor (1 hora)",
   realtor_5: "Consulta con Realtor (5 horas)",
   realtor_10: "Consulta con Realtor (10 horas)",
-  attorney_1: "Consulta con abogado (1 hora)",
 };
 
 export interface CreateTierCheckoutInput {
@@ -159,7 +158,6 @@ export async function createConsultationCheckoutSession(
       product: input.product,
       user_id: input.userId,
       realtor_hours: String(p.realtorHours),
-      attorney_hours: String(p.attorneyHours),
     },
     success_url: `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: input.cancelUrl,
