@@ -3,11 +3,15 @@
 // bloats the i18n dictionary, and the LegalDocument component renders any doc.
 
 export interface LegalSection {
+  /** Ancla estable para enlazar la sección (p. ej. "refunds" → /terms#refunds). */
+  id?: string;
   heading: string;
   /** Body paragraphs (plain text). */
   body: string[];
   /** Optional bullet list rendered after the body. */
   bullets?: string[];
+  /** Optional table rendered after the bullets (e.g. the cookie list). */
+  table?: { columns: string[]; rows: string[][] };
   /** Optional nested subsections. */
   sub?: LegalSection[];
 }
@@ -24,11 +28,4 @@ export interface LegalContent {
   es: LegalDoc;
 }
 
-/** Single source for the "last updated / effective" date shown on every doc. */
-export const LEGAL_LAST_UPDATED = "2026-09-02";
-
-/** Cookie Policy: cookies de Microsoft Clarity detalladas (y antes, #193: solo analítica). */
-export const COOKIES_LAST_UPDATED = "2026-10-16";
-
-/** Privacy Policy: sección 6.1, análisis de uso y grabación de sesiones (Microsoft Clarity). */
-export const PRIVACY_LAST_UPDATED = "2026-10-16";
+// Fechas y versiones de cada documento: src/lib/legal/config.ts (LEGAL_DOCS).

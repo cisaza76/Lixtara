@@ -1296,6 +1296,7 @@ export const dictionaries = {
     legal: {
       backHome: "Back to home",
       lastUpdated: "Last updated",
+      version: "Version",
       englishControls:
         "This document is maintained in English. A Spanish translation is provided for convenience; if there is any conflict, the English-language version governs.",
     },
@@ -3184,6 +3185,7 @@ export const dictionaries = {
     legal: {
       backHome: "Volver al inicio",
       lastUpdated: "Última actualización",
+      version: "Versión",
       englishControls:
         "Este documento se mantiene en inglés. La traducción al español se ofrece por conveniencia; en caso de cualquier conflicto, prevalece la versión en inglés.",
     },

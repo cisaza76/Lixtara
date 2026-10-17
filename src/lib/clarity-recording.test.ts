@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { cookiesDocFor } from "@/lib/legal/cookies";
 import { privacyDoc } from "@/lib/legal/privacy";
-import { COOKIES_LAST_UPDATED, LEGAL_LAST_UPDATED, PRIVACY_LAST_UPDATED } from "@/lib/legal/types";
+import { LEGAL_DOCS } from "@/lib/legal/config";
 
 const root = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
@@ -72,8 +72,7 @@ describe("Clarity (2026-10-16): graba el embudo, nunca /account, sin datos del u
       expect(s4, lang).toContain("Google LLC (Google Analytics)");
       expect(s4, lang).toContain("Microsoft (Clarity)");
     }
-    expect(PRIVACY_LAST_UPDATED).toBe("2026-10-16");
-    expect(COOKIES_LAST_UPDATED).toBe("2026-10-16");
-    expect(LEGAL_LAST_UPDATED).toBe("2026-09-02");
+    expect(LEGAL_DOCS.privacy.updated >= "2026-10-16").toBe(true);
+    expect(LEGAL_DOCS.cookies.updated >= "2026-10-16").toBe(true);
   });
 });

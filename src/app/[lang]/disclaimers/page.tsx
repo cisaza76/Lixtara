@@ -23,6 +23,6 @@ export default async function DisclaimersPage({
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   return (
-    <LegalDocument lang={lang as Locale} doc={disclaimersDoc[lang as Locale]} />
+    <LegalDocument docId="disclaimers" lang={lang as Locale} doc={disclaimersDoc[lang as Locale]} />
   );
 }

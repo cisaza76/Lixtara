@@ -22,5 +22,5 @@ export default async function TermsPage({
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  return <LegalDocument lang={lang as Locale} doc={termsDoc[lang as Locale]} />;
+  return <LegalDocument docId="terms" lang={lang as Locale} doc={termsDoc[lang as Locale]} />;
 }
