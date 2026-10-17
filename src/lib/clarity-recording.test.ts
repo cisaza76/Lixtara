@@ -67,6 +67,11 @@ describe("Clarity (2026-10-16): graba el embudo, nunca /account, sin datos del u
       expect(sub, lang).toContain("Stripe");
       expect(sub, lang).not.toMatch(/comply|complies|compliance|cumpl/i);
     }
+    for (const lang of ["en", "es"] as const) {
+      const s4 = JSON.stringify(privacyDoc[lang].sections.find((s) => s.heading.startsWith("4."))!.sub);
+      expect(s4, lang).toContain("Google LLC (Google Analytics)");
+      expect(s4, lang).toContain("Microsoft (Clarity)");
+    }
     expect(PRIVACY_LAST_UPDATED).toBe("2026-10-16");
     expect(COOKIES_LAST_UPDATED).toBe("2026-10-16");
     expect(LEGAL_LAST_UPDATED).toBe("2026-09-02");
