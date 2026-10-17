@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { LegalDocument } from "@/components/legal-document";
 import { privacyDoc } from "@/lib/legal/privacy";
+import { PRIVACY_LAST_UPDATED } from "@/lib/legal/types";
 
 // El título de la pestaña sale del propio documento, en el idioma de la página.
 export async function generateMetadata({
@@ -23,6 +24,10 @@ export default async function PrivacyPage({
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   return (
-    <LegalDocument lang={lang as Locale} doc={privacyDoc[lang as Locale]} />
+    <LegalDocument
+      lang={lang as Locale}
+      doc={privacyDoc[lang as Locale]}
+      updatedOn={PRIVACY_LAST_UPDATED}
+    />
   );
 }

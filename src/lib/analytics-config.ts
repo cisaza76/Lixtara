@@ -63,12 +63,18 @@ export function analyticsConfig(env: {
 
 /**
  * Las herramientas que nombra el banner, según lo configurado. Con GTM entran las del
- * contenedor del CMO aprobadas (GA4 y Clarity); PostHog solo si está su variable.
+ * contenedor del CMO aprobadas (GA4 y Clarity); PostHog solo si está su variable. Clarity va
+ * al final, con lo que hace (graba cómo se usan las páginas, con los datos personales ocultos).
  */
 export function consentTools(c: Pick<AnalyticsConfig, "gtmId" | "posthogKey">, lang: "en" | "es"): string {
+  const clarity =
+    lang === "es"
+      ? "Microsoft Clarity, que graba cómo se usan las páginas con tu información personal oculta"
+      : "Microsoft Clarity, which records how pages are used with personal information hidden";
   const tools = [
-    ...(c.gtmId ? ["Google Analytics", "Microsoft Clarity"] : []),
+    ...(c.gtmId ? ["Google Analytics"] : []),
     ...(c.posthogKey ? ["PostHog"] : []),
+    ...(c.gtmId ? [clarity] : []),
   ];
   const and = lang === "es" ? " y " : " and ";
   return tools.length > 1 ? `${tools.slice(0, -1).join(", ")}${and}${tools.at(-1)}` : (tools[0] ?? "");
@@ -102,13 +108,29 @@ export function isAnalyticsExcludedPath(pathname: string): boolean {
 }
 
 /**
- * Rutas que Clarity no graba (decisión del owner 2026-10-14, opción "a"): ahí se escriben
- * dirección, correo, contraseña o datos de la cuenta. El contenedor las excluye en la carga
- * de página, pero Clarity no tiene cómo detenerse en una navegación sin recarga: a estas
- * rutas se entra SIEMPRE con carga completa cuando Clarity está activo (RecordingGuard).
+ * Rutas que Clarity no graba. Decisión del owner 2026-10-16 (reemplaza la opción "a" del
+ * 2026-10-14): Clarity graba TODO el embudo (páginas públicas, /listing, /auth, /sign-in,
+ * /sign-up) con enmascaramiento Estricto, y NO graba el área de cuenta (/account). /admin
+ * tampoco (ahí ni siquiera corre la analítica). El contenedor del CMO excluye estas rutas en
+ * la carga de página; Clarity no se puede detener en una navegación sin recarga, así que a
+ * estas rutas se entra, y de ellas se sale, con carga completa (RecordingGuard).
  */
 export function isRecordingExcludedPath(pathname: string): boolean {
-  return /^\/(en|es)\/(listing|account|auth|sign-in|sign-up|dashboard|admin)(\/|$)/.test(pathname);
+  return /^\/(en|es)\/(account|admin)(\/|$)/.test(pathname);
+}
+
+/**
+ * ¿Ir de `from` a `to` exige carga completa?
+ *   - Entrar a una ruta excluida: SIEMPRE (Clarity podría estar grabando).
+ *   - Salir de una ruta excluida: solo con consentimiento, para que el contenedor vuelva a
+ *     cargar Clarity al regresar al embudo (sin recarga, el resto de la visita no se graba).
+ */
+export function needsFullLoad(from: string, to: string, consentGranted: boolean): boolean {
+  const a = isRecordingExcludedPath(from);
+  const b = isRecordingExcludedPath(to);
+  if (b && !a) return true;
+  if (a && !b) return consentGranted;
+  return false;
 }
 
 /**

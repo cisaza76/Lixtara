@@ -109,12 +109,13 @@ export function MobileMenu({
                   >
                     <LayoutDashboard className="w-4 h-4" /> {auth.dashboard}
                   </Link>
-                  <Link
+                  {/* <a>, no <Link>: /account se carga completa (Clarity no la graba). */}
+                  <a
                     href={`/${lang}/account`}
                     className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70"
                   >
                     <UserRound className="w-4 h-4" /> {auth.account}
-                  </Link>
+                  </a>
                   <form action={`/${lang}/auth/sign-out`} method="POST">
                     <button
                       type="submit"

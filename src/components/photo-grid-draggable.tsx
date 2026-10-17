@@ -299,9 +299,11 @@ export function PhotoGridDraggable({
               } ${isStaging ? "opacity-60" : ""}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* Clarity: la foto del inmueble va enmascarada; los botones de la tarjeta no. */}
               <img
                 src={photo.url}
                 alt=""
+                data-clarity-mask="true"
                 className="w-full h-full object-cover pointer-events-none"
               />
 

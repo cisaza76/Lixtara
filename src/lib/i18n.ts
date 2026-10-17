@@ -1307,7 +1307,7 @@ export const dictionaries = {
       regionLabel: "Cookie notice",
       // {tools}: las herramientas configuradas en este build (ver consentTools en analytics-config).
       consentMessage:
-        "We use essential cookies to run the site. With your permission, we also use analytics cookies ({tools}) to understand how the site is used. No advertising cookies.",
+        "We use essential cookies to run the site. With your permission, we also use analytics cookies ({tools}) to improve the site. No advertising cookies.",
       consentAccept: "Accept analytics",
       consentReject: "Reject",
       settings: "Cookie settings",
@@ -3190,12 +3190,12 @@ export const dictionaries = {
     cookieNotice: {
       message:
         "Usamos cookies esenciales para mantener tu sesión y operar el flujo de publicación, además de otras opcionales descritas en nuestra Política de Cookies.",
-      learnMore: "Política de Cookies",
+      learnMore: "Política de cookies",
       accept: "Entendido",
       regionLabel: "Aviso de cookies",
       // {tools}: las herramientas configuradas en este build (ver consentTools en analytics-config).
       consentMessage:
-        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica ({tools}) para entender cómo se usa el sitio. Sin cookies de publicidad.",
+        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica ({tools}) para mejorar el sitio. No usamos cookies de publicidad.",
       consentAccept: "Aceptar analítica",
       consentReject: "Rechazar",
       settings: "Configurar cookies",
