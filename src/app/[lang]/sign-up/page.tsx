@@ -8,6 +8,7 @@ import { SITE_URL } from "@/lib/config";
 import { SIGNUP_EMAIL_COOKIE } from "@/lib/auth/signup-code";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
+import { passwordRejection } from "@/lib/auth/password-errors";
 import {
   AuthShell,
   Field,
@@ -32,6 +33,10 @@ export default async function SignUpPage({
   const errorMessage =
     sp.error === "weak_password"
       ? authCopy.errors.passwordTooShort
+      : sp.error === "leaked_password"
+      ? authCopy.errors.leakedPassword
+      : sp.error === "rejected_password"
+      ? authCopy.errors.passwordRejected
       : sp.error === "captcha"
         ? authCopy.errors.captchaFailed
         : sp.error === "unexpected"
@@ -68,8 +73,17 @@ export default async function SignUpPage({
     });
 
     if (error) {
+      const rejected = passwordRejection(error);
       redirect(
-        `/${lang}/sign-up?error=${isCaptchaError(error) ? "captcha" : "unexpected"}`,
+        `/${lang}/sign-up?error=${
+          rejected === "leaked"
+            ? "leaked_password"
+            : rejected === "weak"
+              ? "rejected_password"
+              : isCaptchaError(error)
+                ? "captcha"
+                : "unexpected"
+        }`,
       );
     }
 

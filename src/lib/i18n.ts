@@ -486,6 +486,7 @@ export const dictionaries = {
         title: "Add photos.",
         body: "Upload at least {min} high-quality photos. They upload as soon as you choose them. JPG, PNG, or WebP, max 10 MB each.",
         bodyPro: "Your plan includes professional photography, so your own photos are optional. If you add some, they show until the professional photos replace them. JPG, PNG, or WebP, max 10 MB each.",
+        bodyPhotographyPaid: "You added professional photography, so your own photos are optional. If you add some, they show until the professional photos replace them. JPG, PNG, or WebP, max 10 MB each.",
         proIncludedTitle: "✓ Professional Photography Included",
         proIncludedBody: "Your plan includes a professional photo session ({photoAddonPrice} value). We'll reach out within 24 hours after your listing is approved to schedule the shoot. Until then you can add your own phone photos if you want; the professional photos replace them.",
         proPhotosOr: "OR upload your own photos below:",
@@ -576,6 +577,8 @@ export const dictionaries = {
           cta: "Add photography: {photoAddonPrice}",
           redirecting: "Redirecting to checkout…",
           failed: "Something went wrong. Please try again.",
+          purchasedTitle: "Professional photography added",
+          purchasedBody: "We'll contact you within 24 hours after your listing is approved to schedule the shoot. Until then, your own photos are optional; the professional photos replace them.",
         },
         stagingCredits: {
           title: "Free staging used up",
@@ -808,6 +811,8 @@ export const dictionaries = {
         emailNotConfirmed: "Please confirm your email before signing in.",
         passwordTooShort: "Password must be at least 8 characters.",
         captchaFailed: "We couldn't verify you're human. Complete the security check and try again.",
+        leakedPassword: "This password appeared in a data breach. Choose a different one.",
+        passwordRejected: "This password doesn't meet the security requirements. Choose a different one.",
         unexpected: "Something went wrong. Please try again.",
       },
       nav: {
@@ -2374,6 +2379,7 @@ export const dictionaries = {
         title: "Agrega fotos.",
         body: "Sube al menos {min} fotos de buena calidad. Se suben en cuanto las eliges. JPG, PNG o WebP, máximo 10 MB cada una.",
         bodyPro: "Tu plan incluye fotografía profesional, así que tus propias fotos son opcionales. Si agregas algunas, se muestran hasta que las profesionales las reemplacen. JPG, PNG o WebP, máximo 10 MB cada una.",
+        bodyPhotographyPaid: "Agregaste fotografía profesional, así que tus propias fotos son opcionales. Si agregas algunas, se muestran hasta que las profesionales las reemplacen. JPG, PNG o WebP, máximo 10 MB cada una.",
         proIncludedTitle: "✓ Fotografía profesional incluida",
         proIncludedBody: "Tu plan incluye una sesión de fotografía profesional (valor {photoAddonPrice}). Te contactaremos dentro de las 24 horas después de que tu listado sea aprobado para agendar la sesión. Mientras tanto, si quieres, puedes agregar tus propias fotos del celular; las profesionales las reemplazan.",
         proPhotosOr: "O sube tus propias fotos abajo:",
@@ -2464,6 +2470,8 @@ export const dictionaries = {
           cta: "Agregar fotografía: {photoAddonPrice}",
           redirecting: "Redirigiendo al pago…",
           failed: "Algo salió mal. Intenta de nuevo.",
+          purchasedTitle: "Fotografía profesional agregada",
+          purchasedBody: "Te contactaremos dentro de las 24 horas siguientes a la aprobación de tu listado para agendar la sesión. Mientras tanto, tus propias fotos son opcionales; las profesionales las reemplazan.",
         },
         stagingCredits: {
           title: "Staging gratis agotado",
@@ -2696,6 +2704,8 @@ export const dictionaries = {
         emailNotConfirmed: "Por favor confirma tu correo antes de iniciar sesión.",
         passwordTooShort: "La contraseña debe tener al menos 8 caracteres.",
         captchaFailed: "No pudimos verificar que eres una persona. Completa la verificación de seguridad e intenta de nuevo.",
+        leakedPassword: "Esta contraseña apareció en una filtración de datos; elige otra.",
+        passwordRejected: "Esta contraseña no cumple los requisitos de seguridad; elige otra.",
         unexpected: "Algo salió mal. Por favor intenta de nuevo.",
       },
       nav: {

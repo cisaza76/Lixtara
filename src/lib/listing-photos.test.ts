@@ -28,3 +28,24 @@ describe("paso 5: una sola regla de fotos", () => {
     expect(MIN_OWN_PHOTOS).toBe(10);
   });
 });
+
+describe("Essentials con el extra de fotografía pagado (2026-10-16)", () => {
+  it("las fotos propias pasan a ser opcionales, igual que en Pro", () => {
+    expect(ownPhotosRequired("essentials")).toBe(true);
+    expect(ownPhotosRequired("essentials", false)).toBe(true);
+    expect(ownPhotosRequired("essentials", true)).toBe(false);
+    expect(ownPhotosRequired("pro", false)).toBe(false);
+    expect(ownPhotosRequired(null, true)).toBe(false);
+  });
+
+  it("el servidor, el paso 5 y el paso 6 aplican la misma regla con el pago", () => {
+    const page = readFileSync("src/app/[lang]/listing/new/page.tsx", "utf8");
+    expect(page).toMatch(/ownPhotosRequired\(\s*prop\?\.pricing_tier as string \| null,\s*await hasPaidPhotography\(supabase, id\),\s*\)/);
+    expect(page).toContain("const photosRequired = ownPhotosRequired(draft?.pricing_tier ?? null, photographyPaid);");
+    expect(page).toContain("(ownPhotosRequired(draft.pricing_tier, photographyPaid) && photos.length < MIN_OWN_PHOTOS)");
+    expect(page).not.toContain("photos.length < 10");
+    const lookup = readFileSync("src/lib/listing-photos.server.ts", "utf8");
+    expect(lookup).toContain('.is("tier", null)');
+    expect(lookup).toContain('.eq("status", "succeeded")');
+  });
+});

@@ -9,6 +9,7 @@ import {
   ErrorBanner,
   SuccessBanner,
 } from "@/components/auth-shell";
+import { passwordRejection } from "@/lib/auth/password-errors";
 
 export default async function ResetPasswordPage({
   params,
@@ -28,6 +29,10 @@ export default async function ResetPasswordPage({
       ? copy.mismatch
       : sp.error === "weak"
         ? authCopy.errors.passwordTooShort
+        : sp.error === "leaked"
+        ? authCopy.errors.leakedPassword
+        : sp.error === "rejected"
+        ? authCopy.errors.passwordRejected
         : sp.error === "unexpected"
           ? authCopy.errors.unexpected
           : null;
@@ -48,7 +53,12 @@ export default async function ResetPasswordPage({
     const supabase = await createClient();
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
-      redirect(`/${lang}/auth/reset-password?error=unexpected`);
+      const rejected = passwordRejection(error);
+      redirect(
+        `/${lang}/auth/reset-password?error=${
+          rejected === "leaked" ? "leaked" : rejected === "weak" ? "rejected" : "unexpected"
+        }`,
+      );
     }
     redirect(`/${lang}/auth/reset-password?success=1`);
   }
