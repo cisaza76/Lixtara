@@ -22,6 +22,7 @@ import { ShowingRequestForm } from "@/components/showing-request-form";
 import { TrackOnMount } from "@/components/analytics-events";
 import { canUseShowingRequests } from "@/lib/buyer-leads.server";
 import { fillBrokerageCopy } from "@/config/brokerage";
+import { buyerAgentComp } from "@/config/legal-terms";
 
 export default async function PropertyDetailPage({
   params,
@@ -479,7 +480,9 @@ export default async function PropertyDetailPage({
                   icon: <path d="M20 6 9 17l-5-5" />,
                 },
                 {
-                  text: `${copy.buyerCommissionLabel}: ${property.buyer_agent_commission}%`,
+                  // La oferta al agente del comprador no se publica: se comunica a los
+                  // agentes que la solicitan (src/config/legal-terms.ts).
+                  text: buyerAgentComp.text[lang].publicNote,
                   icon: (
                     <>
                       <line x1="19" y1="5" x2="5" y2="19" />

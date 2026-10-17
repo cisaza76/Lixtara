@@ -60,7 +60,15 @@ export type AnalyticsEvent =
   | { event: "listing_resumed"; step: number; source: ListingResumeSource; lang: string }
   | { event: "agreement_signed"; plan_tier?: PlanTier; lang: string }
   | { event: "begin_checkout"; plan_tier: PlanTier; value: number; currency: "USD"; lang: string }
-  | { event: "calculator_used"; home_price_range: HomePriceRange; buyer_commission_pct: number; lang: string }
+  // buyer_commission_pct: the % for a percentage offer, 0 for no offer, null for a fixed amount
+  // (the amount itself is never sent).
+  | {
+      event: "calculator_used";
+      home_price_range: HomePriceRange;
+      buyer_comp_type: "none" | "percent" | "amount";
+      buyer_commission_pct: number | null;
+      lang: string;
+    }
   // Embudo comprador
   | {
       event: "property_search";
@@ -150,8 +158,9 @@ const STEP_ERROR_FIELDS: Record<string, string> = {
   no_files: "photos",
   not_enough: "photos",
   rights_required: "photo_rights",
-  buyer_commission_required: "buyer_agent_commission",
-  invalid_buyer_commission: "buyer_agent_commission",
+  buyer_comp_choice_required: "buyer_agent_comp",
+  buyer_comp_pct_range: "buyer_agent_comp",
+  buyer_comp_amount_range: "buyer_agent_comp",
 };
 
 export function listingErrorField(code: string | null | undefined): string | null {

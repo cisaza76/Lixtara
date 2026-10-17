@@ -1,16 +1,21 @@
-// Evalúa Ask Loui contra el modelo real con los casos de src/lib/loui-legal-cases.ts.
+// Evalúa Ask Loui contra el modelo real con los casos de src/lib/loui-legal-cases.ts
+// (servicios legales, acceso antes del MLS) y src/lib/loui-terms-cases.ts (compensación al
+// agente del comprador, plazo de publicación, reembolso).
 // Envía SOLO las preguntas de prueba (sin datos de usuarios ni del MLS).
 //   pnpm exec tsx --env-file=.env.local scripts/loui-legal-evals.ts
 import { generateText } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { LOUI_SYSTEM_PROMPT } from "../src/lib/loui-prompt";
 import { LOUI_LEGAL_CASES } from "../src/lib/loui-legal-cases";
+import { LOUI_TERMS_CASES } from "../src/lib/loui-terms-cases";
+
+const CASES = [...LOUI_LEGAL_CASES, ...LOUI_TERMS_CASES];
 
 const MODEL = "claude-sonnet-4-6"; // el mismo de src/app/api/loui/route.ts
 
 async function main() {
   let failed = 0;
-  for (const c of LOUI_LEGAL_CASES) {
+  for (const c of CASES) {
     const { text } = await generateText({
       model: anthropic(MODEL),
       system: LOUI_SYSTEM_PROMPT,
@@ -24,7 +29,7 @@ async function main() {
     if (bad.length) console.log(`  dijo lo prohibido: ${bad.join(", ")}`);
     if (missing.length) console.log(`  le faltó: ${missing.join(", ")}`);
   }
-  console.log(`\n${LOUI_LEGAL_CASES.length - failed}/${LOUI_LEGAL_CASES.length} casos OK`);
+  console.log(`\n${CASES.length - failed}/${CASES.length} casos OK`);
   process.exit(failed ? 1 : 0);
 }
 

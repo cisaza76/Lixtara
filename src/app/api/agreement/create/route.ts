@@ -17,6 +17,7 @@ import {
   LIXTARA_BROKER_ROLE,
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
+import { buyerCommissionAck, formatOffer, offerFromRow } from "@/lib/buyer-comp";
 import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { brokerSigner } from "@/config/brokerage";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
+      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission, buyer_agent_comp_type, buyer_agent_comp_amount, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
     )
     .eq("id", propertyId)
     .eq("owner_id", user.id)
@@ -82,6 +83,13 @@ export async function POST(req: Request) {
       { error: "property_not_in_draft", status: property.mls_status },
       { status: 409 },
     );
+  }
+
+  // La oferta al agente del comprador se elige en el paso 6 (0% es válido). Sin elección no
+  // se arma un contrato con un valor que el vendedor no decidió.
+  const buyerOffer = offerFromRow(property);
+  if (!buyerOffer) {
+    return NextResponse.json({ error: "buyer_comp_not_set" }, { status: 409 });
   }
 
   // Reuse any in-flight envelope so we don't create duplicates on retry.
@@ -135,7 +143,6 @@ export async function POST(req: Request) {
       // any tabLabel that the template doesn't bind.
       const tierId = (property.pricing_tier ?? "pro") as PricingTierId;
       const tier = PRICING_TIERS[tierId] ?? PRICING_TIERS.pro;
-      const buyerPct = Number(property.buyer_agent_commission ?? 0);
 
       const today = new Date();
       const startDate = today.toLocaleDateString("en-US", {
@@ -242,7 +249,8 @@ export async function POST(req: Request) {
         // ── Economics (Lixtara plan) ──
         flat_fee: `$${tier.flatFee}`,
         commission_pct: `${tier.commissionPct}%`,
-        buyer_agent_commission: `${buyerPct}%`,
+        // "2.5%", "$12,000" o "0%" (sin oferta).
+        buyer_agent_commission: formatOffer(buyerOffer),
         // ── Term ──
         start_date: startDate,
         termination_date: terminationDateStr,
@@ -266,8 +274,9 @@ export async function POST(req: Request) {
         // Checkbox tabs (template must bind these labels on the Seller role):
         //  • lockbox_authorized → contract line 71, item E — checked only when
         //    the plan includes a lockbox.
-        //  • buyer_commission_ack → contract line 145, item A — always checked
-        //    (the seller agrees to publish a buyer-agent commission).
+        //  • buyer_commission_ack → contract line 145, item A — checked only when the
+        //    seller offers compensation (> 0). With 0% it stays unchecked and no CASSB-1
+        //    applies (src/lib/buyer-comp.ts#compensationAgreementsFor).
         checkboxTabs: {
           cash_only: property.cash_only === true,
           // Contract clause: "not currently occupied by tenant" — checked when
@@ -277,7 +286,7 @@ export async function POST(req: Request) {
             property.occupancy_status === "vacant" ||
             property.occupancy_status === "owner_occupied",
           lockbox_authorized: lockboxIncluded,
-          buyer_commission_ack: true,
+          buyer_commission_ack: buyerCommissionAck(buyerOffer),
         },
         emailSubject: "Please sign your Lixtara listing agreement",
       });

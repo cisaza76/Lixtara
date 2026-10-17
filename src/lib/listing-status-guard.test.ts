@@ -19,9 +19,17 @@ function fn(name: string): string {
   return sql.slice(i, sql.indexOf("$$;", sql.indexOf("as $$", i)) + 3);
 }
 
-/** Columnas de la lista de permitidas, tal como las declara la migración. */
+/** Columnas de la lista de permitidas, tal como las declara la ÚLTIMA migración que la define. */
 const permitidas = (() => {
-  const cuerpo = fn("properties_seller_writable_columns");
+  const dir = join(ROOT, "supabase/migrations");
+  const ultima = readdirSync(dir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => readFileSync(join(dir, f), "utf8"))
+    .filter((m) => m.includes("create or replace function public.properties_seller_writable_columns"))
+    .at(-1)!;
+  const i = ultima.indexOf("create or replace function public.properties_seller_writable_columns");
+  const cuerpo = ultima.slice(i, ultima.indexOf("$$;", ultima.indexOf("as $$", i)) + 3);
   return [...cuerpo.slice(cuerpo.indexOf("array[")).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
 })();
 

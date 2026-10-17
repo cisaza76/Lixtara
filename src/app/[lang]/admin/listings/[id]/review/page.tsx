@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { compensationAgreementsFor, formatOffer, offerFromRow } from "@/lib/buyer-comp";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
@@ -47,6 +48,8 @@ interface Property {
   tenant_notes: string | null;
   legal_description: string | null;
   buyer_agent_commission: number | null;
+  buyer_agent_comp_type: string | null;
+  buyer_agent_comp_amount: number | null;
 }
 
 interface SellerRequest {
@@ -167,7 +170,7 @@ export default async function ListingReviewPage({
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description,buyer_agent_commission",
+      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description,buyer_agent_commission,buyer_agent_comp_type,buyer_agent_comp_amount",
     )
     .eq("id", id)
     .maybeSingle();
@@ -478,12 +481,22 @@ export default async function ListingReviewPage({
                 prop.pricing_tier.slice(1)
             : null,
         )}
-        {field(
-          "Buyer-agent %",
-          prop.buyer_agent_commission != null
-            ? `${prop.buyer_agent_commission}%`
-            : null,
-        )}
+        {(() => {
+          const offer = offerFromRow(prop);
+          return (
+            <>
+              {field("Buyer's agent compensation", offer ? formatOffer(offer) : null)}
+              {field(
+                "CASSB-1",
+                offer
+                  ? compensationAgreementsFor(offer) === 1
+                    ? "Needed when a buyer's agent asks for it"
+                    : "Not needed (0%)"
+                  : null,
+              )}
+            </>
+          );
+        })()}
         {field("Lot size", prop.lot_size)}
       </section>
 
