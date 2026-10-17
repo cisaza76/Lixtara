@@ -27,5 +27,8 @@ export interface LegalContent {
 /** Single source for the "last updated / effective" date shown on every doc. */
 export const LEGAL_LAST_UPDATED = "2026-09-02";
 
-/** Cookie Policy: solo analítica (GA4 + Clarity) y Sentry declarado; #193, en producción el 2026-10-16. */
+/** Cookie Policy: cookies de Microsoft Clarity detalladas (y antes, #193: solo analítica). */
 export const COOKIES_LAST_UPDATED = "2026-10-16";
+
+/** Privacy Policy: sección 6.1, análisis de uso y grabación de sesiones (Microsoft Clarity). */
+export const PRIVACY_LAST_UPDATED = "2026-10-16";

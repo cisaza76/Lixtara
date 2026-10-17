@@ -183,14 +183,15 @@ export default async function RootLayout({
                       <LayoutDashboard className="w-4 h-4" />
                       <span className="hidden lg:inline">{authNavCopy.dashboard}</span>
                     </Link>
-                    <Link
+                    {/* <a>, no <Link>: /account se carga completa (Clarity no la graba). */}
+                    <a
                       href={`/${lang}/account`}
                       title={authNavCopy.account}
                       className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/70 hover:text-gold transition-colors"
                     >
                       <UserRound className="w-4 h-4" />
                       <span className="hidden lg:inline">{authNavCopy.account}</span>
-                    </Link>
+                    </a>
                     <form action={`/${lang}/auth/sign-out`} method="POST">
                       <button
                         type="submit"
@@ -448,7 +449,7 @@ export default async function RootLayout({
         />
         {/* Con analítica configurada: banner de consentimiento (nada se carga sin aceptar).
             Sin ella: el aviso informativo de siempre (solo cookies esenciales). */}
-        {/* Clarity no graba /listing, /account, /auth…: ahí se entra con carga completa. */}
+        {/* Clarity no graba /account (ni /admin): se entra y se sale con carga completa. */}
         {analytics.gtmId && <RecordingGuard />}
         {analytics.enabled ? (
           <AnalyticsConsent

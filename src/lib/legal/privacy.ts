@@ -103,6 +103,8 @@ export const privacyDoc: LegalContent = {
               "Upstash, for rate-limiting and abuse protection.",
               "Cloudflare (Turnstile), for bot protection on sign-in, sign-up, password-reset, and listing forms.",
               "Vercel, for hosting the Service.",
+              "Google LLC (Google Analytics), for usage analytics, only if you accept analytics cookies.",
+              "Microsoft (Clarity), for usage analytics and session recording, only if you accept analytics cookies (see Section 6.1).",
             ],
           },
           {
@@ -150,6 +152,20 @@ export const privacyDoc: LegalContent = {
         body: [
           "We and our service providers use cookies and similar technologies to operate the Service, remember your preferences, keep you signed in, understand how the Service is used, and improve it.",
           "For a detailed description of the cookies and similar technologies we use and the choices available to you, please see our separate Cookie Policy.",
+        ],
+        sub: [
+          {
+            heading: "6.1 Usage Analytics and Session Recording",
+            body: [
+              "We use Microsoft Clarity, a service of Microsoft Corporation, to understand how the Service is used through heatmaps and session recordings. This helps us find where the site is hard to use and improve it.",
+              "Clarity runs only if you accept analytics cookies in the cookie banner. You can withdraw your consent at any time through \"Cookie settings\" in the site footer; after that, Clarity is no longer loaded.",
+            ],
+            bullets: [
+              "The text and data you type are hidden in the recordings. Photos, documents and signatures are hidden as well.",
+              "Your account area (/account) is not recorded. Payment is not recorded either: it takes place on Stripe's pages, outside our site.",
+              "Microsoft processes this data under its own privacy statement: https://privacy.microsoft.com/privacystatement",
+            ],
+          },
         ],
       },
       {
@@ -334,6 +350,8 @@ export const privacyDoc: LegalContent = {
               "Upstash, para la limitación de tasa (rate-limiting) y la protección contra abusos.",
               "Cloudflare (Turnstile), para la protección contra bots en los formularios de inicio de sesión, registro, restablecimiento de contraseña y listing.",
               "Vercel, para el alojamiento del Servicio.",
+              "Google LLC (Google Analytics), para análisis de uso, solo si usted acepta las cookies de analítica.",
+              "Microsoft (Clarity), para análisis de uso y grabación de sesiones, solo si usted acepta las cookies de analítica (consulte la Sección 6.1).",
             ],
           },
           {
@@ -381,6 +399,20 @@ export const privacyDoc: LegalContent = {
         body: [
           "Nosotros y nuestros proveedores de servicios usamos cookies y tecnologías similares para operar el Servicio, recordar sus preferencias, mantener su sesión iniciada, comprender cómo se utiliza el Servicio y mejorarlo.",
           "Para una descripción detallada de las cookies y tecnologías similares que usamos y de las opciones disponibles para usted, consulte nuestra Política de Cookies independiente.",
+        ],
+        sub: [
+          {
+            heading: "6.1 Análisis de Uso y Grabación de Sesiones",
+            body: [
+              "Usamos Microsoft Clarity, un servicio de Microsoft Corporation, para entender cómo se usa el Servicio mediante mapas de calor y grabaciones de sesión. Esto nos ayuda a encontrar dónde el sitio es difícil de usar y a mejorarlo.",
+              "Clarity solo funciona si usted acepta las cookies de analítica en el aviso de cookies. Puede retirar su consentimiento en cualquier momento en \"Configurar cookies\", en el pie del sitio; a partir de ese momento, Clarity deja de cargarse.",
+            ],
+            bullets: [
+              "El texto y los datos que usted escribe se ocultan en las grabaciones. Las fotos, los documentos y las firmas también se ocultan.",
+              "No se graba su área de cuenta (/account). Tampoco se graba el pago: ocurre en las páginas de Stripe, fuera de nuestro sitio.",
+              "Microsoft procesa estos datos según su propia declaración de privacidad: https://privacy.microsoft.com/privacystatement",
+            ],
+          },
         ],
       },
       {

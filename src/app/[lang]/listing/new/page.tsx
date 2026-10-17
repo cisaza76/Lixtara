@@ -2991,7 +2991,8 @@ export default async function ListingNewPage({
                               : copy.step6.primaryNone,
                           )}
                       </p>
-                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {/* Clarity: las fotos del inmueble van enmascaradas (solo miniaturas, sin botones). */}
+                      <div data-clarity-mask="true" className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                         {photos.slice(0, 12).map((p) => (
                           <div
                             key={p.id}

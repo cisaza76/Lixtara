@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -252,12 +251,14 @@ export default async function AccountPage({
               { href: `/${lang}/auth/forgot-password`, label: copy.toolForgot },
             ].map((tool) => (
               <li key={tool.href}>
-                <Link
+                {/* <a>, no <Link>: al salir de /account la página se carga completa para que
+                    Clarity vuelva a cargarse en el embudo (/listing, /dashboard…). */}
+                <a
                   href={tool.href}
                   className="flex items-center justify-between border border-gold-soft px-4 py-3 text-ink/80 hover:border-gold hover:text-ink transition-colors"
                 >
                   {tool.label} <span aria-hidden className="text-gold">→</span>
-                </Link>
+                </a>
               </li>
             ))}
           </ul>

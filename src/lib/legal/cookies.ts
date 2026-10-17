@@ -333,7 +333,8 @@ export const cookiesDoc: LegalContent = {
   },
 };
 
-// ── Variante con analítica (2026-10-11; publicidad retirada 2026-10-15) ───────────────
+// ── Variante con analítica (2026-10-11; publicidad retirada 2026-10-15; Clarity graba el
+//    embudo y no /account, cookies de Clarity detalladas: 2026-10-16) ─────────────────────
 // La política tiene que ser cierta en cada estado del sitio. Sin herramientas configuradas
 // (sin NEXT_PUBLIC_GTM_ID ni NEXT_PUBLIC_POSTHOG_KEY) se muestra el texto de arriba tal cual.
 // Con alguna, estos párrafos se reemplazan por la descripción real, SOLO con consentimiento
@@ -386,7 +387,7 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
     const tools = [
       t.gtm && "Google Analytics 4 (loaded through Google Tag Manager) to measure traffic sources and campaigns",
       t.gtm &&
-        "Microsoft Clarity to understand how visitors interact with our pages through aggregated heatmaps and session replays, configured to mask the text you type",
+        "Microsoft Clarity (Microsoft Corporation) to understand how visitors use our pages through heatmaps and session recordings. Clarity hides the text and data you type, and we also hide photos, documents and signatures; your account area (/account) and payment, which Stripe processes, are not recorded",
       t.posthog && "PostHog to understand how visitors use our search and listing flows, without recording sessions",
     ].filter(Boolean) as string[];
     const list = tools.length > 1 ? `${tools.slice(0, -1).join(", ")}, and ${tools.at(-1)}` : tools[0];
@@ -403,7 +404,7 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
       [
         src.analyticsBullet1,
         t.gtm
-          ? "Google Analytics 4 / Google Tag Manager (cookies such as _ga) and Microsoft Clarity (cookies such as _clck and _clsk), only with your consent."
+          ? "Google Analytics 4 / Google Tag Manager (cookies such as _ga) and Microsoft Clarity, only with your consent. Clarity sets _clck (about 1 year) and _clsk (about 1 day) on our domain. Microsoft may also set, on its own domains, CLID (about 1 year), MUID (about 1 year), ANONCHK (about 10 minutes), MR (about 7 days) and SM (session). Durations are set by Microsoft and may change."
           : "PostHog (cookies and local storage such as ph_*), only with your consent.",
       ],
       [
@@ -425,7 +426,7 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
   const tools = [
     t.gtm && "Google Analytics 4 (cargado a través de Google Tag Manager) para medir fuentes de tráfico y campañas",
     t.gtm &&
-      "Microsoft Clarity para entender cómo los visitantes interactúan con nuestras páginas mediante mapas de calor agregados y grabaciones de sesión, configurado para ocultar el texto que usted escribe",
+      "Microsoft Clarity (Microsoft Corporation) para entender cómo los visitantes usan nuestras páginas mediante mapas de calor y grabaciones de sesión. Clarity oculta el texto y los datos que usted escribe, y nosotros ocultamos además las fotos, los documentos y las firmas; no se graba su área de cuenta (/account) ni el pago, que procesa Stripe",
     t.posthog && "PostHog para entender cómo los visitantes usan nuestra búsqueda y nuestros flujos de publicación, sin grabar sesiones",
   ].filter(Boolean) as string[];
   const list = tools.length > 1 ? `${tools.slice(0, -1).join(", ")} y ${tools.at(-1)}` : tools[0];
@@ -442,7 +443,7 @@ function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
     [
       src.analyticsBullet1,
       t.gtm
-        ? "Google Analytics 4 / Google Tag Manager (cookies como _ga) y Microsoft Clarity (cookies como _clck y _clsk), solo con su consentimiento."
+        ? "Google Analytics 4 / Google Tag Manager (cookies como _ga) y Microsoft Clarity, solo con su consentimiento. Clarity establece _clck (aproximadamente 1 año) y _clsk (aproximadamente 1 día) en nuestro dominio. Microsoft también puede establecer, en sus propios dominios, CLID (aproximadamente 1 año), MUID (aproximadamente 1 año), ANONCHK (aproximadamente 10 minutos), MR (aproximadamente 7 días) y SM (de sesión). Las duraciones las fija Microsoft y pueden cambiar."
         : "PostHog (cookies y almacenamiento local como ph_*), solo con su consentimiento.",
     ],
     [

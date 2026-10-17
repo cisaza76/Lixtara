@@ -11,11 +11,12 @@ import {
   homePriceRange, markPageview, resultsBucket, track, trackThen,
 } from "@/lib/analytics";
 import {
-  ANALYTICS_COOKIE_RE, GRANTED_CONSENT, analyticsConfig, consentTools, isAnalyticsExcludedPath, isRecordingExcludedPath,
+  ANALYTICS_COOKIE_RE, GRANTED_CONSENT, analyticsConfig, consentTools, isAnalyticsExcludedPath, isRecordingExcludedPath, needsFullLoad,
   readConsent,
   sanitizePosthogProperties, sanitizeUrl,
 } from "@/lib/analytics-config";
 import { recordServerEvent } from "@/lib/analytics.server";
+import { t } from "@/lib/i18n";
 
 describe("listingStepEvent", () => {
   it("names each of the 8 listing steps with a stable slug", () => {
@@ -240,15 +241,24 @@ describe("cada herramienta por su lado (GTM ya no depende de PostHog)", () => {
   });
 });
 
-describe("Clarity: rutas que nunca graba (se entra con carga completa)", () => {
-  it("registro, cuenta, autenticación, panel y admin, en los dos idiomas", () => {
-    for (const p of ["/en/listing/new", "/es/listing/continue", "/en/account", "/es/auth/confirm", "/en/sign-in",
-      "/es/sign-up", "/en/dashboard/listings/x", "/es/admin"]) {
+describe("Clarity: graba el embudo, nunca /account (se entra y se sale con carga completa)", () => {
+  it("/account y /admin no se graban; el embudo y la autenticación sí", () => {
+    for (const p of ["/en/account", "/es/account", "/es/account/x", "/en/admin", "/es/admin/seller-leads"]) {
       expect(isRecordingExcludedPath(p), p).toBe(true);
     }
-    for (const p of ["/en", "/es/properties", "/en/property/abc", "/en/listings-guide", "/en/accounting"]) {
+    for (const p of ["/en", "/es/properties", "/en/listing/new", "/es/listing/continue", "/es/auth/verify",
+      "/en/sign-in", "/es/sign-up", "/en/dashboard", "/en/accounting", "/en/accounts"]) {
       expect(isRecordingExcludedPath(p), p).toBe(false);
     }
+  });
+  it("entrar a /account siempre recarga; salir hacia el embudo recarga solo con consentimiento", () => {
+    expect(needsFullLoad("/en/listing/new", "/en/account", false)).toBe(true);
+    expect(needsFullLoad("/es/listing/new", "/es/account", true)).toBe(true);
+    expect(needsFullLoad("/en/sign-in", "/en/account", false)).toBe(true);
+    expect(needsFullLoad("/en/account", "/en/listing/new", true)).toBe(true);
+    expect(needsFullLoad("/en/account", "/en/listing/new", false)).toBe(false);
+    expect(needsFullLoad("/en/listing/new", "/en/dashboard", true)).toBe(false);
+    expect(needsFullLoad("/en/account", "/en/account", true)).toBe(false);
   });
 });
 
@@ -271,9 +281,27 @@ describe("consentimiento: lo que concede 'Aceptar' y lo que se borra al rechazar
   it("el banner nombra solo las herramientas configuradas", () => {
     const gtm = "GTM-ABC1234";
     const key = "phc_" + "a".repeat(40);
-    expect(consentTools({ gtmId: gtm, posthogKey: null }, "en")).toBe("Google Analytics and Microsoft Clarity");
-    expect(consentTools({ gtmId: gtm, posthogKey: key }, "es")).toBe("Google Analytics, Microsoft Clarity y PostHog");
+    expect(consentTools({ gtmId: gtm, posthogKey: null }, "en")).toBe(
+      "Google Analytics and Microsoft Clarity, which records how pages are used with personal information hidden",
+    );
+    expect(consentTools({ gtmId: gtm, posthogKey: key }, "es")).toBe(
+      "Google Analytics, PostHog y Microsoft Clarity, que graba cómo se usan las páginas con tu información personal oculta",
+    );
     expect(consentTools({ gtmId: null, posthogKey: key }, "en")).toBe("PostHog");
+  });
+
+  it("el aviso con GTM dice exactamente el texto aprobado (2026-10-16), en EN y ES", () => {
+    const c = { gtmId: "GTM-5KGLHNL4", posthogKey: null };
+    const msg = (lang: "en" | "es") => t(lang).cookieNotice.consentMessage.replace("{tools}", consentTools(c, lang));
+    expect(msg("en")).toBe(
+      "We use essential cookies to run the site. With your permission, we also use analytics cookies (Google Analytics and Microsoft Clarity, which records how pages are used with personal information hidden) to improve the site. No advertising cookies.",
+    );
+    expect(msg("es")).toBe(
+      "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica (Google Analytics y Microsoft Clarity, que graba cómo se usan las páginas con tu información personal oculta) para mejorar el sitio. No usamos cookies de publicidad.",
+    );
+    expect(t("en").cookieNotice.learnMore).toBe("Cookie Policy");
+    expect(t("es").cookieNotice.learnMore).toBe("Política de cookies");
+    for (const lang of ["en", "es"] as const) expect(msg(lang)).not.toMatch(/!|\p{Extended_Pictographic}/u);
   });
 });
 
