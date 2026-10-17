@@ -43,6 +43,10 @@ interface AccountGateLabels {
   errPassword: string;
   errExists: string;
   errFailed: string;
+  /** La contraseña apareció en una filtración (Supabase: weak_password + "pwned"). */
+  errLeaked: string;
+  /** Supabase la rechazó por otra regla de su política. */
+  errRejected: string;
   errCodeFormat: string;
   errCodeInvalid: string;
 }
@@ -118,6 +122,10 @@ function errorMessage(error: string | null, labels: AccountGateLabels): string |
       return labels.errExists;
     case "failed":
       return labels.errFailed;
+    case "leaked":
+      return labels.errLeaked;
+    case "rejected":
+      return labels.errRejected;
     default:
       return null;
   }

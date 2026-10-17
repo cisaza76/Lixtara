@@ -49,7 +49,7 @@ import {
   improveListingDescription,
   improveShowingInstructions,
 } from "@/lib/ai";
-import { lookupMiamiDadeProperty } from "@/lib/miami-dade";
+import { lookupMiamiDadeProperty, unitFromStoredStreet } from "@/lib/miami-dade";
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
@@ -82,8 +82,10 @@ import {
   suggestedTierParam,
 } from "@/lib/listing-step1-form";
 import { AppFormValidation } from "@/components/app-form-validation";
+import { passwordRejection } from "@/lib/auth/password-errors";
 import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
+import { hasPaidPhotography } from "@/lib/listing-photos.server";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
@@ -95,6 +97,12 @@ const PROPERTY_TYPES = [
   "townhouse",
   "multi_family",
 ] as const;
+
+/** Paso 7: contraseña rechazada por Supabase (filtrada o débil) → clave de `aerror`. */
+function passwordErrorKey(error: unknown): "leaked" | "rejected" | null {
+  const r = passwordRejection(error);
+  return r === "leaked" ? "leaked" : r === "weak" ? "rejected" : null;
+}
 
 function clampStep(value: number): number {
   return Math.min(Math.max(value, 1), TOTAL_STEPS);
@@ -146,7 +154,7 @@ interface Draft {
   bathrooms: number;
   sqft: number;
   lot_size: number | null;
-  year_built: number;
+  year_built: number | null;
   list_price: number;
   description: string | null;
   showing_instructions: string | null;
@@ -377,10 +385,10 @@ export default async function ListingNewPage({
       const fieldsEmpty =
         draft.bedrooms === 0 &&
         draft.sqft === 0 &&
-        draft.year_built <= new Date().getFullYear();
+        (draft.year_built == null || draft.year_built >= new Date().getFullYear());
       if (isMiamiDade && fieldsEmpty) {
         tasks.push(
-          lookupMiamiDadeProperty(baseStreetForLookup(draft.address_street), draft.address_zip).then(
+          lookupMiamiDadeProperty(baseStreetForLookup(draft.address_street), draft.address_zip, unitFromStoredStreet(draft.address_street)).then(
             (result) => {
               if (result.folio) updates.folio = result.folio;
               if (result.found && result.details) {
@@ -682,7 +690,9 @@ export default async function ListingNewPage({
         bedrooms: 0,
         bathrooms: 1,
         sqft: 0,
-        year_built: new Date().getFullYear(),
+        // Sin año hasta que lo dé el condado o el vendedor. Antes se guardaba el año actual,
+        // que se mostraba como si fuera el dato real (p. ej. 2026 en 100 Biscayne Blvd).
+        year_built: null,
         list_price: 0,
         mls_status: "draft",
         ...(suggestedTier ? { pricing_tier: suggestedTier } : {}),
@@ -1014,7 +1024,7 @@ export default async function ListingNewPage({
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
     }
 
-    const result = await lookupMiamiDadeProperty(baseStreetForLookup(row.address_street), row.address_zip);
+    const result = await lookupMiamiDadeProperty(baseStreetForLookup(row.address_street), row.address_zip, unitFromStoredStreet(row.address_street));
     if (!result.found || !result.details) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=notfound`);
     }
@@ -1323,7 +1333,10 @@ export default async function ListingNewPage({
       .select("pricing_tier")
       .eq("id", id)
       .maybeSingle();
-    const needsOwnPhotos = ownPhotosRequired(prop?.pricing_tier as string | null);
+    const needsOwnPhotos = ownPhotosRequired(
+      prop?.pricing_tier as string | null,
+      await hasPaidPhotography(supabase, id),
+    );
 
     const { count } = await supabase
       .from("property_photos")
@@ -1331,8 +1344,9 @@ export default async function ListingNewPage({
       .eq("property_id", id);
     const photoCount = count ?? 0;
 
-    // Pro/Concierge include professional photography, so a seller who uploads
-    // none may skip the minimum and the rights box. DIY (Essentials), and anyone
+    // Pro/Concierge include professional photography (and Essentials with the paid
+    // add-on), so a seller who uploads none may skip the minimum and the rights box.
+    // DIY (Essentials without it), and anyone
     // who DID upload, still confirm rights; Essentials still needs MIN_OWN_PHOTOS.
     if (
       (needsOwnPhotos || photoCount > 0) &&
@@ -1458,7 +1472,7 @@ export default async function ListingNewPage({
           account_pending: false,
         },
       });
-      if (pwError) redirect(`${back}&aerror=failed`);
+      if (pwError) redirect(`${back}&aerror=${passwordErrorKey(pwError) ?? "failed"}`);
       const svc = createService();
       await svc
         .from("users")
@@ -1484,9 +1498,9 @@ export default async function ListingNewPage({
       },
     );
     if (error) {
-      const code = /registered|already/i.test(error.message)
-        ? "exists"
-        : "failed";
+      const code =
+        passwordErrorKey(error) ??
+        (/registered|already/i.test(error.message) ? "exists" : "failed");
       redirect(`${back}&aerror=${code}`);
     }
 
@@ -1611,8 +1625,13 @@ export default async function ListingNewPage({
     redirect(`${back}&verified=1&ev=email_verified_account`);
   }
 
-  // Paso 5: misma regla que nextFromStep5 (src/lib/listing-photos.ts).
-  const photosRequired = ownPhotosRequired(draft?.pricing_tier ?? null);
+  // Paso 5: misma regla que nextFromStep5 (src/lib/listing-photos.ts). El extra de
+  // fotografía pagado cuenta como en Pro.
+  const photographyPaid =
+    draftId && (step === 5 || step === 6)
+      ? await hasPaidPhotography(await createClient(), draftId)
+      : false;
+  const photosRequired = ownPhotosRequired(draft?.pricing_tier ?? null, photographyPaid);
 
   const errorMessage =
     sp.error === "captcha"
@@ -2160,7 +2179,10 @@ export default async function ListingNewPage({
                 name="year_built"
                 type="text"
                 defaultValue={
-                  draft?.year_built && draft.year_built > 1800
+                  draft?.year_built &&
+                  draft.year_built > 1800 &&
+                  // Borradores viejos nacían con el año actual: en uno sin tocar no es un dato.
+                  (draft.year_built < new Date().getFullYear() || draft.bedrooms > 0 || draft.sqft > 0)
                     ? String(draft.year_built)
                     : ""
                 }
@@ -2501,7 +2523,9 @@ export default async function ListingNewPage({
             <p className="text-base leading-relaxed text-ink/70">
               {photosRequired
                 ? copy.step5.body.replace("{min}", String(MIN_OWN_PHOTOS))
-                : copy.step5.bodyPro}
+                : photographyPaid && draft?.pricing_tier === "essentials"
+                  ? copy.step5.bodyPhotographyPaid
+                  : copy.step5.bodyPro}
             </p>
           </div>
 
@@ -2538,8 +2562,20 @@ export default async function ListingNewPage({
             </div>
           )}
 
+          {/* Essentials with the add-on already paid: no second checkout. */}
+          {draft?.pricing_tier === "essentials" && photographyPaid && (
+            <div className="border border-gold bg-gold/5 p-5 flex flex-col gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                {copy.step5.photoAddon.purchasedTitle}
+              </p>
+              <p className="text-sm text-ink/80 leading-relaxed">
+                {copy.step5.photoAddon.purchasedBody}
+              </p>
+            </div>
+          )}
+
           {/* Essentials: optional professional-photography add-on ($495) */}
-          {draft?.pricing_tier === "essentials" && draftId && (
+          {draft?.pricing_tier === "essentials" && !photographyPaid && draftId && (
             <div className="border border-gold-soft bg-ivory-strong/30 p-5 flex flex-col gap-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
                 {copy.step5.photoAddon.title}
@@ -2726,7 +2762,7 @@ export default async function ListingNewPage({
               draft.sqft === 0 ||
               draft.list_price === 0 ||
               !draft.description ||
-              (!tier?.includesPhotography && photos.length < 10);
+              (ownPhotosRequired(draft.pricing_tier, photographyPaid) && photos.length < MIN_OWN_PHOTOS);
 
             const SectionHeader = ({
               title,
@@ -2861,7 +2897,7 @@ export default async function ListingNewPage({
                         <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
                           {copy.step6.builtLabel}
                         </span>
-                        <span className="text-ink">{draft.year_built}</span>
+                        <span className="text-ink">{draft.year_built ?? "—"}</span>
                       </div>
                       {(draft.parking_spaces != null ||
                         draft.hoa_fee != null ||
@@ -3346,6 +3382,8 @@ export default async function ListingNewPage({
                 errPassword: copy.step7.gateErrPassword,
                 errExists: copy.step7.gateErrExists,
                 errFailed: copy.step7.gateErrFailed,
+                errLeaked: t(lang).auth.errors.leakedPassword,
+                errRejected: t(lang).auth.errors.passwordRejected,
                 errCodeFormat: copy.step7.gateErrCodeFormat,
                 errCodeInvalid: copy.step7.gateErrCodeInvalid,
               }}

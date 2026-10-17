@@ -83,14 +83,98 @@ export function mapDorToType(dor: string | null | undefined): string | null {
   return null;
 }
 
+/**
+ * La unidad que el vendedor escribió en el paso 1 (se guarda como "<calle>, Unit <unidad>"),
+ * para que la búsqueda del condado tome la parcela de ESA unidad y no otra del edificio.
+ */
+export function unitFromStoredStreet(street: string): string | null {
+  const m = street.match(/(?:\b(?:unit|apt|apartment|suite|ste)\b|#)\s*#?\s*([A-Za-z0-9-]+)\s*$/i);
+  return m ? m[1] : null;
+}
+
+/** Lo que usamos de cada candidato de GetAddress. */
+export interface CountyCandidate {
+  Strap?: unknown;
+  Folio?: unknown;
+  SiteAddress?: unknown;
+  SiteUnit?: unknown;
+}
+
+function normToken(t: string): string {
+  // "6th" → "6", "Ave." → "AVE"
+  return t.toUpperCase().replace(/[.,#]/g, "").replace(/^(\d+)(ST|ND|RD|TH)$/, "$1");
+}
+
+/** Número de casa + primera palabra del nombre de la calle (sin direccionales). */
+function streetKey(street: string): { number: string; name: string } | null {
+  const tokens = street.trim().split(/\s+/).map(normToken).filter(Boolean);
+  const number = tokens[0] ?? "";
+  if (!/^\d+[A-Z]?$/.test(number)) return null;
+  const DIRS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW"]);
+  const name = tokens.slice(1).find((t) => !DIRS.has(t)) ?? "";
+  return name ? { number, name } : null;
+}
+
+function normUnit(u: unknown): string {
+  return String(u ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^0+(?=\w)/, "");
+}
+
+/**
+ * Regla (2026-10-16): el condado devuelve la propiedad más PARECIDA, no la exacta. Con
+ * "100 Biscayne Blvd" devolvía 130 Biscayne Blvd (un edificio de oficinas) y con
+ * "500 Brickell Ave" el área común del condominio; el autollenado copiaba datos de otra
+ * parcela (habitaciones, pies², impuestos y la descripción legal del contrato). Solo se
+ * acepta un candidato con el MISMO número de casa y la misma calle, y:
+ *   - con unidad escrita: el candidato de esa unidad;
+ *   - sin unidad: un único candidato (si hay varios, es un edificio de unidades → ninguno).
+ * Sin candidato aceptable → null (el vendedor completa a mano).
+ */
+export function pickCountyCandidate(
+  candidates: CountyCandidate[],
+  street: string,
+  unit?: string | null,
+): string | null {
+  const want = streetKey(street);
+  if (!want) return null;
+  const sameStreet = candidates.filter((c) => {
+    const got = streetKey(String(c.SiteAddress ?? ""));
+    return got !== null && got.number === want.number && got.name === want.name;
+  });
+  const wantUnit = normUnit(unit);
+  const matches = wantUnit ? sameStreet.filter((c) => normUnit(c.SiteUnit) === wantUnit) : sameStreet;
+  if (matches.length !== 1) return null;
+  const folio = matches[0].Strap ?? matches[0].Folio;
+  return folio ? String(folio).replace(/-/g, "") : null;
+}
+
+/**
+ * Año de construcción del condado. PropertyInfo.YearBuilt puede venir como texto
+ * ("Multiple (See Building Info.)") o "0": entonces se usa el año REAL (`Actual`) más
+ * antiguo de los edificios. Regla de Camilo (2026-10-16): un año igual o mayor al actual
+ * no se acepta (el vendedor lo escribe si de verdad es construcción nueva).
+ */
+export function countyYearBuilt(
+  yearBuilt: unknown,
+  buildings: Array<Record<string, unknown>>,
+  currentYear: number,
+): number | null {
+  const ok = (y: number) => Number.isInteger(y) && y > 1800 && y < currentYear;
+  const direct = Number(yearBuilt);
+  if (ok(direct)) return direct;
+  const actual = buildings.map((b) => Number(b.Actual)).filter(ok);
+  return actual.length > 0 ? Math.min(...actual) : null;
+}
+
 async function searchByAddress(
   street: string,
   zip: string,
+  unit?: string | null,
 ): Promise<string | null> {
   const url =
     `${MD_PA_BASE}?Operation=GetAddress&clientAppName=PropertySearch` +
-    `&from=1&to=1&myAddress=${encodeURIComponent(street)}` +
-    `&myUnit=&myCity=&myState=FL&myZipCode=${encodeURIComponent(zip)}` +
+    `&from=1&to=20&myAddress=${encodeURIComponent(street)}` +
+    // Con unidad, el condado filtra por ella (un edificio puede tener cientos).
+    `&myUnit=${encodeURIComponent(unit?.trim() ?? "")}&myCity=&myState=FL&myZipCode=${encodeURIComponent(zip)}` +
     `&RollYear=`;
   const res = await fetch(url, {
     headers: {
@@ -107,11 +191,8 @@ async function searchByAddress(
   } catch {
     return null;
   }
-  const infos =
-    (json?.MinimumPropertyInfos as Array<Record<string, unknown>>) ?? [];
-  const folio =
-    (infos[0]?.Strap as string) ?? (infos[0]?.Folio as string) ?? null;
-  return folio ? String(folio).replace(/-/g, "") : null;
+  const infos = (json?.MinimumPropertyInfos as CountyCandidate[]) ?? [];
+  return pickCountyCandidate(infos, street, unit);
 }
 
 async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
@@ -165,9 +246,7 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
       0,
   );
   const lot = Number(info.LotSize ?? 0);
-  const year = Number(
-    info.YearBuilt ?? building.Actual ?? building.Effective ?? 0,
-  );
+  const year = countyYearBuilt(info.YearBuilt, buildingInfos, new Date().getFullYear());
   const dor =
     (info.DORDescription as string) ?? (info.DORCode as string) ?? "";
 
@@ -193,7 +272,7 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
     bathrooms: totalBaths > 0 && totalBaths < 30 ? totalBaths : null,
     sqft: sqft > 100 && sqft < 50000 ? Math.round(sqft) : null,
     lot_size: lot > 0 ? lot : null,
-    year_built: year > 1800 && year < 2100 ? year : null,
+    year_built: year,
     property_type: mapDorToType(String(info.DORCode ?? dor)),
     legal_description: legalDescription,
     tax_annual_amount: taxAnnualEstimate,
@@ -203,12 +282,13 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
 export async function lookupMiamiDadeProperty(
   street: string,
   zip: string,
+  unit?: string | null,
 ): Promise<MiamiDadeLookupResult> {
   try {
     if (!street?.trim() || !/^\d{5}$/.test(zip ?? "")) {
       return { found: false, error: "street and 5-digit zip required" };
     }
-    const folio = await searchByAddress(street.trim(), zip);
+    const folio = await searchByAddress(street.trim(), zip, unit);
     if (!folio) return { found: false };
     const details = await fetchByFolio(folio);
     if (!details) return { found: false, folio };

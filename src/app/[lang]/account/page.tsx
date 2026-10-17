@@ -3,6 +3,7 @@ import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import { Field, SubmitButton, ErrorBanner, SuccessBanner } from "@/components/auth-shell";
+import { passwordRejection } from "@/lib/auth/password-errors";
 
 // "My account": the signed-in person sees the email they registered with,
 // edits their name and phone (the name is the signer on the listing
@@ -95,8 +96,10 @@ export default async function AccountPage({
     const { error } = await sb.auth.updateUser({ password });
     if (error) {
       // Supabase may ask for a recent sign-in before a password change.
+      const rejected = passwordRejection(error);
       const reauth = /reauth|recent|nonce/i.test(error.message);
-      redirect(`${back}?error=${reauth ? "reauth" : "failed"}#password`);
+      const key = rejected === "leaked" ? "leaked" : rejected === "weak" ? "rejected" : reauth ? "reauth" : "failed";
+      redirect(`${back}?error=${key}#password`);
     }
 
     // A step-1 account that now has a name and a password is complete: the
@@ -141,6 +144,8 @@ export default async function AccountPage({
     mismatch: copy.errMismatch,
     reauth: copy.errReauth,
     failed: copy.errFailed,
+    leaked: t(lang).auth.errors.leakedPassword,
+    rejected: t(lang).auth.errors.passwordRejected,
   };
   const saved: Record<string, string> = {
     profile: copy.savedProfile,

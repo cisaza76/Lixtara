@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { messageFor, type ValidationLabels } from "@/components/localized-validation";
+import { fieldErrorId } from "@/lib/field-error-id";
 
 // Validación de la app en los formularios de /listing/new. Sin esto el navegador validaba
 // por su cuenta (burbuja nativa, en el idioma del navegador): el envío nunca llegaba y
@@ -56,9 +57,6 @@ function placeMessage(form: HTMLFormElement, el: Control, p: HTMLElement): Eleme
   return el;
 }
 
-function errorId(form: HTMLFormElement, name: string): string {
-  return `${form.id || "listing-form"}-${name}-error`;
-}
 
 function unmark(el: Control) {
   el.removeAttribute("aria-invalid");
@@ -144,7 +142,7 @@ export function AppFormValidation({
         const text = (el.validity.valueMissing && fieldMessages[el.name]) || messageFor(el, el.validity, labels);
         const p = document.createElement("p");
         p.setAttribute(ERROR_ATTR, key);
-        p.id = errorId(form, key);
+        p.id = fieldErrorId(form, key);
         p.className = "text-sm text-red-700 leading-relaxed";
         p.textContent = text;
         const where = placeMessage(form, el, p);
