@@ -1,157 +1,159 @@
 import type { LegalContent } from "./types";
+import { PRIVACY_PROVIDERS, providerBullet } from "./providers";
+
+// Política de Privacidad. BORRADOR 2026-10 para revisión del abogado de Lixtara: no es un
+// texto final y no afirma que Lixtara cumpla una ley determinada. Las dudas van marcadas
+// [VERIFICAR: …] y quedan visibles hasta la revisión.
+// Marcadores ({legalName}, {brokerageAddress}, {privacyEmail}, …): src/lib/legal/config.ts.
+// La lista de proveedores (4.1) se genera de src/lib/legal/providers.ts.
 
 export const privacyDoc: LegalContent = {
   en: {
     title: "Privacy Policy",
     intro: [
-      "This Privacy Policy explains how Lixtara collects, uses, shares, and protects information about you when you use our website, platform, and related services (the \"Service\"). Lixtara is a Miami, Florida-based real-estate technology platform that connects sellers who list their own homes with buyers who make offers, and supports the e-signing of real-estate agreements.",
-      "Lixtara is operated by Lixtara. By accessing or using the Service, you acknowledge that you have read and understood this Privacy Policy. If you do not agree with our practices, please do not use the Service.",
-      "We are a United States-based company, and we process information in the United States. Please read this Policy together with our Terms of Service and our Cookie Policy.",
+      "This Privacy Policy explains how {legalName} (\"Lixtara,\" \"we,\" \"us\") collects, uses, shares and protects personal information when you use lixtara.com and our related services (the \"Service\"). Lixtara is a licensed Florida real estate brokerage (FL #{brokerageLicense}) located at {brokerageAddress}.",
+      "Please read it together with our Terms of Service and our Cookie Policy. If you do not agree with this Policy, please do not use the Service.",
     ],
     sections: [
       {
-        heading: "1. Introduction and Scope",
+        heading: "1. Who We Are and What This Policy Covers",
         body: [
-          "This Privacy Policy applies to personal information we collect through the Lixtara website, web application, and any associated features, including our seller listing tools, buyer offer tools, the \"Loui\" AI assistant, virtual staging, and the \"Living Listing\" feature.",
-          "This Policy describes the categories of information we collect, how we use and disclose that information, the third-party service providers we rely on, and the choices and rights available to you. It does not apply to the practices of third parties that we do not own or control, including service providers and other companies whose own privacy policies govern their handling of your information.",
-          "Terms such as \"we,\" \"us,\" and \"our\" refer to Lixtara. \"You\" refers to any individual who uses the Service, whether as a seller, buyer, visitor, or other user.",
+          "This Policy applies to personal information we collect through the Service: the public website, the seller listing flow, the seller dashboard and account area, buyer tools (offers, saved homes and showing requests), the Loui AI assistant, virtual staging and listing media features, and the emails we send.",
+          "It does not cover websites or services run by others, even if we link to them, such as the pages where Stripe processes payments or where DocuSign collects signatures. Those companies handle your information under their own policies.",
+          "\"You\" means anyone who uses the Service: sellers, buyers, visitors, and property owners we contact.",
         ],
       },
       {
         heading: "2. Information We Collect",
-        body: [
-          "We collect information that you provide to us directly, information we collect automatically when you use the Service, and information we receive from third parties. The categories below describe the information we may collect.",
-        ],
+        body: ["We collect information you give us, information collected automatically when you use the Service, and information we receive from other sources."],
         sub: [
           {
-            heading: "2.1 Information You Provide to Us",
-            body: [
-              "We collect the information you provide when you create an account, list a property, make or respond to an offer, complete a transaction, sign agreements, or otherwise communicate with us.",
-            ],
+            heading: "2.1 Information You Give Us",
+            body: [],
             bullets: [
-              "Account information: your name, email address, and password, and any profile details you choose to add.",
-              "Property and listing details: information about the homes you list, including address, descriptions, features, pricing, and photographs and other media you upload.",
-              "Offer and transaction information: details related to offers you make or receive, counteroffers, and the progress and terms of a real-estate transaction.",
-              "Payment information: payment details you provide when you purchase a plan or service. Payments are processed by our payment provider, Stripe. Lixtara does not store full payment card numbers.",
-              "Identity and signature information: information used to verify your identity and capture your electronic signature on agreements, handled through our e-signature provider, DocuSign.",
-              "Communications: the content of messages you send to us, including support requests and conversations with the Loui AI assistant.",
+              "Account information: name, email address, phone number and password. Your password is stored by our authentication provider in a protected (hashed) form; we never see it in plain text.",
+              "Listing information: the property address, unit, property facts, price, description, showing instructions, occupancy and tenant details, the buyer-agent compensation you choose, photos, videos and other files you upload.",
+              "Agreement information: the details placed in your listing agreement (for example, the legal description and folio number) and your electronic signature, which is collected by DocuSign.",
+              "Payment information: the plan or service you buy and the payment status. Your card details are entered on Stripe's pages; Lixtara does not receive or store full card numbers.",
+              "Buyer information: when you make an offer, request a showing or save a home, the contact details, offer terms, financing information and messages you provide. Offers and showing requests are shared with the seller of that home and with our broker.",
+              "Communications: messages you send us through forms, email or the Loui assistant, and your choices about receiving emails, calls or text messages.",
             ],
           },
           {
-            heading: "2.2 Information We Collect Automatically",
-            body: [
-              "When you use the Service, we and our service providers automatically collect certain information about your device and how you interact with the Service.",
-            ],
+            heading: "2.2 Information Collected Automatically",
+            body: [],
             bullets: [
-              "Usage data: pages and features you view, actions you take, search queries, and timestamps of your activity.",
-              "Device data: your IP address, browser type, operating system, device identifiers, and similar technical information.",
-              "Cookies and similar technologies: information collected through cookies and comparable technologies, as described in Section 6 and in our separate Cookie Policy.",
-              "Address and location data: location information associated with the listings you create and view, used to display properties and render maps.",
+              "Device and log information: IP address, browser and device type, operating system, pages requested and the date and time of each request. Our hosting provider keeps these records in its server logs.",
+              "Usage information: pages and features you use and actions you take in the listing flow (for example, which step you completed), recorded without the text you type.",
+              "Cookies and similar technologies: as described in Section 6 and in our Cookie Policy. Analytics tools run only if you accept analytics cookies.",
             ],
           },
           {
-            heading: "2.3 Information We Receive from Third Parties",
-            body: [
-              "We may receive information about a property or transaction from third parties to support the Service.",
-            ],
+            heading: "2.3 Information From Other Sources",
+            body: [],
             bullets: [
-              "Public property records: property records obtained from the Miami-Dade County Property Appraiser to help describe and verify listings.",
-              "Property value estimates: estimated property values and related data obtained from Rentcast.",
+              "Public property records from the Miami-Dade County Property Appraiser, used to pre-fill property details.",
+              "Estimated values and comparable sales from Rentcast, based on the property address.",
+              "Listing information from the multiple listing service (MLS) of the MIAMI Association of REALTORS®, received through Bridge Interactive, including the name and contact details of the listing agent and office shown with each MLS listing.",
+              "Prospecting data: to contact owners of properties in South Florida, we use public property records and contact details (such as email addresses) obtained from third-party data providers. [VERIFICAR: fuente de los datos de contacto, contrato con el proveedor y base para usarlos en correos de prospección.]",
+            ],
+          },
+          {
+            id: "consent-evidence",
+            heading: "2.4 Records of Your Consent",
+            body: [
+              "When you accept our Terms (including the refund terms before paying), consent to electronic records and signatures, or agree to receive calls or text messages, we keep a record of that acceptance: the date and time, the version of the document, the language you saw it in, a cryptographic fingerprint (hash) of the exact text you accepted, your IP address and your browser's user-agent string.",
+              "We use these records only to prove that the consent was given, to answer payment disputes (chargebacks) and to meet our legal and recordkeeping obligations. [VERIFICAR: plazo de conservación de estos registros.]",
             ],
           },
         ],
       },
       {
-        heading: "3. How We Use Your Information",
+        heading: "3. How We Use Information",
+        body: ["We use personal information to:"],
+        bullets: [
+          "Provide the Service: create and secure your account, build and publish your listing, prepare your listing agreement for signature, process payments and support your transaction.",
+          "Carry out our duties as a licensed real estate brokerage, including our broker's review of each listing before it is published on the MLS.",
+          "Deliver offers and showing requests to the seller and our broker, and keep you informed about them.",
+          "Run AI features you choose to use (Section 5).",
+          "Send transactional emails and, where permitted, marketing or prospecting emails (Section 7).",
+          "Measure and improve the Service, including with analytics you accept (Section 6).",
+          "Keep the Service safe: prevent fraud, abuse and automated attacks, and fix technical errors.",
+          "Keep records of consents and transactions, resolve disputes, enforce our agreements and comply with legal obligations.",
+        ],
+        sub: [
+          {
+            heading: "3.1 Why We Are Allowed to Use It",
+            body: [
+              "We process personal information to provide the Service you request and perform our agreements with you, to meet legal and regulatory obligations that apply to a Florida real estate brokerage, for our legitimate business interests (such as security and improving the Service), and with your consent where we ask for it (for example, analytics cookies or calls and text messages). You can withdraw a consent at any time; withdrawal does not affect processing that took place before it. [VERIFICAR aplicabilidad: la política está pensada para usuarios de EE. UU.; confirmar si hace falta lenguaje de bases jurídicas y cuál.]",
+            ],
+          },
+        ],
+      },
+      {
+        heading: "4. How We Share Information",
+        body: ["We share personal information only as described below. We do not sell personal information for money."],
+        sub: [
+          {
+            id: "providers",
+            heading: "4.1 Service Providers",
+            body: [
+              "We use the following providers to run the Service. They process personal information on our behalf and only for the purposes listed. Each one handles data under its own privacy policy, linked below.",
+            ],
+            bullets: PRIVACY_PROVIDERS.map((p) => providerBullet(p, "en")),
+          },
+          {
+            heading: "4.2 The MLS and Real Estate Websites",
+            body: [
+              "When your listing is approved, our broker publishes it on the MLS. Listing information (address, price, property details, photos and description) then becomes public and is distributed by the MLS to real estate websites and other brokers. Your phone number is shown on those sites only if you choose that option. The buyer-agent compensation you choose is not published on the MLS.",
+            ],
+          },
+          {
+            heading: "4.3 Parties to Your Transaction",
+            body: [
+              "We share the information needed to negotiate and close your transaction with the other party and their agent, and, when you direct us, with closing agents, title companies, lenders or attorneys.",
+            ],
+          },
+          {
+            heading: "4.4 Legal Requirements and Safety",
+            body: [
+              "We may disclose information when required by law, subpoena or a request from a government authority (including the Florida Department of Business and Professional Regulation), or when needed to protect the rights, safety or property of Lixtara, our users or others.",
+            ],
+          },
+          {
+            heading: "4.5 Business Transfers",
+            body: [
+              "If Lixtara is involved in a merger, acquisition or sale of assets, personal information may be transferred as part of that transaction, subject to this Policy.",
+            ],
+          },
+          {
+            id: "no-sale",
+            heading: "4.6 No Sale of Personal Information; Advertising",
+            body: [
+              "We do not sell personal information for money, and we do not use advertising cookies or targeted advertising on the Service. [VERIFICAR: Microsoft Clarity puede establecer la cookie MUID en dominios de Microsoft, que Microsoft describe como usada también para publicidad. Confirmar si esto es \"compartir\" para publicidad conductual bajo leyes estatales aplicables y si la frase anterior puede quedar así.]",
+            ],
+          },
+        ],
+      },
+      {
+        id: "ai",
+        heading: "5. Artificial Intelligence Features",
         body: [
-          "We use the information we collect for the following purposes:",
+          "Some features use AI models from third-party providers. Information you submit to these features is sent to the provider to generate the result:",
         ],
         bullets: [
-          "To provide, operate, and maintain the Service and to create and manage your account.",
-          "To process and display property listings, facilitate offers and counteroffers, and support the progress of real-estate transactions.",
-          "To process payments for plans and services through our payment provider.",
-          "To enable the electronic signing of real-estate agreements and to maintain related signature and identity records.",
-          "To facilitate broker support and the licensed-broker functions of the platform.",
-          "To power AI features, including the Loui AI assistant, virtual staging, and the Living Listing feature.",
-          "To protect the security and integrity of the Service, detect and prevent fraud and abuse, and enforce our terms.",
-          "To communicate with you, including sending transactional messages, responding to inquiries, and providing customer support.",
-          "To comply with our legal obligations and respond to lawful requests.",
-          "To analyze, improve, and develop the Service and its features.",
+          "Loui assistant: your messages are sent to Anthropic. If you are signed in as a seller, Loui can also read your listings and the offers received on them (including the buyer's name and any notes in the offer) to answer your questions. Do not share in the chat information you do not want processed this way. [VERIFICAR: si conviene dejar de enviar el nombre y las notas del comprador al modelo.]",
+          "Listing description and showing instructions: when you ask us to improve them, the text is sent to Anthropic.",
+          "Photos: when you use virtual staging, the photo is sent to Luma AI; when you create a Living Listing video, the photo is sent to Google (Gemini API); some photo-analysis features send photos to Anthropic.",
+          "We do not send MLS listing data to AI models.",
+          "AI results can be wrong. Loui's answers are not legal, tax or financial advice, and staged or generated images are illustrations, labeled as such.",
         ],
       },
       {
-        heading: "4. How We Share Your Information",
+        id: "cookies",
+        heading: "6. Cookies and Session Recording",
         body: [
-          "We share information in the circumstances described below. We do not sell your personal information for money.",
-        ],
-        sub: [
-          {
-            heading: "4.1 Service Providers and Sub-Processors",
-            body: [
-              "We share information with trusted service providers who process information on our behalf to deliver the Service. These providers are authorized to use your information only as necessary to provide services to us. They include:",
-            ],
-            bullets: [
-              "Supabase, for authentication, database hosting, and file storage.",
-              "Stripe, for payment processing.",
-              "DocuSign, for electronic signature of agreements.",
-              "Resend, for sending transactional email.",
-              "Mapbox and Google Maps, for maps and geocoding.",
-              "Rentcast, for property value estimates.",
-              "Miami-Dade County Property Appraiser, for public property records lookup.",
-              "Anthropic, the AI provider that powers the Loui AI assistant.",
-              "Luma, for AI image and video generation used in virtual staging and the Living Listing feature.",
-              "Upstash, for rate-limiting and abuse protection.",
-              "Cloudflare (Turnstile), for bot protection on sign-in, sign-up, password-reset, and listing forms.",
-              "Vercel, for hosting the Service.",
-              "Google LLC (Google Analytics), for usage analytics, only if you accept analytics cookies.",
-              "Microsoft (Clarity), for usage analytics and session recording, only if you accept analytics cookies (see Section 6.1).",
-            ],
-          },
-          {
-            heading: "4.2 Parties to Your Real-Estate Transaction",
-            body: [
-              "Because Lixtara facilitates real-estate transactions, we share relevant information with the parties to your transaction. Depending on your role, this may include the broker, buyers and their agents, sellers, and title or escrow providers, as needed to negotiate, document, and complete the transaction.",
-            ],
-          },
-          {
-            heading: "4.3 Legal and Safety",
-            body: [
-              "We may disclose information when we believe it is necessary to comply with applicable law, regulation, legal process, or a governmental request; to enforce our agreements; or to protect the rights, property, safety, or security of Lixtara, our users, or the public.",
-            ],
-          },
-          {
-            heading: "4.4 Business Transfers",
-            body: [
-              "If Lixtara is involved in a merger, acquisition, financing, reorganization, sale of assets, or similar transaction, your information may be transferred as part of that transaction, subject to this Privacy Policy.",
-            ],
-          },
-          {
-            heading: "4.5 With Your Direction",
-            body: [
-              "We may share your information with other parties when you direct us to do so or otherwise consent to the sharing.",
-            ],
-          },
-          {
-            heading: "4.6 No Sale of Personal Information; Sharing and Targeted Advertising",
-            body: [
-              "Lixtara does not sell your personal information for money. We do not currently share your personal information for cross-context behavioral or targeted advertising, and we do not engage in targeted advertising of this kind. If our practices change, we will update this Policy and provide any rights and choices required by law.",
-            ],
-          },
-        ],
-      },
-      {
-        heading: "5. AI Processing of Your Content",
-        body: [
-          "When you use our AI features, the text and images you submit are processed by our AI providers to generate responses and content. Specifically:",
-          "When you chat with the Loui AI assistant, your messages are sent to Anthropic to generate responses. When you use virtual staging or the Living Listing feature, the images and related inputs you submit are sent to Luma to generate staged images or video content.",
-          "AI-generated outputs, including staged images and Living Listing media, are illustrative and intended to help visualize possibilities. They may not accurately reflect the actual condition, dimensions, or features of a property and should not be relied upon as a factual representation. Do not submit information through AI features that you do not wish to be processed for these purposes.",
-        ],
-      },
-      {
-        heading: "6. Cookies and Similar Technologies",
-        body: [
-          "We and our service providers use cookies and similar technologies to operate the Service, remember your preferences, keep you signed in, understand how the Service is used, and improve it.",
-          "For a detailed description of the cookies and similar technologies we use and the choices available to you, please see our separate Cookie Policy.",
+          "We use cookies that the Service needs to work (for example, to keep you signed in). Analytics tools load only if you accept analytics cookies in the cookie banner, and you can change your choice at any time through \"Cookie settings\" in the site footer. The full list is in our Cookie Policy.",
         ],
         sub: [
           {
@@ -169,81 +171,82 @@ export const privacyDoc: LegalContent = {
         ],
       },
       {
-        heading: "7. Data Retention",
-        body: [
-          "We retain personal information for as long as necessary to provide the Service, maintain your account, complete and document real-estate transactions, comply with our legal and recordkeeping obligations, resolve disputes, and enforce our agreements.",
-          "When information is no longer needed for these purposes, we take reasonable steps to delete it or to anonymize or de-identify it. Retention periods vary depending on the type of information and the purpose for which it was collected.",
+        id: "communications",
+        heading: "7. Email, Calls and Text Messages",
+        body: [],
+        bullets: [
+          "Transactional email: we send emails you need to use the Service (verification codes, receipts, status of your listing, offers and showing requests). You cannot opt out of these while you use the Service.",
+          "Marketing and prospecting email: we may email property owners about our services, including owners who have not used the Service, using contact data described in Section 2.3. Every such email identifies Lixtara, includes our postal address and has an unsubscribe link; we honor unsubscribe requests. [VERIFICAR: requisitos de CAN-SPAM y de la ley de Florida para correos comerciales a propietarios.]",
+          "Calls and text messages: we call or text you only with your consent or to respond to your own request. Agreeing to calls or texts is never a condition of buying our services. We do not currently send text messages. [VERIFICAR: si se activan SMS o llamadas automatizadas, revisar TCPA y Florida Telephone Solicitation Act antes.]",
         ],
       },
       {
-        heading: "8. Data Security",
+        id: "retention",
+        heading: "8. How Long We Keep Information",
         body: [
-          "We use reasonable administrative, technical, and organizational measures designed to protect personal information against loss, misuse, and unauthorized access, disclosure, alteration, and destruction. We rely on established service providers, and we apply access controls and other safeguards appropriate to the nature of the information.",
-          "However, no method of transmission over the Internet or method of electronic storage is completely secure. We cannot guarantee the absolute security of your information, and you provide it at your own risk. If you have reason to believe that your interaction with us is no longer secure, please contact us immediately.",
+          "We keep personal information only as long as needed for the purposes in this Policy, including legal and recordkeeping obligations. The periods below are our current proposal:",
+        ],
+        bullets: [
+          "Transaction and brokerage records (listing agreements, offers, payment records): at least 5 years after the transaction or the end of the listing. [VERIFICAR: plazo de conservación de registros del corredor en Florida (Ch. 475 / Reglas 61J2).]",
+          "Consent records (Section 2.4): for as long as the account exists and at least 5 years after the consent. [VERIFICAR plazo.]",
+          "Account information: while your account is active; when you ask us to delete it, we delete or de-identify what we are not required to keep.",
+          "Unfinished listing drafts and abandoned sign-ups: [VERIFICAR plazo propuesto, p. ej. 24 meses sin actividad].",
+          "Server logs and analytics data: according to the provider's settings, generally up to 13 months. [VERIFICAR.]",
         ],
       },
       {
-        heading: "9. Your Privacy Rights",
+        id: "security",
+        heading: "9. Security and Data Breach Notice",
         body: [
-          "Depending on where you live and subject to applicable law, you may have rights regarding your personal information, including the right to access the information we hold about you, to correct inaccurate information, to request deletion, to obtain a copy of certain information in a portable format, and to opt out of certain processing.",
-          "To exercise your rights, contact us at privacy@lixtara.com. We may need to verify your identity before fulfilling your request, including by asking you to confirm information associated with your account, in order to protect your information from unauthorized access.",
-        ],
-        sub: [
-          {
-            heading: "9.1 California Residents",
-            body: [
-              "If you are a California resident, the California Consumer Privacy Act (CCPA), as amended by the California Privacy Rights Act (CPRA), provides you with certain rights regarding your personal information. These include the right to know what personal information we collect, use, and disclose; the right to request deletion of your personal information; the right to correct inaccurate personal information; the right to opt out of the sale or sharing of personal information; and the right not to be discriminated against for exercising your rights.",
-              "As stated above, Lixtara does not sell your personal information for money and does not currently share personal information for cross-context behavioral advertising. To exercise your California rights, contact us at privacy@lixtara.com.",
-            ],
-          },
-          {
-            heading: "9.2 Florida Residents",
-            body: [
-              "If you are a Florida resident, the Florida Digital Bill of Rights may provide you with certain rights regarding your personal information, which may include rights to access, correct, delete, and obtain a copy of your personal information, and to opt out of certain processing. To exercise these rights, contact us at privacy@lixtara.com.",
-            ],
-          },
+          "We use reasonable administrative, technical and physical safeguards: encryption in transit, access controls limited by role, database rules that restrict each user to their own records, and providers with recognized security programs. No system is perfectly secure, and we cannot guarantee absolute security.",
+          "If a breach of security affects your personal information, we will notify you and, when applicable, the appropriate authorities, in a manner consistent with the Florida Information Protection Act (section 501.171, Florida Statutes) and other applicable law. [VERIFICAR alcance: qué datos de Lixtara son \"personal information\" bajo §501.171 y plazos de notificación.]",
         ],
       },
       {
-        heading: "10. Children's Privacy",
+        id: "rights",
+        heading: "10. Your Choices and Rights",
         body: [
-          "The Service is intended for adults who are at least 18 years old. It is not directed to children, and we do not knowingly collect personal information from children. If you believe that a child has provided us with personal information, please contact us at privacy@lixtara.com, and we will take appropriate steps to delete it.",
+          "You can review and update your account information at any time in your account area. You can also ask us to access, correct or delete your personal information, or to stop sending you marketing emails, by writing to {privacyEmail}. We will verify your identity before acting on a request and answer within a reasonable time.",
+          "Depending on where you live, privacy laws may give you additional rights. Whether a particular law applies to Lixtara depends on thresholds set by that law. [VERIFICAR aplicabilidad por umbrales: CCPA/CPRA de California, Florida Digital Bill of Rights y otras leyes estatales; no afirmar cumplimiento hasta confirmar.]",
+          "Some information cannot be deleted while we are required to keep it, for example records of a real estate transaction or of a payment.",
         ],
       },
       {
-        heading: "11. International Users and Data Transfers",
+        heading: "11. Children",
         body: [
-          "Lixtara is based in the United States, and we process and store information in the United States. If you access the Service from outside the United States, you understand that your information will be transferred to and processed in the United States, where data protection laws may differ from those in your jurisdiction.",
-          "If you are located in a jurisdiction governed by laws such as the EU General Data Protection Regulation (GDPR), please be aware that, by using the Service, you direct us to process your information in the United States as described in this Policy.",
+          "The Service is not directed to anyone under 18, and we do not knowingly collect personal information from children. If you believe a child has given us personal information, write to {privacyEmail} and we will delete it.",
         ],
       },
       {
-        heading: "12. Do Not Track",
+        heading: "12. Where Information Is Processed",
         body: [
-          "Some browsers offer a \"Do Not Track\" signal. Because there is no consistent industry standard for how to respond to these signals, the Service does not currently respond to Do Not Track signals. We will continue to monitor developments in this area.",
+          "Lixtara is based in the United States and processes information in the United States. If you use the Service from another country, your information will be transferred to and processed in the United States.",
         ],
       },
       {
-        heading: "13. Third-Party Links and Services",
+        heading: "13. Do Not Track",
         body: [
-          "The Service may contain links to third-party websites, products, or services that we do not own or control, and it relies on third-party providers as described in this Policy. We are not responsible for the privacy practices of these third parties. We encourage you to review the privacy policies of any third-party services you access.",
+          "There is no common standard for responding to browser \"Do Not Track\" signals, so the Service does not respond to them. Analytics tools run only if you accept them in the cookie banner.",
         ],
       },
       {
-        heading: "14. Changes to This Policy",
+        heading: "14. Links to Other Websites",
         body: [
-          "We may update this Privacy Policy from time to time to reflect changes in our practices, technology, legal requirements, or other factors. When we make changes, we will revise the date associated with this Policy and, where appropriate, provide additional notice. Your continued use of the Service after an update becomes effective constitutes your acceptance of the revised Policy.",
+          "The Service links to websites we do not control, such as MLS portals, Stripe and DocuSign. Their privacy practices are governed by their own policies.",
         ],
       },
       {
-        heading: "15. Contact Us and How to Exercise Your Rights",
+        heading: "15. Changes to This Policy",
         body: [
-          "If you have questions about this Privacy Policy or our privacy practices, or if you wish to exercise your privacy rights, please contact us:",
-          "By email for privacy matters: privacy@lixtara.com",
-          "By email for general support: support@lixtara.com",
-          "By mail: Lixtara, Miami, Florida, United States",
-          "Attention: privacy@lixtara.com",
-          "To submit a request to access, correct, delete, or otherwise exercise your rights, please email privacy@lixtara.com with details of your request. We may need to verify your identity before processing your request.",
+          "We may update this Policy. The version and the \"Last updated\" date at the top of this page change with each update, and we will give additional notice of material changes when appropriate.",
+        ],
+      },
+      {
+        heading: "16. Contact Us",
+        body: [
+          "Privacy questions and requests: {privacyEmail}",
+          "General support: {supportEmail}",
+          "Mail: {legalName}, {brokerageAddress}",
         ],
       },
     ],
@@ -251,154 +254,149 @@ export const privacyDoc: LegalContent = {
   es: {
     title: "Política de Privacidad",
     intro: [
-      "Esta Política de Privacidad explica cómo Lixtara recopila, usa, comparte y protege la información sobre usted cuando utiliza nuestro sitio web, plataforma y servicios relacionados (el \"Servicio\"). Lixtara es una plataforma de tecnología inmobiliaria con sede en Miami, Florida, que conecta a vendedores que publican sus propias viviendas con compradores que presentan ofertas, y facilita la firma electrónica de acuerdos inmobiliarios.",
-      "Lixtara es operada por Lixtara. Al acceder o utilizar el Servicio, usted reconoce que ha leído y comprendido esta Política de Privacidad. Si no está de acuerdo con nuestras prácticas, por favor no utilice el Servicio.",
-      "Somos una empresa con sede en los Estados Unidos y procesamos la información en los Estados Unidos. Le pedimos que lea esta Política junto con nuestros Términos de Servicio y nuestra Política de Cookies.",
+      "Esta Política de Privacidad explica cómo {legalName} (\"Lixtara\", \"nosotros\") recopila, usa, comparte y protege la información personal cuando usted usa lixtara.com y nuestros servicios relacionados (el \"Servicio\"). Lixtara es una correduría inmobiliaria con licencia en Florida (FL #{brokerageLicense}), con domicilio en {brokerageAddress}.",
+      "Léala junto con nuestros Términos del Servicio y nuestra Política de Cookies. Si no está de acuerdo con esta Política, le pedimos que no use el Servicio.",
     ],
     sections: [
       {
-        heading: "1. Introducción y Alcance",
+        heading: "1. Quiénes Somos y Qué Cubre Esta Política",
         body: [
-          "Esta Política de Privacidad se aplica a la información personal que recopilamos a través del sitio web, la aplicación web y cualquier función asociada de Lixtara, incluidas nuestras herramientas de publicación para vendedores, las herramientas de ofertas para compradores, el asistente de IA \"Loui\", la preparación virtual de espacios (\"virtual staging\") y la función \"Living Listing\".",
-          "Esta Política describe las categorías de información que recopilamos, cómo usamos y divulgamos dicha información, los proveedores de servicios externos en los que nos apoyamos y las opciones y derechos disponibles para usted. No se aplica a las prácticas de terceros que no poseemos ni controlamos, incluidos los proveedores de servicios y otras empresas cuyas propias políticas de privacidad rigen el tratamiento de su información.",
-          "Los términos como \"nosotros\" y \"nuestro\" se refieren a Lixtara. \"Usted\" se refiere a cualquier persona que utilice el Servicio, ya sea como vendedor, comprador, visitante u otro usuario.",
+          "Esta Política se aplica a la información personal que recopilamos a través del Servicio: el sitio público, el proceso de publicación para vendedores, el panel y el área de cuenta del vendedor, las herramientas para compradores (ofertas, casas guardadas y solicitudes de visita), el asistente de IA Loui, el staging virtual y las funciones de video del listado, y los correos que enviamos.",
+          "No cubre sitios ni servicios operados por terceros, aunque los enlacemos, como las páginas donde Stripe procesa los pagos o donde DocuSign recoge las firmas. Esas empresas tratan su información según sus propias políticas.",
+          "\"Usted\" es cualquier persona que use el Servicio: vendedores, compradores, visitantes y propietarios a quienes contactamos.",
         ],
       },
       {
         heading: "2. Información que Recopilamos",
-        body: [
-          "Recopilamos la información que usted nos proporciona directamente, la información que recopilamos automáticamente cuando utiliza el Servicio y la información que recibimos de terceros. Las categorías a continuación describen la información que podemos recopilar.",
-        ],
+        body: ["Recopilamos la información que usted nos da, la que se registra automáticamente cuando usa el Servicio y la que recibimos de otras fuentes."],
         sub: [
           {
-            heading: "2.1 Información que Usted nos Proporciona",
-            body: [
-              "Recopilamos la información que usted proporciona cuando crea una cuenta, publica una propiedad, presenta o responde a una oferta, completa una transacción, firma acuerdos o se comunica con nosotros de otra manera.",
-            ],
+            heading: "2.1 Información que Usted nos Da",
+            body: [],
             bullets: [
-              "Información de la cuenta: su nombre, dirección de correo electrónico y contraseña, así como cualquier detalle de perfil que decida agregar.",
-              "Detalles de la propiedad y la publicación: información sobre las viviendas que publica, incluidos la dirección, las descripciones, las características, los precios, y las fotografías y demás contenido que cargue.",
-              "Información de ofertas y transacciones: detalles relacionados con las ofertas que presenta o recibe, las contraofertas, y el progreso y los términos de una transacción inmobiliaria.",
-              "Información de pago: los datos de pago que proporciona cuando adquiere un plan o servicio. Los pagos son procesados por nuestro proveedor de pagos, Stripe. Lixtara no almacena los números completos de las tarjetas de pago.",
-              "Información de identidad y firma: la información utilizada para verificar su identidad y capturar su firma electrónica en los acuerdos, gestionada a través de nuestro proveedor de firma electrónica, DocuSign.",
-              "Comunicaciones: el contenido de los mensajes que nos envía, incluidas las solicitudes de soporte y las conversaciones con el asistente de IA Loui.",
+              "Datos de la cuenta: nombre, correo electrónico, número de teléfono y contraseña. La contraseña la guarda nuestro proveedor de autenticación de forma protegida (cifrada mediante hash); nunca la vemos en texto legible.",
+              "Datos del listado: la dirección y la unidad, las características de la propiedad, el precio, la descripción, las instrucciones de visita, la ocupación y los datos del inquilino, la compensación que usted ofrece al agente del comprador, y las fotos, videos y demás archivos que suba.",
+              "Datos del acuerdo: la información que se incluye en su acuerdo de listado (por ejemplo, la descripción legal y el número de folio) y su firma electrónica, que recoge DocuSign.",
+              "Datos de pago: el plan o servicio que compra y el estado del pago. Usted ingresa los datos de su tarjeta en las páginas de Stripe; Lixtara no recibe ni guarda números completos de tarjeta.",
+              "Datos de compradores: cuando hace una oferta, pide una visita o guarda una casa, los datos de contacto, las condiciones de la oferta, la información de financiamiento y los mensajes que nos da. Las ofertas y las solicitudes de visita se comparten con el vendedor de esa casa y con nuestra broker.",
+              "Comunicaciones: los mensajes que nos envía por formularios, correo o el asistente Loui, y sus preferencias sobre recibir correos, llamadas o mensajes de texto.",
             ],
           },
           {
-            heading: "2.2 Información que Recopilamos Automáticamente",
-            body: [
-              "Cuando utiliza el Servicio, nosotros y nuestros proveedores de servicios recopilamos automáticamente cierta información sobre su dispositivo y sobre cómo interactúa con el Servicio.",
-            ],
+            heading: "2.2 Información que se Registra Automáticamente",
+            body: [],
             bullets: [
-              "Datos de uso: las páginas y funciones que visualiza, las acciones que realiza, las consultas de búsqueda y las marcas de tiempo de su actividad.",
-              "Datos del dispositivo: su dirección IP, tipo de navegador, sistema operativo, identificadores de dispositivo e información técnica similar.",
-              "Cookies y tecnologías similares: información recopilada mediante cookies y tecnologías comparables, según se describe en la Sección 6 y en nuestra Política de Cookies independiente.",
-              "Datos de dirección y ubicación: información de ubicación asociada con las publicaciones que crea y visualiza, utilizada para mostrar propiedades y representar mapas.",
+              "Datos del dispositivo y registros: dirección IP, tipo de navegador y de dispositivo, sistema operativo, páginas solicitadas y la fecha y hora de cada solicitud. Nuestro proveedor de alojamiento guarda estos datos en los registros del servidor.",
+              "Datos de uso: las páginas y funciones que usa y lo que hace en el proceso de publicación (por ejemplo, qué paso completó), sin el texto que escribe.",
+              "Cookies y tecnologías similares: según se describe en la Sección 6 y en nuestra Política de Cookies. Las herramientas de analítica solo funcionan si usted acepta las cookies de analítica.",
             ],
           },
           {
-            heading: "2.3 Información que Recibimos de Terceros",
-            body: [
-              "Podemos recibir información sobre una propiedad o transacción de terceros para apoyar el Servicio.",
-            ],
+            heading: "2.3 Información de Otras Fuentes",
+            body: [],
             bullets: [
-              "Registros públicos de propiedad: registros de propiedad obtenidos del Tasador de Propiedades del Condado de Miami-Dade (Miami-Dade County Property Appraiser) para ayudar a describir y verificar las publicaciones.",
-              "Estimaciones de valor de la propiedad: valores estimados de propiedad y datos relacionados obtenidos de Rentcast.",
+              "Registros públicos del Tasador de Propiedades del Condado de Miami-Dade, que usamos para completar los datos de la propiedad.",
+              "Valores estimados y ventas comparables de Rentcast, a partir de la dirección de la propiedad.",
+              "Información de listados del servicio de listado múltiple (MLS) de MIAMI Association of REALTORS®, que recibimos a través de Bridge Interactive, incluido el nombre y los datos de contacto del agente y de la oficina que figuran en cada listado del MLS.",
+              "Datos de prospección: para contactar a propietarios de inmuebles en el sur de Florida, usamos registros públicos de propiedades y datos de contacto (como correos electrónicos) obtenidos de proveedores de datos. [VERIFICAR: fuente de los datos de contacto, contrato con el proveedor y base para usarlos en correos de prospección.]",
+            ],
+          },
+          {
+            id: "consent-evidence",
+            heading: "2.4 Registro de su Consentimiento",
+            body: [
+              "Cuando usted acepta nuestros Términos (incluidas las condiciones de reembolso antes de pagar), consiente el uso de registros y firmas electrónicas, o acepta recibir llamadas o mensajes de texto, guardamos constancia de esa aceptación: la fecha y la hora, la versión del documento, el idioma en que lo vio, una huella criptográfica (hash) del texto exacto que aceptó, su dirección IP y la identificación de su navegador (user agent).",
+              "Usamos estas constancias solo para demostrar que el consentimiento se dio, para responder a disputas de pago (contracargos) y para cumplir nuestras obligaciones legales y de conservación de registros. [VERIFICAR: plazo de conservación de estos registros.]",
             ],
           },
         ],
       },
       {
-        heading: "3. Cómo Usamos su Información",
+        heading: "3. Para Qué Usamos la Información",
+        body: ["Usamos la información personal para:"],
+        bullets: [
+          "Prestar el Servicio: crear y proteger su cuenta, preparar y publicar su listado, preparar su acuerdo de listado para la firma, procesar pagos y acompañar su transacción.",
+          "Cumplir nuestras funciones de correduría inmobiliaria con licencia, incluida la revisión de cada listado por nuestra broker antes de publicarlo en el MLS.",
+          "Hacer llegar las ofertas y las solicitudes de visita al vendedor y a nuestra broker, y mantenerle informado sobre ellas.",
+          "Hacer funcionar las funciones de IA que usted decida usar (Sección 5).",
+          "Enviar correos transaccionales y, cuando esté permitido, correos de marketing o de prospección (Sección 7).",
+          "Medir y mejorar el Servicio, incluso con la analítica que usted acepte (Sección 6).",
+          "Proteger el Servicio: prevenir fraudes, abusos y ataques automatizados, y corregir errores técnicos.",
+          "Conservar constancia de consentimientos y transacciones, resolver disputas, hacer valer nuestros acuerdos y atender obligaciones legales.",
+        ],
+        sub: [
+          {
+            heading: "3.1 Por Qué Podemos Usarla",
+            body: [
+              "Tratamos la información personal para prestar el Servicio que usted pide y cumplir los acuerdos que tenemos con usted, para atender obligaciones legales y regulatorias de una correduría inmobiliaria en Florida, por intereses legítimos de nuestro negocio (como la seguridad y la mejora del Servicio) y con su consentimiento cuando se lo pedimos (por ejemplo, para las cookies de analítica o para llamadas y mensajes de texto). Puede retirar un consentimiento en cualquier momento; el retiro no afecta el tratamiento hecho antes. [VERIFICAR aplicabilidad: la política está pensada para usuarios de EE. UU.; confirmar si hace falta lenguaje de bases jurídicas y cuál.]",
+            ],
+          },
+        ],
+      },
+      {
+        heading: "4. Con Quién Compartimos la Información",
+        body: ["Solo compartimos información personal como se describe a continuación. No vendemos información personal a cambio de dinero."],
+        sub: [
+          {
+            id: "providers",
+            heading: "4.1 Proveedores de Servicios",
+            body: [
+              "Usamos los siguientes proveedores para operar el Servicio. Tratan información personal por cuenta nuestra y solo para los fines indicados. Cada uno la trata según su propia política de privacidad, enlazada a continuación.",
+            ],
+            bullets: PRIVACY_PROVIDERS.map((p) => providerBullet(p, "es")),
+          },
+          {
+            heading: "4.2 El MLS y los Portales Inmobiliarios",
+            body: [
+              "Cuando su listado se aprueba, nuestra broker lo publica en el MLS. A partir de ese momento la información del listado (dirección, precio, características, fotos y descripción) es pública y el MLS la distribuye a portales inmobiliarios y a otros corredores. Su número de teléfono aparece en esos portales solo si usted elige esa opción. La compensación que usted ofrece al agente del comprador no se publica en el MLS.",
+            ],
+          },
+          {
+            heading: "4.3 Las Partes de su Transacción",
+            body: [
+              "Compartimos con la otra parte y con su agente la información necesaria para negociar y cerrar su transacción y, cuando usted nos lo indica, con agentes de cierre, compañías de título, prestamistas o abogados.",
+            ],
+          },
+          {
+            heading: "4.4 Requisitos Legales y Seguridad",
+            body: [
+              "Podemos divulgar información cuando lo exija la ley, una citación o una autoridad (incluido el Departamento de Regulación Comercial y Profesional de Florida, DBPR), o cuando sea necesario para proteger los derechos, la seguridad o los bienes de Lixtara, de nuestros usuarios o de terceros.",
+            ],
+          },
+          {
+            heading: "4.5 Transferencias del Negocio",
+            body: [
+              "Si Lixtara participa en una fusión, adquisición o venta de activos, la información personal puede transferirse como parte de esa operación, sujeta a esta Política.",
+            ],
+          },
+          {
+            id: "no-sale",
+            heading: "4.6 No Vendemos Información Personal; Publicidad",
+            body: [
+              "No vendemos información personal a cambio de dinero, y no usamos cookies de publicidad ni publicidad dirigida en el Servicio. [VERIFICAR: Microsoft Clarity puede establecer la cookie MUID en dominios de Microsoft, que Microsoft describe como usada también para publicidad. Confirmar si esto es \"compartir\" para publicidad conductual bajo leyes estatales aplicables y si la frase anterior puede quedar así.]",
+            ],
+          },
+        ],
+      },
+      {
+        id: "ai",
+        heading: "5. Funciones de Inteligencia Artificial",
         body: [
-          "Usamos la información que recopilamos para los siguientes fines:",
+          "Algunas funciones usan modelos de IA de proveedores externos. Lo que usted envía a esas funciones se manda al proveedor para generar el resultado:",
         ],
         bullets: [
-          "Para proporcionar, operar y mantener el Servicio, y para crear y administrar su cuenta.",
-          "Para procesar y mostrar las publicaciones de propiedades, facilitar las ofertas y contraofertas, y apoyar el progreso de las transacciones inmobiliarias.",
-          "Para procesar los pagos de planes y servicios a través de nuestro proveedor de pagos.",
-          "Para habilitar la firma electrónica de acuerdos inmobiliarios y mantener los registros de firma e identidad relacionados.",
-          "Para facilitar el soporte de corredores (brokers) y las funciones de corredor con licencia de la plataforma.",
-          "Para impulsar las funciones de IA, incluido el asistente de IA Loui, la preparación virtual de espacios y la función Living Listing.",
-          "Para proteger la seguridad y la integridad del Servicio, detectar y prevenir el fraude y el abuso, y hacer cumplir nuestros términos.",
-          "Para comunicarnos con usted, incluido el envío de mensajes transaccionales, la respuesta a consultas y la prestación de soporte al cliente.",
-          "Para cumplir con nuestras obligaciones legales y responder a solicitudes lícitas.",
-          "Para analizar, mejorar y desarrollar el Servicio y sus funciones.",
+          "Asistente Loui: sus mensajes se envían a Anthropic. Si usted inició sesión como vendedor, Loui también puede leer sus listados y las ofertas recibidas en ellos (incluido el nombre del comprador y las notas de la oferta) para responder sus preguntas. No comparta en el chat información que no quiera que se trate de esta forma. [VERIFICAR: si conviene dejar de enviar el nombre y las notas del comprador al modelo.]",
+          "Descripción del listado e instrucciones de visita: cuando nos pide mejorarlas, el texto se envía a Anthropic.",
+          "Fotos: cuando usa el staging virtual, la foto se envía a Luma AI; cuando crea un video Living Listing, la foto se envía a Google (Gemini API); algunas funciones de análisis de fotos las envían a Anthropic.",
+          "No enviamos datos de listados del MLS a modelos de IA.",
+          "La IA puede equivocarse. Las respuestas de Loui no son asesoría legal, fiscal ni financiera, y las imágenes con staging o generadas son ilustraciones, identificadas como tales.",
         ],
       },
       {
-        heading: "4. Cómo Compartimos su Información",
+        id: "cookies",
+        heading: "6. Cookies y Grabación de Sesiones",
         body: [
-          "Compartimos información en las circunstancias que se describen a continuación. No vendemos su información personal por dinero.",
-        ],
-        sub: [
-          {
-            heading: "4.1 Proveedores de Servicios y Subencargados del Tratamiento",
-            body: [
-              "Compartimos información con proveedores de servicios de confianza que procesan información en nuestro nombre para prestar el Servicio. Estos proveedores están autorizados a usar su información únicamente en la medida necesaria para prestarnos servicios. Incluyen:",
-            ],
-            bullets: [
-              "Supabase, para autenticación, alojamiento de la base de datos y almacenamiento de archivos.",
-              "Stripe, para el procesamiento de pagos.",
-              "DocuSign, para la firma electrónica de acuerdos.",
-              "Resend, para el envío de correo electrónico transaccional.",
-              "Mapbox y Google Maps, para mapas y geocodificación.",
-              "Rentcast, para estimaciones de valor de propiedades.",
-              "Tasador de Propiedades del Condado de Miami-Dade, para la consulta de registros públicos de propiedad.",
-              "Anthropic, el proveedor de IA que impulsa el asistente de IA Loui.",
-              "Luma, para la generación de imágenes y video con IA utilizada en la preparación virtual de espacios y la función Living Listing.",
-              "Upstash, para la limitación de tasa (rate-limiting) y la protección contra abusos.",
-              "Cloudflare (Turnstile), para la protección contra bots en los formularios de inicio de sesión, registro, restablecimiento de contraseña y listing.",
-              "Vercel, para el alojamiento del Servicio.",
-              "Google LLC (Google Analytics), para análisis de uso, solo si usted acepta las cookies de analítica.",
-              "Microsoft (Clarity), para análisis de uso y grabación de sesiones, solo si usted acepta las cookies de analítica (consulte la Sección 6.1).",
-            ],
-          },
-          {
-            heading: "4.2 Partes de su Transacción Inmobiliaria",
-            body: [
-              "Debido a que Lixtara facilita transacciones inmobiliarias, compartimos la información pertinente con las partes de su transacción. Según su función, esto puede incluir al corredor, a los compradores y sus agentes, a los vendedores, y a los proveedores de título o custodia (title o escrow), según sea necesario para negociar, documentar y completar la transacción.",
-            ],
-          },
-          {
-            heading: "4.3 Asuntos Legales y de Seguridad",
-            body: [
-              "Podemos divulgar información cuando creemos que es necesario para cumplir con la ley, la regulación, un proceso legal o una solicitud gubernamental aplicables; para hacer cumplir nuestros acuerdos; o para proteger los derechos, la propiedad, la seguridad o la protección de Lixtara, nuestros usuarios o el público.",
-            ],
-          },
-          {
-            heading: "4.4 Transferencias Comerciales",
-            body: [
-              "Si Lixtara participa en una fusión, adquisición, financiación, reorganización, venta de activos o transacción similar, su información podrá ser transferida como parte de esa transacción, sujeta a esta Política de Privacidad.",
-            ],
-          },
-          {
-            heading: "4.5 Con su Indicación",
-            body: [
-              "Podemos compartir su información con otras partes cuando usted nos indique que lo hagamos o consienta de otro modo a dicha divulgación.",
-            ],
-          },
-          {
-            heading: "4.6 Ausencia de Venta de Información Personal; Compartición y Publicidad Dirigida",
-            body: [
-              "Lixtara no vende su información personal por dinero. Actualmente no compartimos su información personal para publicidad conductual de contexto cruzado o publicidad dirigida, y no realizamos publicidad dirigida de este tipo. Si nuestras prácticas cambian, actualizaremos esta Política y proporcionaremos los derechos y opciones que exija la ley.",
-            ],
-          },
-        ],
-      },
-      {
-        heading: "5. Procesamiento de su Contenido por IA",
-        body: [
-          "Cuando utiliza nuestras funciones de IA, el texto y las imágenes que envía son procesados por nuestros proveedores de IA para generar respuestas y contenido. En concreto:",
-          "Cuando conversa con el asistente de IA Loui, sus mensajes se envían a Anthropic para generar respuestas. Cuando utiliza la preparación virtual de espacios o la función Living Listing, las imágenes y los datos relacionados que envía se transmiten a Luma para generar imágenes preparadas o contenido de video.",
-          "Los resultados generados por IA, incluidas las imágenes preparadas y el contenido de Living Listing, son ilustrativos y están destinados a ayudar a visualizar posibilidades. Es posible que no reflejen con exactitud la condición, las dimensiones o las características reales de una propiedad y no deben considerarse como una representación fáctica. No envíe a través de las funciones de IA información que no desee que sea procesada para estos fines.",
-        ],
-      },
-      {
-        heading: "6. Cookies y Tecnologías Similares",
-        body: [
-          "Nosotros y nuestros proveedores de servicios usamos cookies y tecnologías similares para operar el Servicio, recordar sus preferencias, mantener su sesión iniciada, comprender cómo se utiliza el Servicio y mejorarlo.",
-          "Para una descripción detallada de las cookies y tecnologías similares que usamos y de las opciones disponibles para usted, consulte nuestra Política de Cookies independiente.",
+          "Usamos las cookies que el Servicio necesita para funcionar (por ejemplo, para mantener su sesión iniciada). Las herramientas de analítica solo se cargan si usted acepta las cookies de analítica en el aviso de cookies, y puede cambiar su elección en cualquier momento en \"Configurar cookies\", en el pie del sitio. La lista completa está en nuestra Política de Cookies.",
         ],
         sub: [
           {
@@ -416,81 +414,82 @@ export const privacyDoc: LegalContent = {
         ],
       },
       {
-        heading: "7. Conservación de Datos",
-        body: [
-          "Conservamos la información personal durante el tiempo que sea necesario para prestar el Servicio, mantener su cuenta, completar y documentar las transacciones inmobiliarias, cumplir con nuestras obligaciones legales y de mantenimiento de registros, resolver disputas y hacer cumplir nuestros acuerdos.",
-          "Cuando la información ya no es necesaria para estos fines, tomamos medidas razonables para eliminarla o para anonimizarla o desidentificarla. Los períodos de conservación varían según el tipo de información y el fin para el cual se recopiló.",
+        id: "communications",
+        heading: "7. Correos, Llamadas y Mensajes de Texto",
+        body: [],
+        bullets: [
+          "Correos transaccionales: le enviamos los correos que necesita para usar el Servicio (códigos de verificación, recibos, estado de su listado, ofertas y solicitudes de visita). Mientras use el Servicio no puede darse de baja de estos correos.",
+          "Correos de marketing y de prospección: podemos escribir a propietarios de inmuebles sobre nuestros servicios, incluso a propietarios que no han usado el Servicio, con los datos de contacto descritos en la Sección 2.3. Cada uno de esos correos identifica a Lixtara, incluye nuestra dirección postal y un enlace para darse de baja, y respetamos cada baja. [VERIFICAR: requisitos de CAN-SPAM y de la ley de Florida para correos comerciales a propietarios.]",
+          "Llamadas y mensajes de texto: solo le llamamos o escribimos por mensaje de texto con su consentimiento o para responder a una solicitud suya. Aceptar llamadas o mensajes nunca es condición para comprar nuestros servicios. Hoy no enviamos mensajes de texto. [VERIFICAR: si se activan SMS o llamadas automatizadas, revisar TCPA y Florida Telephone Solicitation Act antes.]",
         ],
       },
       {
-        heading: "8. Seguridad de los Datos",
+        id: "retention",
+        heading: "8. Cuánto Tiempo Conservamos la Información",
         body: [
-          "Utilizamos medidas administrativas, técnicas y organizativas razonables diseñadas para proteger la información personal contra la pérdida, el uso indebido y el acceso, la divulgación, la alteración y la destrucción no autorizados. Nos apoyamos en proveedores de servicios establecidos y aplicamos controles de acceso y otras salvaguardas apropiadas para la naturaleza de la información.",
-          "Sin embargo, ningún método de transmisión por Internet ni método de almacenamiento electrónico es completamente seguro. No podemos garantizar la seguridad absoluta de su información, y usted la proporciona bajo su propio riesgo. Si tiene motivos para creer que su interacción con nosotros ya no es segura, comuníquese con nosotros de inmediato.",
+          "Conservamos la información personal solo mientras sea necesaria para los fines de esta Política, incluidas las obligaciones legales y de conservación de registros. Los plazos siguientes son nuestra propuesta actual:",
+        ],
+        bullets: [
+          "Registros de transacciones y de correduría (acuerdos de listado, ofertas, registros de pago): al menos 5 años después de la transacción o del fin del listado. [VERIFICAR: plazo de conservación de registros del corredor en Florida (Cap. 475 / Reglas 61J2).]",
+          "Constancias de consentimiento (Sección 2.4): mientras exista la cuenta y al menos 5 años después del consentimiento. [VERIFICAR plazo.]",
+          "Datos de la cuenta: mientras su cuenta esté activa; cuando nos pida eliminarla, borramos o desidentificamos lo que no estemos obligados a conservar.",
+          "Borradores de listado sin terminar y registros abandonados: [VERIFICAR plazo propuesto, p. ej. 24 meses sin actividad].",
+          "Registros del servidor y datos de analítica: según la configuración de cada proveedor, por lo general hasta 13 meses. [VERIFICAR.]",
         ],
       },
       {
-        heading: "9. Sus Derechos de Privacidad",
+        id: "security",
+        heading: "9. Seguridad y Aviso de Incidentes",
         body: [
-          "Según el lugar donde resida y conforme a la ley aplicable, usted puede tener derechos sobre su información personal, incluido el derecho a acceder a la información que tenemos sobre usted, a corregir información inexacta, a solicitar su eliminación, a obtener una copia de cierta información en un formato portátil y a oponerse a determinados tratamientos.",
-          "Para ejercer sus derechos, comuníquese con nosotros en privacy@lixtara.com. Es posible que necesitemos verificar su identidad antes de atender su solicitud, incluso pidiéndole que confirme información asociada con su cuenta, con el fin de proteger su información contra el acceso no autorizado.",
-        ],
-        sub: [
-          {
-            heading: "9.1 Residentes de California",
-            body: [
-              "Si usted es residente de California, la Ley de Privacidad del Consumidor de California (CCPA), en su versión modificada por la Ley de Derechos de Privacidad de California (CPRA), le otorga ciertos derechos sobre su información personal. Estos incluyen el derecho a saber qué información personal recopilamos, usamos y divulgamos; el derecho a solicitar la eliminación de su información personal; el derecho a corregir información personal inexacta; el derecho a oponerse a la venta o la compartición de información personal; y el derecho a no ser discriminado por ejercer sus derechos.",
-              "Como se indicó anteriormente, Lixtara no vende su información personal por dinero y actualmente no comparte información personal para publicidad conductual de contexto cruzado. Para ejercer sus derechos en California, comuníquese con nosotros en privacy@lixtara.com.",
-            ],
-          },
-          {
-            heading: "9.2 Residentes de Florida",
-            body: [
-              "Si usted es residente de Florida, la Carta de Derechos Digitales de Florida (Florida Digital Bill of Rights) puede otorgarle ciertos derechos sobre su información personal, que pueden incluir los derechos a acceder, corregir, eliminar y obtener una copia de su información personal, y a oponerse a determinados tratamientos. Para ejercer estos derechos, comuníquese con nosotros en privacy@lixtara.com.",
-            ],
-          },
+          "Aplicamos medidas administrativas, técnicas y físicas razonables: cifrado en tránsito, accesos limitados según la función de cada persona, reglas en la base de datos que limitan a cada usuario a sus propios registros, y proveedores con programas de seguridad reconocidos. Ningún sistema es completamente seguro y no podemos garantizar una seguridad absoluta.",
+          "Si un incidente de seguridad afecta su información personal, le avisaremos a usted y, cuando corresponda, a las autoridades competentes, de manera coherente con la Florida Information Protection Act (sección 501.171 de los Estatutos de Florida) y demás leyes aplicables. [VERIFICAR alcance: qué datos de Lixtara son \"personal information\" bajo §501.171 y plazos de notificación.]",
         ],
       },
       {
-        heading: "10. Privacidad de los Menores",
+        id: "rights",
+        heading: "10. Sus Opciones y Derechos",
         body: [
-          "El Servicio está destinado a adultos que tengan al menos 18 años. No está dirigido a menores, y no recopilamos a sabiendas información personal de menores. Si cree que un menor nos ha proporcionado información personal, comuníquese con nosotros en privacy@lixtara.com, y tomaremos las medidas apropiadas para eliminarla.",
+          "Puede revisar y actualizar los datos de su cuenta en cualquier momento desde su área de cuenta. También puede pedirnos acceder a su información personal, corregirla o eliminarla, o dejar de recibir correos de marketing, escribiendo a {privacyEmail}. Verificaremos su identidad antes de atender la solicitud y le responderemos en un plazo razonable.",
+          "Según dónde viva, las leyes de privacidad pueden darle derechos adicionales. Que una ley determinada se aplique a Lixtara depende de los umbrales que esa ley fija. [VERIFICAR aplicabilidad por umbrales: CCPA/CPRA de California, Florida Digital Bill of Rights y otras leyes estatales; no afirmar cumplimiento hasta confirmar.]",
+          "Hay información que no podemos eliminar mientras estemos obligados a conservarla, por ejemplo los registros de una transacción inmobiliaria o de un pago.",
         ],
       },
       {
-        heading: "11. Usuarios Internacionales y Transferencias de Datos",
+        heading: "11. Menores de Edad",
         body: [
-          "Lixtara tiene su sede en los Estados Unidos, y procesamos y almacenamos la información en los Estados Unidos. Si accede al Servicio desde fuera de los Estados Unidos, usted comprende que su información será transferida y procesada en los Estados Unidos, donde las leyes de protección de datos pueden diferir de las de su jurisdicción.",
-          "Si usted se encuentra en una jurisdicción regida por leyes como el Reglamento General de Protección de Datos de la UE (GDPR), tenga en cuenta que, al utilizar el Servicio, usted nos indica que procesemos su información en los Estados Unidos según se describe en esta Política.",
+          "El Servicio no está dirigido a menores de 18 años y no recopilamos a sabiendas información personal de menores. Si cree que un menor nos dio información personal, escriba a {privacyEmail} y la eliminaremos.",
         ],
       },
       {
-        heading: "12. No Rastrear (Do Not Track)",
+        heading: "12. Dónde se Trata la Información",
         body: [
-          "Algunos navegadores ofrecen una señal de \"No Rastrear\" (\"Do Not Track\"). Dado que no existe un estándar coherente en la industria sobre cómo responder a estas señales, el Servicio actualmente no responde a las señales de No Rastrear. Continuaremos supervisando los avances en esta materia.",
+          "Lixtara tiene su sede en Estados Unidos y trata la información en Estados Unidos. Si usa el Servicio desde otro país, su información se transferirá a Estados Unidos y se tratará allí.",
         ],
       },
       {
-        heading: "13. Enlaces y Servicios de Terceros",
+        heading: "13. Señal \"Do Not Track\"",
         body: [
-          "El Servicio puede contener enlaces a sitios web, productos o servicios de terceros que no poseemos ni controlamos, y se apoya en proveedores externos según se describe en esta Política. No somos responsables de las prácticas de privacidad de estos terceros. Le recomendamos que revise las políticas de privacidad de cualquier servicio de terceros al que acceda.",
+          "No existe un estándar común para responder a la señal \"Do Not Track\" de los navegadores, por lo que el Servicio no responde a ella. Las herramientas de analítica solo funcionan si usted las acepta en el aviso de cookies.",
         ],
       },
       {
-        heading: "14. Cambios a esta Política",
+        heading: "14. Enlaces a Otros Sitios",
         body: [
-          "Podemos actualizar esta Política de Privacidad de vez en cuando para reflejar cambios en nuestras prácticas, la tecnología, los requisitos legales u otros factores. Cuando realicemos cambios, revisaremos la fecha asociada con esta Política y, cuando corresponda, proporcionaremos un aviso adicional. Su uso continuado del Servicio después de que una actualización entre en vigor constituye su aceptación de la Política revisada.",
+          "El Servicio tiene enlaces a sitios que no controlamos, como portales del MLS, Stripe y DocuSign. Sus prácticas de privacidad se rigen por sus propias políticas.",
         ],
       },
       {
-        heading: "15. Contáctenos y Cómo Ejercer sus Derechos",
+        heading: "15. Cambios a Esta Política",
         body: [
-          "Si tiene preguntas sobre esta Política de Privacidad o sobre nuestras prácticas de privacidad, o si desea ejercer sus derechos de privacidad, comuníquese con nosotros:",
-          "Por correo electrónico para asuntos de privacidad: privacy@lixtara.com",
-          "Por correo electrónico para soporte general: support@lixtara.com",
-          "Por correo postal: Lixtara, Miami, Florida, United States",
-          "Atención: privacy@lixtara.com",
-          "Para presentar una solicitud de acceso, corrección, eliminación o de ejercicio de sus derechos, envíe un correo electrónico a privacy@lixtara.com con los detalles de su solicitud. Es posible que necesitemos verificar su identidad antes de procesar su solicitud.",
+          "Podemos actualizar esta Política. La versión y la fecha de \"Última actualización\", al inicio de esta página, cambian con cada actualización, y daremos un aviso adicional cuando los cambios sean importantes.",
+        ],
+      },
+      {
+        heading: "16. Contáctenos",
+        body: [
+          "Consultas y solicitudes de privacidad: {privacyEmail}",
+          "Soporte general: {supportEmail}",
+          "Correo postal: {legalName}, {brokerageAddress}",
         ],
       },
     ],

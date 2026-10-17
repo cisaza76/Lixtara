@@ -56,6 +56,8 @@ export interface CreateTierCheckoutInput {
   cancelUrl: string;
   /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
   attribution?: CheckoutAttribution;
+  /** Versión de los Términos cuya casilla de reembolso aceptó (prueba ante un contracargo). */
+  refundTermsVersion?: string;
 }
 
 export interface TierCheckoutResult {
@@ -106,6 +108,7 @@ export async function createTierCheckoutSession(
       property_id: input.propertyId,
       tier: input.tier,
       user_id: input.userId,
+      ...(input.refundTermsVersion ? { refund_terms_version: input.refundTermsVersion } : {}),
     },
     // successUrl already carries query params (?step=8&id=...), so append the
     // session id with the correct separator — using "?" here produced a

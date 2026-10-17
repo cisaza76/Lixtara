@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import type { LegalDoc, LegalSection } from "@/lib/legal/types";
-import { LEGAL_LAST_UPDATED } from "@/lib/legal/types";
+import { LEGAL_DOCS, fillLegalDoc, type LegalDocId } from "@/lib/legal/config";
 
 // Renders any long-form legal document (Terms, Privacy, Cookies, Disclaimers)
 // in the brand's editorial style. Server component — content comes from the
@@ -15,7 +15,7 @@ function Section({ section, level }: { section: LegalSection; level: number }) {
       ? "font-display text-xl lg:text-2xl text-ink font-normal mt-10 mb-3 scroll-mt-24"
       : "font-display text-base lg:text-lg text-ink font-normal mt-6 mb-2";
   return (
-    <section>
+    <section id={section.id} className={section.id ? "scroll-mt-24" : undefined}>
       <Heading className={headingClass}>{section.heading}</Heading>
       {section.body.map((p, i) => (
         // whitespace-pre-line: preserva los saltos de línea de un bloque de
@@ -35,6 +35,32 @@ function Section({ section, level }: { section: LegalSection; level: number }) {
           ))}
         </ul>
       )}
+      {section.table && (
+        <div className="mb-4 overflow-x-auto">
+          <table className="w-full min-w-[520px] border-collapse text-left text-xs leading-relaxed text-ink/75">
+            <thead>
+              <tr>
+                {section.table.columns.map((c, i) => (
+                  <th key={i} className="border-b border-gold-soft py-2 pr-3 font-semibold text-ink">
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {section.table.rows.map((r, i) => (
+                <tr key={i} className="border-b border-gold-soft/50 align-top">
+                  {r.map((cell, j) => (
+                    <td key={j} className="py-2 pr-3">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {section.sub?.map((s, i) => (
         <Section key={i} section={s} level={level + 1} />
       ))}
@@ -44,16 +70,18 @@ function Section({ section, level }: { section: LegalSection; level: number }) {
 
 export function LegalDocument({
   lang,
-  doc,
-  updatedOn = LEGAL_LAST_UPDATED,
+  doc: rawDoc,
+  docId,
 }: {
   lang: Locale;
   doc: LegalDoc;
-  /** YYYY-MM-DD. Un documento que cambió después de los demás lleva su propia fecha. */
-  updatedOn?: string;
+  /** Fecha y versión salen de LEGAL_DOCS (src/lib/legal/config.ts). */
+  docId: LegalDocId;
 }) {
   const copy = t(lang).legal;
-  const lastUpdated = new Date(`${updatedOn}T00:00:00`).toLocaleDateString(
+  const meta = LEGAL_DOCS[docId];
+  const doc = fillLegalDoc(rawDoc);
+  const lastUpdated = new Date(`${meta.updated}T00:00:00`).toLocaleDateString(
     lang,
     { year: "numeric", month: "long", day: "numeric" },
   );
@@ -72,7 +100,7 @@ export function LegalDocument({
           {doc.title}
         </h1>
         <p className="mt-3 text-[10px] uppercase tracking-[0.22em] text-ink/45">
-          {copy.lastUpdated}: {lastUpdated}
+          {copy.lastUpdated}: {lastUpdated} · {copy.version} {meta.version}
         </p>
 
         {lang === "es" && (

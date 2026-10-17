@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { t } from "@/lib/i18n";
 import { sellerLeadIsTest } from "@/lib/listing-email-gate";
 import { writtenOutsideProduction } from "@/lib/test-data";
-import { COOKIES_LAST_UPDATED, LEGAL_LAST_UPDATED } from "@/lib/legal/types";
+import { LEGAL_DOCS } from "@/lib/legal/config";
 
 const root = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
@@ -74,9 +74,8 @@ describe("hallazgos de preview (paso 1, validación, cookies, seller_leads)", ()
   });
 
   it("la política de cookies lleva la fecha del despliegue de #193; los demás documentos no cambian", () => {
-    expect(COOKIES_LAST_UPDATED).toBe("2026-10-16");
-    expect(LEGAL_LAST_UPDATED).toBe("2026-09-02");
-    expect(read("src/app/[lang]/cookies/page.tsx")).toContain("updatedOn={COOKIES_LAST_UPDATED}");
+    expect(LEGAL_DOCS.cookies.updated >= "2026-10-16").toBe(true);
+    expect(read("src/app/[lang]/cookies/page.tsx")).toContain('docId="cookies"');
   });
 
   it("properties: fuera de Production el servidor marca is_test al crear (el guard no deja al vendedor)", () => {

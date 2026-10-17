@@ -2,6 +2,8 @@
 // and Stripe checkout (F2+) all read from this single source of truth.
 // NEVER hardcode flat-fee dollar amounts or commission percentages elsewhere.
 
+import { PUBLICATION_BUSINESS_DAYS } from "@/config/publication";
+
 export type PricingTierId = "essentials" | "pro" | "concierge";
 
 export interface PricingTier {
@@ -172,6 +174,7 @@ function formatThousands(amount: number): string {
 
 // Fills catalog-wide placeholders so dictionaries never hardcode amounts:
 //   {photoAddonPrice}       → "$495"   (PHOTOGRAPHY_ADDON_PRICE)
+//   {publicationBusinessDays} → "2"    (src/config/publication.ts)
 //   {proFlatFee}            → "$495"   {proCommissionPct} → "1"
 //   {exampleSalePrice}      → "$500,000"
 //   {exampleBuyerPct}       → "2.5" (DEFAULT_BUYER_COMMISSION_PCT)
@@ -184,6 +187,7 @@ export function fillPricingCopy(text: string): string {
   const example = compareWithTraditional("pro", EXAMPLE_SALE_PRICE, DEFAULT_BUYER_COMMISSION_PCT);
   return text
     .replaceAll("{photoAddonPrice}", formatPrice(PHOTOGRAPHY_ADDON_PRICE))
+    .replaceAll("{publicationBusinessDays}", String(PUBLICATION_BUSINESS_DAYS))
     .replaceAll("{proFlatFee}", formatPrice(PRICING_TIERS.pro.flatFee))
     .replaceAll("{proCommissionPct}", String(PRICING_TIERS.pro.commissionPct))
     .replaceAll("{exampleSalePrice}", formatPrice(EXAMPLE_SALE_PRICE))

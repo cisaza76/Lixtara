@@ -82,6 +82,8 @@ import {
   suggestedTierParam,
 } from "@/lib/listing-step1-form";
 import { AppFormValidation } from "@/components/app-form-validation";
+import { CONSENTS } from "@/lib/legal/consents";
+import { LEGAL_DOCS, fillLegalCopy } from "@/lib/legal/config";
 import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
@@ -1612,6 +1614,12 @@ export default async function ListingNewPage({
   }
 
   // Paso 5: misma regla que nextFromStep5 (src/lib/listing-photos.ts).
+  // Paso 7: aviso y casilla E-SIGN antes de abrir DocuSign (textos versionados).
+  const esignProps = {
+    notice: (CONSENTS.esign.notice?.[lang] ?? []).map(fillLegalCopy),
+    checkbox: fillLegalCopy(CONSENTS.esign.checkbox[lang].before),
+    version: CONSENTS.esign.version,
+  };
   const photosRequired = ownPhotosRequired(draft?.pricing_tier ?? null);
 
   const errorMessage =
@@ -3393,6 +3401,7 @@ export default async function ListingNewPage({
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
                     }}
+                    esign={esignProps}
                   />
                 </div>
               );
@@ -3423,6 +3432,7 @@ export default async function ListingNewPage({
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
                     }}
+                    esign={esignProps}
                   />
                 </div>
               );
@@ -3438,6 +3448,7 @@ export default async function ListingNewPage({
                   redirecting: copy.step7.redirecting,
                   failed: copy.step7.failed,
                 }}
+                esign={esignProps}
               />
             );
             })()
@@ -3587,6 +3598,11 @@ export default async function ListingNewPage({
                     redirecting: copy.step8.redirecting,
                     failed: copy.step8.failed,
                     confirming: copy.step8.confirmingExisting,
+                  }}
+                  refundAck={{
+                    parts: CONSENTS.terms_refund.checkbox[lang],
+                    termsHref: `/${lang}${LEGAL_DOCS.terms.path}#refunds`,
+                    version: CONSENTS.terms_refund.version,
                   }}
                 />
 

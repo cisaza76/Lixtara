@@ -125,7 +125,7 @@ export const dictionaries = {
             "Listing active for 24 months",
             "Realtor consultation: $150/hr · Attorney: $450/hr (pay per use)",
             "Lockbox + yard sign: $60 add-on when vacant",
-            "Cancel anytime · {commissionPct}% Lixtara commission at closing, only if your home sells",
+            "{commissionPct}% Lixtara commission at closing, only if your home sells",
           ],
           notIncluded: [
             "Professional photography (available as a paid add-on)",
@@ -139,7 +139,7 @@ export const dictionaries = {
           tagline: "Most chosen by sellers",
           forWhom: "Perfect for: Sellers who want broker support and pro photos",
           features: [
-            "Priority MLS listing (live within 48h, broker-reviewed description), syndicated to Zillow, Realtor.com, Redfin, Trulia and 100+ other sites",
+            "MLS listing with a broker-reviewed description, published within {publicationBusinessDays} business days of broker approval and syndicated to Zillow, Realtor.com, Redfin, Trulia and 100+ other sites",
             "Professional photography ({photoAddonPrice} value, included)",
             "Broker compliance & strategy call (30 min)",
             "Dedicated listing coordinator",
@@ -149,7 +149,7 @@ export const dictionaries = {
             "AI chatbot support 24/7 (Ask Loui)",
             "Email + chat support",
             "Realtor consultation: $150/hr · Attorney: $450/hr (pay per use)",
-            "Listing active for 24 months · Cancel anytime · {commissionPct}% Lixtara commission at closing, only if your home sells",
+            "Listing active for 24 months · {commissionPct}% Lixtara commission at closing, only if your home sells",
           ],
           notIncluded: [
             "Drone shots",
@@ -164,7 +164,7 @@ export const dictionaries = {
           tagline: "White-glove service",
           forWhom: "Perfect for: Sellers who want full white-glove service",
           features: [
-            "Priority MLS listing (live within 48h, broker-reviewed description), syndicated to Zillow, Realtor.com, Redfin, Trulia and 100+ other sites",
+            "MLS listing with a broker-reviewed description, published within {publicationBusinessDays} business days of broker approval and syndicated to Zillow, Realtor.com, Redfin, Trulia and 100+ other sites",
             "Premium photography + drone shots",
             "Dedicated broker, 7 days a week",
             "Full negotiation assistance",
@@ -178,7 +178,7 @@ export const dictionaries = {
             "Showing scheduling integration",
             "AI chatbot support 24/7 (Ask Loui)",
             "Phone, email + chat support",
-            "Listing active for 24 months · Cancel anytime · {commissionPct}% Lixtara commission at closing, only if your home sells",
+            "Listing active for 24 months · {commissionPct}% Lixtara commission at closing, only if your home sells",
           ],
           notIncluded: [],
         },
@@ -1289,13 +1289,17 @@ export const dictionaries = {
         cookies: "Cookies",
         disclaimers: "Disclaimers",
         dmca: "Copyright / DMCA",
+        notices: "Brokerage & Fair Housing notices",
+        accessibility: "Accessibility",
       },
       copyright: "All rights reserved.",
       equalHousing: "Equal Housing Opportunity",
+      licensedBrokerage: "Licensed Real Estate Brokerage",
     },
     legal: {
       backHome: "Back to home",
       lastUpdated: "Last updated",
+      version: "Version",
       englishControls:
         "This document is maintained in English. A Spanish translation is provided for convenience; if there is any conflict, the English-language version governs.",
     },
@@ -1668,7 +1672,7 @@ export const dictionaries = {
         },
         {
           q: "Which plan should I pick?",
-          a: "Every plan puts your home on the MLS and its partner sites. Essentials fits sellers comfortable taking their own photos and running the sale from their dashboard. Pro is the most popular: it adds professional photography, a 30 minute broker strategy call, a dedicated listing coordinator and priority MLS publication within 48 hours. Concierge is full service: premium photography with drone, a dedicated broker 7 days a week, negotiation and transaction management through closing, and unlimited Realtor and attorney consultations.",
+          a: "Every plan puts your home on the MLS and its partner sites. Essentials fits sellers comfortable taking their own photos and running the sale from their dashboard. Pro is the most popular: it adds professional photography, a 30 minute broker strategy call and a dedicated listing coordinator. Concierge is full service: premium photography with drone, a dedicated broker 7 days a week, negotiation and transaction management through closing, and unlimited Realtor and attorney consultations.",
         },
         {
           q: "Is Lixtara a licensed brokerage?",
@@ -1676,15 +1680,15 @@ export const dictionaries = {
         },
         {
           q: "What about the buyer's agent commission?",
-          a: "You decide how much to offer the buyer's agent (usually 2 to 2.5%), and it's published with your MLS listing so every agent sees it. It is separate from Lixtara's fee and is only paid at closing if a buyer's agent brings the offer. Higher compensation tends to attract more agents to show your property.",
+          a: "You decide whether to offer the buyer's agent any compensation, and how much. It's always negotiable and it isn't published on the MLS. It's separate from Lixtara's fee and is only paid at closing if you agreed to it with the buyer's side.",
         },
         {
           q: "How long until my listing goes live on the MLS?",
-          a: "Once you sign the listing agreement through DocuSign and activate your plan, our broker reviews your listing and publishes it on the MLS. Pro and Concierge listings get priority and go live within 48 hours. From the MLS your home reaches Zillow, Realtor.com, Redfin, Trulia and 100+ other sites.",
+          a: "Once you sign the listing agreement through DocuSign and pay your plan fee, our broker reviews and countersigns it, and we publish your listing on the MLS within {publicationBusinessDays} business days of that approval. From the MLS your home reaches Zillow, Realtor.com, Redfin, Trulia and 100+ other sites, each on its own schedule.",
         },
         {
           q: "What if my home doesn't sell?",
-          a: "Your listing stays active for a 24-month term, the longest in the industry. The flat fee is non-refundable because it covers creating and managing your MLS listing, but commission only applies when the property sells. You can withdraw your listing at any time with no penalty.",
+          a: "Your listing stays active for a 24-month term. The flat fee is non-refundable once your listing is published on the MLS; before that, it's refunded in full in the cases listed in our Terms. Lixtara's commission only applies if the property sells. Ending the listing early is governed by the listing agreement you sign.",
         },
       ],
     },
@@ -2013,7 +2017,7 @@ export const dictionaries = {
             "Listado activo por 24 meses",
             "Consulta con Realtor: $150/h · Abogado: $450/h (pago por uso)",
             "Lockbox + letrero: $60 adicionales si la casa está vacía",
-            "Cancela cuando quieras · {commissionPct}% de comisión Lixtara al cierre, solo si tu casa se vende",
+            "{commissionPct}% de comisión Lixtara al cierre, solo si tu casa se vende",
           ],
           notIncluded: [
             "Fotografía profesional (disponible como servicio adicional pagado)",
@@ -2027,7 +2031,7 @@ export const dictionaries = {
           tagline: "El más elegido",
           forWhom: "Ideal para: vendedores que quieren respaldo del broker y fotos profesionales",
           features: [
-            "Publicación prioritaria en el MLS (activa en 48h, descripción revisada por el broker), distribuida a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios",
+            "Publicación en el MLS con descripción revisada por el broker, dentro de {publicationBusinessDays} días hábiles después de la aprobación del broker, y distribuida a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios",
             "Fotografía profesional (valor {photoAddonPrice}, incluida)",
             "Llamada de cumplimiento y estrategia con el broker (30 min)",
             "Coordinador de listado dedicado",
@@ -2037,7 +2041,7 @@ export const dictionaries = {
             "Soporte con chatbot de IA 24/7 (Pregúntale a Loui)",
             "Soporte por correo + chat",
             "Consulta con Realtor: $150/h · Abogado: $450/h (pago por uso)",
-            "Listado activo por 24 meses · Cancela cuando quieras · {commissionPct}% de comisión Lixtara al cierre, solo si tu casa se vende",
+            "Listado activo por 24 meses · {commissionPct}% de comisión Lixtara al cierre, solo si tu casa se vende",
           ],
           notIncluded: [
             "Tomas con dron",
@@ -2052,7 +2056,7 @@ export const dictionaries = {
           tagline: "Servicio integral y personalizado",
           forWhom: "Ideal para: vendedores que quieren un servicio integral y personalizado",
           features: [
-            "Publicación prioritaria en el MLS (activa en 48h, descripción revisada por el broker), distribuida a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios",
+            "Publicación en el MLS con descripción revisada por el broker, dentro de {publicationBusinessDays} días hábiles después de la aprobación del broker, y distribuida a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios",
             "Fotografía premium + tomas con dron",
             "Broker dedicado, 7 días a la semana",
             "Asistencia completa en negociación",
@@ -2066,7 +2070,7 @@ export const dictionaries = {
             "Integración de agendamiento de visitas",
             "Soporte con chatbot de IA 24/7 (Pregúntale a Loui)",
             "Soporte por teléfono, correo + chat",
-            "Listado activo por 24 meses · Cancela cuando quieras · {commissionPct}% de comisión Lixtara al cierre, solo si tu casa se vende",
+            "Listado activo por 24 meses · {commissionPct}% de comisión Lixtara al cierre, solo si tu casa se vende",
           ],
           notIncluded: [],
         },
@@ -3097,7 +3101,7 @@ export const dictionaries = {
       titleBefore: "Hablemos",
       titleAccent: "",
       titleAfter: ".",
-      intro: "¿Preguntas sobre vender, comprar o una consulta? Escríbenos por WhatsApp, llámanos o envía el formulario y nuestra broker te responde en máximo un día hábil.",
+      intro: "¿Preguntas sobre vender, comprar o una consulta? Escríbenos por WhatsApp, llámanos o envía el formulario y nuestra broker normalmente te responde en un día hábil.",
       whatsappCta: "WhatsApp",
       callCta: "Llamar",
       formTitle: "Envíanos un mensaje",
@@ -3113,7 +3117,7 @@ export const dictionaries = {
       },
       messageLabel: "Mensaje",
       submit: "Enviar mensaje",
-      sent: "Gracias, tu mensaje ya va en camino. Te respondemos por correo en máximo un día hábil.",
+      sent: "Gracias, tu mensaje ya va en camino. Normalmente te respondemos por correo en un día hábil.",
       errors: {
         required: "Escribe tu nombre, correo y mensaje.",
         email: "Ese correo no parece válido.",
@@ -3177,13 +3181,17 @@ export const dictionaries = {
         cookies: "Cookies",
         disclaimers: "Avisos legales",
         dmca: "Derechos de autor / DMCA",
+        notices: "Avisos de corretaje y vivienda justa",
+        accessibility: "Accesibilidad",
       },
       copyright: "Todos los derechos reservados.",
       equalHousing: "Igualdad de oportunidades de vivienda",
+      licensedBrokerage: "Brokerage inmobiliaria licenciada",
     },
     legal: {
       backHome: "Volver al inicio",
       lastUpdated: "Última actualización",
+      version: "Versión",
       englishControls:
         "Este documento se mantiene en inglés. La traducción al español se ofrece por conveniencia; en caso de cualquier conflicto, prevalece la versión en inglés.",
     },
@@ -3556,7 +3564,7 @@ export const dictionaries = {
         },
         {
           q: "¿Qué plan debería elegir?",
-          a: "Todos los planes publican tu casa en el MLS y en sus sitios asociados. Essentials es para vendedores que toman sus propias fotos y manejan la venta desde su panel. Pro es el más popular: agrega fotografía profesional, una llamada de estrategia de 30 minutos con el broker, un coordinador de listado dedicado y publicación prioritaria en el MLS en 48 horas. Concierge es servicio completo: fotografía premium con dron, broker dedicado 7 días a la semana, negociación y gestión de la transacción hasta el cierre, y consultas ilimitadas con Realtor y abogado.",
+          a: "Todos los planes publican tu casa en el MLS y en sus sitios asociados. Essentials es para vendedores que toman sus propias fotos y manejan la venta desde su panel. Pro es el más popular: agrega fotografía profesional, una llamada de estrategia de 30 minutos con el broker y un coordinador de listado dedicado. Concierge es servicio completo: fotografía premium con dron, broker dedicado 7 días a la semana, negociación y gestión de la transacción hasta el cierre, y consultas ilimitadas con Realtor y abogado.",
         },
         {
           q: "¿Lixtara es una inmobiliaria licenciada?",
@@ -3564,15 +3572,15 @@ export const dictionaries = {
         },
         {
           q: "¿Y la comisión del agente del comprador?",
-          a: "Tú decides cuánto ofrecer al agente del comprador (normalmente entre 2 y 2.5%), y se publica con tu listado en el MLS para que todos los agentes lo vean. Es separado de la tarifa de Lixtara y se paga al cierre solo si un agente del comprador trae la oferta. Una compensación más alta tiende a atraer más agentes a mostrar tu propiedad.",
+          a: "Tú decides si ofreces una compensación al agente del comprador y cuánto. Siempre es negociable y no se publica en el MLS. Es aparte de la tarifa de Lixtara y solo se paga al cierre si la acordaste con la parte compradora.",
         },
         {
           q: "¿Cuánto tarda mi listado en salir al MLS?",
-          a: "Cuando firmas el acuerdo de listado por DocuSign y activas tu plan, nuestro broker revisa tu listado y lo publica en el MLS. Los planes Pro y Concierge tienen prioridad y salen en 48 horas. Desde el MLS tu casa llega a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios.",
+          a: "Cuando firmas el acuerdo de listado por DocuSign y pagas la tarifa de tu plan, nuestro broker lo revisa y lo contrafirma, y publicamos tu listado en el MLS dentro de {publicationBusinessDays} días hábiles después de esa aprobación. Desde el MLS tu casa llega a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios, cada uno a su propio ritmo.",
         },
         {
           q: "¿Qué pasa si mi casa no se vende?",
-          a: "Tu listado permanece activo por un plazo de 24 meses, el más largo de la industria. La tarifa fija no es reembolsable porque cubre la creación y administración de tu listado en el MLS, pero la comisión solo aplica si la propiedad se vende. Puedes retirar tu listado en cualquier momento sin penalidad.",
+          a: "Tu listado permanece activo por un plazo de 24 meses. La tarifa fija no es reembolsable una vez tu listado está publicado en el MLS; antes de eso, se devuelve completa en los casos que indican nuestros Términos. La comisión de Lixtara solo aplica si la propiedad se vende. Terminar el listado antes de tiempo se rige por el acuerdo de listado que firmas.",
         },
       ],
     },
