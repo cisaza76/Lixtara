@@ -13,6 +13,7 @@ vi.mock("resend", () => ({
 }));
 
 import { sendPaymentReceipt } from "@/lib/email";
+import { PUBLICATION_BUSINESS_DAYS } from "@/lib/legal/config";
 
 describe("recibo de pago: recuerda el % al cierre, solo si se vende", () => {
   afterEach(() => {
@@ -31,5 +32,19 @@ describe("recibo de pago: recuerda el % al cierre, solo si se vende", () => {
     expect(en.text).toContain("1% Lixtara commission");
     expect(es.html).toContain("comisión Lixtara del 1.5% del precio de venta, que se paga al cierre y solo si tu propiedad se vende");
     expect(es.text).toContain("1.5%");
+  });
+
+  it("incluye el reembolso resumido, el plazo de publicación y el enlace a los Términos (#refunds)", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    await sendPaymentReceipt({ ...base, lang: "en" });
+    await sendPaymentReceipt({ ...base, lang: "es" });
+    const [en, es] = h.calls.map((c) => c[0]!);
+    expect(en.html).toContain("non-refundable once your listing is published on the MLS");
+    expect(en.html).toContain(`within ${PUBLICATION_BUSINESS_DAYS} business days after our broker countersigns`);
+    expect(en.html).toContain('href="https://x/en/terms#refunds"');
+    expect(en.text).toContain("https://x/en/terms#refunds");
+    expect(es.html).toContain("no es reembolsable una vez tu listing esté publicado en el MLS");
+    expect(es.html).toContain(`dentro de ${PUBLICATION_BUSINESS_DAYS} días hábiles`);
+    expect(es.html).toContain('href="https://x/es/terms#refunds"');
   });
 });

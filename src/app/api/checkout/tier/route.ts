@@ -1,5 +1,9 @@
 // POST /api/checkout/tier
-// Body (JSON): { property_id, lang? }
+// Body (JSON): { property_id, lang?, accept_refund_terms: true, refund_terms_version }
+//
+// Sin la casilla de reembolso aceptada (y en la versión vigente de los Términos) no hay
+// checkout: 400 refund_terms_required / refund_terms_outdated. La aceptación se registra en
+// terms_acceptances con la sesión de Stripe; si no queda registrada, no se paga (503).
 //
 // Creates a Stripe Checkout Session for the property's tier flat fee.
 // Persists a `payments` row in 'pending' status with the session id. Returns
@@ -7,7 +11,7 @@
 
 import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createTierCheckoutSession } from "@/lib/stripe";
+import { createTierCheckoutSession, expireCheckoutSession } from "@/lib/stripe";
 import { checkoutAttribution } from "@/lib/ga4-attribution";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
@@ -15,10 +19,14 @@ import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { createService } from "@/lib/supabase/service";
 import { decideCheckout, type ExistingPayment } from "@/lib/checkout-guard";
 import { checkoutGuardDeps } from "@/lib/checkout-return.server";
+import { CONSENTS } from "@/lib/legal/consents";
+import { recordAcceptance } from "@/lib/legal/consents.server";
 
 interface Body {
   property_id?: string;
   lang?: string;
+  accept_refund_terms?: unknown;
+  refund_terms_version?: unknown;
 }
 
 const TIERS = new Set<string>(["essentials", "pro", "concierge"]);
@@ -55,6 +63,23 @@ export async function POST(req: Request) {
   if (!propertyId) {
     return NextResponse.json({ error: "property_id_required" }, { status: 400 });
   }
+  // Casilla de reembolso del paso 8: obligatoria, y de la versión vigente de los Términos.
+  if (body.accept_refund_terms !== true) {
+    return NextResponse.json({ error: "refund_terms_required" }, { status: 400 });
+  }
+  if (body.refund_terms_version !== CONSENTS.terms_refund.version) {
+    return NextResponse.json({ error: "refund_terms_outdated" }, { status: 409 });
+  }
+  const recordRefundAck = (sessionId: string) =>
+    recordAcceptance({
+      document: "terms_refund",
+      lang,
+      context: "checkout_tier",
+      userId: user.id,
+      propertyId,
+      stripeCheckoutSessionId: sessionId,
+      headers: req.headers,
+    });
 
   const { data: property } = await supabase
     .from("properties")
@@ -127,6 +152,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "payment_check_unavailable" }, { status: 503 });
   }
   if (decision.action === "reuse") {
+    if (!(await recordRefundAck(decision.sessionId))) {
+      return NextResponse.json({ error: "consent_record_failed" }, { status: 503 });
+    }
     return NextResponse.json({ url: decision.url, session_id: decision.sessionId, reused: true });
   }
 
@@ -140,7 +168,14 @@ export async function POST(req: Request) {
       userEmail: user.email,
       successUrl: `${origin}/${lang}/listing/new?step=8&id=${propertyId}`,
       cancelUrl: `${origin}/${lang}/listing/new?step=8&id=${propertyId}&error=cancelled`,
+      refundTermsVersion: CONSENTS.terms_refund.version,
     });
+
+    // Sin prueba de la casilla no se paga: la sesión se cierra antes de que alguien la use.
+    if (!(await recordRefundAck(sessionId))) {
+      await expireCheckoutSession(sessionId).catch(() => {});
+      return NextResponse.json({ error: "consent_record_failed" }, { status: 503 });
+    }
 
     const { error: insErr } = await supabase.from("payments").insert({
       property_id: propertyId,

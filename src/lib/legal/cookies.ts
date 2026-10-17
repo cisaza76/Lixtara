@@ -1,486 +1,399 @@
-import type { LegalContent } from "./types";
+import type { LegalContent, LegalDoc, LegalSection } from "./types";
+import { CONSENT_COOKIE, CONSENT_MAX_AGE_S } from "@/lib/analytics-config";
+import { STEP1_FORM_COOKIE, STEP1_FORM_MAX_AGE_S } from "@/lib/listing-step1-form";
+import { SIGNUP_EMAIL_COOKIE } from "@/lib/auth/signup-code";
+import { FIRST_TOUCH_COOKIE, FIRST_TOUCH_MAX_AGE_S } from "@/lib/funnel-events";
 
-export const cookiesDoc: LegalContent = {
-  en: {
-    title: "Cookie Policy",
-    intro: [
-      "This Cookie Policy explains how Lixtara (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), a real-estate platform based in Miami, Florida, uses cookies and similar technologies when you visit our website and use our services.",
-      "It describes what these technologies are, why we use them, the categories of cookies we rely on, and the choices available to you. This policy should be read together with our Privacy Policy, which explains how we handle personal information more generally.",
-      "By using Lixtara, you agree to the use of strictly necessary cookies, which are essential for the platform to function. Any future use of non-essential cookies will be subject to the consent process described in this policy. This policy is governed by the laws of the State of Florida, USA, and applicable privacy and ePrivacy laws.",
-    ],
-    sections: [
-      {
-        heading: "1. What Are Cookies (and Similar Technologies)",
-        body: [
-          "Cookies are small text files that a website places on your device (computer, tablet, or phone) when you visit. They allow the website to recognize your device, remember certain information about your visit, and function reliably across pages and sessions.",
-          "\"Similar technologies\" refers to other mechanisms that store or read information on your device for comparable purposes. The most common example we use is browser local storage and session storage, which let the platform keep limited information (such as your interface preferences or sign-in state) in your browser.",
-          "In this policy, references to \"cookies\" include these similar technologies unless we state otherwise.",
-        ],
-        bullets: [
-          "First-party cookies are set by Lixtara itself.",
-          "Third-party cookies are set by external services we embed (for example, payment or e-signature tools) and are governed by those providers' own policies.",
-          "Session cookies are temporary and are deleted when you close your browser.",
-          "Persistent cookies remain on your device for a set period or until you delete them.",
-        ],
-      },
-      {
-        heading: "2. How We Use Cookies",
-        body: [
-          "Today, Lixtara primarily uses strictly necessary cookies. These keep you securely signed in, protect the listing and transaction flows, and remember basic preferences such as your chosen language.",
-          "We use cookies to operate and secure the platform, not to track you across unrelated websites for advertising. We do not currently use cookies for advertising, and we do not currently run product or marketing analytics that rely on cookies.",
-        ],
-        bullets: [
-          "To authenticate sellers and buyers and keep them signed in.",
-          "To secure the listing flow and other account actions against misuse.",
-          "To remember preferences such as your language selection.",
-          "To support rate-limiting and security measures that help protect the platform.",
-        ],
-      },
-      {
-        heading: "3. Types of Cookies We Use",
-        body: [
-          "The cookies and similar technologies on Lixtara fall into the categories described below. Because we focus on essential functionality, most of what we use is strictly necessary or functional.",
-        ],
-        sub: [
-          {
-            heading: "3.1 Strictly Necessary: Authentication & Session",
-            body: [
-              "These cookies are essential for the platform to work. They are set by our authentication provider (Supabase Auth) to keep sellers and buyers signed in, maintain a secure session, and protect the listing and transaction flows.",
-              "Without these cookies, you would not be able to sign in or complete core actions such as creating or managing a listing.",
-            ],
-            bullets: [
-              "Maintain your signed-in session as you move between pages.",
-              "Help secure account and listing actions.",
-              "Cannot be switched off through our platform because the service cannot function without them.",
-            ],
-          },
-          {
-            heading: "3.2 Functional / Preference",
-            body: [
-              "These cookies and storage entries remember choices you make so the platform behaves the way you expect.",
-            ],
-            bullets: [
-              "Remember your language preference (for example, English or Spanish).",
-              "Remember basic interface preferences.",
-              "If disabled, the platform still works, but some preferences may not be retained between visits.",
-            ],
-          },
-          {
-            heading: "3.3 Security & Rate-Limiting",
-            body: [
-              "These technologies support measures that help protect the platform from abuse, including rate-limiting mechanisms (for example, those powered by Upstash) that limit how often certain actions can be performed.",
-              "We also use Sentry (Functional Software, Inc.) as a technical error-monitoring tool. It does not set cookies or use local storage, and it is not used for analytics or advertising. When an error occurs in your browser, it sends technical details about that error (such as the error message, the page address and the browser type) so we can detect and fix failures, and an anonymous signal per visit to measure the site's stability. We configure it not to send personal data such as cookies, form contents or the text you type. Because it is necessary to keep the service working, it does not depend on the cookie banner.",
-            ],
-            bullets: [
-              "Help detect and limit abusive or automated activity.",
-              "Support the integrity and availability of the service.",
-              "Sentry: error monitoring, without cookies; not used for analytics or advertising.",
-            ],
-          },
-          {
-            heading: "3.4 Analytics & Performance",
-            body: [
-              "We do not currently use analytics or performance cookies. If, in the future, we add privacy-respecting product or marketing analytics, this policy will be updated and, where required by applicable law, we will obtain your consent before such non-essential cookies are set.",
-            ],
-            bullets: [
-              "Not currently in use.",
-              "Any future use will be disclosed here and, where required, consent-based.",
-            ],
-          },
-          {
-            heading: "3.5 Advertising",
-            body: [
-              "We do not use advertising or targeting cookies. Lixtara does not serve third-party advertising and does not use cookies to build advertising profiles or track you across unrelated websites.",
-            ],
-            bullets: [
-              "Not used.",
-            ],
-          },
-        ],
-      },
-      {
-        heading: "4. Third-Party Cookies",
-        body: [
-          "When you use certain features, we embed third-party tools that may set their own cookies on your device. These cookies are controlled by those providers, not by Lixtara, and are governed by the providers' own cookie and privacy policies. We encourage you to review those policies.",
-          "These third-party cookies are generally only relevant when you actually use the corresponding feature.",
-        ],
-        bullets: [
-          "Stripe: when you complete a payment or checkout.",
-          "DocuSign: when you review or sign documents electronically.",
-          "Mapbox and Google Maps: when maps are displayed or used.",
-        ],
-      },
-      {
-        heading: "5. How Long Cookies Last",
-        body: [
-          "Cookies last for different lengths of time depending on their purpose.",
-          "Session cookies are temporary. They exist only for the duration of your visit and are removed when you close your browser. Persistent cookies remain on your device for a defined period or until you delete them, allowing the platform to remember information across visits, such as keeping you signed in or remembering your language.",
-          "The exact lifespan of third-party cookies is determined by the providers that set them.",
-        ],
-        bullets: [
-          "Session cookies: deleted when you close your browser.",
-          "Persistent cookies: remain for a set period or until you clear them.",
-        ],
-      },
-      {
-        heading: "6. Managing & Disabling Cookies",
-        body: [
-          "You can control and delete cookies through your browser settings. Most browsers let you view the cookies stored on your device, block or delete them, and choose whether to accept cookies from specific sites. The steps vary by browser, so check your browser's help resources for details.",
-          "Please note that strictly necessary cookies are essential to how Lixtara works. If you block or delete them, you will not be able to sign in, and the listing flow and other core features will not function correctly.",
-          "Disabling functional cookies will not break the platform but may mean preferences such as your language are not remembered between visits.",
-        ],
-        bullets: [
-          "Use your browser settings to view, block, or delete cookies.",
-          "Clearing cookies may sign you out and reset your preferences.",
-          "Blocking strictly necessary cookies will prevent sign-in and the listing flow from working.",
-        ],
-      },
-      {
-        heading: "7. Consent & the Cookie Notice",
-        body: [
-          "When you first visit Lixtara, we show a lightweight cookie notice that informs you about our use of cookies and points you to this policy.",
-          "Strictly necessary cookies do not require your consent because the platform cannot function without them. If we introduce non-essential cookies in the future (for example, analytics), we will request your consent where required by applicable privacy and ePrivacy laws before those cookies are set, and you will be able to make a choice through the cookie notice.",
-        ],
-        bullets: [
-          "Strictly necessary cookies are used without separate consent.",
-          "Any future non-essential cookies will be subject to consent where required.",
-        ],
-      },
-      {
-        heading: "8. Changes to This Cookie Policy",
-        body: [
-          "We may update this Cookie Policy from time to time to reflect changes in the technologies we use, in our services, or in legal requirements. When we make material changes, we will update the effective date shown with this policy and, where appropriate, provide additional notice.",
-          "We encourage you to review this policy periodically to stay informed about how we use cookies.",
-        ],
-      },
-      {
-        heading: "9. Contact Us",
-        body: [
-          "If you have questions about this Cookie Policy or our use of cookies, please contact us.",
-        ],
-        bullets: [
-          "Email: privacy@lixtara.com",
-          "Lixtara, Miami, Florida, USA",
-          "Mailing address: Miami, Florida, United States",
-        ],
-      },
-    ],
-  },
-  es: {
-    title: "Política de Cookies",
-    intro: [
-      "Esta Política de Cookies explica cómo Lixtara (\"Lixtara\", \"nosotros\" o \"nuestro\"), una plataforma inmobiliaria con sede en Miami, Florida, utiliza cookies y tecnologías similares cuando visita nuestro sitio web y utiliza nuestros servicios.",
-      "Describe qué son estas tecnologías, por qué las utilizamos, las categorías de cookies de las que dependemos y las opciones disponibles para usted. Esta política debe leerse junto con nuestra Política de Privacidad, que explica de forma más general cómo tratamos la información personal.",
-      "Al utilizar Lixtara, usted acepta el uso de cookies estrictamente necesarias, que son esenciales para que la plataforma funcione. Cualquier uso futuro de cookies no esenciales estará sujeto al proceso de consentimiento descrito en esta política. Esta política se rige por las leyes del Estado de Florida, EE. UU., y por las leyes aplicables de privacidad y de privacidad en las comunicaciones electrónicas (ePrivacy).",
-    ],
-    sections: [
-      {
-        heading: "1. Qué Son las Cookies (y Tecnologías Similares)",
-        body: [
-          "Las cookies son pequeños archivos de texto que un sitio web coloca en su dispositivo (computadora, tableta o teléfono) cuando lo visita. Permiten que el sitio web reconozca su dispositivo, recuerde cierta información sobre su visita y funcione de forma fiable entre páginas y sesiones.",
-          "Las \"tecnologías similares\" se refieren a otros mecanismos que almacenan o leen información en su dispositivo con fines comparables. El ejemplo más común que utilizamos es el almacenamiento local (local storage) y de sesión (session storage) del navegador, que permiten a la plataforma conservar información limitada (como sus preferencias de interfaz o su estado de inicio de sesión) en su navegador.",
-          "En esta política, las referencias a \"cookies\" incluyen estas tecnologías similares, salvo que se indique lo contrario.",
-        ],
-        bullets: [
-          "Las cookies de origen propio son establecidas por la propia Lixtara.",
-          "Las cookies de terceros son establecidas por servicios externos que integramos (por ejemplo, herramientas de pago o de firma electrónica) y se rigen por las políticas propias de esos proveedores.",
-          "Las cookies de sesión son temporales y se eliminan cuando cierra su navegador.",
-          "Las cookies persistentes permanecen en su dispositivo durante un período determinado o hasta que las elimine.",
-        ],
-      },
-      {
-        heading: "2. Cómo Utilizamos las Cookies",
-        body: [
-          "Hoy, Lixtara utiliza principalmente cookies estrictamente necesarias. Estas mantienen su sesión iniciada de forma segura, protegen los flujos de publicación de propiedades y de transacciones, y recuerdan preferencias básicas como el idioma que ha elegido.",
-          "Utilizamos cookies para operar y proteger la plataforma, no para rastrearle a través de sitios web no relacionados con fines publicitarios. Actualmente no utilizamos cookies con fines publicitarios y no ejecutamos análisis de producto ni de marketing que dependan de cookies.",
-        ],
-        bullets: [
-          "Para autenticar a vendedores y compradores y mantener su sesión iniciada.",
-          "Para proteger el flujo de publicación y otras acciones de la cuenta contra usos indebidos.",
-          "Para recordar preferencias como la selección de idioma.",
-          "Para respaldar las medidas de limitación de frecuencia (rate-limiting) y de seguridad que ayudan a proteger la plataforma.",
-        ],
-      },
-      {
-        heading: "3. Tipos de Cookies que Utilizamos",
-        body: [
-          "Las cookies y tecnologías similares en Lixtara se agrupan en las categorías descritas a continuación. Dado que nos centramos en la funcionalidad esencial, la mayor parte de lo que utilizamos es estrictamente necesario o funcional.",
-        ],
-        sub: [
-          {
-            heading: "3.1 Estrictamente Necesarias: Autenticación y Sesión",
-            body: [
-              "Estas cookies son esenciales para que la plataforma funcione. Las establece nuestro proveedor de autenticación (Supabase Auth) para mantener a vendedores y compradores con la sesión iniciada, conservar una sesión segura y proteger los flujos de publicación y de transacciones.",
-              "Sin estas cookies, no podría iniciar sesión ni completar acciones esenciales como crear o gestionar una publicación.",
-            ],
-            bullets: [
-              "Mantienen su sesión iniciada mientras navega entre páginas.",
-              "Ayudan a proteger las acciones de cuenta y de publicación.",
-              "No pueden desactivarse a través de nuestra plataforma, ya que el servicio no puede funcionar sin ellas.",
-            ],
-          },
-          {
-            heading: "3.2 Funcionales / de Preferencia",
-            body: [
-              "Estas cookies y entradas de almacenamiento recuerdan las elecciones que usted realiza para que la plataforma se comporte como espera.",
-            ],
-            bullets: [
-              "Recuerdan su preferencia de idioma (por ejemplo, inglés o español).",
-              "Recuerdan preferencias básicas de la interfaz.",
-              "Si se desactivan, la plataforma sigue funcionando, pero es posible que algunas preferencias no se conserven entre visitas.",
-            ],
-          },
-          {
-            heading: "3.3 Seguridad y Limitación de Frecuencia",
-            body: [
-              "Estas tecnologías respaldan medidas que ayudan a proteger la plataforma frente a abusos, incluidos los mecanismos de limitación de frecuencia (por ejemplo, los impulsados por Upstash) que limitan la frecuencia con la que pueden realizarse ciertas acciones.",
-              "También usamos Sentry (Functional Software, Inc.) como herramienta técnica de monitoreo de errores. No establece cookies ni usa almacenamiento local, y no se usa para analítica ni publicidad. Cuando ocurre un error en su navegador, envía datos técnicos de ese error (como el mensaje de error, la dirección de la página y el tipo de navegador) para que podamos detectar y corregir fallas, y una señal anónima por visita para medir la estabilidad del sitio. Lo configuramos para que no envíe datos personales como cookies, el contenido de formularios o el texto que usted escribe. Como es necesario para que el servicio funcione, no depende del banner de cookies.",
-            ],
-            bullets: [
-              "Ayudan a detectar y limitar la actividad abusiva o automatizada.",
-              "Respaldan la integridad y la disponibilidad del servicio.",
-              "Sentry: monitoreo de errores, sin cookies; no se usa para analítica ni publicidad.",
-            ],
-          },
-          {
-            heading: "3.4 Análisis y Rendimiento",
-            body: [
-              "Actualmente no utilizamos cookies de análisis ni de rendimiento. Si, en el futuro, incorporamos análisis de producto o de marketing que respeten la privacidad, esta política se actualizará y, cuando lo exija la ley aplicable, obtendremos su consentimiento antes de que se establezcan dichas cookies no esenciales.",
-            ],
-            bullets: [
-              "No se utilizan actualmente.",
-              "Cualquier uso futuro se divulgará aquí y, cuando se requiera, se basará en el consentimiento.",
-            ],
-          },
-          {
-            heading: "3.5 Publicidad",
-            body: [
-              "No utilizamos cookies de publicidad ni de segmentación. Lixtara no muestra publicidad de terceros y no utiliza cookies para crear perfiles publicitarios ni para rastrearle a través de sitios web no relacionados.",
-            ],
-            bullets: [
-              "No se utilizan.",
-            ],
-          },
-        ],
-      },
-      {
-        heading: "4. Cookies de Terceros",
-        body: [
-          "Cuando utiliza determinadas funciones, integramos herramientas de terceros que pueden establecer sus propias cookies en su dispositivo. Estas cookies son controladas por dichos proveedores, no por Lixtara, y se rigen por las políticas de cookies y de privacidad propias de los proveedores. Le recomendamos revisar dichas políticas.",
-          "Estas cookies de terceros suelen ser relevantes únicamente cuando usted utiliza efectivamente la función correspondiente.",
-        ],
-        bullets: [
-          "Stripe: cuando realiza un pago o un proceso de pago (checkout).",
-          "DocuSign: cuando revisa o firma documentos electrónicamente.",
-          "Mapbox y Google Maps: cuando se muestran o utilizan mapas.",
-        ],
-      },
-      {
-        heading: "5. Cuánto Duran las Cookies",
-        body: [
-          "Las cookies duran períodos de tiempo distintos según su finalidad.",
-          "Las cookies de sesión son temporales. Existen únicamente durante su visita y se eliminan cuando cierra su navegador. Las cookies persistentes permanecen en su dispositivo durante un período definido o hasta que las elimine, lo que permite a la plataforma recordar información entre visitas, como mantener su sesión iniciada o recordar su idioma.",
-          "La duración exacta de las cookies de terceros la determinan los proveedores que las establecen.",
-        ],
-        bullets: [
-          "Cookies de sesión: se eliminan cuando cierra su navegador.",
-          "Cookies persistentes: permanecen durante un período determinado o hasta que las borre.",
-        ],
-      },
-      {
-        heading: "6. Gestión y Desactivación de Cookies",
-        body: [
-          "Puede controlar y eliminar las cookies a través de la configuración de su navegador. La mayoría de los navegadores le permiten ver las cookies almacenadas en su dispositivo, bloquearlas o eliminarlas, y elegir si acepta cookies de sitios específicos. Los pasos varían según el navegador, por lo que le recomendamos consultar los recursos de ayuda de su navegador para más detalles.",
-          "Tenga en cuenta que las cookies estrictamente necesarias son esenciales para el funcionamiento de Lixtara. Si las bloquea o elimina, no podrá iniciar sesión, y el flujo de publicación y otras funciones esenciales no funcionarán correctamente.",
-          "Desactivar las cookies funcionales no inutilizará la plataforma, pero puede implicar que preferencias como su idioma no se recuerden entre visitas.",
-        ],
-        bullets: [
-          "Utilice la configuración de su navegador para ver, bloquear o eliminar cookies.",
-          "Borrar las cookies puede cerrar su sesión y restablecer sus preferencias.",
-          "Bloquear las cookies estrictamente necesarias impedirá el inicio de sesión y el funcionamiento del flujo de publicación.",
-        ],
-      },
-      {
-        heading: "7. Consentimiento y el Aviso de Cookies",
-        body: [
-          "Cuando visita Lixtara por primera vez, le mostramos un aviso de cookies ligero que le informa sobre nuestro uso de cookies y le remite a esta política.",
-          "Las cookies estrictamente necesarias no requieren su consentimiento porque la plataforma no puede funcionar sin ellas. Si en el futuro incorporamos cookies no esenciales (por ejemplo, de análisis), solicitaremos su consentimiento cuando lo exijan las leyes aplicables de privacidad y de privacidad en las comunicaciones electrónicas (ePrivacy) antes de establecer dichas cookies, y podrá realizar su elección a través del aviso de cookies.",
-        ],
-        bullets: [
-          "Las cookies estrictamente necesarias se utilizan sin un consentimiento por separado.",
-          "Cualquier cookie no esencial futura estará sujeta a consentimiento cuando se requiera.",
-        ],
-      },
-      {
-        heading: "8. Cambios en Esta Política de Cookies",
-        body: [
-          "Podemos actualizar esta Política de Cookies de vez en cuando para reflejar cambios en las tecnologías que utilizamos, en nuestros servicios o en los requisitos legales. Cuando realicemos cambios sustanciales, actualizaremos la fecha de vigencia que se muestra junto a esta política y, cuando corresponda, proporcionaremos un aviso adicional.",
-          "Le recomendamos revisar esta política periódicamente para mantenerse informado sobre cómo utilizamos las cookies.",
-        ],
-      },
-      {
-        heading: "9. Contáctenos",
-        body: [
-          "Si tiene preguntas sobre esta Política de Cookies o sobre nuestro uso de cookies, contáctenos.",
-        ],
-        bullets: [
-          "Correo electrónico: privacy@lixtara.com",
-          "Lixtara, Miami, Florida, EE. UU.",
-          "Dirección postal: Miami, Florida, United States",
-        ],
-      },
-    ],
-  },
-};
-
-// ── Variante con analítica (2026-10-11; publicidad retirada 2026-10-15; Clarity graba el
-//    embudo y no /account, cookies de Clarity detalladas: 2026-10-16) ─────────────────────
-// La política tiene que ser cierta en cada estado del sitio. Sin herramientas configuradas
-// (sin NEXT_PUBLIC_GTM_ID ni NEXT_PUBLIC_POSTHOG_KEY) se muestra el texto de arriba tal cual.
-// Con alguna, estos párrafos se reemplazan por la descripción real, SOLO con consentimiento
-// (opt-in en todas las regiones):
-//   - GTM (contenedor del CMO): GA4 y Microsoft Clarity.
-//   - PostHog: analítica de producto.
-// Google Ads y Meta NO están aprobados: la sección 3.5 sigue diciendo que no se usa
-// publicidad, en todas las variantes. Si se aprueban, esta variante y la política de
-// privacidad (California, "share" para publicidad conductual) se revisan ANTES de publicarlas.
-// BORRADOR pendiente de revisión legal.
+// Política de Cookies. BORRADOR 2026-10 para revisión del abogado de Lixtara.
+//
+// Tiene que ser cierta en cada estado del sitio, así que se ARMA según lo configurado:
+//   - sin NEXT_PUBLIC_GTM_ID ni NEXT_PUBLIC_POSTHOG_KEY: solo cookies necesarias;
+//   - con GTM (contenedor del CMO): Google Analytics 4 y Microsoft Clarity, solo con
+//     consentimiento (opt-in en todas las regiones);
+//   - con PostHog: su analítica de producto, solo con consentimiento.
+// Google Ads y Meta NO están aprobados: la sección de publicidad dice que no se usan, en todas
+// las variantes. Nombres y duraciones de NUESTRAS cookies salen de las constantes del código.
+// Clarity: lista de "Clarity Cookies" (Microsoft Learn, actualizada 2025-12-05); Microsoft ya
+// no publica duraciones: las de la tabla son aproximadas (versión anterior de esa página).
 
 export interface CookieTools {
   gtm: boolean;
   posthog: boolean;
 }
 
-type Pairs = Array<[string, string]>;
+type Lang = "en" | "es";
 
-const SOURCES = {
-  en: {
-    intro: "Any future use of non-essential cookies will be subject to the consent process described in this policy.",
-    how: "We do not currently use cookies for advertising, and we do not currently run product or marketing analytics that rely on cookies.",
-    analyticsBody:
-      "We do not currently use analytics or performance cookies. If, in the future, we add privacy-respecting product or marketing analytics, this policy will be updated and, where required by applicable law, we will obtain your consent before such non-essential cookies are set.",
-    analyticsBullet1: "Not currently in use.",
-    analyticsBullet2: "Any future use will be disclosed here and, where required, consent-based.",
-    notice:
-      "When you first visit Lixtara, we show a lightweight cookie notice that informs you about our use of cookies and points you to this policy.",
-    future:
-      "If we introduce non-essential cookies in the future (for example, analytics), we will request your consent where required by applicable privacy and ePrivacy laws before those cookies are set, and you will be able to make a choice through the cookie notice.",
-  },
-  es: {
-    intro: "Cualquier uso futuro de cookies no esenciales estará sujeto al proceso de consentimiento descrito en esta política.",
-    how: "Actualmente no utilizamos cookies con fines publicitarios y no ejecutamos análisis de producto ni de marketing que dependan de cookies.",
-    analyticsBody:
-      "Actualmente no utilizamos cookies de análisis ni de rendimiento. Si, en el futuro, incorporamos análisis de producto o de marketing que respeten la privacidad, esta política se actualizará y, cuando lo exija la ley aplicable, obtendremos su consentimiento antes de que se establezcan dichas cookies no esenciales.",
-    analyticsBullet1: "No se utilizan actualmente.",
-    analyticsBullet2: "Cualquier uso futuro se divulgará aquí y, cuando se requiera, se basará en el consentimiento.",
-    notice:
-      "Cuando visita Lixtara por primera vez, le mostramos un aviso de cookies ligero que le informa sobre nuestro uso de cookies y le remite a esta política.",
-    future:
-      "Si en el futuro incorporamos cookies no esenciales (por ejemplo, de análisis), solicitaremos su consentimiento cuando lo exijan las leyes aplicables de privacidad y de privacidad en las comunicaciones electrónicas (ePrivacy) antes de establecer dichas cookies, y podrá realizar su elección a través del aviso de cookies.",
-  },
-} as const;
+const days = (s: number) => Math.round(s / 86400);
+const minutes = (s: number) => Math.round(s / 60);
 
-function replacementsFor(lang: "en" | "es", t: CookieTools): Pairs {
-  const src = SOURCES[lang];
-  if (lang === "en") {
-    const kinds = "analytics";
-    const tools = [
-      t.gtm && "Google Analytics 4 (loaded through Google Tag Manager) to measure traffic sources and campaigns",
-      t.gtm &&
-        "Microsoft Clarity (Microsoft Corporation) to understand how visitors use our pages through heatmaps and session recordings. Clarity hides the text and data you type, and we also hide photos, documents and signatures; your account area (/account) and payment, which Stripe processes, are not recorded",
-      t.posthog && "PostHog to understand how visitors use our search and listing flows, without recording sessions",
-    ].filter(Boolean) as string[];
-    const list = tools.length > 1 ? `${tools.slice(0, -1).join(", ")}, and ${tools.at(-1)}` : tools[0];
-    return [
-      [src.intro, `Non-essential ${kinds} cookies are used only if you accept them through the consent banner described in this policy.`],
-      [
-        src.how,
-        "We do not use cookies for advertising. With your consent, we use analytics cookies to understand how the site is used, as described in Section 3.4.",
-      ],
-      [
-        src.analyticsBody,
-        `Only if you accept in the consent banner, we use ${list}. The events we send ourselves include page addresses without query parameters and never the text you type. If you reject, these tools are not loaded.`,
-      ],
-      [
-        src.analyticsBullet1,
-        t.gtm
-          ? "Google Analytics 4 / Google Tag Manager (cookies such as _ga) and Microsoft Clarity, only with your consent. Clarity sets _clck (about 1 year) and _clsk (about 1 day) on our domain. Microsoft may also set, on its own domains, CLID (about 1 year), MUID (about 1 year), ANONCHK (about 10 minutes), MR (about 7 days) and SM (session). Durations are set by Microsoft and may change."
-          : "PostHog (cookies and local storage such as ph_*), only with your consent.",
-      ],
-      [
-        src.analyticsBullet2,
-        (t.gtm && t.posthog ? "PostHog (cookies and local storage such as ph_*), only with your consent. " : "") +
-          "You can change your choice at any time through \"Cookie settings\" in the site footer.",
-      ],
-      [
-        src.notice,
-        `When you first visit Lixtara, we show a cookie banner that lets you accept or reject ${kinds} cookies, with both options equally available, and points you to this policy.`,
-      ],
-      [
-        src.future,
-        `${kinds[0].toUpperCase()}${kinds.slice(1)} cookies are set only after you accept them. If you reject them, or later withdraw your consent through "Cookie settings", these tools are not loaded and the cookies they set on our domain are deleted from your browser.`,
-      ],
-    ];
+function duration(lang: Lang, kind: "days" | "minutes" | "hours" | "years" | "session", n = 1): string {
+  const es = lang === "es";
+  switch (kind) {
+    case "days":
+      return es ? `${n} días` : `${n} days`;
+    case "minutes":
+      return es ? `${n} minutos` : `${n} minutes`;
+    case "hours":
+      return es ? (n === 1 ? "1 hora" : `${n} horas`) : n === 1 ? "1 hour" : `${n} hours`;
+    case "years":
+      return es ? (n === 1 ? "1 año" : `${n} años`) : n === 1 ? "1 year" : `${n} years`;
+    case "session":
+      return es ? "Sesión (se borra al cerrar el navegador)" : "Session (deleted when you close the browser)";
   }
-  const kinds = "de analítica";
-  const tools = [
-    t.gtm && "Google Analytics 4 (cargado a través de Google Tag Manager) para medir fuentes de tráfico y campañas",
-    t.gtm &&
-      "Microsoft Clarity (Microsoft Corporation) para entender cómo los visitantes usan nuestras páginas mediante mapas de calor y grabaciones de sesión. Clarity oculta el texto y los datos que usted escribe, y nosotros ocultamos además las fotos, los documentos y las firmas; no se graba su área de cuenta (/account) ni el pago, que procesa Stripe",
-    t.posthog && "PostHog para entender cómo los visitantes usan nuestra búsqueda y nuestros flujos de publicación, sin grabar sesiones",
-  ].filter(Boolean) as string[];
-  const list = tools.length > 1 ? `${tools.slice(0, -1).join(", ")} y ${tools.at(-1)}` : tools[0];
+}
+
+const COLUMNS = {
+  en: ["Name", "Provider", "Purpose", "Duration"],
+  es: ["Nombre", "Proveedor", "Finalidad", "Duración"],
+};
+
+function necessaryRows(lang: Lang): string[][] {
+  const es = lang === "es";
   return [
-    [src.intro, `Las cookies ${kinds}, que no son esenciales, solo se usan si usted las acepta en el banner de consentimiento descrito en esta política.`],
     [
-      src.how,
-      "No utilizamos cookies con fines publicitarios. Con su consentimiento, usamos cookies de analítica para entender cómo se usa el sitio, según se describe en la Sección 3.4.",
+      "sb-<project>-auth-token (may be split into .0, .1)",
+      "Lixtara (Supabase Auth)",
+      es
+        ? "Mantiene su sesión iniciada y protege las acciones de su cuenta y del listado."
+        : "Keeps you signed in and protects account and listing actions.",
+      es
+        ? "Hasta 400 días, o hasta que cierre sesión [VERIFICAR: duración efectiva de la sesión en Supabase]"
+        : "Up to 400 days, or until you sign out [VERIFICAR: duración efectiva de la sesión en Supabase]",
     ],
     [
-      src.analyticsBody,
-      `Solo si usted acepta en el banner de consentimiento, usamos ${list}. Los eventos que enviamos nosotros incluyen direcciones de página sin parámetros y nunca el texto que usted escribe. Si rechaza, estas herramientas no se cargan.`,
+      CONSENT_COOKIE,
+      "Lixtara",
+      es
+        ? "Guarda su elección en el aviso de cookies (aceptar o rechazar la analítica)."
+        : "Stores your choice in the cookie banner (accept or reject analytics).",
+      duration(lang, "days", days(CONSENT_MAX_AGE_S)),
     ],
     [
-      src.analyticsBullet1,
-      t.gtm
-        ? "Google Analytics 4 / Google Tag Manager (cookies como _ga) y Microsoft Clarity, solo con su consentimiento. Clarity establece _clck (aproximadamente 1 año) y _clsk (aproximadamente 1 día) en nuestro dominio. Microsoft también puede establecer, en sus propios dominios, CLID (aproximadamente 1 año), MUID (aproximadamente 1 año), ANONCHK (aproximadamente 10 minutos), MR (aproximadamente 7 días) y SM (de sesión). Las duraciones las fija Microsoft y pueden cambiar."
-        : "PostHog (cookies y almacenamiento local como ph_*), solo con su consentimiento.",
+      STEP1_FORM_COOKIE,
+      "Lixtara",
+      es
+        ? "Conserva la dirección y el correo que escribió en el paso 1 del listado si el envío falla o si inicia sesión, para que no los pierda."
+        : "Keeps the address and email you typed in step 1 of the listing flow if the submission fails or you sign in, so you don't lose them.",
+      duration(lang, "minutes", minutes(STEP1_FORM_MAX_AGE_S)),
     ],
     [
-      src.analyticsBullet2,
-      (t.gtm && t.posthog ? "PostHog (cookies y almacenamiento local como ph_*), solo con su consentimiento. " : "") +
-        "Puede cambiar su elección en cualquier momento en \"Configurar cookies\", en el pie del sitio.",
-    ],
-    [
-      src.notice,
-      `Cuando visita Lixtara por primera vez, le mostramos un banner de cookies que le permite aceptar o rechazar las cookies ${kinds}, con ambas opciones igual de accesibles, y le remite a esta política.`,
-    ],
-    [
-      src.future,
-      `Las cookies ${kinds} solo se establecen después de que usted las acepta. Si las rechaza, o retira su consentimiento más tarde en "Configurar cookies", estas herramientas no se cargan y las cookies que dejaron en nuestro dominio se borran de su navegador.`,
+      SIGNUP_EMAIL_COOKIE,
+      "Lixtara",
+      es
+        ? "Recuerda el correo con el que se registró para la pantalla del código de verificación, sin ponerlo en la dirección de la página."
+        : "Remembers the email you signed up with for the verification-code screen, without putting it in the page address.",
+      duration(lang, "hours", 1),
     ],
   ];
 }
 
-function replaceDeep<T>(value: T, pairs: Array<[string, string]>): T {
-  if (typeof value === "string") {
-    // Por fragmento: algunas frases viven dentro de un párrafo más largo.
-    return pairs.reduce((acc, [from, to]) => acc.split(from).join(to), value as string) as T;
+function analyticsRows(lang: Lang, t: CookieTools): string[][] {
+  const es = lang === "es";
+  const approx = (en: string, esText: string) => (es ? `Aprox. ${esText}` : `About ${en}`);
+  const ms = es ? "Microsoft, en dominios de Microsoft" : "Microsoft, on Microsoft domains";
+  const rows: string[][] = [
+    [
+      FIRST_TOUCH_COOKIE,
+      "Lixtara",
+      es
+        ? "Guarda de qué campaña o sitio llegó por primera vez (parámetros UTM, sin datos personales), para medir nuestras campañas."
+        : "Stores which campaign or website first brought you here (UTM parameters, no personal data), to measure our campaigns.",
+      duration(lang, "days", days(FIRST_TOUCH_MAX_AGE_S)),
+    ],
+  ];
+  if (t.gtm) {
+    rows.push(
+      [
+        "_ga",
+        "Google LLC (Google Analytics 4)",
+        es ? "Distingue visitantes para las estadísticas de uso." : "Distinguishes visitors for usage statistics.",
+        `${duration(lang, "years", 2)} [VERIFICAR: duración vigente según Google]`,
+      ],
+      [
+        "_ga_<container-id>",
+        "Google LLC (Google Analytics 4)",
+        es ? "Mantiene el estado de la sesión para las estadísticas de uso." : "Keeps the session state for usage statistics.",
+        `${duration(lang, "years", 2)} [VERIFICAR: duración vigente según Google]`,
+      ],
+      [
+        "_clck",
+        "Microsoft (Clarity)",
+        es ? "Identificador seudónimo de Clarity y sus preferencias en este sitio." : "Clarity's pseudonymous user ID and preferences for this site.",
+        approx("1 year", "1 año"),
+      ],
+      [
+        "_clsk",
+        "Microsoft (Clarity)",
+        es ? "Une las páginas que visita en una misma grabación de sesión." : "Connects the pages you view into a single session recording.",
+        approx("1 day", "1 día"),
+      ],
+      [
+        "CLID",
+        es ? "Microsoft (Clarity), en dominios de Microsoft" : "Microsoft (Clarity), on Microsoft domains",
+        es
+          ? "Indica la primera vez que Clarity vio a este navegador en cualquier sitio que use Clarity."
+          : "Identifies the first time Clarity saw this browser on any site that uses Clarity.",
+        approx("1 year", "1 año"),
+      ],
+      [
+        "MUID",
+        ms,
+        es
+          ? "Identifica navegadores que visitan sitios de Microsoft; Microsoft lo usa para analítica, operación y publicidad. [VERIFICAR: uso publicitario frente a \"No usamos cookies de publicidad\".]"
+          : "Identifies browsers visiting Microsoft sites; Microsoft uses it for analytics, operations and advertising. [VERIFICAR: uso publicitario frente a \"No usamos cookies de publicidad\".]",
+        approx("1 year", "1 año"),
+      ],
+      [
+        "ANONCHK",
+        ms,
+        es
+          ? "Indica si el MUID se transfiere a otra cookie de Microsoft usada para publicidad; Clarity no la usa y su valor es siempre 0."
+          : "Indicates whether MUID is transferred to another Microsoft cookie used for advertising; Clarity does not use it and the value is always 0.",
+        approx("10 minutes", "10 minutos"),
+      ],
+      [
+        "MR",
+        ms,
+        es ? "Indica si hay que renovar el MUID." : "Indicates whether to refresh MUID.",
+        approx("7 days", "7 días"),
+      ],
+      [
+        "SM",
+        ms,
+        es ? "Sincroniza el MUID entre dominios de Microsoft." : "Synchronizes MUID across Microsoft domains.",
+        duration(lang, "session"),
+      ],
+    );
   }
-  if (Array.isArray(value)) return value.map((v) => replaceDeep(v, pairs)) as T;
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, replaceDeep(v, pairs)])) as T;
+  if (t.posthog) {
+    rows.push([
+      "ph_<project-key>_posthog (cookie and local storage)",
+      "PostHog, Inc.",
+      es
+        ? "Identificador seudónimo para la analítica de producto, sin grabación de sesiones."
+        : "Pseudonymous identifier for product analytics, without session recording.",
+      `${duration(lang, "years", 1)} [VERIFICAR: duración según PostHog]`,
+    ]);
   }
-  return value;
+  return rows;
 }
+
+/** Textos de la variante sin analítica; cada variante con analítica los reemplaza (lo comprueba la prueba). */
+const NO_ANALYTICS = {
+  en: {
+    how: "Today we use only cookies that the site needs to work. We do not run analytics tools that use cookies.",
+    analytics:
+      "We do not currently use analytics cookies. If we add them, we will update this policy and ask for your consent before they are set.",
+    consent:
+      "Because we only use strictly necessary cookies, the cookie notice informs you about them; there is nothing to accept or reject.",
+  },
+  es: {
+    how: "Hoy solo usamos las cookies que el sitio necesita para funcionar. No usamos herramientas de analítica con cookies.",
+    analytics:
+      "Actualmente no usamos cookies de analítica. Si las incorporamos, actualizaremos esta política y le pediremos su consentimiento antes de establecerlas.",
+    consent:
+      "Como solo usamos cookies estrictamente necesarias, el aviso de cookies le informa sobre ellas; no hay nada que aceptar o rechazar.",
+  },
+} as const;
+
+function toolList(lang: Lang, t: CookieTools): string {
+  const items = (
+    lang === "es"
+      ? [
+          t.gtm && "Google Analytics 4 (cargado mediante Google Tag Manager), para medir el tráfico y de dónde llegan las visitas",
+          t.gtm && "Microsoft Clarity, para entender cómo se usan las páginas mediante mapas de calor y grabaciones de sesión",
+          t.posthog && "PostHog, para entender cómo se usan la búsqueda y el proceso de publicación, sin grabar sesiones",
+        ]
+      : [
+          t.gtm && "Google Analytics 4 (loaded through Google Tag Manager), to measure traffic and where visits come from",
+          t.gtm && "Microsoft Clarity, to understand how pages are used through heatmaps and session recordings",
+          t.posthog && "PostHog, to understand how search and the listing flow are used, without recording sessions",
+        ]
+  ).filter(Boolean) as string[];
+  const and = lang === "es" ? " y " : ", and ";
+  return items.length > 1 ? `${items.slice(0, -1).join(", ")}${and}${items.at(-1)}` : (items[0] ?? "");
+}
+
+function build(lang: Lang, t: CookieTools): LegalDoc {
+  const es = lang === "es";
+  const any = t.gtm || t.posthog;
+  const na = NO_ANALYTICS[lang];
+
+  const analytics: LegalSection = {
+    id: "analytics",
+    heading: es ? "4. Cookies de Analítica (solo con su consentimiento)" : "4. Analytics Cookies (only with your consent)",
+    body: any
+      ? [
+          es
+            ? `Solo si usted acepta en el aviso de cookies, usamos ${toolList(lang, t)}. Si rechaza, estas herramientas no se cargan. Los eventos que enviamos nosotros llevan direcciones de página sin parámetros y nunca el texto que usted escribe.`
+            : `Only if you accept in the cookie banner, we use ${toolList(lang, t)}. If you reject, these tools are not loaded. The events we send ourselves include page addresses without query parameters and never the text you type.`,
+          ...(t.gtm
+            ? [
+                es
+                  ? "Clarity oculta el texto y los datos que usted escribe, y nosotros ocultamos además las fotos, los documentos y las firmas. No se graba su área de cuenta (/account) ni el pago, que procesa Stripe en sus propias páginas."
+                  : "Clarity hides the text and data you type, and we also hide photos, documents and signatures. Your account area (/account) and payment, which Stripe processes on its own pages, are not recorded.",
+                es
+                  ? "Microsoft no publica hoy la duración de las cookies de Clarity; las duraciones de la tabla son aproximadas y las fija Microsoft."
+                  : "Microsoft no longer publishes the duration of Clarity's cookies; the durations in the table are approximate and are set by Microsoft.",
+              ]
+            : []),
+        ]
+      : [na.analytics],
+    ...(any ? { table: { columns: [...COLUMNS[lang]], rows: analyticsRows(lang, t) } } : {}),
+  };
+
+  return {
+    title: es ? "Política de Cookies" : "Cookie Policy",
+    intro: [
+      es
+        ? "Esta Política de Cookies explica cómo {legalName} (\"Lixtara\") usa cookies y tecnologías similares en lixtara.com. Léala junto con nuestra Política de Privacidad."
+        : "This Cookie Policy explains how {legalName} (\"Lixtara\") uses cookies and similar technologies on lixtara.com. Please read it together with our Privacy Policy.",
+    ],
+    sections: [
+      {
+        heading: es ? "1. Qué Son las Cookies" : "1. What Cookies Are",
+        body: es
+          ? [
+              "Las cookies son pequeños archivos de texto que un sitio guarda en su navegador. En esta política también llamamos \"cookies\" a tecnologías similares, como el almacenamiento local del navegador.",
+              "Las cookies propias las pone Lixtara; las de terceros, otros servicios. Las de sesión se borran al cerrar el navegador; las persistentes duran el tiempo indicado o hasta que usted las borre.",
+            ]
+          : [
+              "Cookies are small text files that a website stores in your browser. In this policy we also call similar technologies, such as the browser's local storage, \"cookies\".",
+              "First-party cookies are set by Lixtara; third-party cookies are set by other services. Session cookies are deleted when you close the browser; persistent cookies last for the period shown or until you delete them.",
+            ],
+      },
+      {
+        heading: es ? "2. Cómo las Usamos" : "2. How We Use Them",
+        body: any
+          ? [
+              es
+                ? "Usamos cookies necesarias para que el sitio funcione y, solo si usted lo acepta, cookies de analítica para entender cómo se usa el sitio y mejorarlo (Sección 4). No usamos cookies de publicidad (Sección 6)."
+                : "We use necessary cookies so the site works and, only if you accept them, analytics cookies to understand how the site is used and improve it (Section 4). We do not use advertising cookies (Section 6).",
+            ]
+          : [na.how],
+      },
+      {
+        id: "necessary",
+        heading: es ? "3. Cookies Estrictamente Necesarias" : "3. Strictly Necessary Cookies",
+        body: [
+          es
+            ? "Sin estas cookies usted no podría iniciar sesión, publicar su listado ni guardar su elección sobre las cookies. Por eso no dependen del aviso de cookies."
+            : "Without these cookies you could not sign in, publish your listing or save your cookie choice. That is why they do not depend on the cookie banner.",
+        ],
+        table: { columns: [...COLUMNS[lang]], rows: necessaryRows(lang) },
+      },
+      analytics,
+      {
+        id: "technical",
+        heading: es ? "5. Herramientas Técnicas sin Cookies" : "5. Technical Tools Without Cookies",
+        body: [],
+        bullets: es
+          ? [
+              "Sentry (Functional Software, Inc.): monitoreo de errores. No usa cookies ni almacenamiento local y no sirve para analítica ni publicidad. Cuando ocurre un error envía datos técnicos (mensaje de error, dirección de la página, tipo de navegador) y una señal anónima por visita para medir la estabilidad del sitio. Está configurado para no enviar cookies, contenidos de formularios ni el texto que usted escribe. Como es necesario para que el servicio funcione, no depende del aviso de cookies.",
+              "Upstash: límites de uso contra abusos, aplicados en nuestros servidores. No pone cookies en su navegador.",
+            ]
+          : [
+              "Sentry (Functional Software, Inc.): error monitoring. It does not use cookies or local storage and is not used for analytics or advertising. When an error happens it sends technical details (error message, page address, browser type) and an anonymous signal per visit to measure site stability. It is configured not to send cookies, form contents or the text you type. Because it is needed to keep the service working, it does not depend on the cookie banner.",
+              "Upstash: rate limits against abuse, applied on our servers. It does not set cookies in your browser.",
+            ],
+      },
+      {
+        id: "advertising",
+        heading: es ? "6. Publicidad" : "6. Advertising",
+        body: [
+          es
+            ? "No utilizamos cookies de publicidad ni de segmentación. Lixtara no muestra publicidad de terceros y no usa cookies para crear perfiles publicitarios ni para seguirle en otros sitios."
+            : "We do not use advertising or targeting cookies. Lixtara does not show third-party advertising and does not use cookies to build advertising profiles or follow you across other websites.",
+          ...(t.gtm
+            ? [
+                es
+                  ? "[VERIFICAR: si usted acepta la analítica, Microsoft puede establecer la cookie MUID en sus propios dominios y la describe como usada también para publicidad. Confirmar si la frase anterior puede quedar así.]"
+                  : "[VERIFICAR: if you accept analytics, Microsoft may set the MUID cookie on its own domains and describes it as also used for advertising. Confirm whether the sentence above can stay as written.]",
+              ]
+            : []),
+        ],
+      },
+      {
+        id: "third-party",
+        heading: es ? "7. Servicios de Terceros que Usted Abre" : "7. Third-Party Services You Open",
+        body: [
+          es
+            ? "Algunas funciones se cargan desde otros servicios, que pueden poner sus propias cookies según sus políticas:"
+            : "Some features load from other services, which may set their own cookies under their own policies:",
+        ],
+        bullets: es
+          ? [
+              "Stripe, cuando paga (en las páginas de Stripe).",
+              "DocuSign, cuando revisa o firma su acuerdo (en las páginas de DocuSign).",
+              "Google Maps, en el autocompletado de direcciones del listado.",
+              "Mapbox, en los mapas de las páginas de propiedades.",
+              "Cloudflare Turnstile, en la verificación contra bots de los formularios. [VERIFICAR: si Turnstile pone cookies y cuáles.]",
+              "Los servidores de fotos del MLS, al mostrar las fotos de listados del MLS.",
+            ]
+          : [
+              "Stripe, when you pay (on Stripe's pages).",
+              "DocuSign, when you review or sign your agreement (on DocuSign's pages).",
+              "Google Maps, for address autocomplete in the listing flow.",
+              "Mapbox, for maps on property pages.",
+              "Cloudflare Turnstile, for the bot check on forms. [VERIFICAR: si Turnstile pone cookies y cuáles.]",
+              "The MLS photo servers, when MLS listing photos are shown.",
+            ],
+      },
+      {
+        id: "choices",
+        heading: es ? "8. Cómo Elegir o Retirar su Consentimiento" : "8. How to Choose or Withdraw Consent",
+        body: any
+          ? [
+              es
+                ? "Cuando visita Lixtara por primera vez, el aviso de cookies le permite aceptar o rechazar las cookies de analítica, con las dos opciones igual de visibles. Nada de analítica se carga antes de que usted acepte."
+                : "When you first visit Lixtara, the cookie banner lets you accept or reject analytics cookies, with both options equally visible. No analytics loads before you accept.",
+              es
+                ? "Puede cambiar su elección en cualquier momento en \"Configurar cookies\", en el pie del sitio. Si retira su consentimiento, estas herramientas dejan de cargarse y las cookies que pusieron en nuestro dominio se borran de su navegador. Las cookies que Microsoft pone en sus propios dominios solo se pueden borrar desde el navegador."
+                : "You can change your choice at any time through \"Cookie settings\" in the site footer. If you withdraw consent, these tools stop loading and the cookies they set on our domain are deleted from your browser. Cookies Microsoft sets on its own domains can only be deleted from your browser.",
+            ]
+          : [na.consent],
+        bullets: es
+          ? [
+              "También puede ver, bloquear o borrar cookies desde la configuración de su navegador.",
+              "Si bloquea las cookies necesarias, no podrá iniciar sesión ni usar el proceso de publicación.",
+            ]
+          : [
+              "You can also view, block or delete cookies in your browser settings.",
+              "If you block necessary cookies, you will not be able to sign in or use the listing flow.",
+            ],
+      },
+      {
+        heading: es ? "9. Cambios a Esta Política" : "9. Changes to This Policy",
+        body: [
+          es
+            ? "Podemos actualizar esta política cuando cambien las herramientas que usamos. La versión y la fecha de \"Última actualización\", al inicio de esta página, cambian con cada actualización."
+            : "We may update this policy when the tools we use change. The version and the \"Last updated\" date at the top of this page change with each update.",
+        ],
+      },
+      {
+        heading: es ? "10. Contáctenos" : "10. Contact Us",
+        body: es
+          ? ["Preguntas sobre cookies: {privacyEmail}", "Correo postal: {legalName}, {brokerageAddress}"]
+          : ["Questions about cookies: {privacyEmail}", "Mail: {legalName}, {brokerageAddress}"],
+      },
+    ],
+  };
+}
+
+const NONE: CookieTools = { gtm: false, posthog: false };
+
+export const cookiesDoc: LegalContent = {
+  en: build("en", NONE),
+  es: build("es", NONE),
+};
 
 /** La política que corresponde al estado real del sitio. */
-export function cookiesDocFor(lang: "en" | "es", tools: CookieTools) {
-  const doc = cookiesDoc[lang];
-  return tools.gtm || tools.posthog ? replaceDeep(doc, replacementsFor(lang, tools)) : doc;
+export function cookiesDocFor(lang: Lang, tools: CookieTools): LegalDoc {
+  return tools.gtm || tools.posthog ? build(lang, tools) : cookiesDoc[lang];
 }
 
-/** Para las pruebas: los textos que cada variante debe encontrar (y reemplazar). */
-export function cookieReplacementSources(lang: "en" | "es", tools: CookieTools): string[] {
-  return replacementsFor(lang, tools).map(([from]) => from);
+/** Para las pruebas: los textos de la variante sin analítica que cada variante con analítica reemplaza. */
+export function cookieReplacementSources(lang: Lang, tools: CookieTools): string[] {
+  if (!tools.gtm && !tools.posthog) return [];
+  return Object.values(NO_ANALYTICS[lang]);
 }

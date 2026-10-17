@@ -16,6 +16,7 @@
 
 import { Resend } from "resend";
 import { BROKERAGE, brokerageLicenseLine } from "@/config/brokerage";
+import { LEGAL_DOCS, PUBLICATION_BUSINESS_DAYS } from "@/lib/legal/config";
 import {
   COMMERCIAL_SENDER,
   canSpamFooter,
@@ -153,6 +154,13 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
   const commissionHtml = commissionLine
     ? `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${commissionLine}</p>`
     : "";
+  // Reembolso resumido y plazo de publicación: los mismos de los Términos (#refunds, #term).
+  const termsUrl = `${new URL(input.dashboardUrl).origin}/${lang}${LEGAL_DOCS.terms.path}#refunds`;
+  const days = PUBLICATION_BUSINESS_DAYS;
+  const refundLine = isEs
+    ? `Publicación: publicamos tu listing en el MLS dentro de ${days} días hábiles después de que nuestro broker lo contrafirme y lo apruebe. Reembolso: la tarifa no es reembolsable una vez tu listing esté publicado en el MLS. Antes de eso, te devolvemos el total si nuestro broker no lo aprueba o no podemos publicarlo, si hubo un cobro duplicado o un error técnico, o si cancelas antes de la publicación.`
+    : `Publication: we publish your listing on the MLS within ${days} business days after our broker countersigns and approves it. Refunds: the fee is non-refundable once your listing is published on the MLS. Before that, you get a full refund if our broker doesn't approve it or we can't publish it, if you were charged twice or by a technical error, or if you cancel before publication.`;
+  const refundHtml = `<p style="font-size:13px;line-height:1.7;color:#444;">${refundLine} <a href="${termsUrl}" style="color:#a18943;">${isEs ? "Términos" : "Terms"}</a>.</p>`;
   const subject = isEs
     ? `Pago recibido por tu listing ${tierName} de Lixtara`
     : `Payment received for your ${tierName} Lixtara listing`;
@@ -163,6 +171,7 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Gracias. Acabamos de procesar tu tarifa de listing <strong>${tierName}</strong> ($${input.amount.toLocaleString()}). Tu propiedad en <strong>${input.propertyAddress}</strong> está ahora en la cola de revisión del broker.</p>
     ${commissionHtml}
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Nuestro broker la revisa típicamente dentro de un día hábil. Te avisamos por email apenas esté live en MLS.</p>
+    ${refundHtml}
     ${button(input.dashboardUrl, "Ver mi dashboard")}
     <p style="font-size:12px;line-height:1.6;color:#666;">Recibo de pago${input.receiptUrl ? `: <a href="${input.receiptUrl}" style="color:#a18943;">ver en Stripe</a>` : " disponible en tu dashboard"}.</p>
   `
@@ -171,13 +180,14 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Thank you. We've processed your <strong>${tierName}</strong> listing fee of $${input.amount.toLocaleString()}. Your property at <strong>${input.propertyAddress}</strong> is now in our broker review queue.</p>
     ${commissionHtml}
     <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Our broker typically reviews within one business day. We'll email you the moment it goes live on MLS.</p>
+    ${refundHtml}
     ${button(input.dashboardUrl, "View my dashboard")}
     <p style="font-size:12px;line-height:1.6;color:#666;">Payment receipt${input.receiptUrl ? `: <a href="${input.receiptUrl}" style="color:#a18943;">view on Stripe</a>` : " available in your dashboard"}.</p>
   `;
 
   const text = isEs
-    ? `Pago recibido por $${input.amount.toLocaleString()} (${tierName}). Tu listing en ${input.propertyAddress} está en revisión del broker. ${commissionLine} Ver dashboard: ${input.dashboardUrl}`
-    : `Payment received: $${input.amount.toLocaleString()} (${tierName}). Your listing at ${input.propertyAddress} is in broker review. ${commissionLine} Dashboard: ${input.dashboardUrl}`;
+    ? `Pago recibido por $${input.amount.toLocaleString()} (${tierName}). Tu listing en ${input.propertyAddress} está en revisión del broker. ${commissionLine} ${refundLine} Términos: ${termsUrl} Ver dashboard: ${input.dashboardUrl}`
+    : `Payment received: $${input.amount.toLocaleString()} (${tierName}). Your listing at ${input.propertyAddress} is in broker review. ${commissionLine} ${refundLine} Terms: ${termsUrl} Dashboard: ${input.dashboardUrl}`;
 
   return send({
     to: input.to,
@@ -240,13 +250,13 @@ export async function sendListingApproved(input: ListingApprovedInput) {
   const body = isEs
     ? `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">¡Tu listing está activo! 🎉</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Nuestro broker aprobó tu listing de <strong>${input.propertyAddress}</strong>. Acaba de sincronizarse con MLS y debería aparecer en Zillow, Realtor.com, Redfin y Trulia en las próximas horas.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Nuestro broker aprobó tu listing de <strong>${input.propertyAddress}</strong>. Ya está en el MLS. Zillow, Realtor.com, Redfin y Trulia toman los listados del MLS a su propio ritmo, así que puede tardar en aparecer en cada uno.</p>
     ${button(input.listingUrl, "Ver mi listing")}
     <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Próximos pasos: las solicitudes de visita y las ofertas de los compradores van a aparecer en tu dashboard. Te avisamos por email de cada una.</p>
   `
     : `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Your listing is live! 🎉</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Our broker approved your listing for <strong>${input.propertyAddress}</strong>. It just synced to MLS and should appear on Zillow, Realtor.com, Redfin and Trulia within the next few hours.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Our broker approved your listing for <strong>${input.propertyAddress}</strong>. It's now on the MLS. Zillow, Realtor.com, Redfin and Trulia pick up MLS listings on their own schedule, so it may take a while to show on each one.</p>
     ${button(input.listingUrl, "View my listing")}
     <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Next: showing requests and offers from buyers will appear in your dashboard. We'll email you each one.</p>
   `;
