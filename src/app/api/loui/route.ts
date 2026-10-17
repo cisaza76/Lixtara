@@ -25,8 +25,10 @@ function totalTextChars(messages: UIMessage[]): number {
   return n;
 }
 
+// Sin "consultation_attorney": Lixtara no agenda ni vende consultas legales; para un abogado
+// Loui da el referido a una firma independiente (src/config/legalPartner.ts). El valor sigue
+// permitido en la tabla schedule_requests (CHECK) para las filas existentes.
 const SCHEDULE_TYPES = [
-  "consultation_attorney",
   "consultation_realtor",
   "strategy_call",
   "showing",
@@ -163,7 +165,7 @@ export async function POST(req: Request) {
     }),
     request_schedule: tool({
       description:
-        "Create a scheduling request that goes to Lixtara's brokerage. Use this whenever the user wants to talk to an attorney, realtor, broker, or schedule a showing — instead of inventing answers.",
+        "Create a scheduling request that goes to Lixtara's brokerage. Use this whenever the user wants to talk to a realtor or the broker, or schedule a showing, instead of inventing answers. Never use it for legal questions: Lixtara is not a law firm; give the attorney referral instead.",
       inputSchema: z.object({
         type: z.enum(SCHEDULE_TYPES),
         topic: z

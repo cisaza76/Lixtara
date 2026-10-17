@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { BROKER_LICENSE, BROKERAGE_NAME } from "@/lib/broker";
 import { fillBrokerageCopy } from "@/config/brokerage";
+import { FootnoteText } from "@/components/footnote-text";
+import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
 import { BROKER_STATS } from "@/lib/broker-stats";
 import {
   PRICING_TIERS,
@@ -471,7 +473,7 @@ export default async function Home({
                         <span
                           className={isPopular ? "text-ivory" : "text-ink"}
                         >
-                          {feat}
+                          <FootnoteText text={feat} lang={lang} />
                         </span>
                       </li>
                       );
@@ -495,6 +497,8 @@ export default async function Home({
               );
             })}
           </div>
+          {/* Servicios legales: los "*" de los planes enlazan aquí. */}
+          <LegalServicesDisclosure lang={lang} anchor className="mt-10 max-w-4xl" />
         </div>
       </section>
 
@@ -688,6 +692,7 @@ export default async function Home({
               </div>
             ))}
           </dl>
+          <LegalServicesDisclosure lang={lang} className="mt-8 max-w-4xl" />
         </div>
       </section>
 

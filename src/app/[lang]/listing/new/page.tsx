@@ -83,6 +83,8 @@ import {
 } from "@/lib/listing-step1-form";
 import { AppFormValidation } from "@/components/app-form-validation";
 import { passwordRejection } from "@/lib/auth/password-errors";
+import { FootnoteText } from "@/components/footnote-text";
+import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
 import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
@@ -1896,7 +1898,7 @@ export default async function ListingNewPage({
                                 •
                               </span>
                               <span className="text-ink/80">
-                                {fillTierCopy(f, tierId)}
+                                <FootnoteText text={fillTierCopy(f, tierId)} lang={lang} />
                               </span>
                             </li>
                           ))}
@@ -1917,6 +1919,8 @@ export default async function ListingNewPage({
               <SubmitButton>{copy.nextLabel} →</SubmitButton>
             </div>
           </form>
+          {/* Servicios legales: los "*" de los planes enlazan aquí. */}
+          <LegalServicesDisclosure lang={lang} anchor />
         </div>
       )}
 

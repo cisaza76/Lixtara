@@ -1,4 +1,5 @@
 import { ListingCtaLink } from "@/components/listing-cta-link";
+import { FootnoteText } from "@/components/footnote-text";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import {
   recommendTier,
@@ -195,7 +196,9 @@ export function PlanQuiz({
                     <span aria-hidden className="text-gold mt-0.5 leading-none">
                       •
                     </span>
-                    <span className="text-ink/80">{f}</span>
+                    <span className="text-ink/80">
+                      <FootnoteText text={f} lang={lang} />
+                    </span>
                   </li>
                 ))}
               </ul>

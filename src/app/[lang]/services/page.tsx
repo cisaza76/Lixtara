@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { isLocale, t } from "@/lib/i18n";
 import { fillPricingCopy } from "@/lib/pricing-tiers";
+import { FootnoteText } from "@/components/footnote-text";
+import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
 
 export default async function ServicesPage({
   params,
@@ -46,7 +48,7 @@ export default async function ServicesPage({
                 {fillPricingCopy(item.price)}
               </p>
               <p className="flex-1 text-sm leading-relaxed text-ink/70">
-                {item.body}
+                <FootnoteText text={item.body} lang={lang} />
               </p>
               <Link
                 href={hrefs[i] ?? `/${lang}/listing/new`}
@@ -60,6 +62,8 @@ export default async function ServicesPage({
             </div>
           ))}
         </div>
+        {/* Servicios legales: el "*" de las consultas enlaza aquí. */}
+        <LegalServicesDisclosure lang={lang} anchor className="mt-10 max-w-4xl" />
       </section>
     </main>
   );
