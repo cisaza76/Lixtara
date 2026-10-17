@@ -39,7 +39,6 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   TRADITIONAL_COSTS,
-  compareWithTraditional,
   fillPricingCopy,
   fillTierCopy,
   isPricingTierId,
@@ -85,6 +84,22 @@ import { AppFormValidation } from "@/components/app-form-validation";
 import { passwordRejection } from "@/lib/auth/password-errors";
 import { FootnoteText } from "@/components/footnote-text";
 import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
+import { BuyerCompStep } from "@/components/buyer-comp-step";
+import {
+  BUYER_COMP_MAX_PCT,
+  offerChoice,
+  offerFromRow,
+  offerToRow,
+  parseOfferInput,
+  suggestedOffer,
+  type OfferInputError,
+} from "@/lib/buyer-comp";
+import {
+  BUYER_COMP_TERMS_VERSION,
+  buyerAgentComp,
+  publicationTimeline,
+  refundPolicy,
+} from "@/config/legal-terms";
 import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
@@ -179,6 +194,8 @@ interface Draft {
   show_phone_on_portals: boolean | null;
   folio: string | null;
   buyer_agent_commission: number | null;
+  buyer_agent_comp_type: string | null;
+  buyer_agent_comp_amount: number | null;
   appliances: string[] | null;
 }
 
@@ -290,7 +307,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,appliances",
+        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,buyer_agent_comp_type,buyer_agent_comp_amount,appliances",
       )
       .eq("id", draftId)
       .maybeSingle();
@@ -462,21 +479,6 @@ export default async function ListingNewPage({
       photos = (photoRows ?? []) as typeof photos;
     }
 
-    // Concierge locks the buyer-agent commission at 3% (the most competitive
-    // cooperating rate). Persist it server-side at step 6 so it's fixed for the
-    // rest of the flow and reflected everywhere that reads the column.
-    if (
-      step === 6 &&
-      draft &&
-      draft.pricing_tier === "concierge" &&
-      Number(draft.buyer_agent_commission ?? 0) !== 3
-    ) {
-      await supabase
-        .from("properties")
-        .update({ buyer_agent_commission: 3 })
-        .eq("id", draftId);
-      draft = { ...draft, buyer_agent_commission: 3 } as Draft;
-    }
 
     if (step === 7 || step === 8) {
       const { data: agRow } = await supabase
@@ -1371,14 +1373,13 @@ export default async function ListingNewPage({
     redirect(`/${lang}/listing/new?step=6&id=${id}&done=5`);
   }
 
-  async function setBuyerCommission(formData: FormData) {
+  // Paso 6: la oferta al agente del comprador se guarda al continuar. 0% es válido; sin
+  // elección (Essentials y Pro no traen preselección) se pide elegir. La versión del texto
+  // queda con la oferta y el trigger de la migración 20261017150000 la registra con fecha.
+  async function nextFromStep6(formData: FormData) {
     "use server";
     const id = String(formData.get("id") ?? "");
-    let pct = Number(formData.get("buyer_agent_commission") ?? "0");
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
-    if (![2, 2.5, 3].includes(pct)) {
-      redirect(`/${lang}/listing/new?step=6&id=${id}&error=invalid_buyer_commission`);
-    }
 
     const supabase = await createClient();
     const {
@@ -1386,51 +1387,40 @@ export default async function ListingNewPage({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
 
-    // Concierge fixes the buyer-agent commission at 3% — ignore any other value.
-    const { data: tierRow } = await supabase
+    const { data: prop } = await supabase
       .from("properties")
-      .select("pricing_tier")
+      .select("list_price")
       .eq("id", id)
       .eq("owner_id", user.id)
       .maybeSingle();
-    if (tierRow?.pricing_tier === "concierge") pct = 3;
+    if (!prop) redirect(`/${lang}/listing/new?step=1&error=required`);
 
-    await supabase
-      .from("properties")
-      .update({ buyer_agent_commission: pct })
-      .eq("id", id)
-      .eq("owner_id", user.id);
-
-    // Revalidate in place instead of redirecting. A redirect navigates, and the
-    // App Router scrolls to the top on navigation — yanking the seller away from
-    // the picker every time they choose a commission. Revalidating refreshes the
-    // current step server-side while preserving scroll position.
-    revalidatePath(`/${lang}/listing/new`);
-  }
-
-  async function nextFromStep6(formData: FormData) {
-    "use server";
-    const id = String(formData.get("id") ?? "");
-    if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
-
-    // Buyer-agent commission must be set before advancing to the agreement.
-    const supabase = await createClient();
-    const { data: prop } = await supabase
-      .from("properties")
-      .select("buyer_agent_commission, pricing_tier")
-      .eq("id", id)
-      .maybeSingle();
-    // Concierge guarantees 3% even if the seller never touched the picker.
-    if (prop?.pricing_tier === "concierge" && prop.buyer_agent_commission !== 3) {
-      await supabase
-        .from("properties")
-        .update({ buyer_agent_commission: 3 })
-        .eq("id", id);
-    } else if (!prop?.buyer_agent_commission || prop.buyer_agent_commission === 0) {
-      redirect(`/${lang}/listing/new?step=6&id=${id}&error=buyer_commission_required`);
+    const parsed = parseOfferInput(
+      {
+        choice: formData.get("buyer_comp_choice") as string | null,
+        customKind: formData.get("buyer_comp_custom_kind") as string | null,
+        customValue: formData.get("buyer_comp_custom_value") as string | null,
+      },
+      prop.list_price,
+    );
+    if (!parsed.ok) {
+      redirect(`/${lang}/listing/new?step=6&id=${id}&error=buyer_comp_${parsed.error}`);
     }
 
-    if (prop) stepCompleted(lang, 6, id, null);
+    const row = offerToRow(parsed.offer);
+    const { error } = await supabase
+      .from("properties")
+      .update({
+        buyer_agent_comp_type: row.buyer_agent_comp_type,
+        buyer_agent_commission: row.buyer_agent_commission,
+        buyer_agent_comp_amount: row.buyer_agent_comp_amount,
+        buyer_agent_comp_terms_version: BUYER_COMP_TERMS_VERSION,
+      })
+      .eq("id", id)
+      .eq("owner_id", user.id);
+    if (error) redirect(`/${lang}/listing/new?step=6&id=${id}&error=save_failed`);
+
+    stepCompleted(lang, 6, id, null);
     redirect(`/${lang}/listing/new?step=7&id=${id}&done=6`);
   }
 
@@ -1684,10 +1674,16 @@ export default async function ListingNewPage({
                                           ? copy.stepErrors.invalidHoa
                                           : sp.error === "invalid_tax"
                                             ? copy.stepErrors.invalidTax
-                                            : sp.error === "buyer_commission_required" ||
-                                                sp.error === "invalid_buyer_commission"
-                                              ? copy.step6.buyerCommissionRequired
-                                              : null;
+                                            : buyerCompError(sp.error);
+  function buyerCompError(code: string | undefined): string | null {
+    const c = copy.step6.buyerComp;
+    const map: Record<`buyer_comp_${OfferInputError}`, string> = {
+      buyer_comp_choice_required: c.choiceRequired,
+      buyer_comp_pct_range: c.pctRange.replace("{max}", String(BUYER_COMP_MAX_PCT)),
+      buyer_comp_amount_range: c.amountRange,
+    };
+    return code && Object.hasOwn(map, code) ? map[code as keyof typeof map] : null;
+  }
   const improvedFlag =
     typeof sp === "object" && "improved" in sp ? (sp.improved as string) : null;
   const autofillResult =
@@ -1919,6 +1915,9 @@ export default async function ListingNewPage({
               <SubmitButton>{copy.nextLabel} →</SubmitButton>
             </div>
           </form>
+          <p className="text-sm text-ink/70 leading-relaxed">
+            {buyerAgentComp.text[lang].planNote}
+          </p>
           {/* Servicios legales: los "*" de los planes enlazan aquí. */}
           <LegalServicesDisclosure lang={lang} anchor />
         </div>
@@ -2790,6 +2789,7 @@ export default async function ListingNewPage({
 
             return (
               <>
+                {errorMessage && !buyerCompError(sp.error) && <ErrorBanner message={errorMessage} />}
                 {incomplete && (
                   <ErrorBanner message={copy.step6.incompleteWarn} />
                 )}
@@ -3093,236 +3093,72 @@ export default async function ListingNewPage({
                   )}
                 </div>
 
-                {/* Buyer-agent compensation picker (item 16) */}
+                {/* Oferta al agente del comprador + desglose: se guardan al continuar */}
                 {(() => {
-                  // Concierge fixes the buyer-agent commission at 3% — show a
-                  // locked tile instead of the picker (item 4).
-                  if (draft.pricing_tier === "concierge") {
-                    return (
-                      <div className="border-t border-gold-soft pt-8 flex flex-col gap-5">
-                        <div className="flex flex-col gap-1">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
-                            {copy.step6.buyerCommissionEyebrow}
-                          </p>
-                          <h3 className="font-display text-2xl text-ink leading-tight">
-                            {copy.step6.buyerCommissionLockedTitle}
-                          </h3>
-                          <p className="text-sm text-ink/70 leading-relaxed">
-                            {copy.step6.buyerCommissionLockedBody}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-4 border-2 border-gold bg-gold/10 p-5">
-                          <span className="font-display text-3xl text-ink leading-none">
-                            3%
-                          </span>
-                          <span className="text-xs text-ink/60">
-                            {copy.step6.buyer3Subtitle}
-                          </span>
-                          <span className="ml-auto inline-flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] text-gold font-semibold">
-                            <svg
-                              width="11"
-                              height="11"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <rect x="5" y="11" width="14" height="9" rx="1.5" />
-                              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                            </svg>
-                            {copy.step6.buyerCommissionLockedBadge}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  }
-                  const currentBuyerComm = Number(
-                    draft.buyer_agent_commission ?? 0,
-                  );
-                  const opts = [
-                    {
-                      pct: 2,
-                      title: copy.step6.buyer2Title,
-                      subtitle: copy.step6.buyer2Subtitle,
-                      tip: copy.step6.buyer2Tip,
-                      recommended: false,
-                    },
-                    {
-                      pct: 2.5,
-                      title: copy.step6.buyer25Title,
-                      subtitle: copy.step6.buyer25Subtitle,
-                      tip: copy.step6.buyer25Tip,
-                      recommended: false,
-                    },
-                    {
-                      pct: 3,
-                      title: copy.step6.buyer3Title,
-                      subtitle: copy.step6.buyer3Subtitle,
-                      tip: copy.step6.buyer3Tip,
-                      recommended: true,
-                    },
-                  ];
+                  const saved = offerFromRow(draft);
+                  const initial = saved ?? suggestedOffer(draft.pricing_tier);
+                  const comp = buyerAgentComp.text[lang];
+                  const c6 = copy.step6;
                   return (
-                    <div className="border-t border-gold-soft pt-8 flex flex-col gap-5">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
-                          {copy.step6.buyerCommissionEyebrow}
-                        </p>
-                        <h3 className="font-display text-2xl text-ink leading-tight">
-                          {copy.step6.buyerCommissionTitle}
+                    <form action={nextFromStep6} className="flex flex-col gap-8">
+                      <input type="hidden" name="id" value={draftId ?? ""} />
+                      <BuyerCompStep
+                        copy={{
+                          ...c6.buyerComp,
+                          title: comp.stepTitle,
+                          body: comp.stepBody,
+                          noticeOffer: comp.noticeOffer,
+                          noticeNoOffer: comp.noticeNoOffer,
+                          conciergeSuggested: comp.conciergeSuggested,
+                          costEyebrow: c6.costEyebrow,
+                          costToday: c6.costToday,
+                          costAtClosing: c6.costAtClosing,
+                          costBuyerAgent: c6.costBuyerAgent,
+                          costTotal: c6.costTotal,
+                          costTraditional: c6.costTraditional,
+                          costSavings: c6.costSavings,
+                          costNote: c6.costNote,
+                        }}
+                        tierId={isPricingTierId(draft.pricing_tier) ? draft.pricing_tier : null}
+                        commissionPct={tier?.commissionPct ?? null}
+                        traditionalListingPct={TRADITIONAL_COSTS.listingCommissionPct}
+                        listPrice={Number(draft.list_price ?? 0)}
+                        initialChoice={offerChoice(initial)}
+                        initialCustomKind={initial?.type === "amount" ? "amount" : "percent"}
+                        initialCustomValue={
+                          initial && offerChoice(initial) === "custom"
+                            ? initial.type === "amount"
+                              ? String(initial.amount)
+                              : initial.type === "percent"
+                                ? String(initial.pct)
+                                : ""
+                            : ""
+                        }
+                        conciergeSuggested={draft.pricing_tier === "concierge"}
+                        error={buyerCompError(sp.error)}
+                      />
+
+                      {/* Continue */}
+                      <div className="border-t border-gold-soft pt-8 flex flex-col gap-4">
+                        <h3 className="font-display text-xl text-ink">
+                          {copy.step6.readyTitle}
                         </h3>
                         <p className="text-sm text-ink/70 leading-relaxed">
-                          {copy.step6.buyerCommissionBody}
+                          {copy.step6.readyBody}
                         </p>
+                        <div className="flex items-center gap-6">
+                          <Link
+                            href={`/${lang}/listing/new?step=5&id=${draftId}`}
+                            className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+                          >
+                            ← {copy.backLabel}
+                          </Link>
+                          <SubmitButton>{copy.step6.continueButton}</SubmitButton>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {opts.map((o) => {
-                          const active = currentBuyerComm === o.pct;
-                          return (
-                            <form
-                              key={o.pct}
-                              action={setBuyerCommission}
-                              className="flex"
-                            >
-                              <input
-                                type="hidden"
-                                name="id"
-                                value={draftId ?? ""}
-                              />
-                              <input
-                                type="hidden"
-                                name="buyer_agent_commission"
-                                value={o.pct}
-                              />
-                              <button
-                                type="submit"
-                                title={o.tip}
-                                className={`flex-1 flex flex-col gap-1 p-5 border-2 text-left transition-colors relative ${
-                                  active
-                                    ? "border-gold bg-gold/10"
-                                    : "border-gold-soft bg-ivory hover:border-gold/60"
-                                }`}
-                              >
-                                <span className="font-display text-2xl text-ink leading-none">
-                                  {o.title}
-                                </span>
-                                <span className="text-xs text-ink/60">
-                                  {o.subtitle}
-                                </span>
-                                {o.recommended && !active && (
-                                  <span className="absolute top-2 right-2 text-[9px] uppercase tracking-[0.18em] text-gold font-semibold">
-                                    ★ {copy.step6.buyer3Recommended}
-                                  </span>
-                                )}
-                                {active && (
-                                  <span className="absolute top-2 right-2 text-[9px] uppercase tracking-[0.18em] text-gold font-semibold">
-                                    ✓ {copy.step6.buyerCommissionSelected}
-                                  </span>
-                                )}
-                                <p className="text-xs text-ink/55 leading-relaxed mt-2 border-t border-gold-soft pt-2">
-                                  {o.tip}
-                                </p>
-                              </button>
-                            </form>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    </form>
                   );
                 })()}
-
-                {/* Cost breakdown (item 17) */}
-                {(() => {
-                  const buyerPct = Number(draft.buyer_agent_commission ?? 0);
-                  if (buyerPct === 0 || !tier || !isPricingTierId(draft.pricing_tier)) return null;
-                  const price = draft.list_price ?? 0;
-                  // Same comparison as the calculator and the FAQ: the buyer-agent % the
-                  // seller chose goes on both sides (compareWithTraditional).
-                  const cmp = compareWithTraditional(draft.pricing_tier, price, buyerPct);
-                  const lixCommission = cmp.lixtara.sellerCommission;
-                  const buyerCommission = cmp.lixtara.buyerCommission;
-                  const lixTotal = cmp.lixtara.total;
-                  const traditionalTotal = cmp.traditional.total;
-                  const savings = Math.max(0, cmp.savings);
-                  return (
-                    <div className="border border-gold-soft p-6 flex flex-col gap-4">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
-                        {copy.step6.costEyebrow}
-                      </p>
-                      <dl className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
-                        <dt className="text-ink/70">{copy.step6.costToday}</dt>
-                        <dd className="text-right text-ink font-display text-lg">
-                          ${tier.flatFee.toLocaleString()}
-                        </dd>
-                        <dt className="text-ink/70">{copy.step6.costAtClosing}</dt>
-                        <dd className="text-right text-ink font-display text-lg">
-                          ${Math.round(lixCommission).toLocaleString()}{" "}
-                          <span className="text-[10px] text-ink/55 ml-1">
-                            ({tier.commissionPct}%)
-                          </span>
-                        </dd>
-                        <dt className="text-ink/70">
-                          {copy.step6.costBuyerAgent}
-                        </dt>
-                        <dd className="text-right text-ink font-display text-lg">
-                          ${Math.round(buyerCommission).toLocaleString()}{" "}
-                          <span className="text-[10px] text-ink/55 ml-1">
-                            ({buyerPct}%)
-                          </span>
-                        </dd>
-                        <dt className="text-ink font-semibold border-t border-gold-soft pt-3">
-                          {copy.step6.costTotal}
-                        </dt>
-                        <dd className="text-right font-display italic text-2xl text-ink border-t border-gold-soft pt-3">
-                          ${Math.round(lixTotal).toLocaleString()}
-                        </dd>
-                        <dt className="text-ink/55 text-xs">
-                          {copy.step6.costTraditional
-                            .replace("{listingPct}", String(TRADITIONAL_COSTS.listingCommissionPct))
-                            .replace("{buyerPct}", String(buyerPct))}
-                        </dt>
-                        <dd className="text-right text-ink/55 text-sm line-through">
-                          ${Math.round(traditionalTotal).toLocaleString()}
-                        </dd>
-                        <dt className="text-gold font-semibold border-t border-gold-soft pt-3">
-                          {copy.step6.costSavings}
-                        </dt>
-                        <dd className="text-right font-display italic text-2xl text-gold border-t border-gold-soft pt-3">
-                          ${Math.round(savings).toLocaleString()}
-                        </dd>
-                      </dl>
-                      <p className="text-[10px] italic text-ink/55 leading-relaxed">
-                        {copy.step6.costNote}
-                      </p>
-                    </div>
-                  );
-                })()}
-
-                {/* Continue */}
-                <div className="border-t border-gold-soft pt-8 flex flex-col gap-4">
-                  <h3 className="font-display text-xl text-ink">
-                    {copy.step6.readyTitle}
-                  </h3>
-                  <p className="text-sm text-ink/70 leading-relaxed">
-                    {copy.step6.readyBody}
-                  </p>
-                  <form
-                    action={nextFromStep6}
-                    className="flex items-center gap-6"
-                  >
-                    <input type="hidden" name="id" value={draftId ?? ""} />
-                    <Link
-                      href={`/${lang}/listing/new?step=5&id=${draftId}`}
-                      className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
-                    >
-                      ← {copy.backLabel}
-                    </Link>
-                    <SubmitButton>{copy.step6.continueButton}</SubmitButton>
-                  </form>
-                </div>
               </>
             );
           })()}
@@ -3550,7 +3386,7 @@ export default async function ListingNewPage({
                 <DashboardRedirect
                   href={`/${lang}/dashboard`}
                   title={copy.step8.successTitle}
-                  body={copy.step8.successBody}
+                  body={`${copy.step8.successBody} ${publicationTimeline.text[lang].sentence}`}
                   redirectingLabel={copy.step8.redirectingDashboard}
                   manualLabel={copy.step8.viewDashboard}
                 />
@@ -3616,6 +3452,13 @@ export default async function ListingNewPage({
                       "{pct}",
                       String(tier.commissionPct),
                     )}
+                  </p>
+                  {/* Plazo y reembolso: los mismos textos que Términos, FAQ y correos */}
+                  <p className="text-xs text-ink/70 leading-relaxed">
+                    {publicationTimeline.text[lang].sentence}
+                  </p>
+                  <p className="text-xs text-ink/70 leading-relaxed">
+                    {refundPolicy.text[lang]}
                   </p>
                 </div>
 

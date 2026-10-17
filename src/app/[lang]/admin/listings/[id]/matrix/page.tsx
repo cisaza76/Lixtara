@@ -15,7 +15,7 @@ import {
 // (ver src/lib/matrix-input-sheet.ts). Solo staff.
 
 const PROPERTY_COLUMNS =
-  "address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,occupancy_status,folio,legal_description,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,appliances,pricing_tier,mls_published_at,buyer_agent_commission,mls_number";
+  "address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,occupancy_status,folio,legal_description,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,appliances,pricing_tier,mls_published_at,buyer_agent_commission,buyer_agent_comp_type,buyer_agent_comp_amount,mls_number";
 
 export default async function MatrixInputSheetPage({
   params,

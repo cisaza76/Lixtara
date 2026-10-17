@@ -29,7 +29,7 @@ describe("recibo de pago: recuerda el % al cierre, solo si se vende", () => {
     const [en, es] = h.calls.map((c) => c[0]!);
     expect(en.html).toContain("1% Lixtara commission on the sale price, paid at closing and only if your property sells");
     expect(en.text).toContain("1% Lixtara commission");
-    expect(es.html).toContain("comisión Lixtara del 1.5% del precio de venta, que se paga al cierre y solo si tu propiedad se vende");
+    expect(es.html).toContain("comisión de Lixtara del 1.5% del precio de venta, que se paga al cierre y solo si tu propiedad se vende");
     expect(es.text).toContain("1.5%");
   });
 });
