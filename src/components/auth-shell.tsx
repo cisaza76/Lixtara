@@ -159,9 +159,11 @@ export function TextareaField({
   );
 }
 
+// data-step-notice: en /listing/new, AppFormValidation oculta este aviso cuando un nuevo
+// intento falla en el navegador, para no mostrar dos errores a la vez.
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    <div data-step-notice className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
       {message}
     </div>
   );

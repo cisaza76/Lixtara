@@ -76,9 +76,13 @@ import {
   STEP1_FORM_MAX_AGE_S,
   decodeStep1Form,
   encodeStep1Form,
+  legacyStep1FormCookiePath,
+  step1FormCookiePath,
+  step1SignInHref,
   suggestedTierParam,
 } from "@/lib/listing-step1-form";
 import { AppFormValidation } from "@/components/app-form-validation";
+import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
@@ -196,6 +200,7 @@ export default async function ListingNewPage({
     gresent?: string;
     change?: string;
     resumed?: string;
+    restore?: string;
   }>;
 }) {
   const { lang } = await params;
@@ -220,9 +225,12 @@ export default async function ListingNewPage({
 
   const sp = await searchParams;
   const step = clampStep(Number.parseInt(sp.step ?? "1", 10) || 1);
-  // Paso 1 que volvió con error: lo que el vendedor había escrito (ver backToStep1).
+  // Paso 1 que volvió con error, o tras iniciar sesión desde ese error (`restore=1`): lo que
+  // el vendedor había escrito (ver backToStep1).
   const step1Saved =
-    step === 1 && sp.error ? decodeStep1Form((await cookies()).get(STEP1_FORM_COOKIE)?.value) : null;
+    step === 1 && (sp.error || sp.restore === "1")
+      ? decodeStep1Form((await cookies()).get(STEP1_FORM_COOKIE)?.value)
+      : null;
   const savedCoord = (v: string | undefined): number | null => {
     const n = v ? Number.parseFloat(v) : Number.NaN;
     return Number.isFinite(n) ? n : null;
@@ -551,7 +559,7 @@ export default async function ListingNewPage({
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
-          path: `/${lang}/listing/new`,
+          path: step1FormCookiePath(lang),
           maxAge: STEP1_FORM_MAX_AGE_S,
         },
       );
@@ -586,7 +594,8 @@ export default async function ListingNewPage({
     // cookie lx_ft, y se comprueba igual).
     const continueTo = async (propertyId: string, uid: string): Promise<never> => {
       const jar = await cookies();
-      jar.delete({ name: STEP1_FORM_COOKIE, path: `/${lang}/listing/new` });
+      jar.delete({ name: STEP1_FORM_COOKIE, path: step1FormCookiePath(lang) });
+      jar.delete({ name: STEP1_FORM_COOKIE, path: legacyStep1FormCookiePath(lang) });
       const firstTouch =
         jar.get(CONSENT_COOKIE)?.value === "granted"
           ? parseFirstTouch(jar.get(FIRST_TOUCH_COOKIE)?.value)
@@ -683,6 +692,9 @@ export default async function ListingNewPage({
     if (error || !created) {
       await backToStep1("save_failed");
     }
+    // Fuera de Production, la propiedad es una prueba (la marca el servidor: el guard no
+    // deja que el vendedor la inserte con is_test).
+    await markPropertyIfOutsideProduction(created!.id);
     await continueTo(created!.id, user.id);
   }
 
@@ -1708,7 +1720,8 @@ export default async function ListingNewPage({
           {errorMessage && <ErrorBanner message={errorMessage} />}
           {sp.error === "email_exists" && (
             <Link
-              href={`/${lang}/sign-in?next=/listing/new`}
+              data-step-notice
+              href={step1SignInHref(lang, sp.suggested_tier)}
               className="self-start text-[10px] uppercase tracking-[0.22em] text-gold hover:text-ink transition-colors"
             >
               {copy.step1.emailSignIn} →
@@ -1721,14 +1734,17 @@ export default async function ListingNewPage({
               verifyAction={verifyGateCode}
               resendAction={resendGateCode}
               changeEmailHref={`/${lang}/listing/new?step=1&id=${draftId}&change=1`}
-              signInHref={`/${lang}/sign-in?next=/listing/new`}
+              signInHref={step1SignInHref(lang, sp.suggested_tier)}
               error={typeof sp.gerror === "string" ? sp.gerror : null}
               resent={sp.gresent === "1"}
               labels={copy.step1.emailCode}
             />
           ) : (
-          <form action={saveStep1} className="flex flex-col gap-6">
-            <AppFormValidation step={1} lang={lang} message={copy.stepErrors.checkMarked} />
+          <form action={saveStep1} noValidate className="flex flex-col gap-6">
+            <AppFormValidation step={1} lang={lang} message={copy.stepErrors.checkMarked}
+              labels={copy.validation}
+              fieldMessages={copy.fieldErrors}
+            />
             {draftId && <input type="hidden" name="id" value={draftId} />}
             {sp.suggested_tier && (
               <input
@@ -1799,8 +1815,11 @@ export default async function ListingNewPage({
             </p>
           </div>
           {errorMessage && <ErrorBanner message={errorMessage} />}
-          <form action={saveStep2} className="flex flex-col gap-6">
-            <AppFormValidation step={2} lang={lang} message={copy.stepErrors.checkMarked} />
+          <form action={saveStep2} noValidate className="flex flex-col gap-6">
+            <AppFormValidation step={2} lang={lang} message={copy.stepErrors.checkMarked}
+              labels={copy.validation}
+              fieldMessages={copy.fieldErrors}
+            />
             <input type="hidden" name="id" value={draftId ?? ""} />
             <div className="flex flex-col gap-4">
               {TIER_ORDER.map((tierId) => {
@@ -2087,8 +2106,11 @@ export default async function ListingNewPage({
           )}
 
           {errorMessage && <ErrorBanner message={errorMessage} />}
-          <form action={saveStep3} className="flex flex-col gap-6">
-            <AppFormValidation step={3} lang={lang} message={copy.stepErrors.checkMarked} />
+          <form action={saveStep3} noValidate className="flex flex-col gap-6">
+            <AppFormValidation step={3} lang={lang} message={copy.stepErrors.checkMarked}
+              labels={copy.validation}
+              fieldMessages={copy.fieldErrors}
+            />
             <input type="hidden" name="id" value={draftId ?? ""} />
 
             <label className="flex flex-col gap-2">
@@ -2396,8 +2418,11 @@ export default async function ListingNewPage({
           {improvedFlag === "showing" && (
             <SuccessBanner message={copy.step4.improvedShowingNotice} />
           )}
-          <form action={saveStep4} className="flex flex-col gap-8">
-            <AppFormValidation step={4} lang={lang} message={copy.stepErrors.checkMarked} />
+          <form action={saveStep4} noValidate className="flex flex-col gap-8">
+            <AppFormValidation step={4} lang={lang} message={copy.stepErrors.checkMarked}
+              labels={copy.validation}
+              fieldMessages={copy.fieldErrors}
+            />
             <input type="hidden" name="id" value={draftId ?? ""} />
 
             {/* Description block + per-field improve button */}
@@ -2578,9 +2603,13 @@ export default async function ListingNewPage({
           {/* Photo grid + ownership disclaimer + Next — visually grouped */}
           <form
             action={nextFromStep5}
+            noValidate
             className="border border-gold-soft p-5 lg:p-6 flex flex-col gap-6 bg-ivory"
           >
-            <AppFormValidation step={5} lang={lang} message={copy.stepErrors.checkMarked} />
+            <AppFormValidation step={5} lang={lang} message={copy.stepErrors.checkMarked}
+              labels={copy.validation}
+              fieldMessages={copy.fieldErrors}
+            />
             <input type="hidden" name="id" value={draftId ?? ""} />
             {photos.length === 0 ? (
               <p className="text-sm text-ink/60 italic">

@@ -8,6 +8,7 @@
 // public.email_verification_challenges, never by Supabase's own OTP: we store
 // only HMAC-SHA256(pepper, challengeId + ":" + code).
 
+import { writtenOutsideProduction } from "@/lib/test-data";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 export const CODE_LENGTH = 6;
@@ -66,4 +67,12 @@ export function resumePath(
   const s = step && step >= 2 && step <= 8 ? step : 2;
   const marker = source ? `&resumed=${source}` : "";
   return `/${lang}/listing/new?id=${encodeURIComponent(propertyId)}&step=${s}${marker}`;
+}
+
+/**
+ * Preview y Production comparten la base: un lead escrito fuera de Production es una prueba
+ * (seller_leads.is_test) y /admin/seller-leads lo oculta por defecto.
+ */
+export function sellerLeadIsTest(vercelEnv: string | undefined): boolean {
+  return writtenOutsideProduction(vercelEnv);
 }

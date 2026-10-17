@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -8,6 +9,7 @@ import { postSignInPath, safeNextPath } from "@/lib/auth/safe-redirect";
 import { isStaff } from "@/lib/admin-auth";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
+import { STEP1_FORM_COOKIE, decodeStep1Form, isStep1RestoreNext } from "@/lib/listing-step1-form";
 import {
   AuthShell,
   Field,
@@ -35,6 +37,10 @@ export default async function SignInPage({
   const sp = await searchParams;
   const authCopy = t(lang).auth;
   const copy = authCopy.signIn;
+  // Viene del paso 1 ("este correo ya tiene una cuenta"): el correo que escribió ahí.
+  const step1Email = isStep1RestoreNext(sp.next)
+    ? decodeStep1Form((await cookies()).get(STEP1_FORM_COOKIE)?.value)?.email || undefined
+    : undefined;
 
   const errorMessage = isErrorKey(sp.error)
     ? sp.error === "invalid"
@@ -67,7 +73,9 @@ export default async function SignInPage({
       if (/invalid login credentials/i.test(error.message)) key = "invalid";
       else if (/email not confirmed/i.test(error.message)) key = "not_confirmed";
       else if (isCaptchaError(error)) key = "captcha";
-      redirect(`/${lang}/sign-in?error=${key}`);
+      // Un intento fallido no pierde el destino (p. ej. volver al paso 1 con lo escrito).
+      const keepNext = next === `/${lang}` ? "" : `&next=${encodeURIComponent(next)}`;
+      redirect(`/${lang}/sign-in?error=${key}${keepNext}`);
     }
 
     redirect(postSignInPath(next, lang, await isStaff(supabase)));
@@ -88,6 +96,7 @@ export default async function SignInPage({
           name="email"
           type="email"
           autoComplete="email"
+          defaultValue={step1Email}
         />
         <Field
           label={copy.passwordLabel}

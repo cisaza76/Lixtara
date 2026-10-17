@@ -32,7 +32,7 @@ function isField(el: EventTarget | null): el is Field {
   );
 }
 
-function messageFor(el: Field, v: ValidityState, labels: ValidationLabels): string {
+export function messageFor(el: Field, v: ValidityState, labels: ValidationLabels): string {
   const type = el instanceof HTMLInputElement ? el.type : "";
   if (v.valueMissing) {
     if (type === "checkbox") return labels.checkboxMissing;

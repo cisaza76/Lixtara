@@ -25,7 +25,7 @@ describe("/listing/new: validación de la app (listing_step_error sale aunque el
     expect(component).toContain("form.checkValidity()");
     expect(component).toContain("e.preventDefault()");
     expect(component).toMatch(/track\(\{ event: "listing_step_error", step, field, lang \}\)/);
-    expect(component).not.toMatch(/\.value/); // nunca lo que la persona escribió
+    expect(component).not.toMatch(/\.value\b/); // nunca lo que la persona escribió (valueMissing sí)
   });
 
   it("el servidor no deja pasar NaN en el paso 3 (vacío o no numérico)", () => {

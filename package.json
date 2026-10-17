@@ -19,6 +19,7 @@
     "db-check:crm": "bash scripts/db-checks/run-crm-leads.sh",
     "db-check:crm-contacts": "bash scripts/db-checks/run-crm-contacts-evidence.sh",
     "db-check:listing-funnel": "bash scripts/db-checks/run-listing-funnel.sh",
+    "db-check:seller-leads-is-test": "bash scripts/db-checks/run-seller-leads-is-test.sh",
     "mls:backfill-numbers": "tsx scripts/backfill-mls-numbers.ts"
   },
   "dependencies": {

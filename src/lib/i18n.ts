@@ -720,6 +720,21 @@ export const dictionaries = {
         number: "Please enter a valid number.",
         generic: "Please check this field.",
       },
+      // Bajo cada campo vacío (AppFormValidation), por su `name`.
+      fieldErrors: {
+        street: "Enter the address.",
+        city: "Enter the city.",
+        state: "Enter the state.",
+        zip: "Enter the ZIP code.",
+        email: "Enter your email.",
+        pricing_tier: "Choose a plan.",
+        bedrooms: "Enter the number of bedrooms.",
+        bathrooms: "Enter the number of bathrooms.",
+        year_built: "Enter the year built.",
+        sqft: "Enter the square footage.",
+        list_price: "Enter the list price.",
+        photos_rights_confirmed: "Confirm you have the rights to the photos.",
+      },
     },
     auth: {
       signIn: {
@@ -2592,6 +2607,21 @@ export const dictionaries = {
         tooShort: "Usa al menos {min} caracteres.",
         number: "Ingresa un número válido.",
         generic: "Revisa este campo.",
+      },
+      // Bajo cada campo vacío (AppFormValidation), por su `name`.
+      fieldErrors: {
+        street: "Ingresa la dirección.",
+        city: "Ingresa la ciudad.",
+        state: "Ingresa el estado.",
+        zip: "Ingresa el código postal.",
+        email: "Ingresa tu correo.",
+        pricing_tier: "Elige un plan.",
+        bedrooms: "Ingresa el número de habitaciones.",
+        bathrooms: "Ingresa el número de baños.",
+        year_built: "Ingresa el año de construcción.",
+        sqft: "Ingresa los pies cuadrados.",
+        list_price: "Ingresa el precio de venta.",
+        photos_rights_confirmed: "Confirma que tienes los derechos de las fotos.",
       },
     },
     auth: {
