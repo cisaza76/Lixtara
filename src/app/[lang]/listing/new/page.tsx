@@ -76,10 +76,13 @@ import {
   STEP1_FORM_MAX_AGE_S,
   decodeStep1Form,
   encodeStep1Form,
+  legacyStep1FormCookiePath,
+  step1FormCookiePath,
   step1SignInHref,
   suggestedTierParam,
 } from "@/lib/listing-step1-form";
 import { AppFormValidation } from "@/components/app-form-validation";
+import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
@@ -556,7 +559,7 @@ export default async function ListingNewPage({
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
-          path: `/${lang}/listing/new`,
+          path: step1FormCookiePath(lang),
           maxAge: STEP1_FORM_MAX_AGE_S,
         },
       );
@@ -591,7 +594,8 @@ export default async function ListingNewPage({
     // cookie lx_ft, y se comprueba igual).
     const continueTo = async (propertyId: string, uid: string): Promise<never> => {
       const jar = await cookies();
-      jar.delete({ name: STEP1_FORM_COOKIE, path: `/${lang}/listing/new` });
+      jar.delete({ name: STEP1_FORM_COOKIE, path: step1FormCookiePath(lang) });
+      jar.delete({ name: STEP1_FORM_COOKIE, path: legacyStep1FormCookiePath(lang) });
       const firstTouch =
         jar.get(CONSENT_COOKIE)?.value === "granted"
           ? parseFirstTouch(jar.get(FIRST_TOUCH_COOKIE)?.value)
@@ -688,6 +692,9 @@ export default async function ListingNewPage({
     if (error || !created) {
       await backToStep1("save_failed");
     }
+    // Fuera de Production, la propiedad es una prueba (la marca el servidor: el guard no
+    // deja que el vendedor la inserte con is_test).
+    await markPropertyIfOutsideProduction(created!.id);
     await continueTo(created!.id, user.id);
   }
 

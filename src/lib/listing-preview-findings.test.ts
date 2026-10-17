@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { t } from "@/lib/i18n";
 import { sellerLeadIsTest } from "@/lib/listing-email-gate";
+import { writtenOutsideProduction } from "@/lib/test-data";
 import { COOKIES_LAST_UPDATED, LEGAL_LAST_UPDATED } from "@/lib/legal/types";
 
 const root = resolve(__dirname, "../..");
@@ -38,10 +39,20 @@ describe("hallazgos de preview (paso 1, validación, cookies, seller_leads)", ()
   });
 
   it("hay mensaje por campo para cada obligatorio, en EN y ES", () => {
-    const names = [
-      "street", "city", "zip", "email", "pricing_tier", "bedrooms", "bathrooms",
-      "year_built", "sqft", "list_price", "photos_rights_confirmed",
-    ];
+    // Todos los obligatorios del flujo, leídos del código: <Field> (obligatorio por defecto)
+    // salvo required={false}, y <input|select|textarea> con required.
+    const names = new Set<string>();
+    for (const src of [page, read("src/components/address-autocomplete.tsx")]) {
+      for (const m of src.matchAll(/<(Field|input|select|textarea)\b((?:[^>"]|"[^"]*")*?)\/?>/g)) {
+        const [, kind, attrs] = m;
+        const name = attrs.match(/\bname="([^"]+)"/)?.[1];
+        if (!name || attrs.includes("required={false}") || /type="hidden"/.test(attrs)) continue;
+        if (kind === "Field" || /\brequired\b/.test(attrs)) names.add(name);
+      }
+    }
+    for (const n of ["street", "city", "state", "zip", "list_price", "photos_rights_confirmed"]) {
+      expect(names.has(n), n).toBe(true);
+    }
     for (const lang of ["en", "es"] as const) {
       const f = t(lang).listingForm.fieldErrors as Record<string, string>;
       for (const n of names) expect(f[n], `${lang}.${n}`).toBeTruthy();
@@ -66,6 +77,23 @@ describe("hallazgos de preview (paso 1, validación, cookies, seller_leads)", ()
     expect(COOKIES_LAST_UPDATED).toBe("2026-10-16");
     expect(LEGAL_LAST_UPDATED).toBe("2026-09-02");
     expect(read("src/app/[lang]/cookies/page.tsx")).toContain("updatedOn={COOKIES_LAST_UPDATED}");
+  });
+
+  it("properties: fuera de Production el servidor marca is_test al crear (el guard no deja al vendedor)", () => {
+    expect(writtenOutsideProduction("production")).toBe(false);
+    expect(writtenOutsideProduction("preview")).toBe(true);
+    const at = page.indexOf('.from("properties")\n      .insert(');
+    expect(at).toBeGreaterThan(-1);
+    expect(page.slice(at, at + 1200)).toContain("await markPropertyIfOutsideProduction(created!.id);");
+    const helper = read("src/lib/test-data.server.ts");
+    expect(helper).toContain("if (!writtenOutsideProduction(process.env.VERCEL_ENV)) return;");
+    expect(helper).toMatch(/createService\(\)\s*\.from\("properties"\)\s*\.update\(\{ is_test: true \}\)/);
+  });
+
+  it("/sign-in precarga el correo del paso 1 solo en el regreso con restore=1", () => {
+    const signIn = read("src/app/[lang]/sign-in/page.tsx");
+    expect(signIn).toContain("isStep1RestoreNext(sp.next)");
+    expect(signIn).toContain("defaultValue={step1Email}");
   });
 
   it("seller_leads: fuera de Production es prueba; el admin las oculta por defecto", () => {

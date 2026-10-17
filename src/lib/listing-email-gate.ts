@@ -8,6 +8,7 @@
 // public.email_verification_challenges, never by Supabase's own OTP: we store
 // only HMAC-SHA256(pepper, challengeId + ":" + code).
 
+import { writtenOutsideProduction } from "@/lib/test-data";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 export const CODE_LENGTH = 6;
@@ -73,5 +74,5 @@ export function resumePath(
  * (seller_leads.is_test) y /admin/seller-leads lo oculta por defecto.
  */
 export function sellerLeadIsTest(vercelEnv: string | undefined): boolean {
-  return vercelEnv !== "production";
+  return writtenOutsideProduction(vercelEnv);
 }

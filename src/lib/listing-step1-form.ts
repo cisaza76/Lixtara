@@ -4,9 +4,36 @@
 // personales). suggested_tier no es personal: sigue en la URL, como cuando llegó.
 // La misma cookie sobrevive a "Iniciar sesión" desde el error de correo existente: el
 // regreso (`restore=1`) vuelve a llenar el paso 1. 30 min alcanzan para iniciar sesión.
+//
+// Path = /[lang], no /[lang]/listing/new: un redirect() desde la server action de /sign-in
+// pinta el destino EN LA MISMA petición (POST /[lang]/sign-in), con las cookies que el
+// navegador mandó a /sign-in. Con path /[lang]/listing/new la cookie no iba en ese POST y
+// el paso 1 se pintaba vacío (preview 2026-10-16). /sign-in también la lee para precargar
+// el correo.
 
 export const STEP1_FORM_COOKIE = "lx_step1_form";
 export const STEP1_FORM_MAX_AGE_S = 30 * 60;
+
+/** Path de la cookie: todo el idioma (ver arriba). */
+export function step1FormCookiePath(lang: string): string {
+  return `/${lang}`;
+}
+
+/** Path anterior (hasta #200): se borra también, para no leer una copia vieja. */
+export function legacyStep1FormCookiePath(lang: string): string {
+  return `/${lang}/listing/new`;
+}
+
+/** ¿Este `next` de /sign-in vuelve al paso 1 con lo escrito? */
+export function isStep1RestoreNext(next: string | undefined | null): boolean {
+  if (!next) return false;
+  try {
+    const u = new URL(next, "https://x.invalid");
+    return /^\/(en|es)\/listing\/new$/.test(u.pathname) && u.searchParams.get("restore") === "1";
+  } catch {
+    return false;
+  }
+}
 
 const TIERS = ["essentials", "pro", "concierge"] as const;
 

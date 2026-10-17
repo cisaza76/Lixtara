@@ -724,6 +724,7 @@ export const dictionaries = {
       fieldErrors: {
         street: "Enter the address.",
         city: "Enter the city.",
+        state: "Enter the state.",
         zip: "Enter the ZIP code.",
         email: "Enter your email.",
         pricing_tier: "Choose a plan.",
@@ -2611,6 +2612,7 @@ export const dictionaries = {
       fieldErrors: {
         street: "Ingresa la dirección.",
         city: "Ingresa la ciudad.",
+        state: "Ingresa el estado.",
         zip: "Ingresa el código postal.",
         email: "Ingresa tu correo.",
         pricing_tier: "Elige un plan.",
