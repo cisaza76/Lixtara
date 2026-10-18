@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +9,10 @@ import { SIGNUP_EMAIL_COOKIE } from "@/lib/auth/signup-code";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
 import { passwordRejection } from "@/lib/auth/password-errors";
+import { createService } from "@/lib/supabase/service";
+import { CONSENTS, consentCheckbox } from "@/lib/legal/consents";
+import { recordAcceptance, termsAcceptedIn } from "@/lib/legal/consents.server";
+import { TermsConsentCheckbox } from "@/components/terms-consent-checkbox";
 import {
   AuthShell,
   Field,
@@ -38,6 +42,8 @@ export default async function SignUpPage({
       ? authCopy.errors.leakedPassword
       : sp.error === "rejected_password"
       ? authCopy.errors.passwordRejected
+      : sp.error === "terms_required"
+      ? authCopy.errors.termsRequired
       : sp.error === "captcha"
         ? authCopy.errors.captchaFailed
         : sp.error === "unexpected"
@@ -52,12 +58,16 @@ export default async function SignUpPage({
     const lastName = String(formData.get("last_name") ?? "").trim();
     const phone = String(formData.get("phone") ?? "").trim();
 
+    // Aceptación expresa de los Términos y la Privacidad: sin la casilla no se crea la cuenta.
+    if (!termsAcceptedIn(formData)) {
+      redirect(`/${lang}/sign-up?error=terms_required`);
+    }
     if (password.length < 8) {
       redirect(`/${lang}/sign-up?error=weak_password`);
     }
 
     const supabase = await createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -86,6 +96,25 @@ export default async function SignUpPage({
                 : "unexpected"
         }`,
       );
+    }
+
+    // Prueba de la aceptación (versión, idioma, hash, IP, user agent, fecha). Con un correo ya
+    // registrado Supabase devuelve un usuario sin identidades y no crea nada: no hay qué
+    // registrar. Si la prueba no queda guardada, la cuenta nueva se borra: ninguna cuenta
+    // existe sin su aceptación.
+    const created = signUpData.user;
+    if (created && (created.identities?.length ?? 0) > 0) {
+      const recorded = await recordAcceptance({
+        document: "terms",
+        lang: lang === "es" ? "es" : "en",
+        context: "signup",
+        userId: created.id,
+        headers: await headers(),
+      });
+      if (!recorded) {
+        await createService().auth.admin.deleteUser(created.id).catch(() => {});
+        redirect(`/${lang}/sign-up?error=unexpected`);
+      }
     }
 
     // The confirmation email carries a 6-digit code; /auth/verify asks for it
@@ -143,10 +172,14 @@ export default async function SignUpPage({
           autoComplete="new-password"
           help={copy.passwordHelp}
         />
+        <TermsConsentCheckbox
+          lang={lang}
+          parts={consentCheckbox("terms", lang)}
+          version={CONSENTS.terms.version}
+        />
         <TurnstileWidget lang={lang} />
         <SubmitButton>{copy.submit}</SubmitButton>
       </form>
-      <p className="text-xs text-ink/55 leading-relaxed">{copy.terms}</p>
       <div className="text-sm text-ink/70">
         {copy.haveAccount}{" "}
         <Link

@@ -1,5 +1,5 @@
 import type { LegalContent } from "./types";
-import { BROKERAGE } from "@/config/brokerage";
+import { BROKERAGE, LEGAL_EMAIL, NOTICES_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
 import { buyerAgentComp, refundPolicy } from "@/config/legal-terms";
 
 const B = BROKERAGE;
@@ -17,7 +17,7 @@ export const termsDoc: LegalContent = {
         body: [
           "By accessing or using the Services in any way, you acknowledge that you have read, understood, and agree to be bound by these Terms and by our Privacy Policy, which is incorporated by reference. These Terms form a binding agreement between you and Lixtara.",
           "If you use the Services on behalf of a company, trust, estate, or other legal entity, you represent that you have authority to bind that entity to these Terms, and \"you\" refers to both you individually and that entity.",
-          "We may publish additional terms, policies, or guidelines for specific features (for example, listing agreements, add-on services, or payment terms). Where a separate signed agreement applies to a particular service, that agreement controls over these Terms to the extent of any direct conflict for that service.",
+          "We may publish additional terms, policies, or guidelines for specific features (for example, listing agreements, add-on services, or payment terms). If these Terms conflict with a listing agreement, buyer agreement, or any other brokerage agreement you sign with Lixtara LLC, that agreement controls.",
         ],
       },
       {
@@ -61,7 +61,7 @@ export const termsDoc: LegalContent = {
           {
             heading: "4.1 Buyer's Agent Compensation",
             // Mismo texto que la FAQ y Loui: una sola fuente en legal-terms.ts.
-            body: [buyerAgentComp.text.en.summary],
+            body: [buyerAgentComp.text.en.termsSummary],
           },
         ],
       },
@@ -69,7 +69,7 @@ export const termsDoc: LegalContent = {
         heading: "5. Accounts and Registration",
         body: [
           "You may begin building a listing without first creating an account. Before you sign any agreement or complete certain steps, you will be asked to create an account.",
-          "When you create an account, you agree to provide accurate, current, and complete information and to keep it updated. You are responsible for maintaining the confidentiality of your login credentials and for all activity that occurs under your account. You agree to notify us promptly at support@lixtara.com of any unauthorized use of your account or any other breach of security.",
+          `When you create an account, you agree to provide accurate, current, and complete information and to keep it updated. You are responsible for maintaining the confidentiality of your login credentials and for all activity that occurs under your account. You agree to notify us promptly at ${SUPPORT_EMAIL} of any unauthorized use of your account or any other breach of security.`,
           "You may maintain only one account per person unless we expressly authorize otherwise. You may not share your account, impersonate another person, or create an account using false information. We may refuse, suspend, or terminate accounts at our discretion in accordance with these Terms.",
         ],
       },
@@ -147,7 +147,7 @@ export const termsDoc: LegalContent = {
         body: [
           "By using the Services, you consent to receive communications from us electronically, including by email and through the Services. You agree that electronic communications, notices, agreements, and disclosures we provide satisfy any legal requirement that such communications be in writing.",
           "Agreements offered through the Services, including listing agreements, are signed electronically through DocuSign. By signing electronically, you consent to the use of electronic records and electronic signatures, and you agree that your electronic signature is the legal equivalent of your handwritten signature and is binding. This consent is given under the federal ESIGN Act and Florida's Uniform Electronic Transaction Act.",
-          "You may withdraw your consent to transact electronically or request a paper copy of a record by contacting us at support@lixtara.com; however, doing so may prevent us from providing certain Services to you. You are responsible for maintaining hardware, software, and internet access capable of receiving and reviewing electronic records.",
+          `You may withdraw your consent to transact electronically or request a paper copy of a record by contacting us at ${SUPPORT_EMAIL}; however, doing so may prevent us from providing certain Services to you. You are responsible for maintaining hardware, software, and internet access capable of receiving and reviewing electronic records.`,
         ],
       },
       {
@@ -176,18 +176,22 @@ export const termsDoc: LegalContent = {
       {
         heading: "16. Term and Termination",
         body: [
-          "These Terms apply while you use the Services. You may stop using the Services at any time. You may close your account by contacting us at support@lixtara.com, subject to any obligations that survive under a signed listing agreement, including a 24-month listing term and any commission obligations.",
+          `These Terms apply while you use the Services. You may stop using the Services at any time. You may close your account by contacting us at ${SUPPORT_EMAIL}, subject to any obligations that survive under a signed listing agreement, including a 24-month listing term and any commission obligations.`,
           "We may suspend or terminate your access to the Services, in whole or in part, at any time if we reasonably believe you have violated these Terms or applicable law, if needed to protect the Services or other users, or as otherwise permitted by law. Where reasonable and lawful, we will provide notice.",
           "Termination of your account does not by itself terminate a signed listing agreement, which is governed by its own terms. Sections of these Terms that by their nature should survive termination (including provisions on fees already incurred, intellectual property, disclaimers, limitation of liability, indemnification, dispute resolution, and governing law) will survive.",
         ],
       },
       {
-        heading: "17. Dispute Resolution, Arbitration, and Class-Action Waiver",
+        // Texto v1 del owner (2026-10-18), PENDIENTE DE APROBACIÓN LEGAL. Sin arbitraje masivo
+        // por lotes. docs/legal/2026-10-18-textos-v1-memo.md.
+        heading: "17. Dispute Resolution; Arbitration; Class Action Waiver",
         body: [
-          "Please read this section carefully, as it affects how disputes between you and Lixtara are resolved. Except as otherwise required by applicable law, you and Lixtara agree to first try to resolve any dispute informally by contacting us at legal@lixtara.com and allowing a reasonable period to resolve the matter in good faith.",
-          "If a dispute is not resolved informally, you and Lixtara agree that any dispute, claim, or controversy arising out of or relating to these Terms or the Services will be resolved by binding individual arbitration administered in Miami-Dade County, Florida, rather than in court, except that either party may bring an individual claim in a small-claims court of competent jurisdiction. The arbitration will be conducted by a neutral arbitrator, and judgment on the award may be entered in any court of competent jurisdiction.",
-          "Class-Action Waiver. To the fullest extent permitted by law, you and Lixtara agree that each may bring claims against the other only in an individual capacity, and not as a plaintiff or class member in any purported class, collective, or representative proceeding. The arbitrator may not consolidate more than one person's claims or preside over any form of class or representative proceeding.",
-          "Some jurisdictions, and certain laws, may limit the enforceability of arbitration or class-action waiver provisions. This Section applies only to the extent permitted by applicable law, and nothing in this Section is intended to waive any right that cannot be waived as a matter of law. If any portion of this Section is found unenforceable, that portion will be severed and the remainder will continue to apply.",
+          "(a) Except for Excluded Claims, you and Lixtara LLC agree that any dispute arising out of or relating to these Terms or your use of the Services will be resolved by binding individual arbitration administered by the American Arbitration Association under its Consumer Arbitration Rules. The Federal Arbitration Act governs this Section.",
+          "(b) Excluded Claims: (i) individual claims within the jurisdiction of a small claims court; (ii) disputes arising under a listing agreement, buyer agreement or other brokerage agreement, which are governed by that agreement; (iii) complaints to the Florida Department of Business and Professional Regulation, the Florida Real Estate Commission or any other government agency.",
+          "(c) Claims may be brought only in an individual capacity, not as a plaintiff or class member in any class, collective or representative proceeding.",
+          `(d) You may opt out of this Section within thirty (30) days after you first accept these Terms by emailing ${LEGAL_EMAIL} with your name and a statement that you opt out of arbitration.`,
+          "(e) If the class action waiver is found unenforceable as to any claim, that claim will proceed in the state or federal courts located in Miami-Dade County, Florida.",
+          "(f) These Terms are governed by Florida law, except that the Federal Arbitration Act governs this Section.",
         ],
       },
       {
@@ -208,7 +212,7 @@ export const termsDoc: LegalContent = {
         heading: "20. Miscellaneous",
         body: [
           "Severability. If any provision of these Terms is held invalid or unenforceable, that provision will be limited or removed to the minimum extent necessary, and the remaining provisions will remain in full force and effect.",
-          "Entire Agreement. These Terms, together with the Privacy Policy and any agreements you sign through the Services, constitute the entire agreement between you and Lixtara regarding the Services and supersede any prior agreements on that subject. A signed listing agreement controls over these Terms to the extent of any direct conflict regarding the brokerage services it covers.",
+          "Entire Agreement. These Terms, together with the Privacy Policy and any agreements you sign through the Services, constitute the entire agreement between you and Lixtara regarding the Services and supersede any prior agreements on that subject. If these Terms conflict with an agreement you sign with Lixtara LLC, Section 1 explains which controls.",
           "No Waiver. Our failure to enforce any provision of these Terms is not a waiver of that provision or of our right to enforce it later.",
           "Assignment. You may not assign or transfer these Terms without our prior written consent. We may assign these Terms in connection with a merger, acquisition, reorganization, or sale of assets, or by operation of law.",
           "Force Majeure. Lixtara is not liable for any delay or failure to perform caused by events beyond our reasonable control, including acts of God, natural disasters, severe weather, war, terrorism, civil unrest, labor disputes, governmental actions, utility or internet failures, or failures of third-party service providers.",
@@ -220,7 +224,7 @@ export const termsDoc: LegalContent = {
         body: [
           "If you have questions about these Terms or the Services, please contact us:",
           `${B.legalName}, ${B.address}, United States.`,
-          "Legal: legal@lixtara.com. Support: support@lixtara.com.",
+          `Legal: ${LEGAL_EMAIL}. Formal notices to Lixtara LLC: ${NOTICES_EMAIL}. Support: ${SUPPORT_EMAIL}.`,
           `Licensed Florida real estate brokerage. Brokerage license number: ${B.brokerageLicense}. Principal broker of record: ${B.brokerName} (license ${B.brokerLicense}).`,
         ],
       },
@@ -238,7 +242,7 @@ export const termsDoc: LegalContent = {
         body: [
           "Al acceder o utilizar los Servicios de cualquier manera, usted reconoce que ha leído, comprendido y aceptado quedar obligado por estos Términos y por nuestra Política de Privacidad, que se incorpora por referencia. Estos Términos constituyen un acuerdo vinculante entre usted y Lixtara.",
           "Si utiliza los Servicios en nombre de una empresa, fideicomiso, sucesión u otra entidad legal, usted declara que tiene la autoridad para obligar a esa entidad a estos Términos, y \"usted\" se refiere tanto a usted como individuo como a esa entidad.",
-          "Podemos publicar términos, políticas o lineamientos adicionales para funciones específicas (por ejemplo, acuerdos de publicación, servicios adicionales o condiciones de pago). Cuando un acuerdo firmado por separado se aplique a un servicio en particular, ese acuerdo prevalecerá sobre estos Términos en la medida de cualquier conflicto directo respecto de ese servicio.",
+          "Podemos publicar términos, políticas o lineamientos adicionales para funciones específicas (por ejemplo, acuerdos de publicación, servicios adicionales o condiciones de pago). Si estos Términos entran en conflicto con un acuerdo de listado, un acuerdo con el comprador o cualquier otro acuerdo de correduría que usted firme con Lixtara LLC, prevalece ese acuerdo.",
         ],
       },
       {
@@ -282,7 +286,7 @@ export const termsDoc: LegalContent = {
           {
             heading: "4.1 Compensación al Agente del Comprador",
             // Mismo texto que la FAQ y Loui (con tú: el registro de los Términos queda para el #203).
-            body: [buyerAgentComp.text.es.summary],
+            body: [buyerAgentComp.text.es.termsSummary],
           },
         ],
       },
@@ -290,7 +294,7 @@ export const termsDoc: LegalContent = {
         heading: "5. Cuentas y Registro",
         body: [
           "Usted puede comenzar a crear una publicación sin crear primero una cuenta. Antes de firmar cualquier acuerdo o completar ciertos pasos, se le pedirá que cree una cuenta.",
-          "Cuando crea una cuenta, usted acepta proporcionar información exacta, actual y completa, y mantenerla actualizada. Usted es responsable de mantener la confidencialidad de sus credenciales de acceso y de toda la actividad que ocurra bajo su cuenta. Usted acepta notificarnos con prontitud a support@lixtara.com sobre cualquier uso no autorizado de su cuenta o cualquier otra violación de seguridad.",
+          `Cuando crea una cuenta, usted acepta proporcionar información exacta, actual y completa, y mantenerla actualizada. Usted es responsable de mantener la confidencialidad de sus credenciales de acceso y de toda la actividad que ocurra bajo su cuenta. Usted acepta notificarnos con prontitud a ${SUPPORT_EMAIL} sobre cualquier uso no autorizado de su cuenta o cualquier otra violación de seguridad.`,
           "Solo podrá mantener una cuenta por persona, a menos que lo autoricemos expresamente de otra manera. No podrá compartir su cuenta, hacerse pasar por otra persona ni crear una cuenta con información falsa. Podemos rechazar, suspender o cancelar cuentas a nuestra discreción de conformidad con estos Términos.",
         ],
       },
@@ -367,7 +371,7 @@ export const termsDoc: LegalContent = {
         body: [
           "Al utilizar los Servicios, usted consiente en recibir comunicaciones de nuestra parte de forma electrónica, incluso por correo electrónico y a través de los Servicios. Usted acepta que las comunicaciones, notificaciones, acuerdos y divulgaciones electrónicas que proporcionemos cumplen con cualquier requisito legal de que dichas comunicaciones consten por escrito.",
           "Los acuerdos ofrecidos a través de los Servicios, incluidos los acuerdos de publicación, se firman electrónicamente mediante DocuSign. Al firmar electrónicamente, usted consiente en el uso de registros y firmas electrónicas, y acepta que su firma electrónica es el equivalente legal de su firma manuscrita y es vinculante. Este consentimiento se otorga conforme a la Ley Federal ESIGN y la Ley de Transacciones Electrónicas Uniformes de Florida.",
-          "Usted puede retirar su consentimiento para realizar transacciones electrónicamente o solicitar una copia en papel de un registro comunicándose con nosotros a support@lixtara.com; sin embargo, hacerlo puede impedirnos prestarle ciertos Servicios. Usted es responsable de mantener el hardware, software y acceso a internet capaces de recibir y revisar registros electrónicos.",
+          `Usted puede retirar su consentimiento para realizar transacciones electrónicamente o solicitar una copia en papel de un registro comunicándose con nosotros a ${SUPPORT_EMAIL}; sin embargo, hacerlo puede impedirnos prestarle ciertos Servicios. Usted es responsable de mantener el hardware, software y acceso a internet capaces de recibir y revisar registros electrónicos.`,
         ],
       },
       {
@@ -396,18 +400,21 @@ export const termsDoc: LegalContent = {
       {
         heading: "16. Vigencia y Terminación",
         body: [
-          "Estos Términos se aplican mientras usted utilice los Servicios. Usted puede dejar de usar los Servicios en cualquier momento. Puede cerrar su cuenta comunicándose con nosotros a support@lixtara.com, sujeto a cualquier obligación que subsista bajo un acuerdo de publicación firmado, incluido un plazo de publicación de 24 meses y cualquier obligación de comisión.",
+          `Estos Términos se aplican mientras usted utilice los Servicios. Usted puede dejar de usar los Servicios en cualquier momento. Puede cerrar su cuenta comunicándose con nosotros a ${SUPPORT_EMAIL}, sujeto a cualquier obligación que subsista bajo un acuerdo de publicación firmado, incluido un plazo de publicación de 24 meses y cualquier obligación de comisión.`,
           "Podemos suspender o cancelar su acceso a los Servicios, en su totalidad o en parte, en cualquier momento si razonablemente creemos que ha violado estos Términos o la ley aplicable, si es necesario para proteger los Servicios u otros usuarios, o según lo permita la ley. Cuando sea razonable y lícito, le proporcionaremos aviso.",
           "La terminación de su cuenta no termina por sí misma un acuerdo de publicación firmado, el cual se rige por sus propios términos. Las secciones de estos Términos que por su naturaleza deban subsistir tras la terminación (incluidas las disposiciones sobre tarifas ya incurridas, propiedad intelectual, renuncias de garantías, limitación de responsabilidad, indemnización, resolución de disputas y ley aplicable) subsistirán.",
         ],
       },
       {
-        heading: "17. Resolución de Disputas, Arbitraje y Renuncia a Acciones Colectivas",
+        // Traducción con usted del texto v1 (2026-10-18), PENDIENTE DE APROBACIÓN LEGAL.
+        heading: "17. Resolución de Disputas; Arbitraje; Renuncia a Acciones Colectivas",
         body: [
-          "Lea esta sección detenidamente, ya que afecta la forma en que se resuelven las disputas entre usted y Lixtara. Salvo que lo exija de otro modo la ley aplicable, usted y Lixtara acuerdan intentar primero resolver cualquier disputa de manera informal comunicándose con nosotros a legal@lixtara.com y permitiendo un período razonable para resolver el asunto de buena fe.",
-          "Si una disputa no se resuelve de manera informal, usted y Lixtara acuerdan que cualquier disputa, reclamación o controversia que surja de o se relacione con estos Términos o los Servicios se resolverá mediante arbitraje individual vinculante administrado en el Condado de Miami-Dade, Florida, en lugar de en un tribunal, salvo que cualquiera de las partes pueda presentar una reclamación individual ante un tribunal de reclamos menores de jurisdicción competente. El arbitraje será realizado por un árbitro neutral, y el laudo podrá ejecutarse en cualquier tribunal de jurisdicción competente.",
-          "Renuncia a Acciones Colectivas. En la máxima medida permitida por la ley, usted y Lixtara acuerdan que cada uno podrá presentar reclamaciones contra el otro únicamente a título individual, y no como demandante o miembro de una clase en ningún supuesto procedimiento colectivo, conjunto o representativo. El árbitro no podrá consolidar las reclamaciones de más de una persona ni presidir ninguna forma de procedimiento colectivo o representativo.",
-          "Algunas jurisdicciones, y ciertas leyes, pueden limitar la exigibilidad de las disposiciones de arbitraje o de renuncia a acciones colectivas. Esta Sección se aplica únicamente en la medida permitida por la ley aplicable, y nada en esta Sección pretende renunciar a ningún derecho que no pueda renunciarse conforme a la ley. Si alguna parte de esta Sección se considera inexigible, esa parte se separará y el resto continuará aplicándose.",
+          "(a) Salvo las Reclamaciones Excluidas, usted y Lixtara LLC acuerdan que cualquier disputa que surja de estos Términos o del uso que usted haga de los Servicios, o que se relacione con ellos, se resolverá mediante arbitraje individual y vinculante administrado por la American Arbitration Association conforme a su Reglamento de Arbitraje de Consumo (Consumer Arbitration Rules). Esta Sección se rige por la Ley Federal de Arbitraje (Federal Arbitration Act).",
+          "(b) Reclamaciones Excluidas: (i) las reclamaciones individuales que sean de competencia de un tribunal de reclamos menores (small claims court); (ii) las disputas que surjan de un acuerdo de listado, un acuerdo con el comprador u otro acuerdo de correduría, que se rigen por ese acuerdo; (iii) las quejas ante el Departamento de Negocios y Regulación Profesional de Florida (DBPR), la Comisión de Bienes Raíces de Florida (FREC) o cualquier otra agencia gubernamental.",
+          "(c) Las reclamaciones solo pueden presentarse a título individual, y no como demandante o miembro de un grupo en ningún procedimiento colectivo, conjunto o representativo.",
+          `(d) Usted puede excluirse de esta Sección dentro de los treinta (30) días siguientes a la fecha en que acepte por primera vez estos Términos, enviando un correo electrónico a ${LEGAL_EMAIL} con su nombre y una declaración de que se excluye del arbitraje.`,
+          "(e) Si se determina que la renuncia a acciones colectivas no es exigible respecto de alguna reclamación, esa reclamación se tramitará ante los tribunales estatales o federales ubicados en el Condado de Miami-Dade, Florida.",
+          "(f) Estos Términos se rigen por las leyes de Florida, salvo esta Sección, que se rige por la Ley Federal de Arbitraje.",
         ],
       },
       {
@@ -428,7 +435,7 @@ export const termsDoc: LegalContent = {
         heading: "20. Disposiciones Varias",
         body: [
           "Divisibilidad. Si alguna disposición de estos Términos se considera inválida o inexigible, dicha disposición se limitará o eliminará en la medida mínima necesaria, y las disposiciones restantes permanecerán en pleno vigor y efecto.",
-          "Acuerdo Íntegro. Estos Términos, junto con la Política de Privacidad y cualquier acuerdo que usted firme a través de los Servicios, constituyen el acuerdo íntegro entre usted y Lixtara respecto de los Servicios y reemplazan cualquier acuerdo anterior sobre ese tema. Un acuerdo de publicación firmado prevalece sobre estos Términos en la medida de cualquier conflicto directo respecto de los servicios de correduría que cubre.",
+          "Acuerdo Íntegro. Estos Términos, junto con la Política de Privacidad y cualquier acuerdo que usted firme a través de los Servicios, constituyen el acuerdo íntegro entre usted y Lixtara respecto de los Servicios y reemplazan cualquier acuerdo anterior sobre ese tema. Si estos Términos entran en conflicto con un acuerdo que usted firme con Lixtara LLC, la Sección 1 explica cuál prevalece.",
           "No Renuncia. Nuestra falta de exigir el cumplimiento de cualquier disposición de estos Términos no constituye una renuncia a dicha disposición ni a nuestro derecho de exigir su cumplimiento posteriormente.",
           "Cesión. Usted no podrá ceder ni transferir estos Términos sin nuestro consentimiento previo por escrito. Nosotros podremos ceder estos Términos en relación con una fusión, adquisición, reorganización o venta de activos, o por ministerio de la ley.",
           "Fuerza Mayor. Lixtara no será responsable de ningún retraso o incumplimiento causado por hechos fuera de nuestro control razonable, incluidos casos fortuitos, desastres naturales, clima severo, guerra, terrorismo, disturbios civiles, conflictos laborales, acciones gubernamentales, fallas de servicios públicos o de internet, o fallas de proveedores de servicios de terceros.",
@@ -440,7 +447,7 @@ export const termsDoc: LegalContent = {
         body: [
           "Si tiene preguntas sobre estos Términos o los Servicios, comuníquese con nosotros:",
           `${B.legalName}, ${B.address}, Estados Unidos.`,
-          "Legal: legal@lixtara.com. Soporte: support@lixtara.com.",
+          `Legal: ${LEGAL_EMAIL}. Notificaciones formales a Lixtara LLC: ${NOTICES_EMAIL}. Soporte: ${SUPPORT_EMAIL}.`,
           `Correduría de bienes raíces licenciada en Florida. Número de licencia de correduría: ${B.brokerageLicense}. La broker a cargo: ${B.brokerName} (licencia ${B.brokerLicense}).`,
         ],
       },

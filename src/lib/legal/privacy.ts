@@ -1,11 +1,12 @@
 import type { LegalContent } from "./types";
+import { BROKERAGE, PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
 
 export const privacyDoc: LegalContent = {
   en: {
     title: "Privacy Policy",
     intro: [
       "This Privacy Policy explains how Lixtara collects, uses, shares, and protects information about you when you use our website, platform, and related services (the \"Service\"). Lixtara is a Miami, Florida-based real-estate technology platform that connects sellers who list their own homes with buyers who make offers, and supports the e-signing of real-estate agreements.",
-      "Lixtara is operated by Lixtara. By accessing or using the Service, you acknowledge that you have read and understood this Privacy Policy. If you do not agree with our practices, please do not use the Service.",
+      `Lixtara is operated by ${BROKERAGE.legalName}, a licensed Florida real estate brokerage (FL #${BROKERAGE.brokerageLicense}) located at ${BROKERAGE.address}. By accessing or using the Service, you acknowledge that you have read and understood this Privacy Policy. If you do not agree with our practices, please do not use the Service.`,
       "We are a United States-based company, and we process information in the United States. Please read this Policy together with our Terms of Service and our Cookie Policy.",
     ],
     sections: [
@@ -14,7 +15,7 @@ export const privacyDoc: LegalContent = {
         body: [
           "This Privacy Policy applies to personal information we collect through the Lixtara website, web application, and any associated features, including our seller listing tools, buyer offer tools, the \"Loui\" AI assistant, virtual staging, and the \"Living Listing\" feature.",
           "This Policy describes the categories of information we collect, how we use and disclose that information, the third-party service providers we rely on, and the choices and rights available to you. It does not apply to the practices of third parties that we do not own or control, including service providers and other companies whose own privacy policies govern their handling of your information.",
-          "Terms such as \"we,\" \"us,\" and \"our\" refer to Lixtara. \"You\" refers to any individual who uses the Service, whether as a seller, buyer, visitor, or other user.",
+          `Terms such as \"we,\" \"us,\" and \"our\" refer to ${BROKERAGE.legalName} (\"Lixtara\"). \"You\" refers to any individual who uses the Service, whether as a seller, buyer, visitor, or other user.`,
         ],
       },
       {
@@ -174,6 +175,18 @@ export const privacyDoc: LegalContent = {
           "We retain personal information for as long as necessary to provide the Service, maintain your account, complete and document real-estate transactions, comply with our legal and recordkeeping obligations, resolve disputes, and enforce our agreements.",
           "When information is no longer needed for these purposes, we take reasonable steps to delete it or to anonymize or de-identify it. Retention periods vary depending on the type of information and the purpose for which it was collected.",
         ],
+        sub: [
+          {
+            // Texto v1 (2026-10-18), PENDIENTE DE APROBACIÓN LEGAL. Registro: terms_acceptances.
+            heading: "7.1 Proof of Consent",
+            body: [
+              "When you accept a legal text on the Service (for example, the refund acknowledgment before you pay for a plan, or the consent to sign documents electronically), we record the date and time, your IP address, your browser's user agent, and the version of the text you accepted.",
+              "We use this record only to document your consent and to defend against claims, including payment disputes. We don't use it for marketing or advertising.",
+              "We keep this record for five (5) years after our relationship with you ends, and then delete it.",
+              `To ask about this record, contact us at ${PRIVACY_EMAIL}.`,
+            ],
+          },
+        ],
       },
       {
         heading: "8. Data Security",
@@ -186,20 +199,20 @@ export const privacyDoc: LegalContent = {
         heading: "9. Your Privacy Rights",
         body: [
           "Depending on where you live and subject to applicable law, you may have rights regarding your personal information, including the right to access the information we hold about you, to correct inaccurate information, to request deletion, to obtain a copy of certain information in a portable format, and to opt out of certain processing.",
-          "To exercise your rights, contact us at privacy@lixtara.com. We may need to verify your identity before fulfilling your request, including by asking you to confirm information associated with your account, in order to protect your information from unauthorized access.",
+          `To exercise your rights, contact us at ${PRIVACY_EMAIL}. We may need to verify your identity before fulfilling your request, including by asking you to confirm information associated with your account, in order to protect your information from unauthorized access.`,
         ],
         sub: [
           {
             heading: "9.1 California Residents",
             body: [
               "If you are a California resident, the California Consumer Privacy Act (CCPA), as amended by the California Privacy Rights Act (CPRA), provides you with certain rights regarding your personal information. These include the right to know what personal information we collect, use, and disclose; the right to request deletion of your personal information; the right to correct inaccurate personal information; the right to opt out of the sale or sharing of personal information; and the right not to be discriminated against for exercising your rights.",
-              "As stated above, Lixtara does not sell your personal information for money and does not currently share personal information for cross-context behavioral advertising. To exercise your California rights, contact us at privacy@lixtara.com.",
+              `As stated above, Lixtara does not sell your personal information for money and does not currently share personal information for cross-context behavioral advertising. To exercise your California rights, contact us at ${PRIVACY_EMAIL}.`,
             ],
           },
           {
             heading: "9.2 Florida Residents",
             body: [
-              "If you are a Florida resident, the Florida Digital Bill of Rights may provide you with certain rights regarding your personal information, which may include rights to access, correct, delete, and obtain a copy of your personal information, and to opt out of certain processing. To exercise these rights, contact us at privacy@lixtara.com.",
+              `If you are a Florida resident, the Florida Digital Bill of Rights may provide you with certain rights regarding your personal information, which may include rights to access, correct, delete, and obtain a copy of your personal information, and to opt out of certain processing. To exercise these rights, contact us at ${PRIVACY_EMAIL}.`,
             ],
           },
         ],
@@ -207,7 +220,7 @@ export const privacyDoc: LegalContent = {
       {
         heading: "10. Children's Privacy",
         body: [
-          "The Service is intended for adults who are at least 18 years old. It is not directed to children, and we do not knowingly collect personal information from children. If you believe that a child has provided us with personal information, please contact us at privacy@lixtara.com, and we will take appropriate steps to delete it.",
+          `The Service is intended for adults who are at least 18 years old. It is not directed to children, and we do not knowingly collect personal information from children. If you believe that a child has provided us with personal information, please contact us at ${PRIVACY_EMAIL}, and we will take appropriate steps to delete it.`,
         ],
       },
       {
@@ -239,11 +252,11 @@ export const privacyDoc: LegalContent = {
         heading: "15. Contact Us and How to Exercise Your Rights",
         body: [
           "If you have questions about this Privacy Policy or our privacy practices, or if you wish to exercise your privacy rights, please contact us:",
-          "By email for privacy matters: privacy@lixtara.com",
-          "By email for general support: support@lixtara.com",
-          "By mail: Lixtara, Miami, Florida, United States",
-          "Attention: privacy@lixtara.com",
-          "To submit a request to access, correct, delete, or otherwise exercise your rights, please email privacy@lixtara.com with details of your request. We may need to verify your identity before processing your request.",
+          `By email for privacy matters: ${PRIVACY_EMAIL}`,
+          `By email for general support: ${SUPPORT_EMAIL}`,
+          `By mail: ${BROKERAGE.legalName}, ${BROKERAGE.address}, United States`,
+          `Attention: ${PRIVACY_EMAIL}`,
+          `To submit a request to access, correct, delete, or otherwise exercise your rights, please email ${PRIVACY_EMAIL} with details of your request. We may need to verify your identity before processing your request.`,
         ],
       },
     ],
@@ -252,7 +265,7 @@ export const privacyDoc: LegalContent = {
     title: "Política de Privacidad",
     intro: [
       "Esta Política de Privacidad explica cómo Lixtara recopila, usa, comparte y protege la información sobre usted cuando utiliza nuestro sitio web, plataforma y servicios relacionados (el \"Servicio\"). Lixtara es una plataforma de tecnología inmobiliaria con sede en Miami, Florida, que conecta a vendedores que publican sus propias viviendas con compradores que presentan ofertas, y facilita la firma electrónica de acuerdos inmobiliarios.",
-      "Lixtara es operada por Lixtara. Al acceder o utilizar el Servicio, usted reconoce que ha leído y comprendido esta Política de Privacidad. Si no está de acuerdo con nuestras prácticas, por favor no utilice el Servicio.",
+      `Lixtara es operada por ${BROKERAGE.legalName}, una correduría inmobiliaria con licencia en Florida (FL #${BROKERAGE.brokerageLicense}), con domicilio en ${BROKERAGE.address}. Al acceder o utilizar el Servicio, usted reconoce que ha leído y comprendido esta Política de Privacidad. Si no está de acuerdo con nuestras prácticas, por favor no utilice el Servicio.`,
       "Somos una empresa con sede en los Estados Unidos y procesamos la información en los Estados Unidos. Le pedimos que lea esta Política junto con nuestros Términos de Servicio y nuestra Política de Cookies.",
     ],
     sections: [
@@ -261,7 +274,7 @@ export const privacyDoc: LegalContent = {
         body: [
           "Esta Política de Privacidad se aplica a la información personal que recopilamos a través del sitio web, la aplicación web y cualquier función asociada de Lixtara, incluidas nuestras herramientas de publicación para vendedores, las herramientas de ofertas para compradores, el asistente de IA \"Loui\", la preparación virtual de espacios (\"virtual staging\") y la función \"Living Listing\".",
           "Esta Política describe las categorías de información que recopilamos, cómo usamos y divulgamos dicha información, los proveedores de servicios externos en los que nos apoyamos y las opciones y derechos disponibles para usted. No se aplica a las prácticas de terceros que no poseemos ni controlamos, incluidos los proveedores de servicios y otras empresas cuyas propias políticas de privacidad rigen el tratamiento de su información.",
-          "Los términos como \"nosotros\" y \"nuestro\" se refieren a Lixtara. \"Usted\" se refiere a cualquier persona que utilice el Servicio, ya sea como vendedor, comprador, visitante u otro usuario.",
+          `Los términos como \"nosotros\" y \"nuestro\" se refieren a ${BROKERAGE.legalName} (\"Lixtara\"). \"Usted\" se refiere a cualquier persona que utilice el Servicio, ya sea como vendedor, comprador, visitante u otro usuario.`,
         ],
       },
       {
@@ -421,6 +434,17 @@ export const privacyDoc: LegalContent = {
           "Conservamos la información personal durante el tiempo que sea necesario para prestar el Servicio, mantener su cuenta, completar y documentar las transacciones inmobiliarias, cumplir con nuestras obligaciones legales y de mantenimiento de registros, resolver disputas y hacer cumplir nuestros acuerdos.",
           "Cuando la información ya no es necesaria para estos fines, tomamos medidas razonables para eliminarla o para anonimizarla o desidentificarla. Los períodos de conservación varían según el tipo de información y el fin para el cual se recopiló.",
         ],
+        sub: [
+          {
+            heading: "7.1 Prueba del Consentimiento",
+            body: [
+              "Cuando usted acepta un texto legal en el Servicio (por ejemplo, la confirmación sobre el reembolso antes de pagar un plan, o el consentimiento para firmar documentos de forma electrónica), registramos la fecha y la hora, su dirección IP, el agente de usuario de su navegador y la versión del texto que aceptó.",
+              "Usamos este registro únicamente para documentar su consentimiento y para defendernos de reclamaciones, incluidas las disputas de pagos. No lo usamos con fines de marketing ni de publicidad.",
+              "Conservamos este registro durante cinco (5) años después de que termine nuestra relación con usted y luego lo eliminamos.",
+              `Para consultar sobre este registro, comuníquese con nosotros en ${PRIVACY_EMAIL}.`,
+            ],
+          },
+        ],
       },
       {
         heading: "8. Seguridad de los Datos",
@@ -433,20 +457,20 @@ export const privacyDoc: LegalContent = {
         heading: "9. Sus Derechos de Privacidad",
         body: [
           "Según el lugar donde resida y conforme a la ley aplicable, usted puede tener derechos sobre su información personal, incluido el derecho a acceder a la información que tenemos sobre usted, a corregir información inexacta, a solicitar su eliminación, a obtener una copia de cierta información en un formato portátil y a oponerse a determinados tratamientos.",
-          "Para ejercer sus derechos, comuníquese con nosotros en privacy@lixtara.com. Es posible que necesitemos verificar su identidad antes de atender su solicitud, incluso pidiéndole que confirme información asociada con su cuenta, con el fin de proteger su información contra el acceso no autorizado.",
+          `Para ejercer sus derechos, comuníquese con nosotros en ${PRIVACY_EMAIL}. Es posible que necesitemos verificar su identidad antes de atender su solicitud, incluso pidiéndole que confirme información asociada con su cuenta, con el fin de proteger su información contra el acceso no autorizado.`,
         ],
         sub: [
           {
             heading: "9.1 Residentes de California",
             body: [
               "Si usted es residente de California, la Ley de Privacidad del Consumidor de California (CCPA), en su versión modificada por la Ley de Derechos de Privacidad de California (CPRA), le otorga ciertos derechos sobre su información personal. Estos incluyen el derecho a saber qué información personal recopilamos, usamos y divulgamos; el derecho a solicitar la eliminación de su información personal; el derecho a corregir información personal inexacta; el derecho a oponerse a la venta o la compartición de información personal; y el derecho a no ser discriminado por ejercer sus derechos.",
-              "Como se indicó anteriormente, Lixtara no vende su información personal por dinero y actualmente no comparte información personal para publicidad conductual de contexto cruzado. Para ejercer sus derechos en California, comuníquese con nosotros en privacy@lixtara.com.",
+              `Como se indicó anteriormente, Lixtara no vende su información personal por dinero y actualmente no comparte información personal para publicidad conductual de contexto cruzado. Para ejercer sus derechos en California, comuníquese con nosotros en ${PRIVACY_EMAIL}.`,
             ],
           },
           {
             heading: "9.2 Residentes de Florida",
             body: [
-              "Si usted es residente de Florida, la Carta de Derechos Digitales de Florida (Florida Digital Bill of Rights) puede otorgarle ciertos derechos sobre su información personal, que pueden incluir los derechos a acceder, corregir, eliminar y obtener una copia de su información personal, y a oponerse a determinados tratamientos. Para ejercer estos derechos, comuníquese con nosotros en privacy@lixtara.com.",
+              `Si usted es residente de Florida, la Carta de Derechos Digitales de Florida (Florida Digital Bill of Rights) puede otorgarle ciertos derechos sobre su información personal, que pueden incluir los derechos a acceder, corregir, eliminar y obtener una copia de su información personal, y a oponerse a determinados tratamientos. Para ejercer estos derechos, comuníquese con nosotros en ${PRIVACY_EMAIL}.`,
             ],
           },
         ],
@@ -454,7 +478,7 @@ export const privacyDoc: LegalContent = {
       {
         heading: "10. Privacidad de los Menores",
         body: [
-          "El Servicio está destinado a adultos que tengan al menos 18 años. No está dirigido a menores, y no recopilamos a sabiendas información personal de menores. Si cree que un menor nos ha proporcionado información personal, comuníquese con nosotros en privacy@lixtara.com, y tomaremos las medidas apropiadas para eliminarla.",
+          `El Servicio está destinado a adultos que tengan al menos 18 años. No está dirigido a menores, y no recopilamos a sabiendas información personal de menores. Si cree que un menor nos ha proporcionado información personal, comuníquese con nosotros en ${PRIVACY_EMAIL}, y tomaremos las medidas apropiadas para eliminarla.`,
         ],
       },
       {
@@ -486,11 +510,11 @@ export const privacyDoc: LegalContent = {
         heading: "15. Contáctenos y Cómo Ejercer sus Derechos",
         body: [
           "Si tiene preguntas sobre esta Política de Privacidad o sobre nuestras prácticas de privacidad, o si desea ejercer sus derechos de privacidad, comuníquese con nosotros:",
-          "Por correo electrónico para asuntos de privacidad: privacy@lixtara.com",
-          "Por correo electrónico para soporte general: support@lixtara.com",
-          "Por correo postal: Lixtara, Miami, Florida, United States",
-          "Atención: privacy@lixtara.com",
-          "Para presentar una solicitud de acceso, corrección, eliminación o de ejercicio de sus derechos, envíe un correo electrónico a privacy@lixtara.com con los detalles de su solicitud. Es posible que necesitemos verificar su identidad antes de procesar su solicitud.",
+          `Por correo electrónico para asuntos de privacidad: ${PRIVACY_EMAIL}`,
+          `Por correo electrónico para soporte general: ${SUPPORT_EMAIL}`,
+          `Por correo postal: ${BROKERAGE.legalName}, ${BROKERAGE.address}, Estados Unidos`,
+          `Atención: ${PRIVACY_EMAIL}`,
+          `Para presentar una solicitud de acceso, corrección, eliminación o de ejercicio de sus derechos, envíe un correo electrónico a ${PRIVACY_EMAIL} con los detalles de su solicitud. Es posible que necesitemos verificar su identidad antes de procesar su solicitud.`,
         ],
       },
     ],

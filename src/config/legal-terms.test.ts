@@ -15,9 +15,9 @@ import {
 // sube su `version` y actualiza aquí el hash: así ninguna definición cambia sin versión nueva.
 const PINNED: Record<LegalTermKey, { version: string; sha256: string }> = {
   lixtaraCharges: { version: "1", sha256: "ee4f31c33eb9fe35a00e93dfe6dd48516839216a6de59499469df9ac06879c51" },
-  buyerAgentComp: { version: "2", sha256: "bf301e9f2024e3dbe3281548f0aaf06092d8c9dd5a26e18338945792b2dcf085" },
+  buyerAgentComp: { version: "3", sha256: "1c5daa79ac688d6a5bcc7075a94f97fbff819d62bcb31e2159d6bb7c29a1e724" },
   publicationTimeline: { version: "1", sha256: "64480052320a494b9837bf751f9c6fb2892675c03c07fe5b14607da58ddcbee2" },
-  refundPolicy: { version: "1", sha256: "6868f60c739ff48259150e11fb106a83f0aa89b56e7bd6198ae1f55d569a72d2" },
+  refundPolicy: { version: "2", sha256: "aa07c78b3a9b41446fd457c3d6d9037f34ccc0f150204cdb92744973863378b2" },
   legalServices: { version: "1", sha256: "3a64942c4dd2db6499e71e2c1de8f95445c3ce89395266a621f5be81df9b5d4e" },
   propertyAccess: { version: "1", sha256: "9f0988ee95d2164da9103bdc4d0d0e70e5c13020a18f7fa92bd03034850cb549" },
   servicesNotProvided: { version: "1", sha256: "b9ae51f78419a7e306e568d33a2ae02e11bf08f37b9b9244ca02688be5a0639e" },

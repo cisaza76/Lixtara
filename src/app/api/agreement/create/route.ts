@@ -24,10 +24,15 @@ import { brokerSigner } from "@/config/brokerage";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import { t } from "@/lib/i18n";
+import { CONSENTS } from "@/lib/legal/consents";
+import { recordAcceptance } from "@/lib/legal/consents.server";
 
 interface Body {
   property_id?: string;
   lang?: string;
+  /** Aviso y casilla E-SIGN del paso 7 (src/lib/legal/consents.ts), en su versión vigente. */
+  accept_esign?: unknown;
+  esign_version?: unknown;
 }
 
 export const maxDuration = 60;
@@ -63,6 +68,13 @@ export async function POST(req: Request) {
   const lang = body.lang === "es" ? "es" : "en";
   if (!propertyId) {
     return NextResponse.json({ error: "property_id_required" }, { status: 400 });
+  }
+  // Consentimiento E-SIGN antes de abrir DocuSign: obligatorio y en la versión vigente.
+  if (body.accept_esign !== true) {
+    return NextResponse.json({ error: "esign_consent_required" }, { status: 400 });
+  }
+  if (body.esign_version !== CONSENTS.esign.version) {
+    return NextResponse.json({ error: "esign_consent_outdated" }, { status: 409 });
   }
 
   const { data: property } = await supabase
@@ -135,6 +147,20 @@ export async function POST(req: Request) {
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
     user.email;
   const signerEmail = user.email;
+
+  // Prueba del consentimiento E-SIGN (IP, user agent, versión, hash del texto). Sin ella no
+  // se abre DocuSign.
+  const esignRecorded = await recordAcceptance({
+    document: "esign",
+    lang,
+    context: "step7_esign",
+    userId: user.id,
+    propertyId,
+    headers: req.headers,
+  });
+  if (!esignRecorded) {
+    return NextResponse.json({ error: "consent_record_failed" }, { status: 503 });
+  }
 
   const origin = new URL(req.url).origin;
   const returnUrl = `${origin}/${lang}/listing/new?step=7&id=${propertyId}&signed=1`;

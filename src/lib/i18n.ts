@@ -770,7 +770,6 @@ export const dictionaries = {
         submit: "Create account",
         haveAccount: "Already have an account?",
         signInLink: "Sign in",
-        terms: "By creating an account you agree to our terms and privacy policy.",
       },
       verify: {
         eyebrow: "Check your email",
@@ -814,6 +813,7 @@ export const dictionaries = {
         emailNotConfirmed: "Please confirm your email before signing in.",
         passwordTooShort: "Password must be at least 8 characters.",
         captchaFailed: "We couldn't verify you're human. Complete the security check and try again.",
+        termsRequired: "To create your account, check the box to agree to the Terms of Service and Privacy Policy.",
         leakedPassword: "This password appeared in a data breach. Choose a different one.",
         passwordRejected: "This password doesn't meet the security requirements. Choose a different one.",
         unexpected: "Something went wrong. Please try again.",
@@ -2717,7 +2717,6 @@ export const dictionaries = {
         submit: "Crear cuenta",
         haveAccount: "¿Ya tienes cuenta?",
         signInLink: "Iniciar sesión",
-        terms: "Al crear una cuenta aceptas nuestros términos y política de privacidad.",
       },
       verify: {
         eyebrow: "Revisa tu correo",
@@ -2761,6 +2760,7 @@ export const dictionaries = {
         emailNotConfirmed: "Por favor confirma tu correo antes de iniciar sesión.",
         passwordTooShort: "La contraseña debe tener al menos 8 caracteres.",
         captchaFailed: "No pudimos verificar que eres una persona. Completa la verificación de seguridad e intenta de nuevo.",
+        termsRequired: "Para crear tu cuenta, marca la casilla para aceptar los Términos de servicio y la Política de privacidad.",
         leakedPassword: "Esta contraseña apareció en una filtración de datos; elige otra.",
         passwordRejected: "Esta contraseña no cumple los requisitos de seguridad; elige otra.",
         unexpected: "Algo salió mal. Por favor intenta de nuevo.",

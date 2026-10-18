@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import Link from "next/link";
 import { isLocale, t, type Locale } from "@/lib/i18n";
@@ -107,6 +107,8 @@ import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
+import { CONSENTS, consentCheckbox, consentNotice } from "@/lib/legal/consents";
+import { recordAcceptance, termsAcceptedIn } from "@/lib/legal/consents.server";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
 
@@ -1451,6 +1453,8 @@ export default async function ListingNewPage({
     const password = String(formData.get("password") ?? "");
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
     const back = `/${lang}/listing/new?step=7&id=${id}`;
+    // Aceptación expresa de los Términos y la Privacidad: sin la casilla no se crea la cuenta.
+    if (!termsAcceptedIn(formData)) redirect(`${back}&aerror=terms_required`);
     if (!firstName || !lastName) redirect(`${back}&aerror=name`);
     if (password.length < 8) redirect(`${back}&aerror=password`);
 
@@ -1459,6 +1463,18 @@ export default async function ListingNewPage({
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
+
+    // La prueba se guarda ANTES de convertir la sesión en una cuenta: si no queda registrada,
+    // no se crea la cuenta (falla cerrado).
+    const termsRecorded = await recordAcceptance({
+      document: "terms",
+      lang: lang === "es" ? "es" : "en",
+      context: "step7_account",
+      userId: user.id,
+      propertyId: id,
+      headers: await headers(),
+    });
+    if (!termsRecorded) redirect(`${back}&aerror=failed`);
 
     // Email already confirmed with the step-1 code: no second code, just set
     // the name and password on the same account.
@@ -1630,6 +1646,12 @@ export default async function ListingNewPage({
     redirect(`${back}&verified=1&ev=email_verified_account`);
   }
 
+  // Paso 7: aviso y casilla E-SIGN antes de abrir DocuSign (textos versionados, consents.ts).
+  const esignProps = {
+    notice: consentNotice("esign", lang),
+    checkbox: consentCheckbox("esign", lang).before,
+    version: CONSENTS.esign.version,
+  };
   // Paso 5: misma regla que nextFromStep5 (src/lib/listing-photos.ts). El extra de
   // fotografía pagado cuenta como en Pro.
   const photographyPaid =
@@ -3204,6 +3226,7 @@ export default async function ListingNewPage({
               draftId={draftId}
               pendingEmail={pendingEmail}
               knownEmail={accountPending ? (sessionUser?.email ?? null) : null}
+              termsConsent={{ parts: consentCheckbox("terms", lang), version: CONSENTS.terms.version }}
               resentAt={
                 typeof sp.resent === "string" ? Number.parseInt(sp.resent, 10) : null
               }
@@ -3240,6 +3263,7 @@ export default async function ListingNewPage({
                 errPassword: copy.step7.gateErrPassword,
                 errExists: copy.step7.gateErrExists,
                 errFailed: copy.step7.gateErrFailed,
+                errTerms: t(lang).auth.errors.termsRequired,
                 errLeaked: t(lang).auth.errors.leakedPassword,
                 errRejected: t(lang).auth.errors.passwordRejected,
                 errCodeFormat: copy.step7.gateErrCodeFormat,
@@ -3289,6 +3313,7 @@ export default async function ListingNewPage({
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
                     }}
+                    esign={esignProps}
                   />
                 </div>
               );
@@ -3319,6 +3344,7 @@ export default async function ListingNewPage({
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
                     }}
+                    esign={esignProps}
                   />
                 </div>
               );
@@ -3334,6 +3360,7 @@ export default async function ListingNewPage({
                   redirecting: copy.step7.redirecting,
                   failed: copy.step7.failed,
                 }}
+                esign={esignProps}
               />
             );
             })()
@@ -3491,6 +3518,15 @@ export default async function ListingNewPage({
                     failed: copy.step8.failed,
                     confirming: copy.step8.confirmingExisting,
                   }}
+                  // Casilla del paso 8 con el precio y la comisión del plan (consents.ts).
+                  refundAck={
+                    isPlanTier(draft?.pricing_tier)
+                      ? {
+                          parts: consentCheckbox("terms_refund", lang, draft.pricing_tier),
+                          version: CONSENTS.terms_refund.version,
+                        }
+                      : null
+                  }
                 />
 
                 <Link

@@ -40,6 +40,22 @@ export const DBPR_BROKER_LICENSE_URL =
 export const CONTACT_EMAIL = "camilo@lixtara.com";
 
 /**
+ * Buzones de los textos legales (decisión del owner, 2026-10-18). Ningún texto legal escribe
+ * un correo a mano: los importa de aquí (src/lib/legal/emails.test.ts lo exige).
+ *   LEGAL_EMAIL   — reclamos, arbitraje (opt-out de 30 días), notificaciones legales
+ *   PRIVACY_EMAIL — derechos de privacidad, cookies, prueba de consentimiento
+ *   NOTICES_EMAIL — avisos formales a Lixtara LLC (Términos, avisos legales)
+ *   DMCA_EMAIL    — agente designado de derechos de autor (DMCA)
+ *   SUPPORT_EMAIL — soporte de la cuenta, copia en papel y retiro del consentimiento E-SIGN
+ * CONTACT_EMAIL (arriba) sigue para bajas del correo frío y contacto general.
+ */
+export const LEGAL_EMAIL = "legal@lixtara.com";
+export const PRIVACY_EMAIL = "privacy@lixtara.com";
+export const NOTICES_EMAIL = "notices@lixtara.com";
+export const DMCA_EMAIL = "dmca@lixtara.com";
+export const SUPPORT_EMAIL = "support@lixtara.com";
+
+/**
  * Años de experiencia en bienes raíces en Florida de Anamaria Velasquez (dato del owner,
  * 2026-10-17). Se atribuyen a ELLA; su equipo se menciona aparte, sin sumar años (decisión del
  * owner, 2026-10-18): nunca "a team with 20+ years". Es experiencia, no antigüedad de la

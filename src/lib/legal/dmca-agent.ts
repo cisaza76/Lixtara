@@ -14,6 +14,8 @@
 // Los valores de abajo deben coincidir EXACTAMENTE con lo presentado ante la
 // Copyright Office. Si divergen, el safe harbor queda defectuoso.
 
+import { DMCA_EMAIL } from "@/config/brokerage";
+
 export interface DmcaAddress {
   line1: string;
   city: string;
@@ -74,13 +76,15 @@ export const DMCA_REGISTRATION: DmcaRegistration = {
   serviceProvider: {
     legalName: "LIXTARA LLC",
     address: REGISTERED_ADDRESS,
+    // Contacto administrativo TAL COMO quedó en el registro de la Copyright Office (no se
+    // publica). Es un dato del registro, no un buzón de los textos: no sale de brokerage.ts.
     adminContact: { phone: "305-522-3454", email: "camilo@lixtara.com" },
   },
   designatedAgent: {
     name: "Copyright Agent",
     organization: "LIXTARA LLC",
     address: REGISTERED_ADDRESS,
-    publicContact: { phone: "786-210-3562", email: "dmca@lixtara.com" },
+    publicContact: { phone: "786-210-3562", email: DMCA_EMAIL },
   },
 };
 

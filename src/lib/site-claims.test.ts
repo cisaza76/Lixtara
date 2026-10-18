@@ -116,14 +116,29 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
   it("Términos §4.1: la compensación al agente del comprador dice lo mismo que la FAQ", () => {
     const sub = termsDoc[lang].sections.flatMap((s) => s.sub ?? []).find((s) => s.heading.startsWith("4.1"));
     const comp = buyerAgentComp.text[lang];
-    expect(sub?.body).toEqual([comp.summary]);
-    // Opcional (0%), aparte de la comisión de Lixtara, hasta 3% por política de Lixtara, fuera del MLS.
-    expect(comp.summary).toContain(comp.cap);
-    expect(comp.cap).toContain(`${BUYER_COMP_MAX_PCT}%`);
+    expect(sub?.body).toEqual([comp.termsSummary]);
+    // Texto v1 del owner (2026-10-18): Lixtara comunica ofertas de hasta 3% del precio de compra;
+    // un monto mayor, directo entre el vendedor y el agente del comprador; nunca en el MLS.
+    expect(comp.termsSummary).toContain(comp.policyTerms);
+    expect(comp.summary).toContain(comp.policy);
+    expect(termsFaq(lang).mustOffer.a).toContain(comp.policy);
+    if (lang === "en") {
+      expect(comp.policy).toBe(
+        `Lixtara will communicate and document offers of compensation to a buyer's broker of up to ${BUYER_COMP_MAX_PCT}% of the purchase price, as directed by the seller. The seller may agree to pay a higher amount directly with the buyer's broker; Lixtara will not prevent or discourage it. Compensation is negotiable, not set by law, and never published on the MLS.`,
+      );
+      expect(comp.policyTerms).toBe(comp.policy);
+    } else {
+      expect(comp.policy).toMatch(/según lo que tú indiques\. Puedes acordar/);
+      expect(comp.policyTerms).toMatch(/según lo que indique el vendedor\. El vendedor puede acordar/);
+      expect(comp.policyTerms).not.toMatch(/\b(tú|tu|puedes)\b/);
+    }
+    for (const t of [comp.policy, comp.policyTerms]) {
+      expect(t).toContain(`${BUYER_COMP_MAX_PCT}%`);
+      expect(t).toMatch(lang === "en" ? /never published on the MLS/ : /nunca se publica en el MLS/);
+      expect(t).toMatch(lang === "en" ? /will not prevent or discourage it/ : /no lo impedirá ni lo desalentará/);
+    }
     expect(comp.summary).toMatch(lang === "en" ? /0% is allowed/ : /puedes ofrecer 0%/);
     expect(comp.summary).toMatch(lang === "en" ? /separate from the Lixtara commission/ : /aparte de la comisión de Lixtara/);
-    expect(comp.summary).toMatch(lang === "en" ? /published on the MLS/ : /no se publica en el MLS/);
-    expect(termsFaq(lang).mustOffer.a).toContain(comp.cap);
     const all = JSON.stringify(termsDoc[lang]);
     expect(all).not.toMatch(/set at 3%|se fija en 3%|2% to 3%|2% al 3%|2% and 3%|2% y 3%|cooperating commission|comisión cooperante/i);
   });

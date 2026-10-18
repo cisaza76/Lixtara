@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { LegalDocument } from "@/components/legal-document";
 import { disclaimersDoc } from "@/lib/legal/disclaimers";
+import { DISCLAIMERS_LAST_UPDATED } from "@/lib/legal/types";
 
 // El título de la pestaña sale del propio documento, en el idioma de la página.
 export async function generateMetadata({
@@ -23,6 +24,6 @@ export default async function DisclaimersPage({
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   return (
-    <LegalDocument lang={lang as Locale} doc={disclaimersDoc[lang as Locale]} />
+    <LegalDocument lang={lang as Locale} doc={disclaimersDoc[lang as Locale]} updatedOn={DISCLAIMERS_LAST_UPDATED} />
   );
 }
