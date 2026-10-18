@@ -3095,7 +3095,11 @@ export default async function ListingNewPage({
                     </>
                   ) : (
                     <p className="text-sm text-ink/55 italic">
-                      {copy.step6.emptySection}
+                      {/* Pro y Concierge (y el extra de fotografía pagado): las fotos propias son
+                          opcionales, no un paso sin completar. */}
+                      {ownPhotosRequired(draft.pricing_tier, photographyPaid)
+                        ? copy.step6.emptySection
+                        : copy.step6.photosOptional}
                     </p>
                   )}
                 </div>
@@ -3264,6 +3268,7 @@ export default async function ListingNewPage({
                 errExists: copy.step7.gateErrExists,
                 errFailed: copy.step7.gateErrFailed,
                 errTerms: t(lang).auth.errors.termsRequired,
+                otherAccountLabel: copy.step7.gateOtherAccount,
                 errLeaked: t(lang).auth.errors.leakedPassword,
                 errRejected: t(lang).auth.errors.passwordRejected,
                 errCodeFormat: copy.step7.gateErrCodeFormat,
@@ -3312,6 +3317,7 @@ export default async function ListingNewPage({
                       startButton: copy.step7.restartButton,
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
+                      consentRequired: copy.step7.consentRequired,
                     }}
                     esign={esignProps}
                   />
@@ -3343,6 +3349,7 @@ export default async function ListingNewPage({
                       startButton: copy.step7.reopenButton,
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
+                      consentRequired: copy.step7.consentRequired,
                     }}
                     esign={esignProps}
                   />
@@ -3359,6 +3366,7 @@ export default async function ListingNewPage({
                   startButton: copy.step7.startButton,
                   redirecting: copy.step7.redirecting,
                   failed: copy.step7.failed,
+                  consentRequired: copy.step7.consentRequired,
                 }}
                 esign={esignProps}
               />
@@ -3517,6 +3525,7 @@ export default async function ListingNewPage({
                     redirecting: copy.step8.redirecting,
                     failed: copy.step8.failed,
                     confirming: copy.step8.confirmingExisting,
+                    consentRequired: copy.step8.consentRequired,
                   }}
                   // Casilla del paso 8 con el precio y la comisión del plan (consents.ts).
                   refundAck={

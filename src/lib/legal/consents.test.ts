@@ -102,10 +102,13 @@ describe("aceptación de Términos y Privacidad al crear la cuenta (terms)", () 
     expect(read("src/components/account-gate.tsx")).toContain("<TermsConsentCheckbox");
   });
 
-  it("la casilla es obligatoria y enlaza a /terms y /privacy", () => {
+  it("la casilla es obligatoria (mensaje propio, no la burbuja del navegador) y enlaza a /terms y /privacy", () => {
     const box = read("src/components/terms-consent-checkbox.tsx");
     expect(box).toContain('name="accept_terms"');
-    expect(box).toMatch(/\brequired\b/);
+    // Sin `required` nativo: el envío se detiene y se muestra requiredMessage en el idioma de la página.
+    expect(box).not.toMatch(/^\s*required\s*$/m);
+    expect(box).toContain("e.preventDefault()");
+    expect(box).toContain("{requiredMessage}");
     expect(box).toContain("LEGAL_DOCS.terms.path");
     expect(box).toContain("LEGAL_DOCS.privacy.path");
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { trackThen, type PlanTier } from "@/lib/analytics";
 import type { ConsentParts } from "@/lib/legal/consents";
 
@@ -16,6 +16,8 @@ interface CheckoutButtonProps {
     failed: string;
     /** 409 payment_confirming: a previous checkout for this listing is paid or completing. */
     confirming: string;
+    /** Si se pulsa sin marcar la casilla (idioma de la página, no la burbuja del navegador). */
+    consentRequired: string;
   };
   /**
    * Casilla obligatoria del paso 8 (texto versionado de src/lib/legal/consents.ts, con el precio
@@ -30,12 +32,19 @@ interface CheckoutButtonProps {
 
 export function CheckoutButton({ propertyId, lang, planTier, value, labels, refundAck }: CheckoutButtonProps) {
   const [accepted, setAccepted] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const box = useRef<HTMLInputElement>(null);
 
   async function handleClick() {
-    if (!accepted || !refundAck) return;
+    if (!refundAck) return;
+    if (!accepted) {
+      setMissing(true);
+      box.current?.focus();
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -82,10 +91,16 @@ export function CheckoutButton({ propertyId, lang, planTier, value, labels, refu
       {refundAck && (
         <label className="flex items-start gap-3 text-sm text-ink/80 leading-relaxed cursor-pointer max-w-xl">
           <input
+            ref={box}
             type="checkbox"
             name="accept_refund_terms"
             checked={accepted}
-            onChange={(e) => setAccepted(e.currentTarget.checked)}
+            aria-invalid={missing || undefined}
+            aria-describedby={missing ? "accept-refund-error" : undefined}
+            onChange={(e) => {
+              setAccepted(e.currentTarget.checked);
+              if (e.currentTarget.checked) setMissing(false);
+            }}
             disabled={submitting || confirming}
             className="mt-1 accent-gold w-4 h-4 shrink-0"
           />
@@ -96,10 +111,15 @@ export function CheckoutButton({ propertyId, lang, planTier, value, labels, refu
           </span>
         </label>
       )}
+      {missing && (
+        <p id="accept-refund-error" role="alert" className="text-xs text-red-700 leading-relaxed max-w-xl">
+          {labels.consentRequired}
+        </p>
+      )}
       <button
         type="button"
         onClick={handleClick}
-        disabled={!refundAck || !accepted || submitting || confirming}
+        disabled={!refundAck || submitting || confirming}
         className="self-start inline-flex items-center justify-center px-8 py-4 bg-ink text-ivory text-[11px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {submitting ? labels.redirecting : labels.payButton}

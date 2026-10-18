@@ -25,6 +25,8 @@ export interface Workstream {
 export interface Metric {
   label: string;
   value: string;
+  /** Texto en vez de número (p. ej. "Aún no está en el MLS"): se muestra más chico. */
+  textValue?: boolean;
 }
 
 export interface NextStep {
@@ -255,7 +257,13 @@ export function SellerListingCard({
             <div className="mt-2 grid grid-cols-3 gap-2">
               {metrics.map((m) => (
                 <div key={m.label} className="flex flex-col gap-0.5">
-                  <span className="font-display text-xl leading-none text-ink">
+                  <span
+                    className={
+                      m.textValue
+                        ? "text-xs leading-snug text-ink/70"
+                        : "font-display text-xl leading-none text-ink"
+                    }
+                  >
                     {m.value}
                   </span>
                   <span className="text-[9px] uppercase tracking-[0.16em] text-ink/50">

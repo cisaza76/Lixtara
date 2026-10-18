@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isFirstSession } from "@/lib/auth/first-session";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t, type Locale } from "@/lib/i18n";
@@ -29,6 +30,7 @@ interface ListingRow {
   list_price: number;
   pricing_tier: string | null;
   mls_status: string;
+  mls_published_at: string | null;
   created_at: string;
 }
 
@@ -131,6 +133,7 @@ export default async function DashboardPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) notFound();
+  const firstSession = isFirstSession(user);
   // Staff have no seller dashboard — the admin panel is their home.
   if (await isStaff(supabase)) redirect(`/${lang}/admin`);
 
@@ -138,7 +141,7 @@ export default async function DashboardPage({
   const { data: listingRows } = await supabase
     .from("properties")
     .select(
-      "id,address_street,address_city,address_state,address_zip,list_price,pricing_tier,mls_status,created_at",
+      "id,address_street,address_city,address_state,address_zip,list_price,pricing_tier,mls_status,mls_published_at,created_at",
     )
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false });
@@ -347,8 +350,15 @@ export default async function DashboardPage({
           </p>
           <div className="flex items-end justify-between gap-6 flex-wrap">
             <h1 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-3xl">
-              {copy.titleBefore}
-              <em className="italic text-gold">{copy.titleAccent}</em>
+              {/* Primer ingreso: "Bienvenido"; después, "Bienvenido de vuelta". */}
+              {firstSession ? (
+                <em className="italic text-gold">{copy.titleFirst}</em>
+              ) : (
+                <>
+                  {copy.titleBefore}
+                  <em className="italic text-gold">{copy.titleAccent}</em>
+                </>
+              )}
               {copy.titleAfter}
             </h1>
             {listings.length > 0 && (
@@ -528,10 +538,13 @@ export default async function DashboardPage({
               ];
 
               // Real, derived performance metrics (no fabricated analytics).
-              const daysListed = daysSince(l.created_at);
+              // Días en el MLS: desde la fecha que fija la broker al publicar (mls_published_at),
+              // nunca desde que se creó el borrador.
               const aiAssets = stagedCount + (videoStatus === "ready" ? 1 : 0);
               const metrics = [
-                { label: cc.metricDays, value: String(daysListed) },
+                l.mls_published_at
+                  ? { label: cc.metricDays, value: String(daysSince(l.mls_published_at)) }
+                  : { label: cc.metricDays, value: cc.metricNotOnMls, textValue: true },
                 { label: cc.metricOffers, value: String(offersCount) },
                 { label: cc.metricAssets, value: String(aiAssets) },
               ];
