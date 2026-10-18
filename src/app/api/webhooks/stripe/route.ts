@@ -37,29 +37,20 @@ async function fulfillCheckout(
   supabase: ServiceClient,
   session: Stripe.Checkout.Session,
 ): Promise<void> {
-  // Consultation purchase → grant prepaid hour tokens (90-day validity is the
-  // column default).
+  // Consultation purchase → grant prepaid Realtor hour tokens (90-day validity is the
+  // column default). Solo horas de Realtor: Lixtara no vende ni acredita horas de abogado
+  // (src/lib/consultations.ts); cualquier otra hora en la metadata se ignora.
   if (session.metadata?.kind === "consultation") {
     const buyerId = session.metadata?.user_id ?? null;
     const realtorHours = Number(session.metadata?.realtor_hours ?? 0);
-    // LEGADO: desde 2026-10-16 Lixtara no vende horas de abogado y ninguna sesión nueva lleva
-    // attorney_hours. Solo una sesión abierta antes de ese despliegue (vencen en 24 h) podría
-    // traerlo: la persona ya pagó, así que se registra igual (ver "Requiere decisión humana").
-    const attorneyHours = Number(session.metadata?.attorney_hours ?? 0);
-    if (buyerId) {
-      const rows: Array<{
-        user_id: string;
-        service_type: string;
-        hours_total: number;
-      }> = [];
-      if (realtorHours > 0)
-        rows.push({ user_id: buyerId, service_type: "realtor", hours_total: realtorHours });
-      if (attorneyHours > 0)
-        rows.push({ user_id: buyerId, service_type: "attorney", hours_total: attorneyHours });
-      if (rows.length > 0) {
-        const { error } = await supabase.from("consultation_tokens").insert(rows);
-        if (error) console.error("consultation token grant failed", error.message);
-      }
+    if (buyerId && realtorHours > 0) {
+      const row: { user_id: string; service_type: "realtor"; hours_total: number } = {
+        user_id: buyerId,
+        service_type: "realtor",
+        hours_total: realtorHours,
+      };
+      const { error } = await supabase.from("consultation_tokens").insert([row]);
+      if (error) console.error("consultation token grant failed", error.message);
     }
     return;
   }

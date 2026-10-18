@@ -70,17 +70,52 @@ export interface MiamiDadeLookupResult {
   error?: string;
 }
 
-// Map county DOR use codes to our property_type enum.
-// 0001 single family, 0003 multi 2-9, 0004 condo, 0005 coop, 0008 multi 10+,
-// 0081 townhouse pud. Others fall through to null.
-export function mapDorToType(dor: string | null | undefined): string | null {
-  if (!dor) return null;
-  const code = String(dor).trim();
-  if (code.startsWith("0001")) return "single_family";
-  if (code.startsWith("0004") || code.startsWith("0005")) return "condo";
-  if (code.startsWith("0081")) return "townhouse";
-  if (code.startsWith("0003") || code.startsWith("0008")) return "multi_family";
-  return null;
+// Código de uso del condado → property_type. El DORCode de Miami-Dade tiene 4 dígitos: los dos
+// primeros son la clase estatal del DOR y los dos últimos el subcódigo del condado
+// (verificado contra GetPropertySearchByFolio, 2026-10-17):
+//   0101 SINGLE FAMILY : 1 UNIT · 0105 CLUSTER HOME · 0407 CONDOMINIUM - RESIDENTIAL ·
+//   0410 TOWNHOUSE · 0508 COOPERATIVE · 0802 MULTIFAMILY 2-9 UNITS · 0303 MULTIFAMILY 10+ ·
+//   0081 VACANT LAND · 0420 DOCK.
+// La descripción manda cuando nombra el tipo (0410 es clase 04 pero es TOWNHOUSE).
+export type CountyPropertyType = "single_family" | "condo" | "townhouse" | "multi_family";
+
+export function mapDorToType(
+  dor: string | null | undefined,
+  description?: string | null,
+): CountyPropertyType | null {
+  const desc = String(description ?? "").toUpperCase();
+  if (/\bTOWNHOUSE\b/.test(desc)) return "townhouse";
+  if (/\bDOCK\b|\bVACANT\b/.test(desc)) return null;
+  if (/\bCONDOMINIUM\b|\bCOOPERATIVE\b/.test(desc)) return "condo";
+  if (/\bMULTIFAMILY\b|\bMULTI-FAMILY\b|\bDUPLEX\b/.test(desc)) return "multi_family";
+  if (/\bSINGLE FAMILY\b/.test(desc)) return "single_family";
+
+  const code = String(dor ?? "").trim().match(/^(\d{2})\d{2}\b/)?.[1];
+  switch (code) {
+    case "01":
+      return "single_family";
+    case "04":
+    case "05":
+      return "condo";
+    case "03":
+    case "08":
+      return "multi_family";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Tipo de propiedad para el autollenado: el código de uso del condado y, si no es claro
+ * (o no llegó), Condo cuando la dirección tiene unidad (decisión del owner 2026-10-17:
+ * 500 Brickell Ave #3001 salía "Casa unifamiliar").
+ */
+export function propertyTypeFromCounty(
+  dor: string | null | undefined,
+  description: string | null | undefined,
+  hasUnit: boolean,
+): CountyPropertyType | null {
+  return mapDorToType(dor, description) ?? (hasUnit ? "condo" : null);
 }
 
 /**
@@ -195,7 +230,7 @@ async function searchByAddress(
   return pickCountyCandidate(infos, street, unit);
 }
 
-async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
+async function fetchByFolio(folio: string, unit?: string | null): Promise<MiamiDadeDetails | null> {
   const url =
     `${MD_PA_BASE}?Operation=GetPropertySearchByFolio&clientAppName=PropertySearch` +
     `&folioNumber=${encodeURIComponent(folio)}`;
@@ -247,8 +282,6 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
   );
   const lot = Number(info.LotSize ?? 0);
   const year = countyYearBuilt(info.YearBuilt, buildingInfos, new Date().getFullYear());
-  const dor =
-    (info.DORDescription as string) ?? (info.DORCode as string) ?? "";
 
   // Legal description lives at the top level of the response, with "|" between
   // its lines (e.g. "19 53 42 ... | SABAL PALM COURT PB 46-66 | BLOCK 1 | ...").
@@ -273,7 +306,11 @@ async function fetchByFolio(folio: string): Promise<MiamiDadeDetails | null> {
     sqft: sqft > 100 && sqft < 50000 ? Math.round(sqft) : null,
     lot_size: lot > 0 ? lot : null,
     year_built: year,
-    property_type: mapDorToType(String(info.DORCode ?? dor)),
+    property_type: propertyTypeFromCounty(
+      info.DORCode as string | undefined,
+      info.DORDescription as string | undefined,
+      Boolean(unit?.trim()),
+    ),
     legal_description: legalDescription,
     tax_annual_amount: taxAnnualEstimate,
   };
@@ -290,7 +327,7 @@ export async function lookupMiamiDadeProperty(
     }
     const folio = await searchByAddress(street.trim(), zip, unit);
     if (!folio) return { found: false };
-    const details = await fetchByFolio(folio);
+    const details = await fetchByFolio(folio, unit);
     if (!details) return { found: false, folio };
     const filled = (Object.keys(details) as Array<keyof MiamiDadeDetails>).filter(
       (k) => details[k] !== null,

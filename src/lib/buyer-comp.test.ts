@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
   BUYER_COMP_MAX_PCT,
+  buyerCompMaxAmount,
+  offerWithinLimit,
   buyerCommissionAck,
   cassb1Tabs,
   compensationAgreementsFor,
@@ -13,6 +15,7 @@ import {
   parseOfferInput,
   suggestedOffer,
 } from "@/lib/buyer-comp";
+import { dictionaries } from "@/lib/i18n";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -34,21 +37,27 @@ describe("oferta al agente del comprador: entrada del paso 6", () => {
     expect(parseOfferInput({ choice: "7" }, 500_000)).toEqual({ ok: false, error: "choice_required" });
   });
 
-  it("porcentaje personalizado: mayor que 0 y hasta 6", () => {
+  it("porcentaje personalizado: mayor que 0 y hasta 3 (regla de Lixtara)", () => {
     const pct = (v: string) => parseOfferInput({ choice: "custom", customKind: "percent", customValue: v }, 500_000);
     expect(pct("2.75")).toEqual({ ok: true, offer: { type: "percent", pct: 2.75 } });
-    expect(pct("6")).toEqual({ ok: true, offer: { type: "percent", pct: 6 } });
+    expect(pct("3")).toEqual({ ok: true, offer: { type: "percent", pct: 3 } });
+    expect(pct("0.01")).toEqual({ ok: true, offer: { type: "percent", pct: 0.01 } });
     expect(pct("1.5%")).toEqual({ ok: true, offer: { type: "percent", pct: 1.5 } });
-    for (const bad of ["0", "6.01", "-1", "abc", "", "2,5"]) expect(pct(bad), bad).toEqual({ ok: false, error: "pct_range" });
-    expect(BUYER_COMP_MAX_PCT).toBe(6);
+    for (const bad of ["0", "-1", "abc", "", "2,5"]) expect(pct(bad), bad).toEqual({ ok: false, error: "pct_range" });
+    for (const over of ["3.01", "3.5", "6"]) expect(pct(over), over).toEqual({ ok: false, error: "pct_max" });
+    expect(BUYER_COMP_MAX_PCT).toBe(3);
   });
 
-  it("monto fijo: mayor que 0 y menor que el precio de lista", () => {
+  it("monto fijo: mayor que 0 y hasta el 3% del precio de lista", () => {
     const amt = (v: string, price = 500_000) =>
       parseOfferInput({ choice: "custom", customKind: "amount", customValue: v }, price);
+    expect(buyerCompMaxAmount(500_000)).toBe(15_000);
+    expect(buyerCompMaxAmount(333_333)).toBe(9_999.99);
     expect(amt("12000")).toEqual({ ok: true, offer: { type: "amount", amount: 12_000 } });
     expect(amt("$12,500")).toEqual({ ok: true, offer: { type: "amount", amount: 12_500 } });
-    for (const bad of ["0", "500000", "600000", "-5", "x"]) expect(amt(bad), bad).toEqual({ ok: false, error: "amount_range" });
+    expect(amt("15000")).toEqual({ ok: true, offer: { type: "amount", amount: 15_000 } });
+    for (const bad of ["0", "-5", "x"]) expect(amt(bad), bad).toEqual({ ok: false, error: "amount_range" });
+    for (const over of ["15000.01", "20000", "500000"]) expect(amt(over), over).toEqual({ ok: false, error: "amount_max" });
     // Sin precio de lista no hay tope con qué comparar: se rechaza.
     expect(amt("1000", 0)).toEqual({ ok: false, error: "amount_range" });
   });
@@ -86,6 +95,32 @@ describe("oferta guardada", () => {
     expect(formatOffer({ type: "none" })).toBe("0%");
     expect(formatOffer({ type: "percent", pct: 2.5 })).toBe("2.5%");
     expect(formatOffer({ type: "amount", amount: 12_000 })).toBe("$12,000");
+  });
+});
+
+describe("tope de Lixtara con el precio de lista actual (agreement/create)", () => {
+  it("0% siempre; % hasta 3; monto hasta el 3% del precio de hoy", () => {
+    expect(offerWithinLimit({ type: "none" }, 0)).toBe(true);
+    expect(offerWithinLimit({ type: "percent", pct: 3 }, 400_000)).toBe(true);
+    expect(offerWithinLimit({ type: "percent", pct: 4 }, 400_000)).toBe(false);
+    expect(offerWithinLimit({ type: "amount", amount: 15_000 }, 500_000)).toBe(true);
+    // Bajó el precio después del paso 6: $15,000 ya es más del 3% de $400,000.
+    expect(offerWithinLimit({ type: "amount", amount: 15_000 }, 400_000)).toBe(false);
+  });
+
+  it("la ruta lo revisa y manda de vuelta al paso 6", () => {
+    const route = read("src/app/api/agreement/create/route.ts");
+    expect(route).toContain("offerWithinLimit(buyerOffer, Number(property.list_price))");
+    expect(route).toContain('step6("buyer_comp_over_limit")');
+  });
+
+  it.each(["en", "es"] as const)("%s: los mensajes del tope hablan de Lixtara, no de leyes ni del MLS", (lang) => {
+    const c = dictionaries[lang].listingForm.step6.buyerComp;
+    const s = dictionaries[lang].savings;
+    const msgs = [c.pctRange, c.pctMax, c.amountRange, c.amountMax, c.overLimit, c.customPercentHelp, c.customAmountHelp, s.buyerCompPctMax, s.buyerCompAmountMax];
+    for (const m of msgs) expect(m).not.toMatch(/\blaw\b|\blegal\b|\bley(es)?\b|\bMLS\b|\brule|\bregla/i);
+    expect(c.pctMax).toBe(lang === "en" ? "Lixtara allows up to {max}%." : "El máximo que permite Lixtara es {max}%.");
+    expect(s.buyerCompPctMax).toBe(lang === "en" ? "Lixtara allows up to {max}%." : "El máximo que permite Lixtara es {max}%.");
   });
 });
 

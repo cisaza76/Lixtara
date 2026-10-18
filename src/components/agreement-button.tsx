@@ -25,7 +25,12 @@ export function AgreementButton({ propertyId, lang, labels }: AgreementButtonPro
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ property_id: propertyId, lang }),
       });
-      const data = (await res.json()) as { url?: string; error?: string; detail?: string };
+      const data = (await res.json()) as { url?: string; error?: string; detail?: string; redirect?: string };
+      // Falta algo del listado (p. ej. la oferta del paso 6): volver a ese paso.
+      if (!res.ok && data.redirect?.startsWith("/") && !data.redirect.startsWith("//")) {
+        window.location.href = data.redirect;
+        return;
+      }
       if (!res.ok || !data.url) {
         // `detail` is DocuSign's English text: console only.
         if (data.detail) console.error("agreement create failed", data.detail);

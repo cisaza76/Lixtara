@@ -88,6 +88,8 @@ import { LegalServicesDisclosure } from "@/components/legal-services-disclosure"
 import { BuyerCompStep } from "@/components/buyer-comp-step";
 import {
   BUYER_COMP_MAX_PCT,
+  buyerCompMaxAmount,
+  formatOffer,
   offerChoice,
   offerFromRow,
   offerToRow,
@@ -700,7 +702,8 @@ export default async function ListingNewPage({
       .insert({
         owner_id: user.id,
         ...addressUpdate,
-        property_type: "single_family",
+        // Hasta que el condado diga otra cosa (paso 3): con unidad, Condo.
+        property_type: unitFromStoredStreet(street) ? "condo" : "single_family",
         bedrooms: 0,
         bathrooms: 1,
         sqft: 0,
@@ -1687,10 +1690,15 @@ export default async function ListingNewPage({
                                             : buyerCompError(sp.error);
   function buyerCompError(code: string | undefined): string | null {
     const c = copy.step6.buyerComp;
-    const map: Record<`buyer_comp_${OfferInputError}`, string> = {
+    const fill = (s: string) =>
+      s.replace("{max}", String(BUYER_COMP_MAX_PCT)).replace("{maxAmount}", formatOffer({ type: "amount", amount: buyerCompMaxAmount(draft?.list_price) }));
+    const map: Record<`buyer_comp_${OfferInputError | "over_limit"}`, string> = {
       buyer_comp_choice_required: c.choiceRequired,
-      buyer_comp_pct_range: c.pctRange.replace("{max}", String(BUYER_COMP_MAX_PCT)),
-      buyer_comp_amount_range: c.amountRange,
+      buyer_comp_pct_range: fill(c.pctRange),
+      buyer_comp_pct_max: fill(c.pctMax),
+      buyer_comp_amount_range: fill(c.amountRange),
+      buyer_comp_amount_max: fill(c.amountMax),
+      buyer_comp_over_limit: fill(c.overLimit),
     };
     return code && Object.hasOwn(map, code) ? map[code as keyof typeof map] : null;
   }

@@ -24,6 +24,7 @@ import {
 } from "@/lib/pricing-tiers";
 import {
   BUYER_COMP_MAX_PCT,
+  buyerCompMaxAmount,
   BUYER_COMP_PRESET_PCTS,
   compareWithOffer,
   formatOffer,
@@ -41,6 +42,8 @@ interface SavingsCopy {
   buyerCompCustomPercent: string;
   buyerCompCustomAmount: string;
   buyerCompCustomLabel: string;
+  buyerCompPctMax: string;
+  buyerCompAmountMax: string;
   youSelected: string;
   upfrontHeader: string;
   closingHeader: string;
@@ -124,6 +127,16 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
     if (parsed.ok) setOffer(parsed.offer);
   };
   const buyerShown = formatOffer(offer);
+  // Tope de Lixtara (3%), dicho cuando el valor personalizado se pasa; la cifra mostrada
+  // sigue con la última oferta válida.
+  const customParsed = choice === "custom" && customValue.trim() !== ""
+    ? parseOfferInput({ choice, customKind, customValue }, price)
+    : null;
+  const customMaxMsg = customParsed && !customParsed.ok && (customParsed.error === "pct_max" || customParsed.error === "amount_max")
+    ? (customParsed.error === "amount_max" ? copy.buyerCompAmountMax : copy.buyerCompPctMax)
+        .replace("{max}", String(BUYER_COMP_MAX_PCT))
+        .replace("{maxAmount}", formatOffer({ type: "amount", amount: buyerCompMaxAmount(price) }))
+    : null;
 
   // calculator_used: once the person stops moving the controls (1.5 s), with the price
   // RANGE (never the exact value) and the kind of offer. Again only if either changes.
@@ -292,9 +305,15 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
                 placeholder={customKind === "percent" ? `0.5 – ${BUYER_COMP_MAX_PCT}` : "10,000"}
                 value={customValue}
                 onChange={(e) => choose({ customValue: e.target.value })}
+                aria-invalid={customMaxMsg ? true : undefined}
                 className="w-32 border-2 border-gold-soft bg-ivory px-3 py-2 text-sm text-ink focus:border-gold focus:outline-none"
               />
             </div>
+          )}
+          {customMaxMsg && (
+            <p role="status" className="text-xs text-red-700">
+              {customMaxMsg}
+            </p>
           )}
           <p className="text-xs text-ink/55 italic leading-relaxed">
             {copy.buyerCommissionHint}

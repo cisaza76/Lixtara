@@ -7,6 +7,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 NAME="lixtara-buyer-comp-check-$$"
 MIG=supabase/migrations/20261017150000_buyer_agent_comp_offer.sql
+MIG3=supabase/migrations/20261017200000_buyer_comp_max_3pct.sql
+RB3=scripts/sql/rollback_20261017200000_buyer_comp_max_3pct.sql
 docker run -d --rm --name "$NAME" -e POSTGRES_PASSWORD=x postgres:17-alpine >/dev/null
 trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
 until docker exec "$NAME" pg_isready -U postgres -q; do sleep 0.5; done
@@ -42,7 +44,7 @@ update public.properties set buyer_agent_commission = 2.5 where id = 'aaaaaaaa-0
 update public.properties set buyer_agent_commission = 0   where id = 'aaaaaaaa-0000-4000-8000-000000000007';
 update public.properties set buyer_agent_commission = 7   where id = 'aaaaaaaa-0000-4000-8000-000000000006';
 SQL
-  cat "$MIG"; cat "$MIG"
+  cat "$MIG"; cat "$MIG"; cat "$MIG3"; cat "$MIG3"
 } | psql_
 
 # Ejecuta SQL como un rol de la API (igual que PostgREST) y devuelve OK:<filas> o ERR:<sqlstate>.
@@ -93,8 +95,8 @@ check "vendedor: porcentaje personalizado 2.75" \
   "select public.intento('authenticated', $S, \$\$update public.properties set buyer_agent_comp_type='percent', buyer_agent_commission=2.75, buyer_agent_comp_amount=null where id = $P1\$\$)" "OK:1"
 check "rechaza 'none' con % > 0" \
   "select public.intento('authenticated', $S, \$\$update public.properties set buyer_agent_comp_type='none', buyer_agent_commission=3 where id = $P1\$\$)" "ERR:23514"
-check "rechaza % > 6" \
-  "select public.intento('authenticated', $S, \$\$update public.properties set buyer_agent_comp_type='percent', buyer_agent_commission=6.5 where id = $P1\$\$)" "ERR:23514"
+check "rechaza % > 3 (tope de Lixtara)" \
+  "select public.intento('authenticated', $S, \$\$update public.properties set buyer_agent_comp_type='percent', buyer_agent_commission=3.01 where id = $P1\$\$)" "ERR:23514"
 check "rechaza monto sin monto" \
   "select public.intento('authenticated', $S, \$\$update public.properties set buyer_agent_comp_type='amount', buyer_agent_commission=0, buyer_agent_comp_amount=null where id = $P1\$\$)" "ERR:23514"
 check "rechaza un tipo desconocido" \
@@ -158,6 +160,28 @@ check "una columna pública nueva de antes de la migración sigue legible (price
   "select public.intento('authenticated', $S, \$\$select price_comps, show_phone_on_portals from public.properties where id = $P1\$\$)" "OK:1"
 [ "$fail" = 0 ] || exit 1
 
+# Tope de 3% (20261017200000): 3 sí, 3.01 no; reversión vuelve a 6; con filas > 3 la
+# migración se detiene sin cambiar nada.
+check "acepta exactamente 3%" \
+  "select public.intento('authenticated', $O, \$\$update public.properties set buyer_agent_comp_type='percent', buyer_agent_commission=3, buyer_agent_comp_amount=null where id = $P7\$\$)" "OK:1"
+check "el monto fijo no tiene tope en la base (depende del precio; lo valida el servidor)" \
+  "select public.intento('authenticated', $O, \$\$update public.properties set buyer_agent_comp_type='amount', buyer_agent_commission=0, buyer_agent_comp_amount=50000 where id = $P7\$\$)" "OK:1"
+{ echo "set client_min_messages = warning;"; cat "$RB3"; } | psql_
+check "reversión del tope: vuelve a aceptar 4%" \
+  "select public.intento('authenticated', $O, \$\$update public.properties set buyer_agent_comp_type='percent', buyer_agent_commission=4, buyer_agent_comp_amount=null where id = $P7\$\$)" "OK:1"
+if { echo "set client_min_messages = warning;"; cat "$MIG3"; } | psql_ 2>/dev/null; then
+  echo "FAIL con una fila de 4% la migración debió detenerse"; fail=1
+else
+  echo "OK   con una fila de 4% la migración se detiene"
+fi
+check "…y no cambió el CHECK (sigue aceptando 4.5%)" \
+  "select public.intento('authenticated', $O, \$\$update public.properties set buyer_agent_commission=4.5 where id = $P7\$\$)" "OK:1"
+psql_ -c "update public.properties set buyer_agent_commission = 3 where id = $P7"
+{ echo "set client_min_messages = warning;"; cat "$MIG3"; } | psql_
+check "resuelta la fila, se aplica: rechaza 3.5%" \
+  "select public.intento('authenticated', $O, \$\$update public.properties set buyer_agent_commission=3.5 where id = $P7\$\$)" "ERR:23514"
+[ "$fail" = 0 ] || exit 1
+
 { echo "set client_min_messages = warning;"; cat scripts/sql/rollback_20261017150000_buyer_agent_comp_offer.sql; } | psql_
 check "reversión: columnas, tabla y trigger fuera; filas intactas" \
   "select (select count(*) from information_schema.columns where table_name='properties' and column_name like 'buyer_agent_comp_%') || ':' || (select count(*) from pg_tables where tablename='property_buyer_comp_history') || ':' || (select count(*) from public.properties)" "0:0:4"
@@ -165,7 +189,7 @@ check "reversión: anon vuelve a leer buyer_agent_commission y la función ya no
   "select public.intento('anon', null, \$\$select buyer_agent_commission from public.properties where id = $P6\$\$) || ':' || (select count(*) from pg_proc where proname = 'get_property_buyer_comp')" "OK:1:0"
 check "reversión: la lista del vendedor vuelve a la de #133" \
   "select count(*) from unnest(public.properties_seller_writable_columns()) c where c like 'buyer_agent_comp_%'" "0"
-{ echo "set client_min_messages = warning;"; cat "$MIG"; } | psql_
+{ echo "set client_min_messages = warning;"; cat "$MIG"; cat "$MIG3"; } | psql_
 echo "re-aplicación ok"
 check "re-aplicación: anon de nuevo sin la oferta" \
   "select public.intento('anon', null, \$\$select buyer_agent_commission from public.properties where id = $P6\$\$)" "ERR:42501"

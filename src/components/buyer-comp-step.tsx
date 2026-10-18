@@ -8,6 +8,7 @@
 import { useId, useState } from "react";
 import {
   BUYER_COMP_MAX_PCT,
+  buyerCompMaxAmount,
   BUYER_COMP_PRESET_PCTS,
   compareWithOffer,
   formatOffer,
@@ -33,6 +34,10 @@ export interface BuyerCompStepCopy {
   customAmountLabel: string;
   customPercentHelp: string;
   customAmountHelp: string;
+  pctRange: string;
+  pctMax: string;
+  amountRange: string;
+  amountMax: string;
   selected: string;
   fixedTag: string;
   costEyebrow: string;
@@ -86,6 +91,16 @@ export function BuyerCompStep({
   const parsed = choice ? parseOfferInput({ choice, customKind, customValue }, listPrice) : null;
   const offer: BuyerCompOffer | null = parsed?.ok ? parsed.offer : null;
   const notice = offer ? (offer.type === "none" ? copy.noticeNoOffer : copy.noticeOffer) : null;
+  const fill = (s: string) =>
+    s.replace("{max}", String(BUYER_COMP_MAX_PCT)).replace("{maxAmount}", formatOffer({ type: "amount", amount: buyerCompMaxAmount(listPrice) }));
+  // Mismo tope que el servidor (parseOfferInput), dicho mientras escribe.
+  const rangeError =
+    choice === "custom" && customValue.trim() !== "" && parsed && !parsed.ok
+      ? fill(
+          { pct_range: copy.pctRange, pct_max: copy.pctMax, amount_range: copy.amountRange, amount_max: copy.amountMax, choice_required: copy.pctRange }[parsed.error],
+        )
+      : null;
+  const rangeErrorId = `${id}-range`;
 
   const options: { value: string; label: string; hint?: string }[] = [
     { value: "0", label: copy.noneLabel, hint: copy.noneHint },
@@ -136,7 +151,15 @@ export function BuyerCompStep({
                   onChange={() => setChoice(o.value)}
                   className="sr-only"
                 />
-                <span className="font-display text-2xl text-ink leading-none">{o.label}</span>
+                <span
+                  className={`font-display text-ink ${
+                    o.value === "custom"
+                      ? "text-xl leading-tight break-words hyphens-auto min-w-0"
+                      : "text-2xl leading-none"
+                  }`}
+                >
+                  {o.label}
+                </span>
                 {o.hint && <span className="text-xs text-ink/60">{o.hint}</span>}
                 {suggested && <span className="text-[10px] text-gold leading-snug">★ {copy.conciergeSuggested}</span>}
                 {active && (
@@ -178,17 +201,20 @@ export function BuyerCompStep({
                 autoComplete="off"
                 value={customValue}
                 onChange={(e) => setCustomValue(e.target.value)}
-                aria-describedby={`${id}-help`}
-                aria-invalid={parsed && !parsed.ok && customValue.trim() !== "" ? true : undefined}
+                aria-describedby={[`${id}-help`, rangeError ? rangeErrorId : null].filter(Boolean).join(" ")}
+                aria-invalid={rangeError ? true : undefined}
                 className="w-40 border border-gold-soft bg-ivory px-3 py-2 text-ink focus:border-gold focus:outline-none"
               />
               {customKind === "percent" && <span className="text-ink/60">%</span>}
             </div>
             <p id={`${id}-help`} className="text-xs text-ink/55">
-              {customKind === "percent"
-                ? copy.customPercentHelp.replace("{max}", String(BUYER_COMP_MAX_PCT))
-                : copy.customAmountHelp}
+              {fill(customKind === "percent" ? copy.customPercentHelp : copy.customAmountHelp)}
             </p>
+            {rangeError && (
+              <p id={rangeErrorId} className="text-sm text-red-700">
+                {rangeError}
+              </p>
+            )}
           </div>
         )}
 

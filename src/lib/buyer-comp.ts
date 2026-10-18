@@ -26,8 +26,26 @@ export const BUYER_COMP_PRESET_PCTS = [2, 2.5, 3] as const;
 /** Punto de partida de Concierge (sugerido por la broker; el vendedor lo cambia). */
 export const CONCIERGE_SUGGESTED_PCT = 3;
 
-/** Rango del porcentaje personalizado: mayor que 0 y hasta 6. [VERIFICAR con la broker] */
-export const BUYER_COMP_MAX_PCT = 6;
+/**
+ * Tope de la compensación personalizada: más de 0 y hasta 3% (porcentaje), o un monto fijo
+ * de hasta el 3% del precio de lista. Es una regla de Lixtara, no una ley ni una regla del
+ * MLS (decisión del owner 2026-10-17). La base lo refuerza para el % (migración
+ * 20261017200000); el monto depende del precio, así que lo valida el servidor.
+ */
+export const BUYER_COMP_MAX_PCT = 3;
+
+/** Monto fijo máximo para ese precio de lista (USD, con centavos). */
+export function buyerCompMaxAmount(listPrice: number | null | undefined): number {
+  const price = Number(listPrice ?? 0);
+  return price > 0 ? Math.floor(price * BUYER_COMP_MAX_PCT) / 100 : 0;
+}
+
+/** La oferta guardada respeta el tope con el precio de lista actual (0% siempre). */
+export function offerWithinLimit(offer: BuyerCompOffer, listPrice: number | null | undefined): boolean {
+  if (offer.type === "none") return true;
+  if (offer.type === "percent") return offer.pct > 0 && offer.pct <= BUYER_COMP_MAX_PCT;
+  return offer.amount > 0 && offer.amount <= buyerCompMaxAmount(listPrice);
+}
 
 export const NO_OFFER: BuyerCompOffer = { type: "none" };
 
@@ -70,11 +88,11 @@ export function suggestedOffer(tier: string | null | undefined): BuyerCompOffer 
   return tier === "concierge" ? { type: "percent", pct: CONCIERGE_SUGGESTED_PCT } : null;
 }
 
-export type OfferInputError = "choice_required" | "pct_range" | "amount_range";
+export type OfferInputError = "choice_required" | "pct_range" | "pct_max" | "amount_range" | "amount_max";
 
 /**
  * Lee el formulario del paso 6. `choice`: "0" | "2" | "2.5" | "3" | "custom".
- * Personalizado: `custom_kind` "percent" (0 < % ≤ 6) o "amount" (0 < USD < precio de lista).
+ * Personalizado: `custom_kind` "percent" (0 < % ≤ 3) o "amount" (0 < USD ≤ 3% del precio de lista).
  */
 export function parseOfferInput(
   input: { choice?: string | null; customKind?: string | null; customValue?: string | null },
@@ -90,18 +108,18 @@ export function parseOfferInput(
   const raw = (input.customValue ?? "").trim().replace(/[$,\s%]/g, "");
   const value = /^\d+(\.\d+)?$/.test(raw) ? Number(raw) : NaN;
   if (input.customKind === "amount") {
-    const price = Number(listPrice ?? 0);
-    if (!Number.isFinite(value) || value <= 0 || !(price > 0) || value >= price) {
-      return { ok: false, error: "amount_range" };
-    }
+    const max = buyerCompMaxAmount(listPrice);
+    if (!Number.isFinite(value) || value <= 0 || !(max > 0)) return { ok: false, error: "amount_range" };
+    if (value > max) return { ok: false, error: "amount_max" };
     return { ok: true, offer: { type: "amount", amount: Math.round(value * 100) / 100 } };
   }
   if (input.customKind === "percent") {
+    // Una coma en un porcentaje no es separador de miles: "2,5" no se lee como 25%.
+    if ((input.customValue ?? "").includes(",")) return { ok: false, error: "pct_range" };
     // numeric(4,2) en la base: dos decimales.
     const pct = Math.round(value * 100) / 100;
-    if (!Number.isFinite(value) || pct <= 0 || pct > BUYER_COMP_MAX_PCT) {
-      return { ok: false, error: "pct_range" };
-    }
+    if (!Number.isFinite(value) || pct <= 0) return { ok: false, error: "pct_range" };
+    if (pct > BUYER_COMP_MAX_PCT) return { ok: false, error: "pct_max" };
     return { ok: true, offer: { type: "percent", pct } };
   }
   return { ok: false, error: "choice_required" };

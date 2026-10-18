@@ -161,6 +161,9 @@ const STEP_ERROR_FIELDS: Record<string, string> = {
   buyer_comp_choice_required: "buyer_agent_comp",
   buyer_comp_pct_range: "buyer_agent_comp",
   buyer_comp_amount_range: "buyer_agent_comp",
+  buyer_comp_pct_max: "buyer_agent_comp",
+  buyer_comp_amount_max: "buyer_agent_comp",
+  buyer_comp_over_limit: "buyer_agent_comp",
 };
 
 export function listingErrorField(code: string | null | undefined): string | null {
