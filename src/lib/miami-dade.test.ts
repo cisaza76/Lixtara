@@ -1,26 +1,68 @@
 import { describe, it, expect } from "vitest";
-import { countyYearBuilt, mapDorToType, pickCountyCandidate, unitFromStoredStreet } from "@/lib/miami-dade";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { countyYearBuilt, mapDorToType, pickCountyCandidate, propertyTypeFromCounty, unitFromStoredStreet } from "@/lib/miami-dade";
 
-describe("mapDorToType", () => {
-  it("maps county DOR use codes to our property_type enum", () => {
-    expect(mapDorToType("0001")).toBe("single_family");
-    expect(mapDorToType("0004")).toBe("condo");
-    expect(mapDorToType("0005")).toBe("condo");
-    expect(mapDorToType("0081")).toBe("townhouse");
-    expect(mapDorToType("0003")).toBe("multi_family");
-    expect(mapDorToType("0008")).toBe("multi_family");
+describe("mapDorToType: código de uso del condado (4 dígitos: clase DOR + subcódigo)", () => {
+  // Pares REALES de GetPropertySearchByFolio (2026-10-17): DORCode | DORDescription.
+  const REAL: Array<[string, string, string | null]> = [
+    ["0101", "RESIDENTIAL - SINGLE FAMILY : 1 UNIT", "single_family"],
+    ["0104", "RESIDENTIAL - SINGLE FAMILY : RESIDENTIAL - TOTAL VALUE", "single_family"],
+    ["0105", "RESIDENTIAL - SINGLE FAMILY : CLUSTER HOME", "single_family"],
+    ["0176", "RESIDENTIAL - SINGLE FAMILY : RESIDENTIAL W/ ADDITIONAL QUARTERS", "single_family"],
+    ["0407", "RESIDENTIAL - TOTAL VALUE : CONDOMINIUM - RESIDENTIAL", "condo"],
+    ["0410", "RESIDENTIAL - TOTAL VALUE : TOWNHOUSE", "townhouse"],
+    ["0508", "COOPERATIVE - RESIDENTIAL : COOPERATIVE - RESIDENTIAL", "condo"],
+    ["0802", "MULTIFAMILY 2-9 UNITS : 2 LIVING UNITS", "multi_family"],
+    ["0803", "MULTIFAMILY 2-9 UNITS : MULTIFAMILY 3 OR MORE UNITS", "multi_family"],
+    ["0303", "MULTIFAMILY 10 UNITS PLUS : MULTIFAMILY 3 OR MORE UNITS", "multi_family"],
+    ["0081", "VACANT RESIDENTIAL : VACANT LAND", null],
+    ["0420", "RESIDENTIAL - TOTAL VALUE : DOCK - TOTAL VALUE", null],
+  ];
+  it.each(REAL)("%s %s → %s", (code, desc, want) => {
+    expect(mapDorToType(code, desc)).toBe(want);
   });
 
-  it("matches on the code prefix (full DOR strings carry a description suffix)", () => {
-    expect(mapDorToType("0001 RESIDENTIAL - SINGLE FAMILY")).toBe("single_family");
-    expect(mapDorToType("  0004 CONDOMINIUM")).toBe("condo");
+  it("sin descripción, decide la clase (los dos primeros dígitos)", () => {
+    expect(mapDorToType("0101")).toBe("single_family");
+    expect(mapDorToType("0407")).toBe("condo");
+    expect(mapDorToType("0508")).toBe("condo");
+    expect(mapDorToType("0802")).toBe("multi_family");
+    expect(mapDorToType("0303")).toBe("multi_family");
   });
 
-  it("returns null for unknown codes and empty/nullish input", () => {
+  it("los códigos viejos mal leídos ya no se aceptan (0081 es terreno, no townhouse)", () => {
+    expect(mapDorToType("0081")).toBeNull();
+    expect(mapDorToType("0001")).toBeNull();
+    expect(mapDorToType("0004")).toBeNull();
+  });
+
+  it("null para códigos desconocidos y entradas vacías", () => {
     expect(mapDorToType("9999")).toBeNull();
     expect(mapDorToType("")).toBeNull();
     expect(mapDorToType(null)).toBeNull();
     expect(mapDorToType(undefined)).toBeNull();
+  });
+});
+
+describe("propertyTypeFromCounty: unidad sin código claro → Condo", () => {
+  it("500 Brickell Ave #3001 (0407) es Condo, no casa unifamiliar", () => {
+    expect(propertyTypeFromCounty("0407", "RESIDENTIAL - TOTAL VALUE : CONDOMINIUM - RESIDENTIAL", true)).toBe("condo");
+  });
+  it("con unidad y código no claro o ausente → condo", () => {
+    expect(propertyTypeFromCounty("0420", "RESIDENTIAL - TOTAL VALUE : DOCK - TOTAL VALUE", true)).toBe("condo");
+    expect(propertyTypeFromCounty(undefined, undefined, true)).toBe("condo");
+  });
+  it("sin unidad y código no claro → null (el vendedor elige)", () => {
+    expect(propertyTypeFromCounty("9999", "", false)).toBeNull();
+  });
+  it("un código claro manda aunque haya unidad", () => {
+    expect(propertyTypeFromCounty("0410", "RESIDENTIAL - TOTAL VALUE : TOWNHOUSE", true)).toBe("townhouse");
+    expect(propertyTypeFromCounty("0802", "MULTIFAMILY 2-9 UNITS : 2 LIVING UNITS", true)).toBe("multi_family");
+  });
+  it("el borrador nuevo con unidad nace como Condo", () => {
+    const wizard = readFileSync(join(resolve(__dirname, "../.."), "src/app/[lang]/listing/new/page.tsx"), "utf8");
+    expect(wizard).toContain('property_type: unitFromStoredStreet(street) ? "condo" : "single_family"');
   });
 });
 

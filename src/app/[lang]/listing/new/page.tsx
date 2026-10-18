@@ -700,7 +700,8 @@ export default async function ListingNewPage({
       .insert({
         owner_id: user.id,
         ...addressUpdate,
-        property_type: "single_family",
+        // Hasta que el condado diga otra cosa (paso 3): con unidad, Condo.
+        property_type: unitFromStoredStreet(street) ? "condo" : "single_family",
         bedrooms: 0,
         bathrooms: 1,
         sqft: 0,

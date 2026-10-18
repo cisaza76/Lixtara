@@ -121,6 +121,11 @@ describe("ningún flujo de Lixtara cobra servicios legales", () => {
     const stripe = read("src/lib/stripe.ts");
     expect(stripe).not.toMatch(/attorney|abogad/i);
   });
+  it("el webhook de Stripe no acredita horas de abogado (ni de sesiones viejas)", () => {
+    const webhook = read("src/app/api/webhooks/stripe/route.ts");
+    expect(webhook).not.toMatch(/attorney_hours|attorneyHours|service_type: "attorney"/);
+    expect(webhook).toContain('service_type: "realtor"');
+  });
   it("la página de consultas no vende horas de abogado", () => {
     const page = read("src/app/[lang]/consultations/page.tsx");
     expect(page).not.toMatch(/attorney_1|best_value|ATTORNEY_HOURLY/);
