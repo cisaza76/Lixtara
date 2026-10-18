@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
+import { PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import { Field, SubmitButton, ErrorBanner, SuccessBanner } from "@/components/auth-shell";
@@ -13,8 +14,6 @@ import { catalogHasListings } from "@/lib/catalog-status.server";
 // finds the rest of their tools. Email changes go through support for now:
 // the email is tied to signed agreements and payments.
 
-const SUPPORT_EMAIL = "support@lixtara.com";
-const PRIVACY_EMAIL = "privacy@lixtara.com";
 
 export default async function AccountPage({
   params,

@@ -1,4 +1,5 @@
 import type { LegalContent } from "./types";
+import { PRIVACY_EMAIL } from "@/config/brokerage";
 
 export const cookiesDoc: LegalContent = {
   en: {
@@ -159,7 +160,7 @@ export const cookiesDoc: LegalContent = {
           "If you have questions about this Cookie Policy or our use of cookies, please contact us.",
         ],
         bullets: [
-          "Email: privacy@lixtara.com",
+          `Email: ${PRIVACY_EMAIL}`,
           "Lixtara, Miami, Florida, USA",
           "Mailing address: Miami, Florida, United States",
         ],
@@ -324,7 +325,7 @@ export const cookiesDoc: LegalContent = {
           "Si tiene preguntas sobre esta Política de Cookies o sobre nuestro uso de cookies, contáctenos.",
         ],
         bullets: [
-          "Correo electrónico: privacy@lixtara.com",
+          `Correo electrónico: ${PRIVACY_EMAIL}`,
           "Lixtara, Miami, Florida, EE. UU.",
           "Dirección postal: Miami, Florida, United States",
         ],

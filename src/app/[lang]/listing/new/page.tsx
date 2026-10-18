@@ -107,6 +107,7 @@ import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
+import { CONSENTS, consentCheckbox, consentNotice } from "@/lib/legal/consents";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
 
@@ -1630,6 +1631,12 @@ export default async function ListingNewPage({
     redirect(`${back}&verified=1&ev=email_verified_account`);
   }
 
+  // Paso 7: aviso y casilla E-SIGN antes de abrir DocuSign (textos versionados, consents.ts).
+  const esignProps = {
+    notice: consentNotice("esign", lang),
+    checkbox: consentCheckbox("esign", lang).before,
+    version: CONSENTS.esign.version,
+  };
   // Paso 5: misma regla que nextFromStep5 (src/lib/listing-photos.ts). El extra de
   // fotografía pagado cuenta como en Pro.
   const photographyPaid =
@@ -3289,6 +3296,7 @@ export default async function ListingNewPage({
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
                     }}
+                    esign={esignProps}
                   />
                 </div>
               );
@@ -3319,6 +3327,7 @@ export default async function ListingNewPage({
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
                     }}
+                    esign={esignProps}
                   />
                 </div>
               );
@@ -3334,6 +3343,7 @@ export default async function ListingNewPage({
                   redirecting: copy.step7.redirecting,
                   failed: copy.step7.failed,
                 }}
+                esign={esignProps}
               />
             );
             })()
@@ -3491,6 +3501,15 @@ export default async function ListingNewPage({
                     failed: copy.step8.failed,
                     confirming: copy.step8.confirmingExisting,
                   }}
+                  // Casilla del paso 8 con el precio y la comisión del plan (consents.ts).
+                  refundAck={
+                    isPlanTier(draft?.pricing_tier)
+                      ? {
+                          parts: consentCheckbox("terms_refund", lang, draft.pricing_tier),
+                          version: CONSENTS.terms_refund.version,
+                        }
+                      : null
+                  }
                 />
 
                 <Link
