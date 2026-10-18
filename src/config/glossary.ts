@@ -4,6 +4,10 @@
 //
 // "broker" se queda igual en español: Anamaria es la broker, nunca "corredora" ni "agente".
 // ("corredor hipotecario" es otra profesión, el mortgage broker, y sí se permite.)
+// Cuando el texto se refiere a ella, siempre en femenino: "la broker", "de la broker", "a la
+// broker" (decisión del owner, 2026-10-18). En el sitio "el broker" siempre era ella, así que
+// la forma masculina con artículo no se permite; "un broker" o "tu broker" sí. El broker
+// dedicado de Concierge también es ella (decisión de la broker, 2026-10-18).
 
 type Lang = "en" | "es";
 
@@ -60,6 +64,15 @@ export const GLOSSARY = {
     forbidden: {
       en: [/\bour agent\b/i],
       es: [/\bcorredor(a|es|as)?\b(?! hipotecari)/i, /\bnuestr[oa] agente\b/i],
+    },
+  },
+  theBroker: {
+    en: "the broker",
+    es: "la broker",
+    forbidden: {
+      en: [],
+      // Concierge lo atiende ella: "la broker dedicada", nunca "un broker dedicado".
+      es: [/\b(el|del|al) broker\b/i, /\bbroker dedicado\b/i],
     },
   },
   seller: {

@@ -11,7 +11,6 @@ export const BROKERAGE_NAME = "Lixtara";
 export const BROKERAGE_LICENSED_ENTITY = BROKERAGE.legalName;
 export const BROKER_LICENSE = BROKERAGE.brokerageLicense;
 export const BROKERAGE_LOCATION = "Miami, FL";
-export const BROKERAGE_YEARS = 20;
 
 export const BROKER_OF_RECORD = BROKERAGE.brokerName;
 export const BROKER_OF_RECORD_LICENSE = BROKERAGE.brokerLicense;

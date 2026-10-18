@@ -27,6 +27,9 @@ export interface LegalContent {
 /** Single source for the "last updated / effective" date shown on every doc. */
 export const LEGAL_LAST_UPDATED = "2026-09-02";
 
+/** Terms of Service: §4.1 compensación al agente del comprador desde legal-terms (v2), Lixtara LLC y dirección (§21); antes §6 reembolso. */
+export const TERMS_LAST_UPDATED = "2026-10-18";
+
 /** Cookie Policy: cookies de Microsoft Clarity detalladas (y antes, #193: solo analítica). */
 export const COOKIES_LAST_UPDATED = "2026-10-16";
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { GLOSSARY, glossaryViolations, term } from "@/config/glossary";
 import { dictionaryTexts, legalTermTexts, type Lang } from "@/lib/site-texts.test-helpers";
 import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
+import { termsDoc } from "@/lib/legal/terms";
 
 const h = vi.hoisted(() => ({ calls: [] as Array<{ html: string; text: string; subject: string }> }));
 vi.mock("resend", () => ({
@@ -26,6 +27,18 @@ async function emailTexts(lang: Lang) {
   return h.calls.map((c, i) => ({ where: `email[${i}]`, text: `${c.subject} ${c.html.replace(/<[^>]+>/g, " ")} ${c.text}` }));
 }
 
+/** Términos del Servicio (encabezados, párrafos y bullets). */
+function termsTexts(lang: Lang) {
+  const doc = termsDoc[lang];
+  const sections = doc.sections.flatMap((sec) => [sec, ...(sec.sub ?? [])]);
+  return [
+    ...doc.intro.map((text, i) => ({ where: `terms.intro[${i}]`, text })),
+    ...sections.flatMap((sec) =>
+      [sec.heading, ...sec.body, ...(sec.bullets ?? [])].map((text) => ({ where: `terms.${sec.heading}`, text })),
+    ),
+  ];
+}
+
 describe("glosario EN/ES", () => {
   it("cada término tiene forma aprobada en los dos idiomas", () => {
     for (const [k, v] of Object.entries(GLOSSARY)) {
@@ -41,11 +54,18 @@ describe("glosario EN/ES", () => {
     expect(glossaryViolations("honorarios de Lixtara", "es").map((v) => v.key)).toContain("lixtaraCommission");
     expect(glossaryViolations("habla con el corredor", "es").map((v) => v.key)).toContain("broker");
     expect(glossaryViolations("un corredor hipotecario", "es")).toEqual([]);
+    expect(term("theBroker", "es")).toBe("la broker");
+    for (const t of ["habla con el broker", "revisión del broker", "pregúntale al broker", "un broker dedicado"]) {
+      expect(glossaryViolations(t, "es").map((v) => v.key), t).toContain("theBroker");
+    }
+    for (const t of ["habla con la broker", "revisión de la broker", "la broker dedicada", "un broker licenciado", "tu broker"]) {
+      expect(glossaryViolations(t, "es"), t).toEqual([]);
+    }
     expect(glossaryViolations("the buyer-agent commission", "en").map((v) => v.key)).toContain("buyerAgentComp");
   });
 
-  it.each(["en", "es"] as const)("%s: diccionario, términos legales, correos y Loui usan solo términos aprobados", async (lang) => {
-    const texts = [...dictionaryTexts(lang), ...legalTermTexts(lang), ...(await emailTexts(lang))];
+  it.each(["en", "es"] as const)("%s: diccionario, términos legales, Términos del Servicio, correos y Loui usan solo términos aprobados", async (lang) => {
+    const texts = [...dictionaryTexts(lang), ...legalTermTexts(lang), ...(await emailTexts(lang)), ...termsTexts(lang)];
     if (lang === "en") texts.push({ where: "loui-prompt", text: LOUI_SYSTEM_PROMPT });
     expect(texts.length).toBeGreaterThan(800); // el recorrido no pasa en vacío
     const found = texts.flatMap(({ where, text }) => glossaryViolations(text, lang).map((v) => `${where}: ${v.match}`));

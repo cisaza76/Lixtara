@@ -95,7 +95,7 @@ describe("listingErrorHtml", () => {
       for (const l of ["en", "es"] as const) {
         const html = listingErrorHtml(l, s);
         expect(html).toContain('<meta name="robots" content="noindex">');
-        expect(html).toContain(`href="/${l}/properties"`);
+        expect(html).toContain(`href="/${l}/contact?topic=buy"`);
         expect(html).not.toMatch(/\$|address|bedrooms/i);
       }
     }

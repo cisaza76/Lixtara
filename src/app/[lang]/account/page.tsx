@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import { Field, SubmitButton, ErrorBanner, SuccessBanner } from "@/components/auth-shell";
 import { passwordRejection } from "@/lib/auth/password-errors";
+import { buyerContactHref } from "@/lib/buyer-entry";
+import { catalogHasListings } from "@/lib/catalog-status.server";
 
 // "My account": the signed-in person sees the email they registered with,
 // edits their name and phone (the name is the signer on the listing
@@ -25,6 +27,7 @@ export default async function AccountPage({
   if (!isLocale(lang)) notFound();
   const sp = await searchParams;
   const copy = t(lang).account;
+  const hasListings = await catalogHasListings();
 
   const supabase = await createClient();
   const {
@@ -251,7 +254,9 @@ export default async function AccountPage({
               { href: `/${lang}/dashboard`, label: copy.toolDashboard },
               { href: `/${lang}/listing/new`, label: copy.toolNewListing },
               { href: `/${lang}/dashboard#received-offers`, label: copy.toolOffers },
-              { href: `/${lang}/properties`, label: copy.toolBrowse },
+              hasListings
+                ? { href: `/${lang}/properties`, label: copy.toolBrowse }
+                : { href: buyerContactHref(lang), label: copy.toolBrowseNoListings },
               { href: `/${lang}/consultations`, label: copy.toolConsultations },
               { href: `/${lang}/auth/forgot-password`, label: copy.toolForgot },
             ].map((tool) => (

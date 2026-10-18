@@ -8,7 +8,7 @@
 //
 // Si cambia cualquiera de estos datos en el DBPR, se cambia AQUÍ y en ningún otro sitio:
 // src/config/brokerage.test.ts falla si aparece en el código otro número de licencia, o un
-// nombre del broker distinto de este.
+// nombre de la broker distinto de este.
 //
 // Nunca usar el número de la antigua licencia de Nexxos Realty (el test lo impide).
 
@@ -19,6 +19,25 @@ export const BROKERAGE = {
   brokerLicense: "BK3664191",
   address: "181 Vera Ct, Miami, FL 33143",
 } as const;
+
+/**
+ * Ficha pública de cada licencia en el DBPR de Florida (myfloridalicense.com). El `id` es el
+ * identificador que el DBPR asigna a la licencia, no se deriva del número: se obtiene buscando
+ * el número en https://www.myfloridalicense.com/wl11.asp. Comprobadas el 2026-10-18, sin
+ * sesión: CQ1075352 muestra Lixtara LLC, 181 Vera Ct, activa; BK3664191 muestra a la broker.
+ * Si cambia una licencia, se buscan de nuevo.
+ */
+export const DBPR_BROKERAGE_LICENSE_URL =
+  "https://www.myfloridalicense.com/LicenseDetail.asp?SID=&id=E3419C0BDBD9CF697EBF4272307D3E21";
+export const DBPR_BROKER_LICENSE_URL =
+  "https://www.myfloridalicense.com/LicenseDetail.asp?SID=&id=6A304B94CD44DC8912D08F4918D8C092";
+
+/**
+ * Años de experiencia en bienes raíces en Florida de Anamaria Velasquez y su equipo (dato del
+ * owner, 2026-10-17). Es EXPERIENCIA del equipo, no antigüedad de la licencia de Lixtara ni de
+ * la broker: nunca escribir "licensed for 20 years". Se muestra como "20+".
+ */
+export const TEAM_EXPERIENCE_YEARS = 20;
 
 /**
  * Email con el que la broker de Lixtara firma CADA acuerdo en DocuSign (#137 f). Decisión
@@ -60,10 +79,14 @@ export function brokerageLicenseLineShort(): string {
 
 /**
  * Fills brokerage placeholders in dictionary copy so no license number or
- * broker name is ever hardcoded in i18n: {brokerageLicense}, {brokerFirstName}.
+ * broker name is ever hardcoded in i18n: {brokerageLicense}, {brokerLicense},
+ * {brokerName}, {brokerFirstName}, {teamYears}.
  */
 export function fillBrokerageCopy(text: string): string {
   return text
     .replaceAll("{brokerageLicense}", BROKERAGE.brokerageLicense)
+    .replaceAll("{brokerLicense}", BROKERAGE.brokerLicense)
+    .replaceAll("{brokerName}", BROKERAGE.brokerName)
+    .replaceAll("{teamYears}", String(TEAM_EXPERIENCE_YEARS))
     .replaceAll("{brokerFirstName}", BROKERAGE.brokerName.split(" ")[0]);
 }

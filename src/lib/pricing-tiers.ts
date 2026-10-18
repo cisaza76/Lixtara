@@ -2,6 +2,8 @@
 // and Stripe checkout (F2+) all read from this single source of truth.
 // NEVER hardcode flat-fee dollar amounts or commission percentages elsewhere.
 
+import { fillBrokerageCopy } from "@/config/brokerage";
+
 export type PricingTierId = "essentials" | "pro" | "concierge";
 
 export interface PricingTier {
@@ -159,7 +161,7 @@ export function tierCostBreakdown(
 export function fillTierCopy(text: string, tierId: PricingTierId): string {
   const t = PRICING_TIERS[tierId];
   return fillPricingCopy(
-    text
+    fillBrokerageCopy(text)
       .replaceAll("{commissionPct}", String(t.commissionPct))
       .replaceAll("{flatFee}", String(t.flatFee))
       .replaceAll("{termMonths}", String(t.termMonths)),
