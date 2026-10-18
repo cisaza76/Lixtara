@@ -2,7 +2,9 @@
 -- terms_acceptances: prueba de cada aceptación de un texto legal (decisión del owner
 -- 2026-10-16, opción 1).
 --
--- Una fila por aceptación, de SOLO INSERCIÓN. Hoy se escribe en tres momentos:
+-- Una fila por aceptación, de SOLO INSERCIÓN. Se escribe en estos momentos:
+--   * 'terms'        — Términos y Privacidad al crear la cuenta (/sign-up y registro del
+--                      paso 7); sin la casilla no se crea la cuenta (agregado 2026-10-18);
 --   * 'terms_refund' — casilla de reembolso del paso 8, antes de pagar el plan en Stripe
 --                      (lleva stripe_checkout_session_id);
 --   * 'esign'        — aviso y consentimiento E-SIGN del paso 7, antes de abrir DocuSign;
@@ -25,7 +27,7 @@ create table if not exists public.terms_acceptances (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete set null,
   property_id uuid references public.properties(id) on delete set null,
-  document text not null check (document in ('terms_refund', 'esign', 'calls_sms')),
+  document text not null check (document in ('terms', 'terms_refund', 'esign', 'calls_sms')),
   version text not null check (length(version) between 1 and 64),
   lang text not null check (lang in ('en', 'es')),
   consent_text_hash text not null check (consent_text_hash ~ '^[0-9a-f]{64}$'),
@@ -37,7 +39,7 @@ create table if not exists public.terms_acceptances (
 );
 
 comment on table public.terms_acceptances is
-  'Prueba de aceptación de textos legales (casilla de reembolso, E-SIGN, llamadas/SMS). Solo inserción desde el servidor; texto exacto reconstruible por versión + idioma + hash (src/lib/legal/consents.ts).';
+  'Prueba de aceptación de textos legales (Términos y Privacidad al crear la cuenta, casilla de reembolso, E-SIGN, llamadas/SMS). Solo inserción desde el servidor; texto exacto reconstruible por versión + idioma + hash (src/lib/legal/consents.ts).';
 
 create index if not exists terms_acceptances_user_idx on public.terms_acceptances (user_id, accepted_at desc);
 create index if not exists terms_acceptances_property_idx on public.terms_acceptances (property_id) where property_id is not null;

@@ -62,11 +62,14 @@ chk("service_role inserta la aceptación del paso 8", "OK:1", await as("service_
 chk("service_role inserta E-SIGN", "OK:1", await as("service_role", null, ins(
   "user_id, property_id, document, version, lang, consent_text_hash, context",
   `'${OTHER}', '${PROP}', 'esign', '2026-10-18-v1', 'en', '${HASH}', 'step7_esign'`)));
+chk("service_role inserta la aceptación de Términos y Privacidad al crear la cuenta", "OK:1", await as("service_role", null, ins(
+  "user_id, document, version, lang, consent_text_hash, context, ip_address, user_agent",
+  `'${OTHER}', 'terms', 'terms-2026-10-18-v1+privacy-2026-10-18-v1', 'en', '${HASH}', 'signup', '2001:db8::1', 'Mozilla/5.0'`)));
 chk("el vendedor NO puede insertar (ni falsear su aceptación)", "ERR:42501", await as("authenticated", SELLER, ins(
   "user_id, document, version, lang, consent_text_hash, context", `'${SELLER}', 'terms_refund', 'x', 'es', '${HASH}', 'checkout_tier'`)));
 chk("anon no puede leer", "ERR:42501", await as("anon", null, "select 1 from public.terms_acceptances"));
 chk("el vendedor ve solo sus filas", "OK:1", await as("authenticated", SELLER, "select 1 from public.terms_acceptances"));
-chk("admin ve todas", "OK:2", await as("authenticated", ADMIN, "select 1 from public.terms_acceptances"));
+chk("admin ve todas", "OK:3", await as("authenticated", ADMIN, "select 1 from public.terms_acceptances"));
 chk("nadie edita (ni service_role)", "ERR:42501", await as("service_role", null, "update public.terms_acceptances set version = 'otra'"));
 chk("nadie borra (ni service_role)", "ERR:42501", await as("service_role", null, "delete from public.terms_acceptances"));
 chk("el vendedor tampoco edita", "ERR:42501", await as("authenticated", SELLER, "update public.terms_acceptances set lang = 'en'"));
@@ -80,10 +83,10 @@ chk("IP inválida → rechazo", "ERR:22P02", await as("service_role", null, ins(
   "document, version, lang, consent_text_hash, context, ip_address", `'esign','v','en','${HASH}','x','no-es-ip'`)));
 
 await db.exec(`delete from public.properties where id = '${PROP}'`);
-chk("borrar la propiedad: la prueba queda, property_id NULL", "2:0",
+chk("borrar la propiedad: la prueba queda, property_id NULL", "3:0",
   (await db.query("select count(*)::int || ':' || count(property_id)::int as r from public.terms_acceptances")).rows[0].r);
 await db.exec(`delete from auth.users where id = '${SELLER}'`);
-chk("borrar el usuario: la prueba queda, user_id NULL", "2:1",
+chk("borrar el usuario: la prueba queda, user_id NULL", "3:2",
   (await db.query("select count(*)::int || ':' || count(user_id)::int as r from public.terms_acceptances")).rows[0].r);
 
 await db.exec(sql(ROLLBACK));

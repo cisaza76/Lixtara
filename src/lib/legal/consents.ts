@@ -9,13 +9,18 @@
 import type { PricingTierId } from "@/lib/pricing-tiers";
 import { LEGAL_DOCS, fillLegalCopy, planConsentVars } from "./config";
 
-export type ConsentDocument = "terms_refund" | "esign" | "calls_sms";
+export type ConsentDocument = "terms" | "terms_refund" | "esign" | "calls_sms";
 export type ConsentLang = "en" | "es";
 
-/** Un texto con, opcionalmente, una parte enlazada. */
+/**
+ * Un texto con, opcionalmente, partes enlazadas: before + link + middle + link2 + after. Los
+ * enlaces son textos; la página decide a dónde apuntan (Términos y Privacidad en `terms`).
+ */
 export interface ConsentParts {
   before: string;
   link?: string;
+  middle?: string;
+  link2?: string;
   after?: string;
 }
 
@@ -29,6 +34,15 @@ export interface ConsentDefinition {
 }
 
 export const CONSENTS: Record<ConsentDocument, ConsentDefinition> = {
+  // Aceptación expresa de los Términos y la Privacidad al crear la cuenta: /sign-up y el
+  // registro del paso 7. Sin la casilla no se crea la cuenta. La versión nombra las dos.
+  terms: {
+    version: `terms-${LEGAL_DOCS.terms.version}+privacy-${LEGAL_DOCS.privacy.version}`,
+    checkbox: {
+      en: { before: "I agree to the ", link: "Terms of Service", middle: " and ", link2: "Privacy Policy", after: "." },
+      es: { before: "Acepto los ", link: "Términos de servicio", middle: " y la ", link2: "Política de privacidad", after: "." },
+    },
+  },
   // Paso 8, antes de "Pagar con Stripe". Dice lo mismo que legal-terms.ts#refundPolicy, los
   // Términos §6 y la FAQ (site-claims.test.ts lo comprueba). La versión es la de los Términos.
   terms_refund: {
@@ -95,17 +109,22 @@ export function consentCheckbox(doc: ConsentDocument, lang: ConsentLang, tier?: 
   if (d.perPlan && !tier) throw new Error(`${doc}: el texto lleva {fee}/{pct} y falta el plan`);
   const vars = d.perPlan && tier ? planConsentVars(tier) : undefined;
   const c = d.checkbox[lang];
-  return {
-    before: fillLegalCopy(c.before, vars),
-    ...(c.link ? { link: fillLegalCopy(c.link, vars) } : {}),
-    ...(c.after ? { after: fillLegalCopy(c.after, vars) } : {}),
-  };
+  const out: ConsentParts = { before: fillLegalCopy(c.before, vars) };
+  for (const k of ["link", "middle", "link2", "after"] as const) {
+    const v = c[k];
+    if (v) out[k] = fillLegalCopy(v, vars);
+  }
+  return out;
+}
+
+/** La casilla como texto plano (lo que entra en el hash). */
+export function consentCheckboxText(parts: ConsentParts): string {
+  return `${parts.before}${parts.link ?? ""}${parts.middle ?? ""}${parts.link2 ?? ""}${parts.after ?? ""}`;
 }
 
 /** El texto exacto que vio la persona (aviso + casilla), con los marcadores ya resueltos. */
 export function consentFullText(doc: ConsentDocument, lang: ConsentLang, tier?: PricingTierId | null): string {
-  const c = consentCheckbox(doc, lang, tier);
-  return [...consentNotice(doc, lang), `${c.before}${c.link ?? ""}${c.after ?? ""}`].join("\n");
+  return [...consentNotice(doc, lang), consentCheckboxText(consentCheckbox(doc, lang, tier))].join("\n");
 }
 
 /**
@@ -115,6 +134,10 @@ export function consentFullText(doc: ConsentDocument, lang: ConsentLang, tier?: 
  * versión nueva + hashes nuevos aquí, conservando los anteriores.
  */
 export const PUBLISHED_CONSENT_HASHES: Record<string, Record<ConsentLang, string>> = {
+  "terms@terms-2026-10-18-v1+privacy-2026-10-18-v1": {
+    en: "d0c085087b7137968c04cb04f13ab9810c9ffbd0a994aec419929fb3db30c2c6",
+    es: "1106e53c0a0dbf07dffb20ba7027179aad4af28846013a29a36badbdf557ac11",
+  },
   "terms_refund@2026-10-18-v1:essentials": {
     en: "3a268aefac927d5b378919744059f26ef86605ee7d692af5ccdc206efcead1c2",
     es: "75fbb5c8e1b0648a8701864e3c00d81266039d72a3e1be13bfe01a6c13d0de96",

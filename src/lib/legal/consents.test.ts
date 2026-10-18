@@ -65,6 +65,52 @@ describe("casilla del paso 8 (terms_refund)", () => {
   });
 });
 
+describe("aceptación de Términos y Privacidad al crear la cuenta (terms)", () => {
+  it("texto exacto y versión que nombra los dos documentos", () => {
+    expect(consentFullText("terms", "en")).toBe("I agree to the Terms of Service and Privacy Policy.");
+    expect(consentFullText("terms", "es")).toBe("Acepto los Términos de servicio y la Política de privacidad.");
+    expect(CONSENTS.terms.version).toBe(`terms-${LEGAL_DOCS.terms.version}+privacy-${LEGAL_DOCS.privacy.version}`);
+    expect(CONSENTS.terms.version.length).toBeLessThanOrEqual(64); // check de la columna
+    const parts = consentCheckbox("terms", "en");
+    expect([parts.link, parts.link2]).toEqual(["Terms of Service", "Privacy Policy"]);
+  });
+
+  it("la migración admite el documento 'terms'", () => {
+    expect(read("supabase/migrations/20261019120000_terms_acceptances.sql")).toContain(
+      "check (document in ('terms', 'terms_refund', 'esign', 'calls_sms'))",
+    );
+  });
+
+  it("/sign-up: sin la casilla no se crea la cuenta; la prueba se registra y, si falla, se borra la cuenta", () => {
+    const page = read("src/app/[lang]/sign-up/page.tsx");
+    const action = page.slice(page.indexOf("async function signUpAction"));
+    expect(action.indexOf("termsAcceptedIn(formData)")).toBeLessThan(action.indexOf("supabase.auth.signUp("));
+    expect(action).toContain('document: "terms"');
+    expect(action).toContain('context: "signup"');
+    expect(action).toContain("auth.admin.deleteUser(created.id)");
+    expect(page).toContain("<TermsConsentCheckbox");
+  });
+
+  it("paso 7: sin la casilla no se crea la cuenta; la prueba va ANTES de convertir la sesión", () => {
+    const page = read("src/app/[lang]/listing/new/page.tsx");
+    const action = page.slice(page.indexOf("async function registerAccount"), page.indexOf("async function resendEmailCode"));
+    const check = action.indexOf("termsAcceptedIn(formData)");
+    const record = action.indexOf('context: "step7_account"');
+    expect(check).toBeGreaterThan(0);
+    expect(record).toBeGreaterThan(check);
+    expect(record).toBeLessThan(action.indexOf("supabase.auth.updateUser("));
+    expect(read("src/components/account-gate.tsx")).toContain("<TermsConsentCheckbox");
+  });
+
+  it("la casilla es obligatoria y enlaza a /terms y /privacy", () => {
+    const box = read("src/components/terms-consent-checkbox.tsx");
+    expect(box).toContain('name="accept_terms"');
+    expect(box).toMatch(/\brequired\b/);
+    expect(box).toContain("LEGAL_DOCS.terms.path");
+    expect(box).toContain("LEGAL_DOCS.privacy.path");
+  });
+});
+
 describe("aviso E-SIGN del paso 7", () => {
   it("lleva el correo de soporte desde brokerage.ts y la casilla", () => {
     for (const lang of ["en", "es"] as const) {
@@ -149,7 +195,7 @@ describe("textos legales v1", () => {
     const arb = en.find((s) => s.heading.startsWith("17."))!;
     expect(arb.heading).toBe("17. Dispute Resolution; Arbitration; Class Action Waiver");
     expect(arb.body).toEqual([
-      "(a) Except for Excluded Claims, you and Lixtara LLC agree that any dispute arising out of or relating to these Terms or your use of the Site will be resolved by binding individual arbitration administered by the American Arbitration Association under its Consumer Arbitration Rules. The Federal Arbitration Act governs this Section.",
+      "(a) Except for Excluded Claims, you and Lixtara LLC agree that any dispute arising out of or relating to these Terms or your use of the Services will be resolved by binding individual arbitration administered by the American Arbitration Association under its Consumer Arbitration Rules. The Federal Arbitration Act governs this Section.",
       "(b) Excluded Claims: (i) individual claims within the jurisdiction of a small claims court; (ii) disputes arising under a listing agreement, buyer agreement or other brokerage agreement, which are governed by that agreement; (iii) complaints to the Florida Department of Business and Professional Regulation, the Florida Real Estate Commission or any other government agency.",
       "(c) Claims may be brought only in an individual capacity, not as a plaintiff or class member in any class, collective or representative proceeding.",
       `(d) You may opt out of this Section within thirty (30) days after you first accept these Terms by emailing ${LEGAL_EMAIL} with your name and a statement that you opt out of arbitration.`,

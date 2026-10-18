@@ -52,3 +52,11 @@ export async function recordAcceptance(input: AcceptanceInput): Promise<boolean>
   }
   return true;
 }
+
+/**
+ * ¿El formulario trae la casilla de Términos y Privacidad marcada, en la versión vigente?
+ * (/sign-up y registro del paso 7: sin ella no se crea la cuenta.)
+ */
+export function termsAcceptedIn(formData: FormData): boolean {
+  return formData.get("accept_terms") === "1" && formData.get("terms_version") === CONSENTS.terms.version;
+}

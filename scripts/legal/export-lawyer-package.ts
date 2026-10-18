@@ -13,7 +13,7 @@ import { termsDoc } from "@/lib/legal/terms";
 import { privacyDoc } from "@/lib/legal/privacy";
 import type { LegalDoc, LegalSection } from "@/lib/legal/types";
 import { LEGAL_DOCS } from "@/lib/legal/config";
-import { CONSENTS, consentCheckbox, consentNotice } from "@/lib/legal/consents";
+import { CONSENTS, consentCheckbox, consentFullText, consentNotice } from "@/lib/legal/consents";
 import { buyerAgentComp, refundPolicy } from "@/config/legal-terms";
 import { legalServicesDisclosure } from "@/config/legalPartner";
 import { BROKERAGE } from "@/config/brokerage";
@@ -100,6 +100,9 @@ function onePager(): string {
     <div class="meta">Generated ${GENERATED}. Checkout checkbox version ${esc(CONSENTS.terms_refund.version)} (= Terms version) · buyer's agent compensation text v${esc(
       buyerAgentComp.version,
     )} · refund policy v${esc(refundPolicy.version)}.</div>
+    <h2>0. Account creation (/sign-up and step 7)</h2>
+    <p>Required; without it the account is not created. Links to the Terms of Service and the Privacy Policy. Version ${esc(CONSENTS.terms.version)}.</p>
+    <table><tr><th>English</th><th>Español</th></tr><tr><td>☐ ${esc(consentFullText("terms", "en"))}</td><td>☐ ${esc(consentFullText("terms", "es"))}</td></tr></table>
     <h2>1. Checkout checkbox (listing flow, step 8)</h2>
     <p>Required before “Pay with Stripe”. {fee} and {pct} come from the seller's plan; the exact text shown (with the plan's amounts) is what is hashed and recorded.</p>
     <table><tr><th style="width:14%">Plan</th><th>English</th><th>Español</th></tr>${rows}</table>

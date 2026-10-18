@@ -10,6 +10,8 @@
 
 import { useEffect, useState } from "react";
 import { TurnstileWidget } from "@/components/turnstile-widget";
+import { TermsConsentCheckbox } from "@/components/terms-consent-checkbox";
+import type { ConsentParts } from "@/lib/legal/consents";
 
 interface AccountGateLabels {
   createEyebrow: string;
@@ -43,6 +45,8 @@ interface AccountGateLabels {
   errPassword: string;
   errExists: string;
   errFailed: string;
+  /** Falta la casilla de Términos y Privacidad. */
+  errTerms: string;
   /** La contraseña apareció en una filtración (Supabase: weak_password + "pwned"). */
   errLeaked: string;
   /** Supabase la rechazó por otra regla de su política. */
@@ -64,6 +68,8 @@ interface AccountGateProps {
   pendingEmail: string | null;
   /** Email already confirmed at step 1: shown read-only, no new code. */
   knownEmail?: string | null;
+  /** Casilla obligatoria de Términos y Privacidad (consents.ts, `terms`). */
+  termsConsent: { parts: ConsentParts; version: string };
   error: string | null;
   codeError: string | null;
   /** Epoch en segundos del último reenvío, propagado por la URL para que el
@@ -80,6 +86,7 @@ export function AccountGate({
   draftId,
   pendingEmail,
   knownEmail = null,
+  termsConsent,
   error,
   codeError,
   resentAt,
@@ -104,6 +111,8 @@ export function AccountGate({
       registerAction={registerAction}
       draftId={draftId}
       knownEmail={knownEmail}
+      termsConsent={termsConsent}
+      lang={lang}
       error={error}
       labels={labels}
     />
@@ -126,6 +135,8 @@ function errorMessage(error: string | null, labels: AccountGateLabels): string |
       return labels.errLeaked;
     case "rejected":
       return labels.errRejected;
+    case "terms_required":
+      return labels.errTerms;
     default:
       return null;
   }
@@ -135,12 +146,16 @@ function CreateAccount({
   registerAction,
   draftId,
   knownEmail,
+  termsConsent,
+  lang,
   error,
   labels,
 }: {
   registerAction: (formData: FormData) => Promise<void>;
   draftId: string;
   knownEmail: string | null;
+  termsConsent: { parts: ConsentParts; version: string };
+  lang: string;
   error: string | null;
   labels: AccountGateLabels;
 }) {
@@ -251,6 +266,12 @@ function CreateAccount({
         </div>
         <span className="text-xs text-ink/50">{labels.passwordHint}</span>
       </label>
+
+      <TermsConsentCheckbox
+        lang={lang === "es" ? "es" : "en"}
+        parts={termsConsent.parts}
+        version={termsConsent.version}
+      />
 
       <button
         type="submit"

@@ -18,16 +18,20 @@ Paquete en PDF: `docs/legal/paquete-abogado-2026-10/`.
 | 6 | Política de reembolso v2 (agrega "se cobra se venda o no") | `src/config/legal-terms.ts` (`refundPolicy`) | Términos §6, FAQ, paso 8, Loui | Pendiente de aprobación legal |
 | 7 | Aviso E-SIGN del paso 7 (texto del #203; ES pasa a tú) | `src/lib/legal/consents.ts` (`esign`, `2026-10-18-v1`) | Paso 7, antes de abrir DocuSign; el servidor lo exige | Pendiente de aprobación legal |
 | 8 | "Lixtara LLC", dirección y licencias en Privacidad y Avisos Legales | `privacy.ts`, `disclaimers.ts` (desde `brokerage.ts`) | Privacidad, `/disclaimers` | Pendiente de aprobación legal |
-| 9 | Correos legales (`legal@`, `privacy@`, `notices@`, `dmca@`, `support@`) | `src/config/brokerage.ts` | Todos los textos legales | Confirmar que los buzones existen |
+| 9 | Aceptación expresa de Términos y Privacidad al crear la cuenta: "I agree to the Terms of Service and Privacy Policy" / "Acepto los Términos de servicio y la Política de privacidad", con enlaces | `src/lib/legal/consents.ts` (`terms`, versión `terms-2026-10-18-v1+privacy-2026-10-18-v1`) | `/sign-up` y el registro del paso 7; sin la casilla no se crea la cuenta | Pendiente de aprobación legal |
+| 10 | Correos legales (`legal@`, `privacy@`, `notices@`, `dmca@`, `support@`) | `src/config/brokerage.ts` | Todos los textos legales | Confirmar que los buzones existen |
 
-Prueba de cada aceptación (casillas 1 y 7): tabla `terms_acceptances`. Guarda fecha, IP, user agent, versión, idioma y SHA-256 del texto exacto, incluido el precio del plan. Es de solo inserción y se escribe solo desde el servidor. Migración `20261019120000_terms_acceptances.sql`, **sin aplicar**.
+Prueba de cada aceptación (casillas 1, 7 y 9): tabla `terms_acceptances`. Guarda fecha, IP, user agent, versión, idioma y SHA-256 del texto exacto, incluido el precio del plan. Es de solo inserción y se escribe solo desde el servidor. Migración `20261019120000_terms_acceptances.sql`, **sin aplicar**.
 
 ## Puntos para el abogado
 
+Siguen abiertos el 1 (retención frente a la tabla de solo inserción) y el 5 (base del 3%: precio de compra o de lista).
+
+
 1. **Retención frente a la tabla de solo inserción.** La 7.1 promete borrar el registro 5 años después de que termine la relación. Hoy la tabla no permite borrar a nadie, ni al `service_role`, y no registra cuándo termina la relación. Hace falta definir qué cuenta como fin de la relación y una purga controlada, que no está construida.
 2. **Borrado de la cuenta.** Si se borra el usuario, la prueba se conserva con `user_id` en NULL. ¿Basta para defender un reclamo, o hay que conservar un identificador?
-3. **Arbitraje "within thirty (30) days after you first accept these Terms".** Hoy no hay aceptación expresa de los Términos al crear la cuenta (punto 5 del memo del #203). Sin ella, no hay una fecha clara de "first accept".
-4. **"your use of the Site"** en la §17(a), mientras el resto de los Términos dice "the Services". ¿Se deja así o se cambia a "the Services"?
+3. **Resuelto (2026-10-18): aceptación expresa al crear la cuenta.** La casilla del punto 9 se registra en `terms_acceptances` (`document = 'terms'`), así que el opt-out de 30 días de la §17(d) cuenta desde esa fecha. Si la prueba no se guarda, no se crea la cuenta: en el paso 7 se registra antes de convertir la sesión; en `/sign-up`, si falla, se borra la cuenta recién creada. Las cuentas creadas antes de este cambio no tienen esta aceptación.
+4. **Resuelto (2026-10-18):** la §17(a) dice "the Services", como el resto de los Términos.
 5. **Compensación: base del 3%.** El texto dice "of the purchase price". El sistema hoy valida el tope de un monto fijo contra el precio de **lista** (migración `20261017200000`). Confirmar si se cambia la regla o el texto.
 6. **"buyer's broker" en español.** Se tradujo como "agente del comprador", el término del glosario del sitio. ¿Correcto en contexto legal?
 7. **E-SIGN en español con tú.** El paso 7 es parte del flujo del vendedor, que usa tú. Los Términos usan usted. Confirmar que el aviso E-SIGN puede ir con tú.
