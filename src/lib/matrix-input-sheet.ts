@@ -13,6 +13,7 @@
 
 import { BROKERAGE } from "@/config/brokerage";
 import { PRICING_TIERS, isPricingTierId } from "@/lib/pricing-tiers";
+import { formatOffer, offerFromRow } from "@/lib/buyer-comp";
 import type { ApplianceKey } from "@/lib/appliances";
 
 export interface MatrixSourceProperty {
@@ -43,6 +44,8 @@ export interface MatrixSourceProperty {
   pricing_tier: string | null;
   mls_published_at: string | null;
   buyer_agent_commission: number | null;
+  buyer_agent_comp_type?: string | null;
+  buyer_agent_comp_amount?: number | null;
 }
 
 export interface MatrixSourcePhoto {
@@ -343,10 +346,16 @@ export function buildMatrixInputSheet(
         {
           label: "Buyer-agent compensation",
           value: null,
-          hint:
-            p.buyer_agent_commission
-              ? `Seller offered ${p.buyer_agent_commission}%. Not an MLS field since the 2024 NAR settlement; handle outside the MLS.`
-              : "Not an MLS field since the 2024 NAR settlement.",
+          hint: (() => {
+            const offer = offerFromRow({
+              buyer_agent_comp_type: p.buyer_agent_comp_type ?? null,
+              buyer_agent_commission: p.buyer_agent_commission,
+              buyer_agent_comp_amount: p.buyer_agent_comp_amount ?? null,
+            });
+            if (!offer) return "Not an MLS field since the 2024 NAR settlement.";
+            if (offer.type === "none") return "Seller offers no compensation (0%). Not an MLS field since the 2024 NAR settlement.";
+            return `Seller offered ${formatOffer(offer)}. Not an MLS field since the 2024 NAR settlement; share it only with agents who ask, in writing (CASSB-1).`;
+          })(),
         },
       ],
     },

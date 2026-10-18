@@ -6,6 +6,7 @@ import { isLocale, t } from "@/lib/i18n";
 import { BROKER_LICENSE, BROKERAGE_NAME } from "@/lib/broker";
 import { fillBrokerageCopy } from "@/config/brokerage";
 import { FootnoteText } from "@/components/footnote-text";
+import { buyerAgentComp } from "@/config/legal-terms";
 import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
 import { BROKER_STATS } from "@/lib/broker-stats";
 import {
@@ -497,8 +498,11 @@ export default async function Home({
               );
             })}
           </div>
+          <p className="mt-10 max-w-4xl text-sm text-ink/70 leading-relaxed">
+            {buyerAgentComp.text[lang].planNote}
+          </p>
           {/* Servicios legales: los "*" de los planes enlazan aquí. */}
-          <LegalServicesDisclosure lang={lang} anchor className="mt-10 max-w-4xl" />
+          <LegalServicesDisclosure lang={lang} anchor className="mt-4 max-w-4xl" />
         </div>
       </section>
 

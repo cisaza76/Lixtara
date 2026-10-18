@@ -19,7 +19,6 @@ export interface PropertyDetail extends PropertySummary {
   longitude: number | null;
   year_built: number;
   description: string | null;
-  buyer_agent_commission: number;
   photos: {
     url: string;
     is_primary: boolean;
@@ -95,7 +94,7 @@ export async function getPropertyById(
   const { data: prop } = await supabase
     .from("properties")
     .select(
-      "id,address_street,address_city,address_state,address_zip,list_price,bedrooms,bathrooms,sqft,property_type,latitude,longitude,year_built,description,buyer_agent_commission,mls_status",
+      "id,address_street,address_city,address_state,address_zip,list_price,bedrooms,bathrooms,sqft,property_type,latitude,longitude,year_built,description,mls_status",
     )
     .eq("id", id)
     .eq("mls_status", "active")

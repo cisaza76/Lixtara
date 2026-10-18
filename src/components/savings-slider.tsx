@@ -1,17 +1,18 @@
 "use client";
 
 // Radical Transparency calculator — full per-tier cost breakdown:
-//   - Home value slider + buyer-agent commission selector (2 / 2.5 / 3 %)
+//   - Home value slider + buyer's agent compensation selector (0 / 2 / 2.5 / 3 % or a
+//     custom percentage or fixed USD amount)
 //   - UPFRONT costs: listing fee, professional photos, DocuSign contracts,
 //     subtotal. On Lixtara this is ONLY the flat fee (what Stripe charges).
-//   - CLOSING costs: your (listing-side) commission + buyer-agent commission,
+//   - CLOSING costs: your (listing-side) commission + buyer's agent compensation,
 //     subtotal — paid from sale proceeds, so only if the home sells
 //   - Total cost + you-save-vs-traditional + a dynamic key-insight callout
 //
-// The buyer-agent commission the seller picks applies to BOTH columns (you offer it
+// The buyer's agent compensation the seller picks applies to BOTH columns (you offer it
 // either way), so the savings reflect only what Lixtara replaces on the seller side.
-// Every number comes from compareWithTraditional (pricing-tiers.ts) — the same
-// function the FAQ, Loui and step 6 use. Never hardcode amounts here.
+// Every number comes from compareWithOffer (buyer-comp.ts, on top of pricing-tiers.ts),
+// the same function step 6 uses. Never hardcode amounts here.
 
 import { useEffect, useRef, useState } from "react";
 import { homePriceRange, track } from "@/lib/analytics";
@@ -20,14 +21,26 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   TRADITIONAL_COSTS,
-  compareWithTraditional,
 } from "@/lib/pricing-tiers";
+import {
+  BUYER_COMP_MAX_PCT,
+  BUYER_COMP_PRESET_PCTS,
+  compareWithOffer,
+  formatOffer,
+  parseOfferInput,
+  type BuyerCompOffer,
+} from "@/lib/buyer-comp";
 import { InfoTip } from "@/components/info-tip";
 
 interface SavingsCopy {
   priceLabel: string;
   buyerCommissionLabel: string;
   buyerCommissionHint: string;
+  buyerCompNone: string;
+  buyerCompCustom: string;
+  buyerCompCustomPercent: string;
+  buyerCompCustomAmount: string;
+  buyerCompCustomLabel: string;
   youSelected: string;
   upfrontHeader: string;
   closingHeader: string;
@@ -80,8 +93,8 @@ interface Column {
   upfront: number;
   buyer: number;
   closing: number;
-  /** the buyer-agent % shown for this column (traditional is fixed; tiers follow the slider) */
-  buyerPctShown: number;
+  /** the buyer's agent compensation shown for this column ("2.5%", "$12,000", "0%") */
+  buyerShown: string;
   total: number;
   savings: number;
 }
@@ -92,29 +105,53 @@ function usd(n: number): string {
 
 export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
   const [price, setPrice] = useState(500_000);
-  const [buyerPct, setBuyerPct] = useState(DEFAULT_BUYER_COMMISSION_PCT);
-
-  // calculator_used: once the person stops moving the controls (1.5 s), with the price
-  // RANGE (never the exact value) and the buyer-agent %. Again only if the range changes.
   const touched = useRef(false);
   const lastSent = useRef<string | null>(null);
+  const [choice, setChoice] = useState(String(DEFAULT_BUYER_COMMISSION_PCT));
+  const [customKind, setCustomKind] = useState<"percent" | "amount">("percent");
+  const [customValue, setCustomValue] = useState("");
+  // The last valid offer: an invalid custom value (while typing) keeps the previous one.
+  const [offer, setOffer] = useState<BuyerCompOffer>({ type: "percent", pct: DEFAULT_BUYER_COMMISSION_PCT });
+  const choose = (next: { choice?: string; customKind?: "percent" | "amount"; customValue?: string }, atPrice = price) => {
+    touched.current = true;
+    const c = next.choice ?? choice;
+    const k = next.customKind ?? customKind;
+    const v = next.customValue ?? customValue;
+    if (next.choice !== undefined) setChoice(c);
+    if (next.customKind !== undefined) setCustomKind(k);
+    if (next.customValue !== undefined) setCustomValue(v);
+    const parsed = parseOfferInput({ choice: c, customKind: k, customValue: v }, atPrice);
+    if (parsed.ok) setOffer(parsed.offer);
+  };
+  const buyerShown = formatOffer(offer);
+
+  // calculator_used: once the person stops moving the controls (1.5 s), with the price
+  // RANGE (never the exact value) and the kind of offer. Again only if either changes.
   useEffect(() => {
     if (!touched.current) return;
     const timer = setTimeout(() => {
       const range = homePriceRange(price);
-      const key = `${range}|${buyerPct}`;
+      // Only the kind and, for a percentage, the %: never a dollar amount.
+      const pct = offer.type === "percent" ? offer.pct : offer.type === "none" ? 0 : null;
+      const key = `${range}|${offer.type}|${pct}`;
       if (key === lastSent.current) return;
       lastSent.current = key;
-      track({ event: "calculator_used", home_price_range: range, buyer_commission_pct: buyerPct, lang });
+      track({
+        event: "calculator_used",
+        home_price_range: range,
+        buyer_comp_type: offer.type,
+        buyer_commission_pct: pct,
+        lang,
+      });
     }, 1500);
     return () => clearTimeout(timer);
-  }, [price, buyerPct, lang]);
+  }, [price, offer, lang]);
 
-  // One comparison per plan (compareWithTraditional): the buyer-agent % the seller picks
-  // goes on BOTH sides, so "You save" is only the listing-side difference. Photos and
-  // documents are not charged on the traditional side: a listing agent includes them.
-  const comparisons = TIER_ORDER.map((id) => ({ id, cmp: compareWithTraditional(id, price, buyerPct) }));
-  const trad = comparisons[0]!.cmp.traditional;
+  // One comparison per plan (compareWithOffer): the compensation the seller picks goes on
+  // BOTH sides, so "You save" is only the listing-side difference. Photos and documents
+  // are not charged on the traditional side: a listing agent includes them.
+  const comparisons = TIER_ORDER.map((id) => ({ id, cmp: compareWithOffer(id, price, offer) }));
+  const first = comparisons[0]!.cmp;
 
   const columns: Column[] = [
     {
@@ -122,36 +159,35 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
       label: copy.traditionalLabel.replace("{pct}", String(TRADITIONAL_COSTS.listingCommissionPct)),
       isTraditional: true,
       listingFee: 0,
-      sellerComm: trad.listingCommission,
+      sellerComm: first.traditionalListingCommission,
       sellerPct: TRADITIONAL_COSTS.listingCommissionPct,
       photos: null,
       photosText: copy.included,
       docusign: null,
       upfront: 0,
-      buyer: trad.buyerCommission,
-      closing: trad.total,
-      buyerPctShown: buyerPct,
-      total: trad.total,
+      buyer: first.buyerCompensation,
+      closing: first.traditionalTotal,
+      buyerShown,
+      total: first.traditionalTotal,
       savings: 0,
     },
     ...comparisons.map(({ id, cmp }): Column => {
       const tier = PRICING_TIERS[id];
-      const cost = cmp.lixtara;
       return {
         key: id,
         label: tierNames[id],
         isTraditional: false,
         listingFee: tier.flatFee,
-        sellerComm: cost.sellerCommission,
+        sellerComm: cmp.lixtaraCommission,
         sellerPct: tier.commissionPct,
         photos: null,
         photosText: tier.includesPhotography ? copy.included : copy.photoDiy,
         docusign: null,
-        upfront: cost.upfront,
-        buyer: cost.buyerCommission,
-        closing: cost.closing,
-        buyerPctShown: buyerPct,
-        total: cost.total,
+        upfront: cmp.flatFee,
+        buyer: cmp.buyerCompensation,
+        closing: cmp.lixtaraCommission + cmp.buyerCompensation,
+        buyerShown,
+        total: cmp.lixtaraTotal,
         savings: cmp.savings,
       };
     }),
@@ -162,7 +198,7 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
     .reduce((best, c) => (c.savings > best.savings ? c : best));
   const keyInsightText = copy.keyInsight
     .replace("{tier}", bestTier.label)
-    .replace("{pct}", `${buyerPct}%`)
+    .replace("{pct}", buyerShown)
     .replace("{amount}", usd(bestTier.savings));
 
   const headerCell =
@@ -214,25 +250,52 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
             {copy.buyerCommissionLabel}
           </span>
-          <div className="flex gap-2">
-            {[2, 2.5, 3].map((pct) => (
+          <div className="grid grid-cols-5 gap-2">
+            {[
+              { value: "0", label: copy.buyerCompNone },
+              ...BUYER_COMP_PRESET_PCTS.map((p) => ({ value: String(p), label: `${p}%` })),
+              { value: "custom", label: copy.buyerCompCustom },
+            ].map((o) => (
               <button
-                key={pct}
+                key={o.value}
                 type="button"
-                onClick={() => {
-                  touched.current = true;
-                  setBuyerPct(pct);
-                }}
-                className={`flex-1 px-4 py-3 text-sm font-medium tracking-wide transition-colors border-2 ${
-                  buyerPct === pct
+                aria-pressed={choice === o.value}
+                onClick={() => choose({ choice: o.value })}
+                className={`px-2 py-3 text-sm font-medium tracking-wide transition-colors border-2 ${
+                  choice === o.value
                     ? "border-gold bg-gold/10 text-ink"
                     : "border-gold-soft bg-ivory text-ink/70 hover:border-gold/60"
                 }`}
               >
-                {pct}%
+                {o.label}
               </button>
             ))}
           </div>
+          {choice === "custom" && (
+            <div className="flex items-center gap-2">
+              <div className="flex border-2 border-gold-soft" role="group" aria-label={copy.buyerCompCustomLabel}>
+                {(["percent", "amount"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={customKind === k}
+                    onClick={() => choose({ customKind: k })}
+                    className={`px-3 py-2 text-xs ${customKind === k ? "bg-gold/10 text-ink" : "text-ink/60"}`}
+                  >
+                    {k === "percent" ? copy.buyerCompCustomPercent : copy.buyerCompCustomAmount}
+                  </button>
+                ))}
+              </div>
+              <input
+                inputMode="decimal"
+                aria-label={copy.buyerCompCustomLabel}
+                placeholder={customKind === "percent" ? `0.5 – ${BUYER_COMP_MAX_PCT}` : "10,000"}
+                value={customValue}
+                onChange={(e) => choose({ customValue: e.target.value })}
+                className="w-32 border-2 border-gold-soft bg-ivory px-3 py-2 text-sm text-ink focus:border-gold focus:outline-none"
+              />
+            </div>
+          )}
           <p className="text-xs text-ink/55 italic leading-relaxed">
             {copy.buyerCommissionHint}
           </p>
@@ -351,13 +414,13 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
                   text={copy.tipBuyerCommission}
                 />
                 <span className="block text-[10px] text-ink/45 not-italic mt-0.5">
-                  {copy.youSelected} {buyerPct}%
+                  {copy.youSelected} {buyerShown}
                 </span>
               </td>
               {columns.map((c) => (
                 <td key={c.key} className={moneyCell}>
                   {usd(c.buyer)}
-                  <span className={pctTag}>({c.buyerPctShown}%)</span>
+                  <span className={pctTag}>({c.buyerShown})</span>
                 </td>
               ))}
             </tr>

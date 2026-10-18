@@ -14,6 +14,7 @@
 // surrounding flow (Stripe webhook, DocuSign webhook, admin approve) must not
 // fail just because the email send did. We log errors instead.
 
+import { publicationTimeline, refundPolicy } from "@/config/legal-terms";
 import { Resend } from "resend";
 import { BROKERAGE, brokerageLicenseLine } from "@/config/brokerage";
 import {
@@ -148,36 +149,41 @@ export async function sendPaymentReceipt(input: PaymentReceiptInput) {
   const commissionLine = commissionPct === null
     ? ""
     : isEs
-      ? `Además de esta tarifa, tu plan incluye una comisión Lixtara del ${commissionPct}% del precio de venta, que se paga al cierre y solo si tu propiedad se vende.`
-      : `In addition to this fee, your plan includes a ${commissionPct}% Lixtara commission on the sale price, paid at closing and only if your property sells.`;
+      ? `Además de esta tarifa fija, tu plan incluye una comisión de Lixtara del ${commissionPct}% del precio de venta, que se paga al cierre y solo si tu propiedad se vende.`
+      : `In addition to this flat fee, your plan includes a ${commissionPct}% Lixtara commission on the sale price, paid at closing and only if your property sells.`;
+  // Plazo y reembolso: los mismos textos que el paso 8, la FAQ y los Términos.
+  const publication = publicationTimeline.text[lang].sentence;
+  const refund = refundPolicy.text[lang];
   const commissionHtml = commissionLine
     ? `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${commissionLine}</p>`
     : "";
   const subject = isEs
-    ? `Pago recibido por tu listing ${tierName} de Lixtara`
-    : `Payment received for your ${tierName} Lixtara listing`;
+    ? `Pago recibido por tu plan ${tierName} de Lixtara`
+    : `Payment received for your ${tierName} Lixtara plan`;
 
   const body = isEs
     ? `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Tu pago llegó. ✓</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Gracias. Acabamos de procesar tu tarifa de listing <strong>${tierName}</strong> ($${input.amount.toLocaleString()}). Tu propiedad en <strong>${input.propertyAddress}</strong> está ahora en la cola de revisión del broker.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Gracias. Acabamos de procesar la tarifa fija de tu plan <strong>${tierName}</strong> ($${input.amount.toLocaleString()}). Tu propiedad en <strong>${input.propertyAddress}</strong> está ahora en la cola de revisión de la broker.</p>
     ${commissionHtml}
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Nuestro broker la revisa típicamente dentro de un día hábil. Te avisamos por email apenas esté live en MLS.</p>
-    ${button(input.dashboardUrl, "Ver mi dashboard")}
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${publication} Te avisamos por correo apenas esté publicada en el MLS.</p>
+    ${button(input.dashboardUrl, "Ver mi panel")}
+    <p style="font-size:12px;line-height:1.6;color:#666;">${refund}</p>
     <p style="font-size:12px;line-height:1.6;color:#666;">Recibo de pago${input.receiptUrl ? `: <a href="${input.receiptUrl}" style="color:#a18943;">ver en Stripe</a>` : " disponible en tu dashboard"}.</p>
   `
     : `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Payment confirmed. ✓</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Thank you. We've processed your <strong>${tierName}</strong> listing fee of $${input.amount.toLocaleString()}. Your property at <strong>${input.propertyAddress}</strong> is now in our broker review queue.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Thank you. We've processed the flat fee for your <strong>${tierName}</strong> plan ($${input.amount.toLocaleString()}). Your property at <strong>${input.propertyAddress}</strong> is now in the broker's review queue.</p>
     ${commissionHtml}
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Our broker typically reviews within one business day. We'll email you the moment it goes live on MLS.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${publication} We'll email you as soon as it's published on the MLS.</p>
     ${button(input.dashboardUrl, "View my dashboard")}
+    <p style="font-size:12px;line-height:1.6;color:#666;">${refund}</p>
     <p style="font-size:12px;line-height:1.6;color:#666;">Payment receipt${input.receiptUrl ? `: <a href="${input.receiptUrl}" style="color:#a18943;">view on Stripe</a>` : " available in your dashboard"}.</p>
   `;
 
   const text = isEs
-    ? `Pago recibido por $${input.amount.toLocaleString()} (${tierName}). Tu listing en ${input.propertyAddress} está en revisión del broker. ${commissionLine} Ver dashboard: ${input.dashboardUrl}`
-    : `Payment received: $${input.amount.toLocaleString()} (${tierName}). Your listing at ${input.propertyAddress} is in broker review. ${commissionLine} Dashboard: ${input.dashboardUrl}`;
+    ? `Pago recibido por $${input.amount.toLocaleString()} (${tierName}). Tu listado en ${input.propertyAddress} está en revisión de la broker. ${commissionLine} ${publication} ${refund} Ver panel: ${input.dashboardUrl}`
+    : `Payment received: $${input.amount.toLocaleString()} (${tierName}). Your listing at ${input.propertyAddress} is in broker review. ${commissionLine} ${publication} ${refund} Dashboard: ${input.dashboardUrl}`;
 
   return send({
     to: input.to,
@@ -198,18 +204,20 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
   const lang = input.lang ?? "en";
   const isEs = lang === "es";
   const subject = isEs
-    ? `Tu acuerdo de listing con Lixtara está firmado`
+    ? `Tu acuerdo de listado con Lixtara está firmado`
     : `Your Lixtara listing agreement is signed`;
 
   const body = isEs
     ? `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Tu acuerdo está firmado. ✓</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Recibimos tu firma del listing agreement para <strong>${input.propertyAddress}</strong>. El siguiente paso es el pago de tu tarifa fija para activar el listing.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Recibimos tu firma del acuerdo de listado para <strong>${input.propertyAddress}</strong>. El siguiente paso es el pago de tu tarifa fija.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${publicationTimeline.text.es.sentence}</p>
     ${button(input.paymentUrl, "Continuar al pago")}
   `
     : `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Your agreement is signed. ✓</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">We received your signature on the listing agreement for <strong>${input.propertyAddress}</strong>. Next step is your flat-fee payment to activate the listing.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">We received your signature on the listing agreement for <strong>${input.propertyAddress}</strong>. The next step is paying your flat fee.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${publicationTimeline.text.en.sentence}</p>
     ${button(input.paymentUrl, "Continue to payment")}
   `;
 
@@ -218,7 +226,7 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
     subject,
     html: shell({ preheader: isEs ? "Acuerdo firmado" : "Agreement signed", body, lang }),
     text: isEs
-      ? `Tu acuerdo de listing está firmado. Continúa al pago: ${input.paymentUrl}`
+      ? `Tu acuerdo de listado está firmado. Continúa al pago: ${input.paymentUrl}`
       : `Your listing agreement is signed. Continue to payment: ${input.paymentUrl}`,
   });
 }
@@ -234,30 +242,32 @@ export async function sendListingApproved(input: ListingApprovedInput) {
   const lang = input.lang ?? "en";
   const isEs = lang === "es";
   const subject = isEs
-    ? `🎉 Tu listing de Lixtara está en vivo en MLS`
-    : `🎉 Your Lixtara listing is live on MLS`;
+    ? `🎉 Tu propiedad está publicada en el MLS`
+    : `🎉 Your property is published on the MLS`;
 
   const body = isEs
     ? `
-    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">¡Tu listing está activo! 🎉</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Nuestro broker aprobó tu listing de <strong>${input.propertyAddress}</strong>. Acaba de sincronizarse con MLS y debería aparecer en Zillow, Realtor.com, Redfin y Trulia en las próximas horas.</p>
-    ${button(input.listingUrl, "Ver mi listing")}
-    <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Próximos pasos: las solicitudes de visita y las ofertas de los compradores van a aparecer en tu dashboard. Te avisamos por email de cada una.</p>
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">¡Tu propiedad está publicada! 🎉</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">La broker aprobó tu listado de <strong>${input.propertyAddress}</strong> y ya está publicado en el MLS. Desde el MLS se distribuye a portales como Zillow, Realtor.com, Redfin y Trulia; cada portal decide cuándo y cómo lo muestra.</p>
+    ${button(input.listingUrl, "Ver mi listado")}
+    <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Próximos pasos: las solicitudes de visita y las ofertas de los compradores van a aparecer en tu panel. Te avisamos por correo de cada una.</p>
+    <p style="font-size:12px;line-height:1.6;color:#666;">${refundPolicy.text.es}</p>
   `
     : `
-    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Your listing is live! 🎉</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Our broker approved your listing for <strong>${input.propertyAddress}</strong>. It just synced to MLS and should appear on Zillow, Realtor.com, Redfin and Trulia within the next few hours.</p>
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Your property is published! 🎉</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">The broker approved your listing for <strong>${input.propertyAddress}</strong>, and it's now published on the MLS. From the MLS it's syndicated to portals like Zillow, Realtor.com, Redfin and Trulia; each portal decides when and how it shows it.</p>
     ${button(input.listingUrl, "View my listing")}
     <p style="font-size:13px;line-height:1.7;color:#1c1c1c;">Next: showing requests and offers from buyers will appear in your dashboard. We'll email you each one.</p>
+    <p style="font-size:12px;line-height:1.6;color:#666;">${refundPolicy.text.en}</p>
   `;
 
   return send({
     to: input.to,
     subject,
-    html: shell({ preheader: isEs ? "Tu listing está en vivo" : "Your listing is live", body, lang }),
+    html: shell({ preheader: isEs ? "Tu propiedad está publicada en el MLS" : "Your property is published on the MLS", body, lang }),
     text: isEs
-      ? `Tu listing en ${input.propertyAddress} está activo en MLS. ${input.listingUrl}`
-      : `Your listing at ${input.propertyAddress} is live on MLS. ${input.listingUrl}`,
+      ? `Tu propiedad en ${input.propertyAddress} está publicada en el MLS. ${input.listingUrl} ${refundPolicy.text.es}`
+      : `Your property at ${input.propertyAddress} is published on the MLS. ${input.listingUrl} ${refundPolicy.text.en}`,
   });
 }
 
@@ -277,7 +287,7 @@ export async function sendBrokerNewPending(input: BrokerNewPendingInput) {
 
   const body = `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">New listing for broker review</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">A seller paid + signed and is awaiting approval to go live on MLS.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">A seller paid + signed and is awaiting approval to be published on the MLS.</p>
     <table cellpadding="0" cellspacing="0" style="margin:16px 0;font-size:13px;color:#1c1c1c;">
       <tr><td style="padding:4px 16px 4px 0;color:#8a8268;text-transform:uppercase;font-size:10px;letter-spacing:0.18em;">Address</td><td style="padding:4px 0;">${input.propertyAddress}</td></tr>
       <tr><td style="padding:4px 16px 4px 0;color:#8a8268;text-transform:uppercase;font-size:10px;letter-spacing:0.18em;">Seller</td><td style="padding:4px 0;">${input.sellerName}</td></tr>
