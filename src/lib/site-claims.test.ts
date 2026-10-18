@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { dictionaryTexts, legalTermTexts, type Lang, type SiteText } from "@/lib/site-texts.test-helpers";
+import { dictionaryTexts, legalTermTexts, sentences, type Lang, type SiteText } from "@/lib/site-texts.test-helpers";
 import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
 import { dictionaries } from "@/lib/i18n";
 import { BROKERAGE, CONTACT_EMAIL, DBPR_BROKER_LICENSE_URL, DBPR_BROKERAGE_LICENSE_URL, fillBrokerageCopy } from "@/config/brokerage";
@@ -197,6 +197,25 @@ describe("entradas de comprador", () => {
   });
 });
 
+describe.each(["en", "es"] as const)("%s: ningún texto promete aparecer directamente en un portal", (lang) => {
+  it("toda frase que nombra Zillow, Realtor.com, Redfin o Trulia dice que llegan desde el MLS", () => {
+    const PORTAL = /\b(Zillow|Realtor\.com|Redfin|Trulia)\b/;
+    const VIA_MLS = /\bMLS\b[^.]*\b(syndicat\w*|feeds|distribu\w*|alimenta)\b|\b(syndicat\w*|distribu\w*)\b[^.]*\bMLS\b/i;
+    const bad: string[] = [];
+    for (const { where, text } of siteTexts(lang)) {
+      for (const sentence of sentences(text)) {
+        if (!PORTAL.test(sentence)) continue;
+        // Mención técnica, no de publicación: los recorridos 3D usan la misma tecnología que Zillow SkyTour.
+        if (/SkyTour/.test(sentence)) continue;
+        // Desde el MLS (frase anterior o la misma).
+        if (VIA_MLS.test(sentence) || /^(From the MLS|Desde el MLS|From there|Desde ahí)(?=[\s,])/.test(sentence)) continue;
+        bad.push(`${where}: ${sentence}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+});
+
 describe("portada: hero nuevo (2026-10-18)", () => {
   const fee = formatPrice(Math.min(...TIER_ORDER.map((id) => PRICING_TIERS[id].flatFee)));
   const pct = `${Math.min(...TIER_ORDER.map((id) => PRICING_TIERS[id].commissionPct))}%`;
@@ -245,13 +264,13 @@ describe("landing de propietarios (/owners)", () => {
     if (lang === "en") {
       expect(title).toBe("A licensed Florida brokerage. A fraction of the commission.");
       expect(fillBrokerageCopy(c.intro)).toBe(
-        `${BROKERAGE.brokerName} and her team, 20+ years in Florida real estate, put your home on the MLS, Zillow, Realtor.com and Redfin. You pay a flat fee, plus a small commission only if it sells.`,
+        `${BROKERAGE.brokerName} and her team, 20+ years in Florida real estate, put your home on the MLS, which feeds Zillow, Realtor.com and Redfin. You pay a flat fee, plus a small commission only if it sells.`,
       );
       expect([c.ctaListing, c.ctaTalk]).toEqual(["Start my listing", "Talk to our team"]);
     } else {
       expect(title).toBe("Una inmobiliaria licenciada en Florida. Una fracción de la comisión.");
       expect(fillBrokerageCopy(c.intro)).toBe(
-        `${BROKERAGE.brokerName} y su equipo, con más de 20 años en el mercado inmobiliario de Florida, ponen tu casa en el MLS, Zillow, Realtor.com y Redfin. Pagas una tarifa fija, más una comisión baja solo si se vende.`,
+        `${BROKERAGE.brokerName} y su equipo, con más de 20 años en el mercado inmobiliario de Florida, ponen tu casa en el MLS, que alimenta a Zillow, Realtor.com y Redfin. Pagas una tarifa fija, más una comisión baja solo si se vende.`,
       );
       expect([c.ctaListing, c.ctaTalk]).toEqual(["Publicar mi casa", "Hablar con nuestro equipo"]);
     }
@@ -321,6 +340,21 @@ describe("landing de propietarios (/owners)", () => {
     const slider = read("src/components/savings-slider.tsx");
     expect(slider).toContain('className="grid grid-cols-4 sm:grid-cols-5 gap-2"');
     expect(slider).toContain('o.value === "custom" ? "col-span-4 sm:col-span-1" : ""');
+  });
+
+  it("calculadora en móvil: una tarjeta por columna (tradicional + 3 planes); la tabla desde md", () => {
+    const slider = read("src/components/savings-slider.tsx");
+    expect(slider).toContain('<ul className="md:hidden flex flex-col gap-4">');
+    expect(slider).toContain('<div className="hidden md:block overflow-x-auto">');
+    // Cada tarjeta trae el total y, en los planes, el ahorro.
+    expect(slider).toMatch(/md:hidden[\s\S]*copy\.lineTotal[\s\S]*copy\.lineSavings[\s\S]*hidden md:block/);
+  });
+
+  it("Loui en móvil: el botón flotante se oculta mientras tapa un enlace, botón o campo", () => {
+    const loui = read("src/components/loui-widget.tsx");
+    expect(loui).toContain("const covering = useCoversInteractive(buttonRef, !open);");
+    expect(loui).toContain('const MOBILE = "(max-width: 767px)";');
+    expect(loui).toContain('covering ? "opacity-0 pointer-events-none" : "opacity-100"');
   });
 
   it("cuenta visitas en funnel_events solo con el idioma, después de responder", () => {
