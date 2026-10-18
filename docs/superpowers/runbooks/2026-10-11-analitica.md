@@ -125,3 +125,37 @@ Los textos del banner y de la variante con analítica de la política de cookies
 - **GA4 `purchase`** desde el webhook de Stripe (Measurement Protocol): solo con consentimiento `granted` guardado en el Checkout, `livemode`, Production y propiedad no `is_test`. `transaction_id` = id de la sesión de Stripe.
 - **Validar el webhook con una compra real reembolsada:** marcar ese listing `is_test` desde el admin **antes** de pagar; así no cuenta en el tablero ni como ingreso en GA4, y se verifica directo en `funnel_events`.
 
+
+## Portada y landing de propietarios (2026-10-18)
+
+### Enlace de Instantly
+```
+https://lixtara.com/en/owners?utm_source=instantly&utm_medium=email&utm_campaign=<campaña>
+https://lixtara.com/es/owners?utm_source=instantly&utm_medium=email&utm_campaign=<campaña>
+```
+- `<campaña>`: minúsculas, números, `.`, `_` o `-`, hasta 64 caracteres (p. ej. `fl-owners-2026-10`). Los espacios pasan a `_`. Si trae otra cosa (`@`, acentos), se descarta.
+- **Nunca** se agrega al enlace ningún dato del propietario: ni nombre, ni dirección, ni email, ni `owner_key`, ni variables de Instantly como `{{firstName}}`. La página no se personaliza.
+- Helper: `ownersInstantlyUrl()` (`src/lib/owners-landing.ts`).
+
+### Qué se registra
+- **Primer contacto (con consentimiento):** la cookie `lx_ft` guarda `source|medium|campaign` en la primera visita con UTM. El paso 1 del registro la lleva a `funnel_events` y a `listing_funnel_v`. No cambió.
+- **`lx_page_view` (con consentimiento):** cuando la URL trae UTM, lleva además `campaign_source`, `campaign_medium` y `campaign_name`, ya saneados. `page_location` sigue **sin parámetros**. PostHog recibe los mismos valores como `utm_source`, `utm_medium` y `utm_campaign` en `$pageview`.
+- **`listing_cta_click`:** `location` = `home_hero` (portada; **antes `hero`**), `owners_hero` u `owners_footer` (landing). Las demás ubicaciones no cambian (`header`, `pricing`, `footer`, `plan_quiz`, `about`).
+- **`owners_landing_view` (servidor, sin consentimiento):** una fila en `funnel_events` por visita de navegador a `/owners`. Lleva solo `metadata.lang`, y `property_id`, `user_id` y `session_id` vacíos (no entra a `listing_funnel_v`). No cuenta bots, escáneres de enlaces de correo, clientes HTTP ni prefetch (`isHumanPageView`). `is_test` = entorno distinto de Production.
+
+```sql
+-- Visitas a /owners por día e idioma (Production)
+select date_trunc('day', created_at at time zone 'America/New_York') as dia,
+       metadata->>'lang' as lang, count(*) as visitas
+  from public.funnel_events
+ where event = 'owners_landing_view' and is_test = false
+ group by 1, 2 order by 1 desc, 2;
+```
+
+### Qué configura el CMO en GTM (`GTM-5KGLHNL4`)
+1. **Variables de capa de datos:** `campaign_source`, `campaign_medium`, `campaign_name`, `location`, `lang` y `tier`.
+2. **Etiqueta GA4 Event `page_view`** (la que dispara `lx_page_view`): agregar los parámetros `campaign_source` = `{{DLV campaign_source}}`, `campaign_medium` = `{{DLV campaign_medium}}` y `campaign_name` = `{{DLV campaign_name}}`. Sin esto, GA4 atribuye estas visitas a "direct", porque `page_location` va sin UTM.
+3. **Etiqueta GA4 Event `{{Event}}`:** agregar `listing_cta_click` a la regex del disparador, con los parámetros `location`, `lang` y `tier`.
+4. **GA4 → Admin → Custom definitions:** dimensión de evento `location` (y `tier`, si no existe).
+5. **Informes:** donde se filtraba `location = hero`, ahora es `home_hero`.
+6. **Verificar en GTM Preview y en GA4 DebugView:** abrir `/en/owners?utm_source=instantly&utm_medium=email&utm_campaign=prueba`, aceptar cookies y comprobar que `page_view` lleva `campaign_source = instantly`. Pulsar "Start my listing" y comprobar `listing_cta_click` con `location = owners_hero`.

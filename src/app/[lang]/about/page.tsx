@@ -2,13 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
-import {
-  BROKERAGE,
-  DBPR_BROKERAGE_LICENSE_URL,
-  brokerageLicenseLine,
-  fillBrokerageCopy,
-} from "@/config/brokerage";
-import { CONTACT, telHref, whatsappHref } from "@/config/contact";
+import { BROKERAGE, brokerageLicenseLine, fillBrokerageCopy } from "@/config/brokerage";
+import { BrokerageFacts } from "@/components/brokerage-facts";
 import { BROKER_PROFILE, TEAM_MEMBERS, initials } from "@/config/team";
 import { buyerContactHref } from "@/lib/buyer-entry";
 import { ListingCtaLink } from "@/components/listing-cta-link";
@@ -45,30 +40,6 @@ export default async function AboutPage({
     ...TEAM_MEMBERS.map((m) => ({ name: m.name, role: m.role[lang], photo: m.photo, bio: m.bio?.[lang] ?? null })),
   ];
 
-  const facts: { label: string; value: React.ReactNode }[] = [
-    { label: copy.brokerageLabel, value: `${BROKERAGE.legalName} · ${copy.licenseLabel} #${BROKERAGE.brokerageLicense}` },
-    { label: copy.brokerLabel, value: `${BROKERAGE.brokerName} · ${copy.licenseLabel} #${BROKERAGE.brokerLicense}` },
-    { label: copy.officeLabel, value: BROKERAGE.address },
-    {
-      label: copy.phoneLabel,
-      value: (
-        <span className="flex flex-wrap gap-x-4 gap-y-1">
-          <a href={telHref()} className="underline decoration-gold-soft underline-offset-4 hover:text-gold">
-            {CONTACT.phoneDisplay}
-          </a>
-          <a
-            href={whatsappHref()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline decoration-gold-soft underline-offset-4 hover:text-gold"
-          >
-            WhatsApp<span className="sr-only"> {copy.opensNewTab}</span>
-          </a>
-        </span>
-      ),
-    },
-  ];
-
   return (
     <main className="bg-background text-foreground flex-1">
       <section className="mx-auto w-full max-w-5xl px-6 lg:px-12 py-20 lg:py-28 flex flex-col gap-16">
@@ -102,22 +73,7 @@ export default async function AboutPage({
 
         <div className="border-t border-gold-soft pt-12 flex flex-col gap-8">
           <h2 className="font-display text-3xl text-ink font-normal">{copy.factsTitle}</h2>
-          <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-            {facts.map((f) => (
-              <div key={f.label} className="flex flex-col gap-1 min-w-0">
-                <dt className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">{f.label}</dt>
-                <dd className="text-base text-ink break-words">{f.value}</dd>
-              </div>
-            ))}
-          </dl>
-          <a
-            href={DBPR_BROKERAGE_LICENSE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="self-start text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors"
-          >
-            {copy.verifyDbpr} ↗<span className="sr-only"> {copy.opensNewTab}</span>
-          </a>
+          <BrokerageFacts lang={lang} />
         </div>
 
         <div className="border-t border-gold-soft pt-12 flex flex-col gap-8">

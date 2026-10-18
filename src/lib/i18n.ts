@@ -13,14 +13,14 @@ export const dictionaries = {
   en: {
     hero: {
       eyebrow: "Licensed Florida brokerage",
-      headlineBefore: "Your home, ",
-      headlineAccent: "your terms",
-      headlineAfter: ". Sell with confidence and control.",
+      headlineBefore: "Sell your Florida home. ",
+      headlineAccent: "Keep more of what you've earned.",
+      headlineAfter: "",
+      // {minFee} y {minPct}: el plan más bajo de pricing-tiers.ts (src/lib/pricing-from.ts).
       subheadline:
-        "Smart technology and licensed brokers guide every step, and more of your sale stays with you.",
-      ctaPrimary: "Start selling",
-      ctaSecondary: "Browse Florida listings",
-      ctaSecondaryNoListings: "Tell us what you're looking for",
+        "List on the MLS with a licensed brokerage and a team with {teamYears}+ years of experience. Plans from {minFee}, plus {minPct} only if your home sells.",
+      ctaPrimary: "See what you'd pay",
+      ctaSecondary: "Start my listing",
       licenseLabel: "FL License #{brokerageLicense}",
       verifyDbpr: "Verify on DBPR",
       opensNewTab: "(opens in a new tab)",
@@ -382,8 +382,8 @@ export const dictionaries = {
         coopDifficult: "Tenant is difficult (explain below)",
         tenantNotesLabel: "Tell us about the tenant situation",
         tenantNotesPlaceholder: "e.g. limited showing windows, pets, access constraints…",
-        showPhoneLabel: "Show my phone number on Zillow / Realtor / Redfin",
-        showPhoneHelp: "Buyers contact you directly via portal forms regardless. Enable this only if you also want your number visible.",
+        showPhoneLabel: "Show my phone number in the listing",
+        showPhoneHelp: "Your listing goes on the MLS, which feeds portals like Zillow, Realtor.com and Redfin; each portal decides what it shows. Turn this on only if you want your number visible where it's shown.",
         boolGroupLabel: "Sale conditions",
         appliancesTitle: "Appliances included",
         appliancesBody: "Check the appliances that stay with the home. These are written into your sale contract as included personal property.",
@@ -1243,6 +1243,40 @@ export const dictionaries = {
       },
       officeLabel: "Office",
     },
+    // Landing de propietarios (/owners): destino de los correos de Instantly. Sin enlace en
+    // el menú y con noindex. {contactEmail} sale de CONTACT_EMAIL (src/config/brokerage.ts).
+    ownersPage: {
+      metaTitle: "For Florida homeowners",
+      metaDescription: "A licensed Florida brokerage. A fraction of the commission.",
+      eyebrow: "For Florida homeowners",
+      titleBefore: "A licensed Florida brokerage. ",
+      titleAccent: "A fraction of the commission.",
+      titleAfter: "",
+      intro:
+        "{brokerName} and her team, {teamYears}+ years in Florida real estate, put your home on the MLS, which feeds Zillow, Realtor.com and Redfin. You pay a flat fee, plus a small commission only if it sells.",
+      ctaListing: "Start my listing",
+      ctaTalk: "Talk to our team",
+      whoEyebrow: "Who's writing to you",
+      whoTitle: "{brokerageName}, a licensed Florida brokerage",
+      whoBody: "{brokerName} and her team answer your email. These are our details, the same ones you can check on the Florida DBPR.",
+      faqEyebrow: "Questions",
+      faqTitle: "Common questions",
+      faq: [
+        {
+          q: "Why did I get this email?",
+          a: "Because public records show you own property in Florida, and Lixtara helps owners sell with a lower commission.",
+        },
+        {
+          q: "Where did you get my information?",
+          a: "From public records: the Florida Department of Revenue and, for companies, Sunbiz. We don't buy lists of personal data.",
+        },
+        {
+          q: "How do I stop receiving emails?",
+          a: "Use the unsubscribe link in any email and you're removed right away. If you email {contactEmail} instead, we'll remove you within 10 business days.",
+        },
+      ],
+      finalTitle: "Want to list your home?",
+    },
     aboutPage: {
       metaTitle: "About Lixtara",
       eyebrow: "About",
@@ -1928,14 +1962,13 @@ export const dictionaries = {
   es: {
     hero: {
       eyebrow: "Inmobiliaria licenciada en Florida",
-      headlineBefore: "Tu casa, ",
-      headlineAccent: "tus reglas",
-      headlineAfter: ". Vende con control y confianza.",
+      headlineBefore: "Vende tu casa en Florida. ",
+      headlineAccent: "Quédate con más de lo que ganaste.",
+      headlineAfter: "",
       subheadline:
-        "Tecnología inteligente y brokers licenciados te guían en cada paso, y más de tu venta se queda contigo.",
-      ctaPrimary: "Empieza a vender",
-      ctaSecondary: "Ver propiedades en Florida",
-      ctaSecondaryNoListings: "Cuéntanos qué buscas",
+        "Publica en el MLS con una inmobiliaria licenciada y un equipo con más de {teamYears} años de experiencia. Planes desde {minFee}, más {minPct} solo si tu casa se vende.",
+      ctaPrimary: "Calcula cuánto pagarías",
+      ctaSecondary: "Publicar mi casa",
       licenseLabel: "Licencia FL #{brokerageLicense}",
       verifyDbpr: "Verificar en DBPR",
       opensNewTab: "(se abre en una pestaña nueva)",
@@ -2297,8 +2330,8 @@ export const dictionaries = {
         coopDifficult: "El inquilino es difícil (explicar abajo)",
         tenantNotesLabel: "Cuéntanos sobre la situación del inquilino",
         tenantNotesPlaceholder: "ej. horarios de visita limitados, mascotas, restricciones de acceso…",
-        showPhoneLabel: "Mostrar mi teléfono en Zillow / Realtor / Redfin",
-        showPhoneHelp: "Los compradores te contactan vía formulario del portal de todos modos. Activa esto solo si también quieres que tu número aparezca visible.",
+        showPhoneLabel: "Mostrar mi teléfono en el listado",
+        showPhoneHelp: "Tu listado va al MLS, que alimenta a portales como Zillow, Realtor.com y Redfin; cada portal decide qué muestra. Actívalo solo si quieres que tu número se vea donde se muestre.",
         boolGroupLabel: "Condiciones de venta",
         appliancesTitle: "Electrodomésticos incluidos",
         appliancesBody: "Marca los electrodomésticos que quedan con la casa. Se incluyen en tu contrato de venta como propiedad personal incluida.",
@@ -2750,7 +2783,7 @@ export const dictionaries = {
       memberSince: "Miembro desde el",
       emailChange: "Es el correo que usamos para tu cuenta, tus acuerdos y tus pagos. Para cambiarlo, escribe a",
       profileTitle: "Información personal",
-      profileBody: "Tu nombre aparece en tu acuerdo de listado. Tu teléfono le permite a nuestro broker contactarte rápido.",
+      profileBody: "Tu nombre aparece en tu acuerdo de listado. Tu teléfono le permite a nuestra broker contactarte rápido.",
       firstName: "Nombre",
       lastName: "Apellido",
       phone: "Teléfono (opcional, con código de país si no es de EE. UU.)",
@@ -3157,6 +3190,38 @@ export const dictionaries = {
         send_failed: "No pudimos enviar tu mensaje. Intenta de nuevo o escríbenos por WhatsApp.",
       },
       officeLabel: "Oficina",
+    },
+    ownersPage: {
+      metaTitle: "Para propietarios en Florida",
+      metaDescription: "Una inmobiliaria licenciada en Florida. Una fracción de la comisión.",
+      eyebrow: "Para propietarios en Florida",
+      titleBefore: "Una inmobiliaria licenciada en Florida. ",
+      titleAccent: "Una fracción de la comisión.",
+      titleAfter: "",
+      intro:
+        "{brokerName} y su equipo, con más de {teamYears} años en el mercado inmobiliario de Florida, ponen tu casa en el MLS, que alimenta a Zillow, Realtor.com y Redfin. Pagas una tarifa fija, más una comisión baja solo si se vende.",
+      ctaListing: "Publicar mi casa",
+      ctaTalk: "Hablar con nuestro equipo",
+      whoEyebrow: "Quién te escribe",
+      whoTitle: "{brokerageName}, una inmobiliaria licenciada en Florida",
+      whoBody: "{brokerName} y su equipo responden tu correo. Estos son nuestros datos, los mismos que puedes verificar en el DBPR de Florida.",
+      faqEyebrow: "Preguntas",
+      faqTitle: "Preguntas frecuentes",
+      faq: [
+        {
+          q: "¿Por qué recibí este correo?",
+          a: "Porque eres propietario de un inmueble en Florida según registros públicos, y Lixtara ayuda a propietarios a vender con menos comisión.",
+        },
+        {
+          q: "¿De dónde sacaron mis datos?",
+          a: "De registros públicos del Departamento de Ingresos de Florida y, para empresas, de Sunbiz. No compramos listas de datos personales.",
+        },
+        {
+          q: "¿Cómo dejo de recibir correos?",
+          a: "Usa el enlace ‘unsubscribe’ de cualquier correo y te quitamos de inmediato. Si prefieres escribir a {contactEmail}, te quitamos en un máximo de 10 días hábiles.",
+        },
+      ],
+      finalTitle: "¿Quieres publicar tu casa?",
     },
     aboutPage: {
       metaTitle: "Sobre Lixtara",

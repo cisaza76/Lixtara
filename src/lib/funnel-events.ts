@@ -76,6 +76,26 @@ export function firstTouchCookieValue(params: URLSearchParams): string | null {
   return parts.some(Boolean) ? parts.join("|") : null;
 }
 
+/**
+ * UTM de la URL actual como campos de campaña de GA4 (campaign_source, campaign_medium,
+ * campaign_name), con la misma limpieza que la cookie. Van en lx_page_view como campos
+ * aparte: page_location sigue sin parámetros. Vacío si la URL no trae UTM.
+ */
+export function campaignFields(params: URLSearchParams): {
+  campaign_source?: string;
+  campaign_medium?: string;
+  campaign_name?: string;
+} {
+  const source = cleanUtm(params.get("utm_source"));
+  const medium = cleanUtm(params.get("utm_medium"));
+  const name = cleanUtm(params.get("utm_campaign"));
+  return {
+    ...(source ? { campaign_source: source } : {}),
+    ...(medium ? { campaign_medium: medium } : {}),
+    ...(name ? { campaign_name: name } : {}),
+  };
+}
+
 export function parseFirstTouch(value: string | undefined): {
   utm_source?: string;
   utm_medium?: string;
@@ -88,4 +108,23 @@ export function parseFirstTouch(value: string | undefined): {
     ...(medium ? { utm_medium: medium } : {}),
     ...(campaign ? { utm_campaign: campaign } : {}),
   };
+}
+
+// --- Visitas a páginas de campaña (sin listing) ---------------------------------------
+// Un conteo propio, sin consentimiento porque no lleva identificadores: ni usuario, ni
+// sesión, ni listing, ni UTM; solo el idioma. property_id null = no entra a listing_funnel_v.
+
+export type PageViewEventName = "owners_landing_view";
+
+// Bots, escáneres de enlaces de correo (Safe Links, Mimecast, Proofpoint…), vistas previas y
+// clientes HTTP. Contarlos inflaría las visitas de cada envío.
+const AUTOMATED_UA =
+  /bot|crawl|spider|slurp|preview|scan|monitor|safe ?links|mimecast|proofpoint|barracuda|headless|lighthouse|curl|wget|python|java\/|go-http|okhttp|axios|node-fetch|undici/i;
+
+/** ¿La visita es de un navegador real? Sin user-agent o con prefetch, no se cuenta. */
+export function isHumanPageView(input: { userAgent: string | null; purpose: string | null }): boolean {
+  const ua = (input.userAgent ?? "").trim();
+  if (!ua || AUTOMATED_UA.test(ua)) return false;
+  if (input.purpose && /prefetch|prerender/i.test(input.purpose)) return false;
+  return true;
 }

@@ -263,7 +263,9 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
             {copy.buyerCommissionLabel}
           </span>
-          <div className="grid grid-cols-5 gap-2">
+          {/* En móvil, los 4 porcentajes en una fila y "Personalizado" debajo, a todo el
+              ancho: con 5 columnas no cabe a 375 px y desborda la página. */}
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
             {[
               { value: "0", label: copy.buyerCompNone },
               ...BUYER_COMP_PRESET_PCTS.map((p) => ({ value: String(p), label: `${p}%` })),
@@ -275,6 +277,8 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
                 aria-pressed={choice === o.value}
                 onClick={() => choose({ choice: o.value })}
                 className={`px-2 py-3 text-sm font-medium tracking-wide transition-colors border-2 ${
+                  o.value === "custom" ? "col-span-4 sm:col-span-1" : ""
+                } ${
                   choice === o.value
                     ? "border-gold bg-gold/10 text-ink"
                     : "border-gold-soft bg-ivory text-ink/70 hover:border-gold/60"
@@ -326,7 +330,62 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
       <p className="border-l-2 border-gold pl-3 text-xs text-ink/70 leading-relaxed">
         {copy.upfrontLegend}
       </p>
-      <div className="overflow-x-auto">
+      {/* Móvil: una tarjeta por columna (tradicional y cada plan), una debajo de otra, con
+          las mismas cifras que la tabla. En una tabla de 4 columnas a 375 px, Pro y Concierge
+          quedaban fuera de la vista sin aviso. */}
+      <ul className="md:hidden flex flex-col gap-4">
+        {columns.map((c) => (
+          <li
+            key={c.key}
+            className={`border p-5 flex flex-col gap-4 ${
+              c.isTraditional ? "border-gold-soft bg-ivory" : "border-gold bg-ivory"
+            }`}
+          >
+            <h3
+              className={`text-[11px] uppercase tracking-[0.18em] font-semibold ${
+                c.isTraditional ? "text-ink/55" : "text-gold"
+              }`}
+            >
+              {c.label}
+            </h3>
+            <dl className="flex flex-col gap-2 text-sm">
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-ink/70 text-xs">{copy.lineUpfrontSubtotal}</dt>
+                <dd className="text-ink text-right">{usd(c.upfront)}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-ink/70 text-xs">{copy.linePhotos}</dt>
+                <dd className="text-ink/60 italic text-right">{c.photosText}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-ink/70 text-xs">{copy.lineSellerCommission}</dt>
+                <dd className="text-ink text-right">
+                  {usd(c.sellerComm)}
+                  <span className={pctTag}>({c.sellerPct}%)</span>
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-ink/70 text-xs">{copy.lineBuyerCommission}</dt>
+                <dd className="text-ink text-right">
+                  {usd(c.buyer)}
+                  <span className={pctTag}>({c.buyerShown})</span>
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4 border-t border-gold-soft pt-3 mt-1">
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-ink font-semibold">{copy.lineTotal}</dt>
+                <dd className="font-display text-xl text-ink text-right">{usd(c.total)}</dd>
+              </div>
+              {!c.isTraditional && (
+                <div className="flex items-baseline justify-between gap-4">
+                  <dt className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">{copy.lineSavings}</dt>
+                  <dd className="font-display italic text-2xl text-gold text-right">{usd(c.savings)}</dd>
+                </div>
+              )}
+            </dl>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm border border-gold-soft">
           <thead>
             <tr className="bg-ivory-strong/40">

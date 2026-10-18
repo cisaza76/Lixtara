@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const createService = vi.fn();
 vi.mock("@/lib/supabase/service", () => ({ createService: () => createService() }));
 
-import { recordFunnelEvent } from "@/lib/funnel-events.server";
+import { recordFunnelEvent, recordPageViewEvent } from "@/lib/funnel-events.server";
 
 const input = { event: "listing_paid", propertyId: "p1", step: 8, livemode: true } as const;
 
@@ -85,5 +85,33 @@ describe("recordFunnelEvent nunca lanza (no puede volver 500 el webhook de Strip
     expect(leadEq).not.toHaveBeenCalled();
     expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: { lang: "en" } }));
     vi.unstubAllEnvs();
+  });
+});
+
+describe("recordPageViewEvent", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("solo el evento y el idioma: sin usuario, sesión, listing ni UTM", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    createService.mockReturnValue({ from: () => ({ insert }) });
+    await recordPageViewEvent("owners_landing_view", "es");
+    expect(insert).toHaveBeenCalledWith({ event: "owners_landing_view", metadata: { lang: "es" }, is_test: false });
+  });
+
+  it("fuera de Production es de prueba, y nunca lanza", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    createService.mockReturnValue({ from: () => ({ insert }) });
+    await recordPageViewEvent("owners_landing_view", "en");
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ is_test: true }));
+    createService.mockImplementation(() => {
+      throw new Error("no env");
+    });
+    await expect(recordPageViewEvent("owners_landing_view", "en")).resolves.toBeUndefined();
   });
 });

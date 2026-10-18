@@ -51,7 +51,11 @@ describe("resolveSlugAlias (#114)", () => {
 
   it("cada ancla existe en la landing", async () => {
     const { readFileSync } = await import("node:fs");
-    const landing = readFileSync(join(LANG_DIR, "page.tsx"), "utf8");
+    // Las secciones compartidas con /owners (cómo funciona, calculadora, planes) viven en
+    // src/components/home-sections.tsx.
+    const landing =
+      readFileSync(join(LANG_DIR, "page.tsx"), "utf8") +
+      readFileSync(join(LANG_DIR, "../../components/home-sections.tsx"), "utf8");
     for (const id of new Set(Object.values(SPANISH_ANCHOR_ALIASES))) {
       expect(landing, id).toContain(`id="${id}"`);
     }

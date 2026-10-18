@@ -54,6 +54,11 @@ async function allTexts(lang: Lang): Promise<SiteText[]> {
 // listado en el MLS" sin nombrar la compensación).
 const COMP = /buyer'?s agent|buyer-agent|buyers' agents|agentes? del comprador|compensaci[oó]n/i;
 
+// Único plazo en días hábiles que no es la publicación: la baja por correo de /owners ("we'll
+// remove you within 10 business days" / "te quitamos en un máximo de 10 días hábiles"). Su
+// texto exacto lo fija site-claims.test.ts.
+const UNSUBSCRIBE = /\b(remove you|te quitamos)\b/i;
+
 describe.each(["en", "es"] as const)("%s: el sitio no contradice legal-terms.ts", (lang) => {
   it("plazo de publicación: nunca horas, ni 'tras la firma', ni otro número de días hábiles", async () => {
     const bad: string[] = [];
@@ -64,7 +69,7 @@ describe.each(["en", "es"] as const)("%s: el sitio no contradice legal-terms.ts"
         const aboutPublishing = /\b(MLS|publish|published|publica|publicad|live|go live)\b/i.test(s);
         if (aboutPublishing && /\b(24|48|72) ?(h|hrs?|hours|horas)\b|24\/48/i.test(s)) bad.push(`${where}: ${s}`);
         if (/\b\d+ (days|días) (after|tras|despu[eé]s de) (signing|la firma)/i.test(s)) bad.push(`${where}: ${s}`);
-        for (const m of s.matchAll(/\b(\d+) (business days|días hábiles)\b/gi)) {
+        for (const m of UNSUBSCRIBE.test(s) ? [] : s.matchAll(/\b(\d+) (business days|días hábiles)\b/gi)) {
           if (Number(m[1]) !== PUBLICATION_BUSINESS_DAYS) bad.push(`${where}: ${s}`);
         }
         if (/\bpriority (MLS )?publication|publicaci[oó]n prioritaria/i.test(s)) bad.push(`${where}: ${s}`);
@@ -77,7 +82,7 @@ describe.each(["en", "es"] as const)("%s: el sitio no contradice legal-terms.ts"
     const trigger = lang === "en" ? /agreement is signed/ : /acuerdo esté firmado/;
     for (const { where, text } of await allTexts(lang)) {
       for (const s of sentences(text)) {
-        if (/business days|días hábiles/i.test(s)) expect(s, where).toMatch(trigger);
+        if (/business days|días hábiles/i.test(s) && !UNSUBSCRIBE.test(s)) expect(s, where).toMatch(trigger);
       }
     }
   });

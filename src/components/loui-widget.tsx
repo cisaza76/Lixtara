@@ -45,6 +45,72 @@ function messageText(m: UIMessage): string {
     .join("");
 }
 
+const MOBILE = "(max-width: 767px)";
+const INTERACTIVE = "a, button, input, select, textarea, summary, label, [role='button']";
+
+/**
+ * ¿Hay un elemento interactivo de la página debajo del botón flotante? Solo en móvil y con el
+ * chat cerrado (`active`). Mira el centro y las cuatro esquinas del botón al hacer scroll (y al
+ * terminar, por el scroll suave), al cambiar el tamaño de la ventana o el alto de la página, y
+ * cuando cargan las fuentes (el hero cambia de alto y un CTA puede quedar debajo).
+ */
+function useCoversInteractive(ref: React.RefObject<HTMLElement | null>, active: boolean): boolean {
+  const [covering, setCovering] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    const mq = window.matchMedia(MOBILE);
+    let frame = 0;
+    let trailing: ReturnType<typeof setTimeout> | undefined;
+    const check = () => {
+      frame = 0;
+      const el = ref.current;
+      if (!el || !mq.matches) return setCovering(false);
+      const r = el.getBoundingClientRect();
+      const points: Array<[number, number]> = [
+        [r.left + r.width / 2, r.top + r.height / 2],
+        [r.left + 2, r.top + 2],
+        [r.right - 2, r.top + 2],
+        [r.left + 2, r.bottom - 2],
+        [r.right - 2, r.bottom - 2],
+      ];
+      const hit = points.some(([x, y]) =>
+        document
+          .elementsFromPoint(x, y)
+          .some((node) => !el.contains(node) && node.closest(INTERACTIVE) !== null),
+      );
+      setCovering(hit);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+      clearTimeout(trailing);
+      trailing = setTimeout(schedule2, 150);
+    };
+    const schedule2 = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+    schedule();
+    void document.fonts?.ready.then(schedule2);
+    window.addEventListener("load", schedule2);
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("scrollend", schedule2);
+    window.addEventListener("resize", schedule);
+    mq.addEventListener("change", schedule);
+    const ro = new ResizeObserver(schedule);
+    ro.observe(document.body);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      clearTimeout(trailing);
+      window.removeEventListener("load", schedule2);
+      window.removeEventListener("scrollend", schedule2);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      mq.removeEventListener("change", schedule);
+      ro.disconnect();
+    };
+  }, [ref, active]);
+  return active && covering;
+}
+
 function hasActiveToolCall(m: UIMessage): boolean {
   return (m.parts ?? []).some(
     (p) => typeof p.type === "string" && p.type.startsWith("tool-"),
@@ -74,6 +140,11 @@ export function LouiWidget({
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  // En móvil el botón flotante no tapa ningún CTA: se oculta mientras debajo hay un enlace,
+  // un botón o un campo (los del hero, "Personalizado", los planes…) y vuelve al quedar libre.
+  // Solo cambia la opacidad: si se moviera al ocultarse, se mediría en otro lugar.
+  const covering = useCoversInteractive(buttonRef, !open);
 
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: "/api/loui", body: { lang } }),
@@ -102,13 +173,18 @@ export function LouiWidget({
     <>
       {/* Floating button */}
       <button
+        ref={buttonRef}
         type="button"
         aria-label={open ? closeLabel : openLabel}
+        aria-hidden={covering || undefined}
+        tabIndex={covering ? -1 : undefined}
         onClick={() => {
           if (!open) track({ event: "loui_open", lang });
           setOpen(!open);
         }}
-        className="fixed z-50 bottom-6 right-6 lg:bottom-8 lg:right-8 w-14 h-14 rounded-full bg-ink text-ivory shadow-xl flex items-center justify-center hover:bg-ink/90 transition-colors"
+        className={`fixed z-50 bottom-4 right-4 md:bottom-6 md:right-6 lg:bottom-8 lg:right-8 w-12 h-12 md:w-14 md:h-14 rounded-full bg-ink text-ivory shadow-xl flex items-center justify-center hover:bg-ink/90 transition-[opacity,background-color] duration-200 ${
+          covering ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
       >
         {open ? (
           <svg
