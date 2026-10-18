@@ -52,12 +52,31 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
     expect(hits(siteTexts(lang), ABSOLUTE_CANCEL[lang])).toEqual([]);
   });
 
-  it("los 20+ años son experiencia del equipo, nunca antigüedad de licencia", () => {
+  it("los 20+ años son experiencia de la broker, nunca antigüedad de licencia", () => {
     expect(hits(siteTexts(lang), LICENSE_TENURE)).toEqual([]);
-    const hero = dictionaries[lang].hero;
-    expect(fillBrokerageCopy(hero.metricYearsLabel)).toContain(BROKERAGE.brokerName);
-    expect(fillBrokerageCopy(hero.metricYearsValue)).toMatch(/20/);
   });
+
+  // Decisión del owner (2026-10-18): los años se atribuyen a la broker; el equipo va en una
+  // frase aparte, sin sumar años.
+  it("insignia y About: la línea de experiencia exacta", () => {
+    const line =
+      lang === "en"
+        ? `${BROKERAGE.brokerName}, Broker · 20+ years in Florida real estate · with her team of licensed agents`
+        : `${BROKERAGE.brokerName}, broker · más de 20 años en bienes raíces en Florida · con su equipo de agentes licenciados`;
+    expect(fillBrokerageCopy(dictionaries[lang].hero.experienceLine)).toBe(line);
+    expect(fillBrokerageCopy(dictionaries[lang].aboutPage.intro)).toBe(line);
+  });
+
+  it("ningún texto le atribuye los años al equipo", () => {
+    const TEAM_YEARS =
+      lang === "en"
+        ? [/\bteam,? (with )?\{brokerYears\}/i, /\bteam (with|of) (\d+|\{brokerYears\})\+? years/i, /\bteam,? \d+\+? years/i]
+        : [/\bequipo,? (con )?(m[aá]s de )?(\{brokerYears\}|\d+) a[ñn]os/i];
+    const raw = JSON.stringify(dictionaries[lang]);
+    for (const re of TEAM_YEARS) expect(raw).not.toMatch(re);
+    expect(hits(siteTexts(lang), TEAM_YEARS)).toEqual([]);
+  });
+
 
   it("hero: sin 'verified', sin porcentajes escritos a mano, con la licencia FL y el enlace al DBPR", () => {
     const hero = JSON.stringify(dictionaries[lang].hero);
@@ -73,8 +92,11 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
   it("testimonios: encabezado y nota de clientes de la broker y su equipo", () => {
     const sp = dictionaries[lang].socialProof;
     expect(`${sp.titleBefore}${sp.titleAccent}${sp.titleAfter}`).toBe(lang === "en" ? "What our clients say" : "Lo que dicen nuestros clientes");
+    // Operaciones anteriores a Lixtara (2026-10-18): no son clientes de la plataforma.
     expect(fillBrokerageCopy(sp.note)).toBe(
-      lang === "en" ? `Clients of ${BROKERAGE.brokerName} and her team.` : `Clientes de ${BROKERAGE.brokerName} y su equipo.`,
+      lang === "en"
+        ? `Clients of ${BROKERAGE.brokerName} and her team, from transactions before Lixtara.`
+        : `Clientes de ${BROKERAGE.brokerName} y su equipo, de operaciones anteriores a Lixtara.`,
     );
   });
 
@@ -233,11 +255,11 @@ describe("portada: hero nuevo (2026-10-18)", () => {
     const sub = fillFromPricing(fillBrokerageCopy(hero.subheadline));
     if (lang === "en") {
       expect(title).toBe("Sell your Florida home. Keep more of what you've earned.");
-      expect(sub).toBe(`List on the MLS with a licensed brokerage and a team with 20+ years of experience. Plans from ${fee}, plus ${pct} only if your home sells.`);
+      expect(sub).toBe(`List on the MLS with a licensed brokerage and a broker with 20+ years of experience. Plans from ${fee}, plus ${pct} only if your home sells.`);
       expect([hero.ctaPrimary, hero.ctaSecondary]).toEqual(["See what you'd pay", "Start my listing"]);
     } else {
       expect(title).toBe("Vende tu casa en Florida. Quédate con más de lo que ganaste.");
-      expect(sub).toBe(`Publica en el MLS con una inmobiliaria licenciada y un equipo con más de 20 años de experiencia. Planes desde ${fee}, más ${pct} solo si tu casa se vende.`);
+      expect(sub).toBe(`Publica en el MLS con una inmobiliaria licenciada y una broker con más de 20 años de experiencia. Planes desde ${fee}, más ${pct} solo si tu casa se vende.`);
       expect([hero.ctaPrimary, hero.ctaSecondary]).toEqual(["Calcula cuánto pagarías", "Publicar mi casa"]);
     }
   });
@@ -250,7 +272,7 @@ describe("portada: hero nuevo (2026-10-18)", () => {
     expect(read("src/components/home-sections.tsx")).toContain("id={CALCULATOR_ANCHOR}");
     // Franja de confianza del #207 debajo del hero.
     expect(src).toContain("href={DBPR_BROKERAGE_LICENSE_URL}");
-    expect(src).toContain("copy.metricYearsLabel");
+    expect(src).toContain("fillBrokerageCopy(copy.experienceLine)");
     expect(src).toContain("copy.metricMlsValue");
   });
 });
@@ -264,13 +286,13 @@ describe("landing de propietarios (/owners)", () => {
     if (lang === "en") {
       expect(title).toBe("A licensed Florida brokerage. A fraction of the commission.");
       expect(fillBrokerageCopy(c.intro)).toBe(
-        `${BROKERAGE.brokerName} and her team, 20+ years in Florida real estate, put your home on the MLS, which feeds Zillow, Realtor.com and Redfin. You pay a flat fee, plus a small commission only if it sells.`,
+        `${BROKERAGE.brokerName}, with 20+ years in Florida real estate, and her team put your home on the MLS, which feeds Zillow, Realtor.com and Redfin. You pay a flat fee, plus a small commission only if it sells.`,
       );
       expect([c.ctaListing, c.ctaTalk]).toEqual(["Start my listing", "Talk to our team"]);
     } else {
       expect(title).toBe("Una inmobiliaria licenciada en Florida. Una fracción de la comisión.");
       expect(fillBrokerageCopy(c.intro)).toBe(
-        `${BROKERAGE.brokerName} y su equipo, con más de 20 años en el mercado inmobiliario de Florida, ponen tu casa en el MLS, que alimenta a Zillow, Realtor.com y Redfin. Pagas una tarifa fija, más una comisión baja solo si se vende.`,
+        `${BROKERAGE.brokerName}, con más de 20 años en el mercado inmobiliario de Florida, y su equipo ponen tu casa en el MLS, que alimenta a Zillow, Realtor.com y Redfin. Pagas una tarifa fija, más una comisión baja solo si se vende.`,
       );
       expect([c.ctaListing, c.ctaTalk]).toEqual(["Publicar mi casa", "Hablar con nuestro equipo"]);
     }

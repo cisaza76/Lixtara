@@ -13,7 +13,7 @@
 
 import { BROKERAGE } from "@/config/brokerage";
 import { PRICING_TIERS, isPricingTierId } from "@/lib/pricing-tiers";
-import { formatOffer, offerFromRow } from "@/lib/buyer-comp";
+import { CASSB1_ENABLED, formatOffer, offerFromRow } from "@/lib/buyer-comp";
 import type { ApplianceKey } from "@/lib/appliances";
 
 export interface MatrixSourceProperty {
@@ -354,7 +354,7 @@ export function buildMatrixInputSheet(
             });
             if (!offer) return "Not an MLS field since the 2024 NAR settlement.";
             if (offer.type === "none") return "Seller offers no compensation (0%). Not an MLS field since the 2024 NAR settlement.";
-            return `Seller offered ${formatOffer(offer)}. Not an MLS field since the 2024 NAR settlement; share it only with agents who ask, in writing (CASSB-1).`;
+            return `Seller offered ${formatOffer(offer)}. Not an MLS field since the 2024 NAR settlement; share it only with agents who ask, in writing${CASSB1_ENABLED ? " (CASSB-1)" : ""}.`;
           })(),
         },
       ],

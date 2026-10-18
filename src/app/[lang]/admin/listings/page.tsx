@@ -13,6 +13,8 @@ interface ListingRow {
   sqft: number | null;
   list_price: number | null;
   mls_status: string;
+  mls_number: string | null;
+  mls_published_at: string | null;
   pricing_tier: string | null;
   created_at: string;
 }
@@ -74,7 +76,7 @@ export default async function AdminListingsPage({
   let query = supabase
     .from("properties")
     .select(
-      "id,address_street,address_city,address_state,bedrooms,bathrooms,sqft,list_price,mls_status,pricing_tier,created_at",
+      "id,address_street,address_city,address_state,bedrooms,bathrooms,sqft,list_price,mls_status,mls_number,mls_published_at,pricing_tier,created_at",
     )
     .order("updated_at", { ascending: false })
     .limit(200);
@@ -160,6 +162,8 @@ export default async function AdminListingsPage({
                 <th className="py-3 pr-4">Price</th>
                 <th className="py-3 pr-4">Status</th>
                 <th className="py-3 pr-4">Tier</th>
+                <th className="py-3 pr-4">MLS #</th>
+                <th className="py-3 pr-4">On MLS since (ET)</th>
                 <th className="py-3 pr-4">Created (ET)</th>
                 <th className="py-3" />
               </tr>
@@ -194,6 +198,21 @@ export default async function AdminListingsPage({
                       ? l.pricing_tier.charAt(0).toUpperCase() +
                         l.pricing_tier.slice(1)
                       : "—"}
+                  </td>
+                  <td className="py-3 pr-4 text-xs text-ink font-mono whitespace-nowrap">
+                    {l.mls_number ?? "—"}
+                  </td>
+                  <td className="py-3 pr-4 text-xs text-ink/70 whitespace-nowrap">
+                    {l.mls_published_at ? (
+                      <>
+                        {CREATED_DATE.format(new Date(l.mls_published_at))}
+                        <span className="block text-ink/50">
+                          {CREATED_TIME.format(new Date(l.mls_published_at))}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-ink/45 italic">Not published</span>
+                    )}
                   </td>
                   <td className="py-3 pr-4 text-xs text-ink/70 whitespace-nowrap">
                     {CREATED_DATE.format(new Date(l.created_at))}

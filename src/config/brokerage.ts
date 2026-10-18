@@ -40,11 +40,13 @@ export const DBPR_BROKER_LICENSE_URL =
 export const CONTACT_EMAIL = "camilo@lixtara.com";
 
 /**
- * Años de experiencia en bienes raíces en Florida de Anamaria Velasquez y su equipo (dato del
- * owner, 2026-10-17). Es EXPERIENCIA del equipo, no antigüedad de la licencia de Lixtara ni de
- * la broker: nunca escribir "licensed for 20 years". Se muestra como "20+".
+ * Años de experiencia en bienes raíces en Florida de Anamaria Velasquez (dato del owner,
+ * 2026-10-17). Se atribuyen a ELLA; su equipo se menciona aparte, sin sumar años (decisión del
+ * owner, 2026-10-18): nunca "a team with 20+ years". Es experiencia, no antigüedad de la
+ * licencia de Lixtara ni de la broker: nunca escribir "licensed for 20 years". Se muestra
+ * como "20+".
  */
-export const TEAM_EXPERIENCE_YEARS = 20;
+export const BROKER_EXPERIENCE_YEARS = 20;
 
 /**
  * Email con el que la broker de Lixtara firma CADA acuerdo en DocuSign (#137 f). Decisión
@@ -79,6 +81,27 @@ export function brokerageLicenseLine(lang: Lang): string {
     : `${b.legalName} · Licensed Real Estate Brokerage · FL #${b.brokerageLicense} · ${b.brokerName}, Broker · FL #${b.brokerLicense}`;
 }
 
+/** Primera línea del pie de los correos fríos (decisión del owner, 2026-10-18). */
+export const COLD_EMAIL_AD_NOTICE = "This is an advertisement.";
+
+/** Texto del enlace de baja; en Instantly se enlaza con su marcador de "unsubscribe". */
+export const COLD_EMAIL_UNSUBSCRIBE_LABEL = "Unsubscribe";
+
+/**
+ * Pie de los correos fríos a propietarios (Instantly): licencias, dirección, aviso para quien
+ * ya tiene su casa listada con otro broker y la baja. La plantilla vive en Instantly (y en el
+ * generador local ~/lixtara-data/pipeline/email_template.py, que lee esta función); este es el
+ * texto que se pega. El último segmento es el texto del enlace de baja.
+ */
+export function coldEmailFooter(): string {
+  return [
+    brokerageLicenseLine("en"),
+    BROKERAGE.address,
+    "If your property is currently listed with another broker, please disregard this message.",
+    COLD_EMAIL_UNSUBSCRIBE_LABEL,
+  ].join(" · ");
+}
+
 /** Variante corta para pantallas angostas (móvil, 375 px). Igual en ambos idiomas. */
 export function brokerageLicenseLineShort(): string {
   return `${BROKERAGE.legalName} · FL Lic. #${BROKERAGE.brokerageLicense}`;
@@ -87,7 +110,7 @@ export function brokerageLicenseLineShort(): string {
 /**
  * Fills brokerage placeholders in dictionary copy so no license number or
  * broker name is ever hardcoded in i18n: {brokerageName}, {brokerageLicense}, {brokerLicense},
- * {brokerName}, {brokerFirstName}, {teamYears}.
+ * {brokerName}, {brokerFirstName}, {brokerYears}.
  */
 export function fillBrokerageCopy(text: string): string {
   return text
@@ -95,6 +118,6 @@ export function fillBrokerageCopy(text: string): string {
     .replaceAll("{brokerageLicense}", BROKERAGE.brokerageLicense)
     .replaceAll("{brokerLicense}", BROKERAGE.brokerLicense)
     .replaceAll("{brokerName}", BROKERAGE.brokerName)
-    .replaceAll("{teamYears}", String(TEAM_EXPERIENCE_YEARS))
+    .replaceAll("{brokerYears}", String(BROKER_EXPERIENCE_YEARS))
     .replaceAll("{brokerFirstName}", BROKERAGE.brokerName.split(" ")[0]);
 }

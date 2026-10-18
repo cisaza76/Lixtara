@@ -21,6 +21,17 @@ import {
   saveListingMlsNumber,
 } from "@/lib/listing-mls-number.server";
 import { describeChanges, type ChangeSet } from "@/lib/listing-requests";
+import {
+  MIN_CORRECTION_NOTE,
+  formatMiamiDateTime,
+  isPlanPaymentSucceeded,
+  markPublishedBlockers,
+  parseMiamiDateTime,
+  refundOnCancel,
+  toMiamiDateTimeInput,
+} from "@/lib/mls-published";
+import { correctListingMlsPublished, markListingMlsPublished } from "@/lib/mls-published.server";
+import { CASSB1_ENABLED } from "@/lib/buyer-comp";
 import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
 
 interface Property {
@@ -39,6 +50,7 @@ interface Property {
   list_price: number | null;
   mls_status: string;
   mls_number: string | null;
+  mls_published_at: string | null;
   pricing_tier: string | null;
   description: string | null;
   showing_instructions: string | null;
@@ -66,6 +78,14 @@ interface Photo {
   url: string;
   is_primary: boolean | null;
   display_order: number | null;
+}
+
+interface PublishedHistoryRow {
+  old_published_at: string | null;
+  new_published_at: string | null;
+  changed_by: string;
+  changed_at: string;
+  note: string | null;
 }
 
 interface Agreement {
@@ -171,7 +191,7 @@ export default async function ListingReviewPage({
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description",
+      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,mls_published_at,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description",
     )
     .eq("id", id)
     .maybeSingle();
@@ -186,7 +206,7 @@ export default async function ListingReviewPage({
   // the admin layout's guard), then read both with the secret key.
   await assertStaffWithUser(lang);
   const svc = createService();
-  const [{ data: photoRows }, { data: agreementRow }] = await Promise.all([
+  const [{ data: photoRows }, { data: agreementRow }, { data: paymentRows }] = await Promise.all([
     svc
       .from("property_photos")
       .select("id,url,is_primary,display_order")
@@ -199,6 +219,7 @@ export default async function ListingReviewPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    svc.from("payments").select("payment_type,tier,status").eq("property_id", id),
   ]);
   const photos = (photoRows ?? []) as Photo[];
 
@@ -210,6 +231,31 @@ export default async function ListingReviewPage({
     .eq("status", "pending")
     .order("created_at", { ascending: true });
   const sellerRequests = (requestRows ?? []) as SellerRequest[];
+
+  // Publicación en el MLS: quién y cuándo (property_status_history, legible por el staff).
+  const [{ data: historyRows }, { data: isAdminRole }] = await Promise.all([
+    supabase
+      .from("property_status_history")
+      .select("old_published_at,new_published_at,changed_by,changed_at,note")
+      .eq("property_id", id)
+      .order("changed_at", { ascending: false })
+      .limit(50),
+    supabase.rpc("has_role", { _role: "admin" }),
+  ]);
+  const publishedHistory = ((historyRows ?? []) as PublishedHistoryRow[]).filter(
+    (h) => h.old_published_at !== h.new_published_at,
+  );
+  const actorIds = [...new Set(publishedHistory.map((h) => h.changed_by))].filter((v) =>
+    /^[0-9a-f-]{36}$/.test(v),
+  );
+  const { data: actorRows } = actorIds.length
+    ? await svc.from("users").select("id,first_name,last_name,email").in("id", actorIds)
+    : { data: [] };
+  const actorName = new Map(
+    ((actorRows ?? []) as { id: string; first_name: string | null; last_name: string | null; email: string | null }[]).map(
+      (u) => [u.id, [u.first_name, u.last_name].filter(Boolean).join(" ") || u.email || u.id],
+    ),
+  );
   const agreement = (agreementRow ?? null) as (Agreement & AgreementRef) | null;
   // Live status: the stored one lags until the seller's page or a DocuSign
   // webhook refreshes it, so refresh it here too.
@@ -239,6 +285,14 @@ export default async function ListingReviewPage({
     apply_failed: "Could not apply the request to the listing. Try again.",
     not_countersigned: "The broker hasn't countersigned the listing agreement in DocuSign yet.",
     docusign_unavailable: "Could not confirm the broker's countersignature with DocuSign. Try again.",
+    already_published: "This listing already has an MLS publication date. Only an admin can correct it.",
+    mls_number_required: "Enter the MLS number to mark the listing as published.",
+    agreement_not_completed: "The listing agreement isn't completed (signed by the seller and countersigned) yet.",
+    payment_not_succeeded: "The plan payment hasn't succeeded yet.",
+    future_date: "The publication date can't be in the future.",
+    admin_only: "Only an admin can correct the publication date.",
+    note_required: `Write a note of at least ${MIN_CORRECTION_NOTE} characters explaining the correction.`,
+    invalid_date: "That date doesn't look right.",
   };
 
   async function approve(formData: FormData) {
@@ -271,6 +325,39 @@ export default async function ListingReviewPage({
     redirect(
       r.ok
         ? `/${lang}/admin/listings/${id}/review?done=mls_number_saved`
+        : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
+    );
+  }
+  async function markPublished(formData: FormData) {
+    "use server";
+    const { sb, userId } = await assertStaffWithUser(lang);
+    const r = await markListingMlsPublished(sb, {
+      propertyId: id,
+      rawMlsNumber: String(formData.get("mls_number") ?? ""),
+      userId,
+    });
+    redirect(
+      r.ok
+        ? `/${lang}/admin/listings/${id}/review?done=mls_published_marked`
+        : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
+    );
+  }
+  // Corrección: solo admin (la base lo exige también), con nota y rastro.
+  async function correctPublished(formData: FormData) {
+    "use server";
+    const { sb, userId } = await assertStaffWithUser(lang);
+    const clear = formData.get("clear") === "1";
+    const publishedAt = clear ? null : parseMiamiDateTime(String(formData.get("published_at") ?? ""));
+    if (!clear && !publishedAt) redirect(`/${lang}/admin/listings/${id}/review?error=invalid_date`);
+    const r = await correctListingMlsPublished(sb, {
+      propertyId: id,
+      publishedAt,
+      note: String(formData.get("note") ?? ""),
+      userId,
+    });
+    redirect(
+      r.ok
+        ? `/${lang}/admin/listings/${id}/review?done=mls_published_corrected`
         : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
     );
   }
@@ -323,6 +410,17 @@ export default async function ListingReviewPage({
   const agreementSigned =
     agreement?.status === "signed" || agreement?.status === "completed";
   const awaitingCountersign = agreement?.status === "signed";
+  const planPaid = isPlanPaymentSucceeded(
+    (paymentRows ?? []) as { payment_type: string | null; tier: string | null; status: string | null }[],
+  );
+  const publishBlockers = markPublishedBlockers({
+    publishedAt: prop.mls_published_at,
+    mlsNumber: prop.mls_number,
+    agreementStatus: agreement?.status ?? null,
+    planPaymentSucceeded: planPaid,
+  });
+  // El número se puede teclear en el mismo formulario: no bloquea el botón.
+  const hardBlockers = publishBlockers.filter((b) => b !== "mls_number_required");
 
   return (
     <div className="flex flex-col gap-8">
@@ -415,6 +513,129 @@ export default async function ListingReviewPage({
         </section>
       )}
 
+      {/* Publicación en el MLS: prueba de devengo de la tarifa fija. Sin fecha, si el vendedor
+          cancela corresponde reembolso total (legal-terms.ts#refundPolicy). */}
+      <section className="border border-gold-soft p-6 flex flex-col gap-4">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
+          MLS publication
+        </span>
+        {prop.mls_published_at ? (
+          <div className="flex flex-col gap-1 text-sm text-ink/80">
+            <p>
+              Published on the MLS:{" "}
+              <strong>{formatMiamiDateTime(prop.mls_published_at)}</strong>
+              {prop.mls_number ? (
+                <>
+                  {" "}· MLS # <strong className="font-mono">{prop.mls_number}</strong>
+                </>
+              ) : null}
+            </p>
+            <p className="text-xs text-ink/60">
+              The flat fee is earned: if the seller cancels now, it is not refunded (except a
+              double charge or a technical error).
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-ink/80">
+              Not marked as published.{" "}
+              <span className="text-ink/60">
+                {refundOnCancel(prop.mls_published_at) === "full"
+                  ? "If the seller cancels now, the flat fee is refunded in full."
+                  : null}
+              </span>
+            </p>
+            <ul className="text-xs text-ink/70 flex flex-col gap-1">
+              <li>{publishBlockers.includes("agreement_not_completed") ? "✗" : "✓"} Listing agreement completed (seller signed, broker countersigned)</li>
+              <li>{publishBlockers.includes("payment_not_succeeded") ? "✗" : "✓"} Plan payment succeeded</li>
+              <li>{publishBlockers.includes("mls_number_required") ? "✗" : "✓"} MLS number</li>
+            </ul>
+            <form action={markPublished} className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">MLS number</span>
+                <input
+                  name="mls_number"
+                  type="text"
+                  required
+                  autoComplete="off"
+                  spellCheck={false}
+                  defaultValue={prop.mls_number ?? ""}
+                  placeholder="A11234567"
+                  className="w-44 border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink uppercase font-mono focus:outline-none focus:border-gold"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={hardBlockers.length > 0}
+                className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Mark as published on the MLS
+              </button>
+            </form>
+            <p className="text-xs text-ink/55">
+              Do it once the listing is live in Matrix. The date is now; it can&apos;t be edited
+              afterwards (only an admin can correct it, with a note).
+            </p>
+          </div>
+        )}
+
+        {prop.mls_published_at && isAdminRole === true && (
+          <details>
+            <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-ink/60 hover:text-gold">
+              Correct the date (admin) →
+            </summary>
+            <form action={correctPublished} className="flex flex-col gap-3 mt-3 max-w-xl">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  Published on (Miami time)
+                </span>
+                <input
+                  name="published_at"
+                  type="datetime-local"
+                  defaultValue={toMiamiDateTimeInput(prop.mls_published_at)}
+                  className="w-60 border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input type="checkbox" name="clear" value="1" />
+                Clear the date (the listing was never published)
+              </label>
+              <textarea
+                name="note"
+                rows={2}
+                required
+                minLength={MIN_CORRECTION_NOTE}
+                maxLength={2000}
+                placeholder="Why is the date being corrected? (required)"
+                className="border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold"
+              />
+              <button
+                type="submit"
+                className="self-start inline-flex items-center px-6 py-3 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.22em] uppercase hover:border-gold transition-colors"
+              >
+                Save correction
+              </button>
+            </form>
+          </details>
+        )}
+
+        {publishedHistory.length > 0 && (
+          <div className="flex flex-col gap-1 border-t border-gold-soft pt-3">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">History</span>
+            <ul className="text-xs text-ink/70 flex flex-col gap-1">
+              {publishedHistory.map((h) => (
+                <li key={`${h.changed_at}-${h.changed_by}`}>
+                  {formatMiamiDateTime(h.changed_at)} · {actorName.get(h.changed_by) ?? h.changed_by}:{" "}
+                  {h.old_published_at ? formatMiamiDateTime(h.old_published_at) : "—"} →{" "}
+                  {h.new_published_at ? formatMiamiDateTime(h.new_published_at) : "cleared"}
+                  {h.note ? <span className="italic"> · “{h.note}”</span> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
       {/* MLS number — anotado a mano desde Matrix; evita que /properties muestre el
           listing dos veces (fila propia + ficha del feed IDX). */}
       <section className="border border-gold-soft p-6 flex flex-col gap-3">
@@ -488,14 +709,16 @@ export default async function ListingReviewPage({
           return (
             <>
               {field("Buyer's agent compensation", offer ? formatOffer(offer) : null)}
-              {field(
-                "CASSB-1",
-                offer
-                  ? compensationAgreementsFor(offer) === 1
-                    ? "Needed when a buyer's agent asks for it"
-                    : "Not needed (0%)"
-                  : null,
-              )}
+              {/* Apagado mientras se confirma qué acuerdo corresponde (CASSB1_ENABLED). */}
+              {CASSB1_ENABLED &&
+                field(
+                  "CASSB-1",
+                  offer
+                    ? compensationAgreementsFor(offer) === 1
+                      ? "Needed when a buyer's agent asks for it"
+                      : "Not needed (0%)"
+                    : null,
+                )}
             </>
           );
         })()}

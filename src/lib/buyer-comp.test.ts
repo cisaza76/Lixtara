@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
   BUYER_COMP_MAX_PCT,
   buyerCompMaxAmount,
   offerWithinLimit,
   buyerCommissionAck,
+  CASSB1_ENABLED,
   cassb1Tabs,
   compensationAgreementsFor,
   formatOffer,
@@ -132,10 +133,31 @@ describe("acuerdo de compensación (CASSB-1)", () => {
     expect(compensationAgreementsFor({ type: "amount", amount: 5_000 })).toBe(1);
   });
 
-  it("campos de la plantilla: % en fee_pct_value, USD en fee_amount; nada con 0%", () => {
+  it.skipIf(!CASSB1_ENABLED)("campos de la plantilla: % en fee_pct_value, USD en fee_amount; nada con 0%", () => {
     expect(cassb1Tabs({ type: "none" })).toBeNull();
     expect(cassb1Tabs({ type: "percent", pct: 2.5 })).toEqual({ fee_pct_value: "2.5" });
     expect(cassb1Tabs({ type: "amount", amount: 12_000 })).toEqual({ fee_amount: "12,000" });
+  });
+
+  // Apagado hasta nuevo aviso (2026-10-18): se confirma si corresponde el CASSB-1 o un acuerdo
+  // de compensación del vendedor al broker del comprador.
+  it("CASSB-1 apagado: no se generan campos ni se sugiere en el admin ni en la hoja de Matrix", () => {
+    expect(CASSB1_ENABLED).toBe(false);
+    expect(cassb1Tabs({ type: "percent", pct: 2.5 })).toBeNull();
+    expect(cassb1Tabs({ type: "amount", amount: 12_000 })).toBeNull();
+    const review = read("src/app/[lang]/admin/listings/[id]/review/page.tsx");
+    expect(review).toMatch(/\{CASSB1_ENABLED &&\s*field\(\s*"CASSB-1"/);
+    const sheet = read("src/lib/matrix-input-sheet.ts");
+    expect(sheet).toContain('${CASSB1_ENABLED ? " (CASSB-1)" : ""}');
+    // Nadie más genera el CASSB-1: cassb1Tabs no tiene llamadas fuera de su módulo y los tests.
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : [],
+      );
+    const callers = walk(join(ROOT, "src"))
+      .filter((f) => !f.endsWith("buyer-comp.ts") && !f.includes(".test."))
+      .filter((f) => readFileSync(f, "utf8").includes("cassb1Tabs"));
+    expect(callers).toEqual([]);
   });
 
   // La exportación de DocuSign está en .gitignore (docs/docusign/): el caso corre solo donde existe.
