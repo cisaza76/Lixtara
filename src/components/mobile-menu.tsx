@@ -15,6 +15,8 @@ interface Props {
   continueHref: string | null;
   nav: {
     buy: string;
+    /** Catálogo si tiene fichas; si no, la sección de compradores (buyNavHref). */
+    buyHref: string;
     sell: string;
     howItWorks: string;
     pricing: string;
@@ -73,7 +75,7 @@ export function MobileMenu({
               </p>
             )}
             <nav className="flex flex-col" onClick={() => setOpen(false)}>
-              <Link href={`/${lang}/properties`} className={link}>
+              <Link href={nav.buyHref} className={link}>
                 {nav.buy}
               </Link>
               <ListingCtaLink href={`/${lang}/listing/new`} location="header" lang={lang} className={link}>

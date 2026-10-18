@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { buyNavHref } from "@/lib/buyer-entry";
+import { catalogHasListings } from "@/lib/catalog-status.server";
 import Link from "next/link";
 import { ListingCtaLink } from "@/components/listing-cta-link";
 import { Inter, Playfair_Display } from "next/font/google";
@@ -64,6 +66,8 @@ export default async function RootLayout({
   if (!isLocale(lang)) notFound();
 
   const navCopy = t(lang).nav;
+  // "Buy": el catálogo solo si tiene fichas; si no, la sección de compradores del inicio.
+  const buyHref = buyNavHref(lang, await catalogHasListings());
   const authNavCopy = t(lang).auth.nav;
   const footerCopy = t(lang).footer;
   // Variables NEXT_PUBLIC_ escritas literalmente para que Next las incruste en el build.
@@ -120,7 +124,7 @@ export default async function RootLayout({
               </Link>
               <ul className="hidden md:flex items-center gap-7 text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
                 <li>
-                  <Link href={`/${lang}/properties`} className="hover:text-gold transition-colors">
+                  <Link href={buyHref} className="hover:text-gold transition-colors">
                     {navCopy.buy}
                   </Link>
                 </li>
@@ -241,6 +245,7 @@ export default async function RootLayout({
               continueHref={continueHref}
               nav={{
                 buy: navCopy.buy,
+                buyHref,
                 sell: navCopy.sell,
                 howItWorks: navCopy.howItWorks,
                 pricing: navCopy.pricing,

@@ -4,11 +4,12 @@ import { ListingCtaLink } from "@/components/listing-cta-link";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { BROKER_LICENSE, BROKERAGE_NAME } from "@/lib/broker";
-import { fillBrokerageCopy } from "@/config/brokerage";
+import { DBPR_LICENSE_SEARCH_URL, fillBrokerageCopy } from "@/config/brokerage";
+import { buyerContactHref, buyerCtaHref } from "@/lib/buyer-entry";
+import { catalogHasListings } from "@/lib/catalog-status.server";
 import { FootnoteText } from "@/components/footnote-text";
 import { buyerAgentComp } from "@/config/legal-terms";
 import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
-import { BROKER_STATS } from "@/lib/broker-stats";
 import {
   PRICING_TIERS,
   TIER_ORDER,
@@ -62,23 +63,15 @@ export default async function Home({
   const selectedValue = parseQuizValue(sp.qv);
   const selectedPhoto = parseQuizPhoto(sp.qp);
 
-  const visibleMetrics: Array<{ value: string; label: string }> = [];
-  if (BROKER_STATS.salesVolume) {
-    visibleMetrics.push({
-      value: BROKER_STATS.salesVolume,
-      label: copy.metricVolumeLabel,
-    });
-  }
-  if (BROKER_STATS.yearsExperience) {
-    visibleMetrics.push({
-      value: `${BROKER_STATS.yearsExperience} ${copy.metricYearsUnit}`,
-      label: copy.metricYearsLabel,
-    });
-  }
-  visibleMetrics.push({
-    value: BROKER_STATS.mlsCoverage,
-    label: copy.metricMlsLabel,
-  });
+  // Insignias del hero: solo datos con respaldo (experiencia del equipo, publicación en el
+  // MLS). Nada de "established", "verified" ni porcentajes (site-claims.test.ts).
+  const visibleMetrics: Array<{ value: string; label: string | null }> = [
+    { value: fillBrokerageCopy(copy.metricYearsValue), label: fillBrokerageCopy(copy.metricYearsLabel) },
+    { value: copy.metricMlsValue, label: null },
+  ];
+  // Con el catálogo vacío, los CTA de compradores van al formulario con el tema "buy".
+  const hasListings = await catalogHasListings();
+  const licenseText = fillBrokerageCopy(copy.licenseLabel);
 
   return (
     <main className="bg-background text-foreground flex-1 flex flex-col">
@@ -110,10 +103,10 @@ export default async function Home({
                 {copy.ctaPrimary}
               </ListingCtaLink>
               <Link
-                href={`/${lang}/properties`}
+                href={buyerCtaHref(lang, hasListings)}
                 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center gap-2 group"
               >
-                {copy.ctaSecondary}
+                {hasListings ? copy.ctaSecondary : copy.ctaSecondaryNoListings}
                 <span
                   aria-hidden
                   className="transition-transform group-hover:translate-x-1"
@@ -125,9 +118,16 @@ export default async function Home({
             <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
               {BROKERAGE_NAME}
               <br />
-              {BROKER_LICENSE
-                ? `${copy.licensedBy} #${BROKER_LICENSE}`
-                : copy.licensePending}
+              {licenseText} ·{" "}
+              <a
+                href={DBPR_LICENSE_SEARCH_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-gold-soft underline-offset-4 hover:text-gold transition-colors"
+              >
+                {copy.verifyDbpr}
+                <span className="sr-only"> {copy.opensNewTab}</span>
+              </a>
             </div>
 
             <div className="border-t border-gold-soft pt-10 mt-4">
@@ -145,9 +145,11 @@ export default async function Home({
                     <dd className="font-display text-3xl text-ink font-normal leading-none">
                       {m.value}
                     </dd>
-                    <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                      {m.label}
-                    </dt>
+                    {m.label && (
+                      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
+                        {m.label}
+                      </dt>
+                    )}
                   </div>
                 ))}
               </dl>
@@ -179,12 +181,21 @@ export default async function Home({
               <div className="absolute -bottom-8 -left-6 sm:-left-10 w-36 h-36 bg-ivory p-2 shadow-xl">
                 <div className="border border-gold w-full h-full flex flex-col items-center justify-center text-center gap-2 px-3">
                   <div className="text-[10px] font-semibold tracking-[0.22em] uppercase text-gold">
-                    {copy.badgeVerified}
+                    {copy.badgeLicensed}
+                  </div>
+                  <div className="text-[10px] leading-tight tracking-[0.12em] text-ink">
+                    #{BROKER_LICENSE}
                   </div>
                   <div className="w-6 h-px bg-gold-soft" />
-                  <div className="text-[8px] leading-tight uppercase tracking-[0.18em] text-ink/80">
-                    {copy.badgeBrokerage}
-                  </div>
+                  <a
+                    href={DBPR_LICENSE_SEARCH_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[8px] leading-tight uppercase tracking-[0.18em] text-ink/80 underline decoration-gold-soft underline-offset-2 hover:text-gold"
+                  >
+                    {copy.verifyDbpr}
+                    <span className="sr-only"> {copy.opensNewTab}</span>
+                  </a>
                 </div>
               </div>
             </div>
@@ -303,6 +314,7 @@ export default async function Home({
               </figure>
             ))}
           </div>
+          <p className="mt-8 text-xs italic text-ink/55">{fillBrokerageCopy(spCopy.note)}</p>
         </div>
       </section>
 
@@ -400,6 +412,7 @@ export default async function Home({
             {TIER_ORDER.map((id) => {
               const tier = PRICING_TIERS[id];
               const tCopy = prCopy.tiers[id];
+              // Plan destacado visualmente (el preseleccionado), sin etiqueta de "más popular".
               const isPopular = id === DEFAULT_TIER;
               return (
                 <div
@@ -410,12 +423,6 @@ export default async function Home({
                       : "bg-ivory text-ink border border-gold-soft"
                   }`}
                 >
-                  {isPopular && (
-                    <div className="absolute -top-3 left-8 lg:left-10 bg-gold text-ink text-[10px] font-semibold uppercase tracking-[0.22em] px-3 py-1">
-                      {prCopy.popularBadge}
-                    </div>
-                  )}
-
                   <div className="flex flex-col gap-2">
                     <h3 className="font-display text-3xl leading-none font-normal">
                       {tCopy.name}
@@ -564,7 +571,7 @@ export default async function Home({
               {buyerCopy.title}
             </h2>
             <p className="max-w-xl text-base leading-relaxed text-ink/70">
-              {buyerCopy.body}
+              {fillBrokerageCopy(buyerCopy.body)}
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12 mb-12">
@@ -581,17 +588,20 @@ export default async function Home({
           </div>
           <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
             <Link
-              href={`/${lang}/properties`}
+              href={buyerCtaHref(lang, hasListings)}
               className="inline-flex items-center justify-center px-8 py-4 bg-ink text-ivory text-[11px] font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
             >
-              {buyerCopy.ctaPrimary}
+              {hasListings ? buyerCopy.ctaPrimary : buyerCopy.ctaPrimaryNoListings}
             </Link>
-            <Link
-              href={`/${lang}/contact?topic=buy`}
-              className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center"
-            >
-              {fillBrokerageCopy(buyerCopy.ctaSecondary)} →
-            </Link>
+            {/* Con el catálogo vacío el CTA principal ya lleva al formulario: no se repite. */}
+            {hasListings && (
+              <Link
+                href={buyerContactHref(lang)}
+                className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center"
+              >
+                {fillBrokerageCopy(buyerCopy.ctaSecondary)} →
+              </Link>
+            )}
           </div>
         </div>
       </section>

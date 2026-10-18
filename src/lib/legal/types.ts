@@ -27,6 +27,9 @@ export interface LegalContent {
 /** Single source for the "last updated / effective" date shown on every doc. */
 export const LEGAL_LAST_UPDATED = "2026-09-02";
 
+/** Terms of Service: §6, reembolso alineado con la política publicada (refundPolicy). */
+export const TERMS_LAST_UPDATED = "2026-10-17";
+
 /** Cookie Policy: cookies de Microsoft Clarity detalladas (y antes, #193: solo analítica). */
 export const COOKIES_LAST_UPDATED = "2026-10-16";
 

@@ -4,6 +4,7 @@
 // (/en o /es). El servidor entrega el copy de ambos idiomas y aquí se elige uno.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { buyerCtaHref } from "@/lib/buyer-entry";
 
 export interface NotFoundCopy {
   eyebrow: string;
@@ -11,9 +12,17 @@ export interface NotFoundCopy {
   body: string;
   homeCta: string;
   listingsCta: string;
+  listingsCtaNoListings: string;
 }
 
-export function NotFoundContent({ copy }: { copy: { en: NotFoundCopy; es: NotFoundCopy } }) {
+export function NotFoundContent({
+  copy,
+  hasListings,
+}: {
+  copy: { en: NotFoundCopy; es: NotFoundCopy };
+  /** Con el catálogo vacío el segundo CTA va al formulario de compra, no a /properties. */
+  hasListings: boolean;
+}) {
   const pathname = usePathname() ?? "";
   const lang = pathname.split("/")[1] === "es" ? "es" : "en";
   const c = copy[lang];
@@ -36,10 +45,10 @@ export function NotFoundContent({ copy }: { copy: { en: NotFoundCopy; es: NotFou
             {c.homeCta}
           </Link>
           <Link
-            href={`/${lang}/properties`}
+            href={buyerCtaHref(lang, hasListings)}
             className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors"
           >
-            {c.listingsCta}
+            {hasListings ? c.listingsCta : c.listingsCtaNoListings}
           </Link>
         </div>
       </div>

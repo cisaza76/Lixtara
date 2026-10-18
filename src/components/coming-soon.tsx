@@ -2,7 +2,6 @@ import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 
 type PageKey =
-  | "about"
   | "services"
   | "contact"
   | "terms"

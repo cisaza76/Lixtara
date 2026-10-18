@@ -1,4 +1,5 @@
 import type { LegalContent } from "./types";
+import { refundPolicy } from "@/config/legal-terms";
 
 export const termsDoc: LegalContent = {
   en: {
@@ -75,8 +76,9 @@ export const termsDoc: LegalContent = {
         body: [
           "Lixtara offers three plans. Each plan consists of a flat, one-time fee plus a low seller-side commission that becomes payable only if and when your property sells. Each plan carries a listing term of 24 months.",
           "The plan tiers are: Essentials: $199 flat fee plus a 0.5% seller-side commission on sale; Pro: $495 flat fee plus a 1% seller-side commission on sale; and Concierge: $995 flat fee plus a 1.5% seller-side commission on sale. The flat fee for each plan is one-time. The seller-side commission is owed only if the property sells. The cooperating buyer-agent commission described in Section 4 is selected separately by you and is in addition to these amounts.",
-          "The flat plan fee is non-refundable. Except where a refund is required by applicable law, all fees paid to Lixtara are non-refundable, and we do not provide refunds or credits for partially used terms, unused features, or listings that do not result in a sale.",
-          "Optional add-ons, such as professional photography and AI virtual staging, may be available for an additional charge that will be disclosed to you before you purchase them. Add-on fees are also non-refundable except where required by law.",
+          // Política de reembolso publicada (FAQ, Loui, paso 8): una sola fuente en legal-terms.ts.
+          refundPolicy.text.en,
+          "Optional add-ons, such as professional photography and AI virtual staging, may be available for an additional charge that will be disclosed to you before you purchase them. Add-on fees are non-refundable except where required by law.",
           "Payments are processed through our third-party payment processor, Stripe. By submitting payment information, you authorize us and Stripe to charge the applicable amounts. Lixtara does not store your full card number; payment card data is handled by Stripe under its terms. You are responsible for any taxes that apply to your purchase, other than taxes on Lixtara's net income.",
         ],
         sub: [
@@ -296,8 +298,8 @@ export const termsDoc: LegalContent = {
         body: [
           "Lixtara ofrece tres planes. Cada plan consiste en una tarifa fija de pago único más una baja comisión del lado del vendedor que se vuelve pagadera únicamente si su propiedad se vende y cuando se venda. Cada plan tiene un plazo de publicación de 24 meses.",
           "Los niveles de los planes son: Essentials: tarifa fija de $199 más una comisión del lado del vendedor del 0.5% sobre la venta; Pro: tarifa fija de $495 más una comisión del lado del vendedor del 1% sobre la venta; y Concierge: tarifa fija de $995 más una comisión del lado del vendedor del 1.5% sobre la venta. La tarifa fija de cada plan es de pago único. La comisión del lado del vendedor se adeuda únicamente si la propiedad se vende. La comisión cooperante al agente del comprador descrita en la Sección 4 la selecciona usted por separado y es adicional a estos montos.",
-          "La tarifa fija del plan no es reembolsable. Salvo cuando la ley aplicable exija un reembolso, todas las tarifas pagadas a Lixtara no son reembolsables, y no otorgamos reembolsos ni créditos por plazos utilizados parcialmente, funciones no utilizadas o publicaciones que no resulten en una venta.",
-          "Los servicios adicionales opcionales, como la fotografía profesional y el home staging virtual con IA, pueden estar disponibles por un cargo adicional que se le informará antes de que los compre. Las tarifas de los servicios adicionales tampoco son reembolsables, salvo cuando la ley lo exija.",
+          refundPolicy.text.es,
+          "Los servicios adicionales opcionales, como la fotografía profesional y el home staging virtual con IA, pueden estar disponibles por un cargo adicional que se le informará antes de que los compre. Las tarifas de los servicios adicionales no son reembolsables, salvo cuando la ley lo exija.",
           "Los pagos se procesan a través de nuestro procesador de pagos externo, Stripe. Al enviar información de pago, usted nos autoriza a nosotros y a Stripe a cobrar los montos correspondientes. Lixtara no almacena el número completo de su tarjeta; los datos de la tarjeta de pago son manejados por Stripe bajo sus propios términos. Usted es responsable de cualquier impuesto que aplique a su compra, salvo los impuestos sobre los ingresos netos de Lixtara.",
         ],
         sub: [

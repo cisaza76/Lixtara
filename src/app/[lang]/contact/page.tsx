@@ -3,9 +3,10 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t, type Locale } from "@/lib/i18n";
 import { SITE_URL } from "@/lib/config";
-import { BROKERAGE } from "@/config/brokerage";
+import { BROKERAGE, fillBrokerageCopy } from "@/config/brokerage";
 import { CONTACT, telHref, whatsappHref } from "@/config/contact";
 import { CONTACT_TOPICS, parseContactForm } from "@/lib/contact-form";
+import { contactTopicFromQuery } from "@/lib/buyer-entry";
 import { sendContactMessage } from "@/lib/email";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { ContactActions } from "@/components/contact-actions";
@@ -35,13 +36,15 @@ export default async function ContactPage({
   searchParams,
 }: {
   params: Promise<{ lang: string }>;
-  searchParams: Promise<{ sent?: string; error?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string; topic?: string }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   const locale: Locale = lang;
   const sp = await searchParams;
   const copy = t(lang).contactPage;
+  // ?topic=buy (CTAs de compradores) deja el tema ya elegido; también tras un error.
+  const topic = contactTopicFromQuery(sp.topic, CONTACT_TOPICS, "sell");
   const error = (ERRORS as readonly string[]).includes(sp.error ?? "")
     ? copy.errors[sp.error as ErrorKey]
     : null;
@@ -52,7 +55,10 @@ export default async function ContactPage({
     const parsed = parseContactForm((k) => formData.get(k)?.toString());
     // Honeypot hit: pretend it worked so bots learn nothing.
     if (!parsed.ok && parsed.error === "spam") redirect(`${back}?sent=1`);
-    if (!parsed.ok) redirect(`${back}?error=${parsed.error}`);
+    if (!parsed.ok) {
+      const keep = contactTopicFromQuery(formData.get("topic")?.toString(), CONTACT_TOPICS, "sell");
+      redirect(`${back}?error=${parsed.error}&topic=${keep}`);
+    }
 
     const h = await headers();
     const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
@@ -60,7 +66,7 @@ export default async function ContactPage({
       message: "rate_limited",
       label: "contact form",
     });
-    if (limited) redirect(`${back}?error=rate_limited`);
+    if (limited) redirect(`${back}?error=rate_limited&topic=${parsed.data.topic}`);
 
     const result = await sendContactMessage({
       to: CONTACT.inboxEmail,
@@ -68,7 +74,7 @@ export default async function ContactPage({
       ...parsed.data,
       pageUrl: `${SITE_URL}${back}`,
     });
-    if (!result.ok) redirect(`${back}?error=send_failed`);
+    if (!result.ok) redirect(`${back}?error=send_failed&topic=${parsed.data.topic}`);
     redirect(`${back}?sent=1&topic=${parsed.data.topic}`);
   }
 
@@ -84,7 +90,7 @@ export default async function ContactPage({
             {copy.titleAccent && <em className="italic text-gold">{copy.titleAccent}</em>}
             {copy.titleAfter}
           </h1>
-          <p className="text-lg leading-relaxed text-ink/70">{copy.intro}</p>
+          <p className="text-lg leading-relaxed text-ink/70">{fillBrokerageCopy(copy.intro)}</p>
           <ContactActions
             lang={lang}
             whatsappHref={whatsappHref()}
@@ -116,7 +122,7 @@ export default async function ContactPage({
               </span>
               <select
                 name="topic"
-                defaultValue="sell"
+                defaultValue={topic}
                 className="bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 text-base text-ink"
               >
                 {CONTACT_TOPICS.map((topic) => (

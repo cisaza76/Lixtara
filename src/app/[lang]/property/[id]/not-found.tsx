@@ -6,17 +6,18 @@
 // listing. Copia local (no i18n.ts) para no cargar todos los diccionarios en el cliente.
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { buyerContactHref } from "@/lib/buyer-entry";
 
 const COPY = {
   en: {
     title: "Listing not found",
     body: "This property is no longer active or never existed.",
-    back: "Back to listings",
+    back: "Tell us what you're looking for",
   },
   es: {
     title: "Listing no encontrado",
     body: "Esta propiedad ya no está activa o nunca existió.",
-    back: "Volver a listings",
+    back: "Cuéntanos qué buscas",
   },
 } as const;
 
@@ -30,7 +31,7 @@ export default function PropertyNotFound() {
         <h1 className="font-display text-4xl text-ink font-normal">{copy.title}</h1>
         <p className="text-base text-ink/70">{copy.body}</p>
         <Link
-          href={`/${lang}/properties`}
+          href={buyerContactHref(lang)}
           className="text-[10px] uppercase tracking-[0.22em] text-gold"
         >
           {copy.back}

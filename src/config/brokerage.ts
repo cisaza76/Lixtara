@@ -21,6 +21,19 @@ export const BROKERAGE = {
 } as const;
 
 /**
+ * Búsqueda pública de licencias del DBPR de Florida (myfloridalicense.com, "Licensing Portal -
+ * License Search", comprobada el 2026-10-17). El visitante busca la licencia CQ o BK ahí.
+ */
+export const DBPR_LICENSE_SEARCH_URL = "https://www.myfloridalicense.com/wl11.asp";
+
+/**
+ * Años de experiencia en bienes raíces en Florida de Anamaria Velasquez y su equipo (dato del
+ * owner, 2026-10-17). Es EXPERIENCIA del equipo, no antigüedad de la licencia de Lixtara ni de
+ * la broker: nunca escribir "licensed for 20 years". Se muestra como "20+".
+ */
+export const TEAM_EXPERIENCE_YEARS = 20;
+
+/**
  * Email con el que la broker de Lixtara firma CADA acuerdo en DocuSign (#137 f). Decisión
  * del owner (2026-09-28): firma Anamaria con un buzón PROPIO — solo ella lo controla, con
  * verificación en dos pasos, idealmente en el dominio lixtara.com; nunca uno genérico
@@ -60,10 +73,14 @@ export function brokerageLicenseLineShort(): string {
 
 /**
  * Fills brokerage placeholders in dictionary copy so no license number or
- * broker name is ever hardcoded in i18n: {brokerageLicense}, {brokerFirstName}.
+ * broker name is ever hardcoded in i18n: {brokerageLicense}, {brokerLicense},
+ * {brokerName}, {brokerFirstName}, {teamYears}.
  */
 export function fillBrokerageCopy(text: string): string {
   return text
     .replaceAll("{brokerageLicense}", BROKERAGE.brokerageLicense)
+    .replaceAll("{brokerLicense}", BROKERAGE.brokerLicense)
+    .replaceAll("{brokerName}", BROKERAGE.brokerName)
+    .replaceAll("{teamYears}", String(TEAM_EXPERIENCE_YEARS))
     .replaceAll("{brokerFirstName}", BROKERAGE.brokerName.split(" ")[0]);
 }
