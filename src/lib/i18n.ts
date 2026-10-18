@@ -1989,8 +1989,8 @@ export const dictionaries = {
         },
         {
           label: "Paso 4",
-          headline: "Cierra con respaldo del broker",
-          body: "Todos los planes incluyen contratos por DocuSign. Pro suma una llamada de estrategia con el broker y un coordinador de listado; Concierge suma un broker dedicado que coordina el contrato, la negociación y el cierre con la compañía de título.",
+          headline: "Cierra con respaldo de la broker",
+          body: "Todos los planes incluyen contratos por DocuSign. Pro suma una llamada de estrategia con la broker y un coordinador de listado; Concierge suma un broker dedicado que coordina el contrato, la negociación y el cierre con la compañía de título.",
         },
       ],
     },
@@ -2049,7 +2049,7 @@ export const dictionaries = {
           ],
           notIncluded: [
             "Fotografía profesional (disponible como servicio adicional pagado)",
-            "Llamada de estrategia con el broker",
+            "Llamada de estrategia con la broker",
             "Coordinador de listado dedicado",
             "Asistencia en negociación y gestión de la transacción",
           ],
@@ -2057,12 +2057,12 @@ export const dictionaries = {
         pro: {
           name: "Pro",
           tagline: "Ideal si quieres fotos profesionales y la opinión de la broker",
-          forWhom: "Ideal para: vendedores que quieren respaldo del broker y fotos profesionales",
+          forWhom: "Ideal para: vendedores que quieren respaldo de la broker y fotos profesionales",
           features: [
-            "Publicación en el MLS con descripción revisada por el broker, distribuida a portales como Zillow, Realtor.com, Redfin y Trulia",
+            "Publicación en el MLS con descripción revisada por la broker, distribuida a portales como Zillow, Realtor.com, Redfin y Trulia",
             publicationTimeline.text.es.planBullet,
             "Fotografía profesional (valor {photoAddonPrice}, incluida)",
-            "Llamada de cumplimiento y estrategia con el broker (30 min)",
+            "Llamada de cumplimiento y estrategia con la broker (30 min)",
             "Coordinador de listado dedicado",
             "Lockbox + letrero incluidos si la casa está vacía",
             "Panel de autogestión con cambios ilimitados",
@@ -2086,7 +2086,7 @@ export const dictionaries = {
           tagline: "Servicio integral y personalizado",
           forWhom: "Ideal para: vendedores que quieren un servicio integral y personalizado",
           features: [
-            "Publicación en el MLS con descripción revisada por el broker, distribuida a portales como Zillow, Realtor.com, Redfin y Trulia",
+            "Publicación en el MLS con descripción revisada por la broker, distribuida a portales como Zillow, Realtor.com, Redfin y Trulia",
             publicationTimeline.text.es.planBullet,
             "Fotografía premium + tomas con dron",
             "Broker dedicado, 7 días a la semana",
@@ -2878,7 +2878,7 @@ export const dictionaries = {
       saveFailed: "No pudimos guardar. Inténtalo de nuevo.",
     },
     admin: {
-      eyebrow: "Cola del broker",
+      eyebrow: "Cola de la broker",
       titleBefore: "Listados por ",
       titleAccent: "revisar",
       titleAfter: ".",
@@ -2912,7 +2912,7 @@ export const dictionaries = {
       tabPending: "Aprobación pendiente",
       tabPayments: "Pagos",
       notAuthorized: "No tienes acceso de administrador.",
-      notAuthorizedBody: "Solo los miembros del equipo del broker pueden ver esta página.",
+      notAuthorizedBody: "Solo los miembros del equipo de la broker pueden ver esta página.",
     },
     dashboardBuyer: {
       offersHeader: "Tus ofertas",
@@ -2945,7 +2945,7 @@ export const dictionaries = {
       ctaPrimary: "Empezar mi primer listado →",
       ctaNew: "Nuevo listado",
       statusDraft: "Borrador",
-      statusPendingApproval: "Esperando revisión del broker",
+      statusPendingApproval: "Esperando revisión de la broker",
       statusActive: "Activo en el MLS",
       statusSold: "Vendido",
       statusInactive: "Inactivo",
@@ -2995,11 +2995,11 @@ export const dictionaries = {
         metricDays: "Días publicado",
         metricOffers: "Ofertas",
         metricAssets: "Recursos con IA",
-        nsComplete: "Termina de configurar tu listado para que el broker pueda publicarlo.",
+        nsComplete: "Termina de configurar tu listado para que la broker pueda publicarlo.",
         nsCompleteCta: "Continuar configuración",
         nsPay: "Activa tu plan para salir en el MLS de Florida.",
         nsPayCta: "Completar pago",
-        nsAgreement: "Firma tu acuerdo de representación para iniciar la revisión del broker.",
+        nsAgreement: "Firma tu acuerdo de representación para iniciar la revisión de la broker.",
         nsAgreementCta: "Revisar acuerdo",
         nsStaging: "Amuebla cuartos vacíos con staging virtual con IA para que el comprador imagine el espacio.",
         nsStagingCta: "Agregar staging virtual",
@@ -3188,7 +3188,7 @@ export const dictionaries = {
       pages: {
         services: {
           eyebrow: "Servicios",
-          body: "Estamos preparando los servicios adicionales (fotografía profesional, staging virtual, consultas con el broker).",
+          body: "Estamos preparando los servicios adicionales (fotografía profesional, staging virtual, consultas con la broker).",
         },
         contact: {
           eyebrow: "Contacto",
@@ -3278,7 +3278,7 @@ export const dictionaries = {
       notIncludedCommon:
         "La compensación al agente del comprador, si la ofreces, y los costos de cierre de terceros (título, depósito en garantía, impuestos de transferencia), que son iguales con cualquier inmobiliaria",
       essentialsWhy: "Mejor valor si te sientes cómodo tomando tus propias fotos, o si ya tienes buenas fotos.",
-      proWhy: "La mayoría de los vendedores en este rango quiere fotos profesionales y una llamada de estrategia con el broker. Pro incluye ambas.",
+      proWhy: "La mayoría de los vendedores en este rango quiere fotos profesionales y una llamada de estrategia con la broker. Pro incluye ambas.",
       conciergeWhy: "Las casas de mayor valor recuperan el costo con fotos premium con dron, mejor posicionamiento y un broker dedicado hasta el cierre.",
     },
     savings: {
@@ -3378,7 +3378,7 @@ export const dictionaries = {
       closeLabel: "Cerrar el chat de Loui",
       headerEyebrow: "Asistente de Lixtara",
       headerTitle: "Pregúntale a Loui.",
-      headerSubtitle: "Asistente de IA supervisado por el broker principal de Lixtara.",
+      headerSubtitle: "Asistente de IA supervisado por la broker principal de Lixtara.",
       placeholder: "Pregunta lo que quieras sobre tu listado o sobre comprar en Florida…",
       sendLabel: "Enviar",
       emptyTitle: "Hola, soy Loui.",
@@ -3592,7 +3592,7 @@ export const dictionaries = {
           tagline: "Nivel portafolio",
           bullets: [
             "Todo lo de Gold",
-            "Revisión trimestral de portafolio con el broker principal",
+            "Revisión trimestral de portafolio con la broker principal",
           ],
         },
       },
@@ -3614,7 +3614,7 @@ export const dictionaries = {
         },
         {
           q: "¿Qué plan debería elegir?",
-          a: "Todos los planes publican tu casa en el MLS y en sus sitios asociados. Essentials es para vendedores que toman sus propias fotos y manejan la venta desde su panel. Pro agrega fotografía profesional, una llamada de estrategia de 30 minutos con el broker, y un coordinador de listado dedicado. Concierge es servicio completo: fotografía premium con dron, broker dedicado 7 días a la semana, negociación y gestión de la transacción hasta el cierre, y consultas ilimitadas con Realtor.",
+          a: "Todos los planes publican tu casa en el MLS y en sus sitios asociados. Essentials es para vendedores que toman sus propias fotos y manejan la venta desde su panel. Pro agrega fotografía profesional, una llamada de estrategia de 30 minutos con la broker, y un coordinador de listado dedicado. Concierge es servicio completo: fotografía premium con dron, broker dedicado 7 días a la semana, negociación y gestión de la transacción hasta el cierre, y consultas ilimitadas con Realtor.",
         },
         {
           q: "¿Lixtara es una inmobiliaria licenciada?",

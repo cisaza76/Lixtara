@@ -15,7 +15,7 @@ import {
 // sube su `version` y actualiza aquí el hash: así ninguna definición cambia sin versión nueva.
 const PINNED: Record<LegalTermKey, { version: string; sha256: string }> = {
   lixtaraCharges: { version: "1", sha256: "ee4f31c33eb9fe35a00e93dfe6dd48516839216a6de59499469df9ac06879c51" },
-  buyerAgentComp: { version: "1", sha256: "0eb69eb83c4b1eac932f09fd73f1ec76aec094257bb214e60d22ca5c84f17d66" },
+  buyerAgentComp: { version: "2", sha256: "bf301e9f2024e3dbe3281548f0aaf06092d8c9dd5a26e18338945792b2dcf085" },
   publicationTimeline: { version: "1", sha256: "64480052320a494b9837bf751f9c6fb2892675c03c07fe5b14607da58ddcbee2" },
   refundPolicy: { version: "1", sha256: "6868f60c739ff48259150e11fb106a83f0aa89b56e7bd6198ae1f55d569a72d2" },
   legalServices: { version: "1", sha256: "3a64942c4dd2db6499e71e2c1de8f95445c3ce89395266a621f5be81df9b5d4e" },

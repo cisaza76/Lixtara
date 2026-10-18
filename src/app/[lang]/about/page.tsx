@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import {
   BROKERAGE,
-  DBPR_LICENSE_SEARCH_URL,
+  DBPR_BROKERAGE_LICENSE_URL,
   brokerageLicenseLine,
   fillBrokerageCopy,
 } from "@/config/brokerage";
@@ -111,7 +111,7 @@ export default async function AboutPage({
             ))}
           </dl>
           <a
-            href={DBPR_LICENSE_SEARCH_URL}
+            href={DBPR_BROKERAGE_LICENSE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="self-start text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors"

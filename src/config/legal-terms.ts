@@ -9,6 +9,7 @@
 // con la oferta del vendedor (properties.buyer_agent_comp_terms_version).
 
 import { legalFaqAnswer, legalServicesDisclosure } from "@/config/legalPartner";
+import { BUYER_COMP_MAX_PCT } from "@/lib/buyer-comp";
 import { PRICING_TIERS, TIER_ORDER } from "@/lib/pricing-tiers";
 
 type Lang = "en" | "es";
@@ -46,8 +47,10 @@ export const lixtaraCharges: TermDefinition<string> = {
 
 // ── 2. Compensación al agente del comprador ──────────────────────────────────────────
 export interface BuyerCompTexts {
-  /** Resumen (FAQ, Términos, Loui). */
+  /** Resumen (Términos §4.1, Loui). Incluye `cap`. */
   summary: string;
+  /** Tope por política de Lixtara (BUYER_COMP_MAX_PCT): Términos, FAQ y Loui. */
+  cap: string;
   /** Paso 6. */
   stepTitle: string;
   stepBody: string;
@@ -56,17 +59,24 @@ export interface BuyerCompTexts {
   conciergeSuggested: string;
   /** Debajo de los planes. */
   planNote: string;
-  /** Ficha pública: la oferta no se muestra, se pide al broker. */
+  /** Ficha pública: la oferta no se muestra, se pide a la broker. */
   publicNote: string;
 }
 
+// v2 (2026-10-18): el tope de 3% por política de Lixtara entra en el texto (Términos §4.1 y
+// FAQ dicen lo mismo) y la ficha pública remite a "la broker".
+const BUYER_COMP_CAP: Record<Lang, string> = {
+  en: `By Lixtara policy, it can be up to ${BUYER_COMP_MAX_PCT}%: as a percentage of the sale price, or as a fixed amount of up to ${BUYER_COMP_MAX_PCT}% of the list price.`,
+  es: `Por política de Lixtara, puede ser de hasta ${BUYER_COMP_MAX_PCT}%: como porcentaje del precio de venta, o como monto fijo de hasta el ${BUYER_COMP_MAX_PCT}% del precio de lista.`,
+};
+
 export const buyerAgentComp: TermDefinition<BuyerCompTexts> = {
-  version: "1",
-  date: "2026-10-17",
+  version: "2",
+  date: "2026-10-18",
   text: {
     en: {
-      summary:
-        "Buyer's agent compensation is separate from the Lixtara commission. You decide whether to offer it and how much, and 0% is allowed. Since 2024, MLS rules don't allow it to be published on the MLS, so if you offer it we share it directly with the agents who ask for it. It's fully negotiable, isn't set by law, and is put in writing.",
+      summary: `Buyer's agent compensation is separate from the Lixtara commission. You decide whether to offer it and how much, and 0% is allowed. ${BUYER_COMP_CAP.en} Since 2024, MLS rules don't allow it to be published on the MLS, so if you offer it we share it directly with the agents who ask for it. Within that limit it's negotiable, isn't set by law, and is put in writing.`,
+      cap: BUYER_COMP_CAP.en,
       stepTitle: "Do you want to offer compensation to the buyer's agent?",
       stepBody:
         "You can offer to pay all or part of the compensation of the agent who represents the buyer, or offer none. This compensation is separate from the Lixtara commission. Since 2024, MLS rules don't allow this offer to be published on the MLS: if you make one, we'll share it directly with the agents who ask for it. It's 100% negotiable, isn't set by law, and will be put in writing.",
@@ -79,8 +89,8 @@ export const buyerAgentComp: TermDefinition<BuyerCompTexts> = {
       publicNote: "Buyer's agent compensation: ask the broker",
     },
     es: {
-      summary:
-        "La compensación al agente del comprador es aparte de la comisión de Lixtara. Tú decides si la ofreces y cuánto, y puedes ofrecer 0%. Desde 2024, por las reglas del MLS, no se publica en el MLS: si la ofreces, la comunicamos directamente a los agentes que la soliciten. Es 100% negociable, no la fija la ley y se formaliza por escrito.",
+      summary: `La compensación al agente del comprador es aparte de la comisión de Lixtara. Tú decides si la ofreces y cuánto, y puedes ofrecer 0%. ${BUYER_COMP_CAP.es} Desde 2024, por las reglas del MLS, no se publica en el MLS: si la ofreces, la comunicamos directamente a los agentes que la soliciten. Dentro de ese límite es negociable, no la fija la ley y se formaliza por escrito.`,
+      cap: BUYER_COMP_CAP.es,
       stepTitle: "¿Quieres ofrecer compensación al agente del comprador?",
       stepBody:
         "Puedes ofrecer pagar, total o parcialmente, la compensación del agente que represente al comprador, o no ofrecer ninguna. Esta compensación es aparte de la comisión de Lixtara. Desde 2024, por las reglas del MLS, esta oferta no se publica en el MLS: si decides hacerla, la comunicaremos directamente a los agentes que la soliciten. Es 100% negociable, no la fija la ley y quedará formalizada por escrito.",
@@ -90,7 +100,7 @@ export const buyerAgentComp: TermDefinition<BuyerCompTexts> = {
       conciergeSuggested: "Punto de partida sugerido por tu broker; puedes cambiarlo",
       planNote:
         "La compensación al agente del comprador es aparte de todos los planes y de la comisión de Lixtara: tú decides si la ofreces, y puedes ofrecer 0%.",
-      publicNote: "Compensación al agente del comprador: consúltala con el broker",
+      publicNote: "Compensación al agente del comprador: consúltala con la broker",
     },
   },
 };
@@ -172,7 +182,7 @@ export const LEGAL_TERMS = {
 
 export type LegalTermKey = keyof typeof LEGAL_TERMS;
 
-/** Lo que se guarda con la oferta del vendedor: "buyer_agent_comp@1". */
+/** Lo que se guarda con la oferta del vendedor: "buyer_agent_comp@2". */
 export const BUYER_COMP_TERMS_VERSION = `buyer_agent_comp@${buyerAgentComp.version}`;
 
 // ── FAQ ─────────────────────────────────────────────────────────────────────────────
@@ -193,7 +203,7 @@ export function termsFaq(lang: Lang) {
       },
       mustOffer: {
         q: "¿Tengo que ofrecer compensación al agente del comprador?",
-        a: `No. Es tu decisión y 0% es una opción válida. ${comp.noticeNoOffer} ${comp.noticeOffer} Es 100% negociable y no la fija la ley.`,
+        a: `No. Es tu decisión y 0% es una opción válida. ${comp.cap} ${comp.noticeNoOffer} ${comp.noticeOffer} Dentro de ese límite es negociable y no la fija la ley.`,
       },
       notOnMls: {
         q: "¿Por qué la compensación no aparece en el MLS?",
@@ -213,7 +223,7 @@ export function termsFaq(lang: Lang) {
       },
       earlyAccess: {
         q: "¿Puedo ver propiedades antes de que salgan al MLS?",
-        a: `No. ${propertyAccess.text.es} Si buscas casa, el broker te acompaña desde que una propiedad está publicada.`,
+        a: `No. ${propertyAccess.text.es} Si buscas casa, la broker te acompaña desde que una propiedad está publicada.`,
       },
     } satisfies Record<string, FaqItem>;
   }
@@ -224,7 +234,7 @@ export function termsFaq(lang: Lang) {
     },
     mustOffer: {
       q: "Do I have to offer compensation to the buyer's agent?",
-      a: `No. It's your decision, and 0% is a valid choice. ${comp.noticeNoOffer} ${comp.noticeOffer} It's fully negotiable and isn't set by law.`,
+      a: `No. It's your decision, and 0% is a valid choice. ${comp.cap} ${comp.noticeNoOffer} ${comp.noticeOffer} Within that limit it's negotiable and isn't set by law.`,
     },
     notOnMls: {
       q: "Why doesn't the buyer's agent compensation appear on the MLS?",

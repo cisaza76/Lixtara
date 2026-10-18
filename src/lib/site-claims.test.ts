@@ -4,8 +4,9 @@ import { join, resolve } from "node:path";
 import { dictionaryTexts, legalTermTexts, type Lang, type SiteText } from "@/lib/site-texts.test-helpers";
 import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
 import { dictionaries } from "@/lib/i18n";
-import { BROKERAGE, DBPR_LICENSE_SEARCH_URL, fillBrokerageCopy } from "@/config/brokerage";
-import { refundPolicy } from "@/config/legal-terms";
+import { BROKERAGE, DBPR_BROKER_LICENSE_URL, DBPR_BROKERAGE_LICENSE_URL, fillBrokerageCopy } from "@/config/brokerage";
+import { buyerAgentComp, refundPolicy, termsFaq } from "@/config/legal-terms";
+import { BUYER_COMP_MAX_PCT } from "@/lib/buyer-comp";
 import { termsDoc } from "@/lib/legal/terms";
 import { buyNavHref, buyerContactHref, buyerCtaHref, contactTopicFromQuery } from "@/lib/buyer-entry";
 import { CONTACT_TOPICS } from "@/lib/contact-form";
@@ -85,6 +86,30 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
     expect(body).not.toMatch(/all fees paid to Lixtara are non-refundable|todas las tarifas pagadas a Lixtara no son reembolsables/);
     expect(body).not.toMatch(/flat plan fee is non-refundable\.|tarifa fija del plan no es reembolsable\./);
   });
+
+  it("Términos §4.1: la compensación al agente del comprador dice lo mismo que la FAQ", () => {
+    const sub = termsDoc[lang].sections.flatMap((s) => s.sub ?? []).find((s) => s.heading.startsWith("4.1"));
+    const comp = buyerAgentComp.text[lang];
+    expect(sub?.body).toEqual([comp.summary]);
+    // Opcional (0%), aparte de la comisión de Lixtara, hasta 3% por política de Lixtara, fuera del MLS.
+    expect(comp.summary).toContain(comp.cap);
+    expect(comp.cap).toContain(`${BUYER_COMP_MAX_PCT}%`);
+    expect(comp.summary).toMatch(lang === "en" ? /0% is allowed/ : /puedes ofrecer 0%/);
+    expect(comp.summary).toMatch(lang === "en" ? /separate from the Lixtara commission/ : /aparte de la comisión de Lixtara/);
+    expect(comp.summary).toMatch(lang === "en" ? /published on the MLS/ : /no se publica en el MLS/);
+    expect(termsFaq(lang).mustOffer.a).toContain(comp.cap);
+    const all = JSON.stringify(termsDoc[lang]);
+    expect(all).not.toMatch(/set at 3%|se fija en 3%|2% to 3%|2% al 3%|2% and 3%|2% y 3%|cooperating commission|comisión cooperante/i);
+  });
+
+  it("Términos: Lixtara LLC y la dirección completa de la configuración de brokerage", () => {
+    const all = JSON.stringify(termsDoc[lang]);
+    expect(all).not.toMatch(/operated by Lixtara \(|operada por Lixtara \(/);
+    expect(termsDoc[lang].intro[0]).toContain(`${BROKERAGE.legalName} (`);
+    const contact = termsDoc[lang].sections.find((s) => s.heading.startsWith("21."));
+    expect(contact?.body.join("\n")).toContain(`${BROKERAGE.legalName}, ${BROKERAGE.address}`);
+    expect(BROKERAGE.address).toBe("181 Vera Ct, Miami, FL 33143");
+  });
 });
 
 describe("entradas de comprador", () => {
@@ -114,11 +139,16 @@ describe("entradas de comprador", () => {
     }
   });
 
-  it("el enlace al DBPR abre la búsqueda de licencias en una pestaña nueva", () => {
-    expect(DBPR_LICENSE_SEARCH_URL).toMatch(/^https:\/\/www\.myfloridalicense\.com\//);
+  it("el enlace al DBPR abre la ficha de cada licencia en una pestaña nueva", () => {
+    for (const url of [DBPR_BROKERAGE_LICENSE_URL, DBPR_BROKER_LICENSE_URL]) {
+      expect(url).toMatch(/^https:\/\/www\.myfloridalicense\.com\/LicenseDetail\.asp\?SID=&id=[0-9A-F]{32}$/);
+    }
+    expect(DBPR_BROKERAGE_LICENSE_URL).not.toBe(DBPR_BROKER_LICENSE_URL);
+    // El inicio enlaza la CQ junto al nombre de la correduría y la BK junto a la licencia de la broker.
+    expect(read("src/app/[lang]/page.tsx")).toContain("href={DBPR_BROKER_LICENSE_URL}");
     for (const f of ["src/app/[lang]/page.tsx", "src/app/[lang]/about/page.tsx"]) {
       const src = read(f);
-      expect(src, f).toContain("href={DBPR_LICENSE_SEARCH_URL}");
+      expect(src, f).toContain("href={DBPR_BROKERAGE_LICENSE_URL}");
       expect(src, f).toContain('target="_blank"');
       expect(src, f).toContain('rel="noopener noreferrer"');
     }

@@ -4,7 +4,7 @@ import { ListingCtaLink } from "@/components/listing-cta-link";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { BROKER_LICENSE, BROKERAGE_NAME } from "@/lib/broker";
-import { DBPR_LICENSE_SEARCH_URL, fillBrokerageCopy } from "@/config/brokerage";
+import { DBPR_BROKER_LICENSE_URL, DBPR_BROKERAGE_LICENSE_URL, fillBrokerageCopy } from "@/config/brokerage";
 import { buyerContactHref, buyerCtaHref } from "@/lib/buyer-entry";
 import { catalogHasListings } from "@/lib/catalog-status.server";
 import { FootnoteText } from "@/components/footnote-text";
@@ -120,7 +120,7 @@ export default async function Home({
               <br />
               {licenseText} ·{" "}
               <a
-                href={DBPR_LICENSE_SEARCH_URL}
+                href={DBPR_BROKERAGE_LICENSE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline decoration-gold-soft underline-offset-4 hover:text-gold transition-colors"
@@ -188,7 +188,7 @@ export default async function Home({
                   </div>
                   <div className="w-6 h-px bg-gold-soft" />
                   <a
-                    href={DBPR_LICENSE_SEARCH_URL}
+                    href={DBPR_BROKER_LICENSE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[8px] leading-tight uppercase tracking-[0.18em] text-ink/80 underline decoration-gold-soft underline-offset-2 hover:text-gold"

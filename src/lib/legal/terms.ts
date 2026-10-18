@@ -1,11 +1,14 @@
 import type { LegalContent } from "./types";
-import { refundPolicy } from "@/config/legal-terms";
+import { BROKERAGE } from "@/config/brokerage";
+import { buyerAgentComp, refundPolicy } from "@/config/legal-terms";
+
+const B = BROKERAGE;
 
 export const termsDoc: LegalContent = {
   en: {
     title: "Terms of Service",
     intro: [
-      "These Terms of Service (the \"Terms\") govern your access to and use of the Lixtara website, applications, and services (collectively, the \"Services\"). Lixtara is an online platform that combines for-sale-by-owner (FSBO) tools with licensed-broker support to help property owners in Florida list, market, and sell their homes. Lixtara is operated by Lixtara (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), based in Miami, Florida, United States.",
+      `These Terms of Service (the \"Terms\") govern your access to and use of the Lixtara website, applications, and services (collectively, the \"Services\"). Lixtara is an online platform that combines for-sale-by-owner (FSBO) tools with licensed-broker support to help property owners in Florida list, market, and sell their homes. Lixtara is operated by ${B.legalName} (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), based in Miami, Florida, United States.`,
       "Please read these Terms carefully. By accessing or using the Services, creating an account, starting a listing, or signing any agreement through the Services, you agree to be bound by these Terms. If you do not agree, do not use the Services. These Terms include important provisions that affect your legal rights, including disclaimers of warranties, a limitation of liability, an indemnification obligation, and provisions regarding dispute resolution and arbitration.",
     ],
     sections: [
@@ -28,9 +31,9 @@ export const termsDoc: LegalContent = {
       {
         heading: "3. Description of the Services",
         body: [
-          "Lixtara provides an online platform that gives sellers FSBO-style tools to create and manage a property listing, combined with support from a real estate brokerage. Through the Services you can, among other things, build a listing, upload photos and property details, choose a plan, offer a cooperating (buyer-agent) commission, order optional add-ons, sign documents electronically, and have your listing marketed and syndicated to third-party real estate portals.",
+          "Lixtara provides an online platform that gives sellers FSBO-style tools to create and manage a property listing, combined with support from a real estate brokerage. Through the Services you can, among other things, build a listing, upload photos and property details, choose a plan, offer compensation to the buyer's agent, order optional add-ons, sign documents electronically, and have your listing marketed and syndicated to third-party real estate portals.",
           "When your listing is published through our brokerage, it is entered in the multiple listing service (MLS) and may be syndicated from there to third-party portals including Zillow, Realtor.com, Redfin, and Trulia. Availability, format, and timing on the MLS and on any third-party portal are governed by the MLS rules or by that portal and are not guaranteed by Lixtara.",
-          "Lixtara is a technology platform and a licensed Florida real estate brokerage (Florida license CQ1075352). Lixtara is not a law firm, lender or mortgage broker, title or escrow company, appraiser, home inspector, surveyor, accountant, or tax advisor, and nothing in the Services constitutes legal, financial, tax, appraisal, or investment advice.",
+          `Lixtara is a technology platform and a licensed Florida real estate brokerage (Florida license ${B.brokerageLicense}). Lixtara is not a law firm, lender or mortgage broker, title or escrow company, appraiser, home inspector, surveyor, accountant, or tax advisor, and nothing in the Services constitutes legal, financial, tax, appraisal, or investment advice.`,
         ],
         bullets: [
           "We do not provide legal advice or prepare legal documents for you as your attorney; you are responsible for obtaining your own legal counsel where appropriate.",
@@ -43,7 +46,7 @@ export const termsDoc: LegalContent = {
       {
         heading: "4. Brokerage Relationship and Florida Real Estate Disclosures",
         body: [
-          "Lixtara operates as a licensed Florida real estate brokerage (Florida license CQ1075352). Our principal broker of record oversees the brokerage activities conducted through the Services in accordance with Florida real estate law.",
+          `Lixtara operates as a licensed Florida real estate brokerage (Florida license ${B.brokerageLicense}). Our principal broker of record, ${B.brokerName}, oversees the brokerage activities conducted through the Services in accordance with Florida real estate law.`,
           "The specific brokerage relationship between you and Lixtara (including the nature, scope, and duties of that relationship) is established and governed by the listing agreement and any related disclosures that you sign. These Terms do not by themselves create a brokerage, agency, or fiduciary relationship. Any agency or representation obligations arise only under, and are limited by, the signed listing agreement and applicable Florida real estate law and disclosure requirements.",
           "Lixtara does not guarantee any result. We make no promise or guarantee that your property will sell, that it will attract any offer, or that any sale will close at a particular price, on particular terms, or within any particular period of time. Real estate outcomes depend on many factors outside our control, including market conditions, pricing, property condition, and buyer behavior.",
           "Fair Housing. Lixtara is committed to the principles of equal housing opportunity. You agree that your listing and your conduct through the Services will comply with the federal Fair Housing Act and the Florida Fair Housing Act and all other applicable anti-discrimination laws. You may not discriminate, or state any preference, limitation, or discrimination, on the basis of race, color, religion, sex, disability, familial status, national origin, or any other protected class.",
@@ -56,10 +59,9 @@ export const termsDoc: LegalContent = {
         ],
         sub: [
           {
-            heading: "4.1 Cooperating (Buyer-Agent) Commission",
-            body: [
-              "As the seller, you separately choose the cooperating commission that you offer to a buyer's agent. This buyer-agent commission is typically in the range of 2% to 3% and is your decision, except that under the Concierge plan the cooperating commission is set at 3%. The cooperating commission you offer is in addition to the Lixtara plan fee and the Lixtara seller-side commission described in Section 6.",
-            ],
+            heading: "4.1 Buyer's Agent Compensation",
+            // Mismo texto que la FAQ y Loui: una sola fuente en legal-terms.ts.
+            body: [buyerAgentComp.text.en.summary],
           },
         ],
       },
@@ -75,7 +77,7 @@ export const termsDoc: LegalContent = {
         heading: "6. Plans, Fees, Commissions, and Payments",
         body: [
           "Lixtara offers three plans. Each plan consists of a flat, one-time fee plus a low seller-side commission that becomes payable only if and when your property sells. Each plan carries a listing term of 24 months.",
-          "The plan tiers are: Essentials: $199 flat fee plus a 0.5% seller-side commission on sale; Pro: $495 flat fee plus a 1% seller-side commission on sale; and Concierge: $995 flat fee plus a 1.5% seller-side commission on sale. The flat fee for each plan is one-time. The seller-side commission is owed only if the property sells. The cooperating buyer-agent commission described in Section 4 is selected separately by you and is in addition to these amounts.",
+          "The plan tiers are: Essentials: $199 flat fee plus a 0.5% seller-side commission on sale; Pro: $495 flat fee plus a 1% seller-side commission on sale; and Concierge: $995 flat fee plus a 1.5% seller-side commission on sale. The flat fee for each plan is one-time. The seller-side commission is owed only if the property sells. Buyer's agent compensation (Section 4.1) is separate from these amounts and is your decision; it can be 0%.",
           // Política de reembolso publicada (FAQ, Loui, paso 8): una sola fuente en legal-terms.ts.
           refundPolicy.text.en,
           "Optional add-ons, such as professional photography and AI virtual staging, may be available for an additional charge that will be disclosed to you before you purchase them. Add-on fees are non-refundable except where required by law.",
@@ -217,9 +219,9 @@ export const termsDoc: LegalContent = {
         heading: "21. Contact Us",
         body: [
           "If you have questions about these Terms or the Services, please contact us:",
-          "Lixtara: Lixtara, Miami, Florida, United States. Mailing address: Miami, Florida, United States.",
+          `${B.legalName}, ${B.address}, United States.`,
           "Legal: legal@lixtara.com. Support: support@lixtara.com.",
-          "Licensed Florida real estate brokerage. Brokerage license number: CQ1075352. Principal broker of record: Anamaria Velasquez.",
+          `Licensed Florida real estate brokerage. Brokerage license number: ${B.brokerageLicense}. Principal broker of record: ${B.brokerName} (license ${B.brokerLicense}).`,
         ],
       },
     ],
@@ -227,7 +229,7 @@ export const termsDoc: LegalContent = {
   es: {
     title: "Términos del Servicio",
     intro: [
-      "Estos Términos del Servicio (los \"Términos\") rigen su acceso y uso del sitio web, las aplicaciones y los servicios de Lixtara (en conjunto, los \"Servicios\"). Lixtara es una plataforma en línea que combina herramientas de venta por el propietario (FSBO, por sus siglas en inglés) con el apoyo de un corredor de bienes raíces con licencia, para ayudar a los propietarios en Florida a publicar, promocionar y vender sus viviendas. Lixtara es operada por Lixtara (\"Lixtara\", \"nosotros\" o \"nuestro\"), con sede en Miami, Florida, Estados Unidos.",
+      `Estos Términos del Servicio (los \"Términos\") rigen su acceso y uso del sitio web, las aplicaciones y los servicios de Lixtara (en conjunto, los \"Servicios\"). Lixtara es una plataforma en línea que combina herramientas de venta por el propietario (FSBO, por sus siglas en inglés) con el apoyo de un broker de bienes raíces con licencia, para ayudar a los propietarios en Florida a publicar, promocionar y vender sus viviendas. Lixtara es operada por ${B.legalName} (\"Lixtara\", \"nosotros\" o \"nuestro\"), con sede en Miami, Florida, Estados Unidos.`,
       "Lea estos Términos detenidamente. Al acceder o utilizar los Servicios, crear una cuenta, iniciar una publicación o firmar cualquier acuerdo a través de los Servicios, usted acepta quedar obligado por estos Términos. Si no está de acuerdo, no utilice los Servicios. Estos Términos incluyen disposiciones importantes que afectan sus derechos legales, incluidas exenciones de garantías, una limitación de responsabilidad, una obligación de indemnización y disposiciones sobre resolución de disputas y arbitraje.",
     ],
     sections: [
@@ -250,9 +252,9 @@ export const termsDoc: LegalContent = {
       {
         heading: "3. Descripción de los Servicios",
         body: [
-          "Lixtara ofrece una plataforma en línea que brinda a los vendedores herramientas tipo FSBO para crear y administrar la publicación de una propiedad, combinadas con el apoyo de una correduría de bienes raíces. A través de los Servicios usted puede, entre otras cosas, crear una publicación, cargar fotos y datos de la propiedad, elegir un plan, ofrecer una comisión al agente del comprador (cooperante), solicitar servicios adicionales opcionales, firmar documentos electrónicamente y hacer que su publicación se promocione y se distribuya a portales inmobiliarios de terceros.",
+          "Lixtara ofrece una plataforma en línea que brinda a los vendedores herramientas tipo FSBO para crear y administrar la publicación de una propiedad, combinadas con el apoyo de una correduría de bienes raíces. A través de los Servicios usted puede, entre otras cosas, crear una publicación, cargar fotos y datos de la propiedad, elegir un plan, ofrecer compensación al agente del comprador, solicitar servicios adicionales opcionales, firmar documentos electrónicamente y hacer que su publicación se promocione y se distribuya a portales inmobiliarios de terceros.",
           "Cuando su publicación se difunde a través de nuestra correduría, se ingresa en el servicio de listado múltiple (MLS) y desde ahí puede distribuirse a portales de terceros que incluyen Zillow, Realtor.com, Redfin y Trulia. La disponibilidad, el formato y los tiempos en el MLS y en cualquier portal de terceros se rigen por las reglas del MLS o por ese portal y no están garantizados por Lixtara.",
-          "Lixtara es una plataforma tecnológica y una correduría de bienes raíces licenciada en Florida (licencia de Florida CQ1075352). Lixtara no es un bufete de abogados, prestamista o corredor hipotecario, compañía de títulos o plica (escrow), tasador, inspector de viviendas, agrimensor, contador ni asesor fiscal, y nada en los Servicios constituye asesoría legal, financiera, fiscal, de tasación o de inversión.",
+          `Lixtara es una plataforma tecnológica y una correduría de bienes raíces licenciada en Florida (licencia de Florida ${B.brokerageLicense}). Lixtara no es un bufete de abogados, prestamista o corredor hipotecario, compañía de títulos o plica (escrow), tasador, inspector de viviendas, agrimensor, contador ni asesor fiscal, y nada en los Servicios constituye asesoría legal, financiera, fiscal, de tasación o de inversión.`,
         ],
         bullets: [
           "No brindamos asesoría legal ni preparamos documentos legales para usted como su abogado; usted es responsable de obtener su propia asesoría legal cuando corresponda.",
@@ -265,7 +267,7 @@ export const termsDoc: LegalContent = {
       {
         heading: "4. Relación de Correduría y Divulgaciones Inmobiliarias de Florida",
         body: [
-          "Lixtara opera como una correduría de bienes raíces licenciada en Florida (licencia de Florida CQ1075352). Nuestra corredora principal a cargo supervisa las actividades de correduría realizadas a través de los Servicios de conformidad con la ley inmobiliaria de Florida.",
+          `Lixtara opera como una correduría de bienes raíces licenciada en Florida (licencia de Florida ${B.brokerageLicense}). La broker a cargo, ${B.brokerName}, supervisa las actividades de correduría realizadas a través de los Servicios de conformidad con la ley inmobiliaria de Florida.`,
           "La relación de correduría específica entre usted y Lixtara (incluyendo la naturaleza, el alcance y los deberes de esa relación) se establece y se rige por el acuerdo de publicación y cualquier divulgación relacionada que usted firme. Estos Términos no crean por sí mismos una relación de correduría, de agencia ni fiduciaria. Cualquier obligación de agencia o representación surge únicamente bajo, y está limitada por, el acuerdo de publicación firmado y la ley inmobiliaria de Florida y los requisitos de divulgación aplicables.",
           "Lixtara no garantiza ningún resultado. No prometemos ni garantizamos que su propiedad se venderá, que atraerá alguna oferta, ni que alguna venta se cerrará a un precio determinado, en condiciones determinadas o dentro de un período de tiempo determinado. Los resultados inmobiliarios dependen de muchos factores fuera de nuestro control, incluidas las condiciones del mercado, el precio, el estado de la propiedad y el comportamiento del comprador.",
           "Vivienda Justa. Lixtara está comprometida con los principios de igualdad de oportunidades en la vivienda. Usted acepta que su publicación y su conducta a través de los Servicios cumplirán con la Ley Federal de Vivienda Justa y la Ley de Vivienda Justa de Florida y todas las demás leyes antidiscriminatorias aplicables. No podrá discriminar, ni expresar preferencia, limitación o discriminación alguna, por motivos de raza, color, religión, sexo, discapacidad, estado familiar, origen nacional o cualquier otra clase protegida.",
@@ -278,10 +280,9 @@ export const termsDoc: LegalContent = {
         ],
         sub: [
           {
-            heading: "4.1 Comisión Cooperante (Agente del Comprador)",
-            body: [
-              "Como vendedor, usted elige por separado la comisión cooperante que ofrece al agente del comprador. Esta comisión al agente del comprador suele estar en el rango del 2% al 3% y es su decisión, salvo que bajo el plan Concierge la comisión cooperante se fija en 3%. La comisión cooperante que usted ofrece es adicional a la tarifa del plan de Lixtara y a la comisión del lado del vendedor de Lixtara descrita en la Sección 6.",
-            ],
+            heading: "4.1 Compensación al Agente del Comprador",
+            // Mismo texto que la FAQ y Loui (con tú: el registro de los Términos queda para el #203).
+            body: [buyerAgentComp.text.es.summary],
           },
         ],
       },
@@ -297,7 +298,7 @@ export const termsDoc: LegalContent = {
         heading: "6. Planes, Tarifas, Comisiones y Pagos",
         body: [
           "Lixtara ofrece tres planes. Cada plan consiste en una tarifa fija de pago único más una baja comisión del lado del vendedor que se vuelve pagadera únicamente si su propiedad se vende y cuando se venda. Cada plan tiene un plazo de publicación de 24 meses.",
-          "Los niveles de los planes son: Essentials: tarifa fija de $199 más una comisión del lado del vendedor del 0.5% sobre la venta; Pro: tarifa fija de $495 más una comisión del lado del vendedor del 1% sobre la venta; y Concierge: tarifa fija de $995 más una comisión del lado del vendedor del 1.5% sobre la venta. La tarifa fija de cada plan es de pago único. La comisión del lado del vendedor se adeuda únicamente si la propiedad se vende. La comisión cooperante al agente del comprador descrita en la Sección 4 la selecciona usted por separado y es adicional a estos montos.",
+          "Los niveles de los planes son: Essentials: tarifa fija de $199 más una comisión del lado del vendedor del 0.5% sobre la venta; Pro: tarifa fija de $495 más una comisión del lado del vendedor del 1% sobre la venta; y Concierge: tarifa fija de $995 más una comisión del lado del vendedor del 1.5% sobre la venta. La tarifa fija de cada plan es de pago único. La comisión del lado del vendedor se adeuda únicamente si la propiedad se vende. La compensación al agente del comprador (Sección 4.1) es aparte de estos montos y es su decisión; puede ser 0%.",
           refundPolicy.text.es,
           "Los servicios adicionales opcionales, como la fotografía profesional y el home staging virtual con IA, pueden estar disponibles por un cargo adicional que se le informará antes de que los compre. Las tarifas de los servicios adicionales no son reembolsables, salvo cuando la ley lo exija.",
           "Los pagos se procesan a través de nuestro procesador de pagos externo, Stripe. Al enviar información de pago, usted nos autoriza a nosotros y a Stripe a cobrar los montos correspondientes. Lixtara no almacena el número completo de su tarjeta; los datos de la tarjeta de pago son manejados por Stripe bajo sus propios términos. Usted es responsable de cualquier impuesto que aplique a su compra, salvo los impuestos sobre los ingresos netos de Lixtara.",
@@ -438,9 +439,9 @@ export const termsDoc: LegalContent = {
         heading: "21. Contáctenos",
         body: [
           "Si tiene preguntas sobre estos Términos o los Servicios, comuníquese con nosotros:",
-          "Lixtara: Lixtara, Miami, Florida, Estados Unidos. Dirección postal: Miami, Florida, United States.",
+          `${B.legalName}, ${B.address}, Estados Unidos.`,
           "Legal: legal@lixtara.com. Soporte: support@lixtara.com.",
-          "Correduría de bienes raíces licenciada en Florida. Número de licencia de correduría: CQ1075352. Corredora principal a cargo: Anamaria Velasquez.",
+          `Correduría de bienes raíces licenciada en Florida. Número de licencia de correduría: ${B.brokerageLicense}. La broker a cargo: ${B.brokerName} (licencia ${B.brokerLicense}).`,
         ],
       },
     ],
