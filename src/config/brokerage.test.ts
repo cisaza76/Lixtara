@@ -8,6 +8,8 @@ import {
   brokerSigner,
   brokerageLicenseLine,
   brokerageLicenseLineShort,
+  COLD_EMAIL_AD_NOTICE,
+  coldEmailFooter,
 } from "./brokerage";
 
 // Datos de licencia: verificados en el DBPR el 2026-09-27. Un error aquí es un problema
@@ -45,6 +47,12 @@ describe("config/brokerage — datos verificados en el DBPR", () => {
     expect(brokerageLicenseLine("es")).toBe(
       "Lixtara LLC · Brokerage inmobiliaria licenciada · FL #CQ1075352 · Anamaria Velasquez, Broker · FL #BK3664191");
     expect(brokerageLicenseLineShort()).toBe("Lixtara LLC · FL Lic. #CQ1075352");
+  });
+
+  it("pie de los correos fríos, literal (2026-10-18)", () => {
+    expect(COLD_EMAIL_AD_NOTICE).toBe("This is an advertisement.");
+    expect(coldEmailFooter()).toBe(
+      "Lixtara LLC · Licensed Real Estate Brokerage · FL #CQ1075352 · Anamaria Velasquez, Broker · FL #BK3664191 · 181 Vera Ct, Miami, FL 33143 · If your property is currently listed with another broker, please disregard this message. · Unsubscribe");
   });
 });
 

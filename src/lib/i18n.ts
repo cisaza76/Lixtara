@@ -18,14 +18,14 @@ export const dictionaries = {
       headlineAfter: "",
       // {minFee} y {minPct}: el plan más bajo de pricing-tiers.ts (src/lib/pricing-from.ts).
       subheadline:
-        "List on the MLS with a licensed brokerage and a team with {teamYears}+ years of experience. Plans from {minFee}, plus {minPct} only if your home sells.",
+        "List on the MLS with a licensed brokerage and a broker with {brokerYears}+ years of experience. Plans from {minFee}, plus {minPct} only if your home sells.",
       ctaPrimary: "See what you'd pay",
       ctaSecondary: "Start my listing",
       licenseLabel: "FL License #{brokerageLicense}",
       verifyDbpr: "Verify on DBPR",
       opensNewTab: "(opens in a new tab)",
-      metricYearsValue: "{teamYears}+ years",
-      metricYearsLabel: "{brokerName} and her team",
+      // Los años son de la broker; el equipo va aparte, sin sumar años (2026-10-18).
+      experienceLine: "{brokerName}, Broker · {brokerYears}+ years in Florida real estate · with her team of licensed agents",
       metricMlsValue: "On the MLS",
       badgeLicensed: "FL License",
       langToggle: "Español",
@@ -84,7 +84,7 @@ export const dictionaries = {
       titleBefore: "What our ",
       titleAccent: "clients",
       titleAfter: " say",
-      note: "Clients of {brokerName} and her team.",
+      note: "Clients of {brokerName} and her team, from transactions before Lixtara.",
       testimonials: [
         {
           quote:
@@ -1253,7 +1253,7 @@ export const dictionaries = {
       titleAccent: "A fraction of the commission.",
       titleAfter: "",
       intro:
-        "{brokerName} and her team, {teamYears}+ years in Florida real estate, put your home on the MLS, which feeds Zillow, Realtor.com and Redfin. You pay a flat fee, plus a small commission only if it sells.",
+        "{brokerName}, with {brokerYears}+ years in Florida real estate, and her team put your home on the MLS, which feeds Zillow, Realtor.com and Redfin. You pay a flat fee, plus a small commission only if it sells.",
       ctaListing: "Start my listing",
       ctaTalk: "Talk to our team",
       whoEyebrow: "Who's writing to you",
@@ -1283,7 +1283,7 @@ export const dictionaries = {
       titleBefore: "About ",
       titleAccent: "Lixtara",
       titleAfter: ".",
-      intro: "Backed by {brokerName} and her team, {teamYears}+ years of Florida real estate experience.",
+      intro: "{brokerName}, Broker · {brokerYears}+ years in Florida real estate · with her team of licensed agents",
       sellers: "If you're selling, Lixtara pairs simple tools to list your home with a licensed brokerage behind every step: a flat fee when you list, and a Lixtara commission at closing only if your home sells.",
       buyers: "If you're buying, the team searches for homes with you, shows them, negotiates your offer and stays with you until closing.",
       factsTitle: "The brokerage",
@@ -1669,7 +1669,7 @@ export const dictionaries = {
     buyerServices: {
       eyebrow: "For buyers",
       title: "Find your next home with a team by your side.",
-      body: "{brokerName} and her team, with {teamYears}+ years of Florida real estate experience, search for homes with you, show them, negotiate your offer and stay with you until closing.",
+      body: "{brokerName}, with {brokerYears}+ years of Florida real estate experience, and her team search for homes with you, show them, negotiate your offer and stay with you until closing.",
       pillar1Title: "We search with you",
       pillar1Body: "Tell us the area, budget and timeline you have in mind, and the team looks for homes that fit across Miami-Dade, Broward and Palm Beach.",
       pillar2Title: "Showings and negotiation",
@@ -1966,14 +1966,13 @@ export const dictionaries = {
       headlineAccent: "Quédate con más de lo que ganaste.",
       headlineAfter: "",
       subheadline:
-        "Publica en el MLS con una inmobiliaria licenciada y un equipo con más de {teamYears} años de experiencia. Planes desde {minFee}, más {minPct} solo si tu casa se vende.",
+        "Publica en el MLS con una inmobiliaria licenciada y una broker con más de {brokerYears} años de experiencia. Planes desde {minFee}, más {minPct} solo si tu casa se vende.",
       ctaPrimary: "Calcula cuánto pagarías",
       ctaSecondary: "Publicar mi casa",
       licenseLabel: "Licencia FL #{brokerageLicense}",
       verifyDbpr: "Verificar en DBPR",
       opensNewTab: "(se abre en una pestaña nueva)",
-      metricYearsValue: "Más de {teamYears} años",
-      metricYearsLabel: "{brokerName} y su equipo",
+      experienceLine: "{brokerName}, broker · más de {brokerYears} años en bienes raíces en Florida · con su equipo de agentes licenciados",
       metricMlsValue: "En el MLS",
       badgeLicensed: "Licencia FL",
       langToggle: "English",
@@ -2032,7 +2031,7 @@ export const dictionaries = {
       titleBefore: "Lo que dicen nuestros ",
       titleAccent: "clientes",
       titleAfter: "",
-      note: "Clientes de {brokerName} y su equipo.",
+      note: "Clientes de {brokerName} y su equipo, de operaciones anteriores a Lixtara.",
       testimonials: [
         {
           quote:
@@ -3199,7 +3198,7 @@ export const dictionaries = {
       titleAccent: "Una fracción de la comisión.",
       titleAfter: "",
       intro:
-        "{brokerName} y su equipo, con más de {teamYears} años en el mercado inmobiliario de Florida, ponen tu casa en el MLS, que alimenta a Zillow, Realtor.com y Redfin. Pagas una tarifa fija, más una comisión baja solo si se vende.",
+        "{brokerName}, con más de {brokerYears} años en el mercado inmobiliario de Florida, y su equipo ponen tu casa en el MLS, que alimenta a Zillow, Realtor.com y Redfin. Pagas una tarifa fija, más una comisión baja solo si se vende.",
       ctaListing: "Publicar mi casa",
       ctaTalk: "Hablar con nuestro equipo",
       whoEyebrow: "Quién te escribe",
@@ -3229,7 +3228,7 @@ export const dictionaries = {
       titleBefore: "Sobre ",
       titleAccent: "Lixtara",
       titleAfter: ".",
-      intro: "Con el respaldo de {brokerName} y su equipo, más de {teamYears} años de experiencia en bienes raíces en Florida.",
+      intro: "{brokerName}, broker · más de {brokerYears} años en bienes raíces en Florida · con su equipo de agentes licenciados",
       sellers: "Si vendes, Lixtara combina herramientas sencillas para publicar tu casa con una inmobiliaria licenciada detrás de cada paso: una tarifa fija al publicar, y una comisión de Lixtara al cierre solo si tu casa se vende.",
       buyers: "Si compras, el equipo busca viviendas contigo, te las muestra, negocia tu oferta y te acompaña hasta el cierre.",
       factsTitle: "La inmobiliaria",
@@ -3615,7 +3614,7 @@ export const dictionaries = {
     buyerServices: {
       eyebrow: "Para compradores",
       title: "Encuentra tu próximo hogar con un equipo a tu lado.",
-      body: "{brokerName} y su equipo, con más de {teamYears} años de experiencia en bienes raíces en Florida, buscan viviendas contigo, te las muestran, negocian tu oferta y te acompañan hasta el cierre.",
+      body: "{brokerName}, con más de {brokerYears} años de experiencia en bienes raíces en Florida, y su equipo buscan viviendas contigo, te las muestran, negocian tu oferta y te acompañan hasta el cierre.",
       pillar1Title: "Buscamos contigo",
       pillar1Body: "Cuéntanos la zona, el presupuesto y los plazos que tienes en mente, y el equipo busca viviendas que encajen en Miami-Dade, Broward y Palm Beach.",
       pillar2Title: "Visitas y negociación",

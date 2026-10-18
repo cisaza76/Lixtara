@@ -171,6 +171,15 @@ export function compareWithOffer(tierId: PricingTierId, salePrice: number, offer
 }
 
 /**
+ * CASSB-1 apagado hasta nuevo aviso (decisión del owner, 2026-10-18): se está confirmando si
+ * corresponde el CASSB-1 o un acuerdo de compensación del vendedor al broker del comprador.
+ * Con false, el código no genera ni sugiere el CASSB-1: cassb1Tabs() devuelve null, el admin
+ * no lo menciona y la hoja de Matrix tampoco. La casilla `buyer_commission_ack` del acuerdo de
+ * listado no cambia (refleja la oferta del vendedor, no el CASSB-1).
+ */
+export const CASSB1_ENABLED = false;
+
+/**
  * Acuerdos de compensación (CASSB-1) que corresponden a la oferta: ninguno con 0%, uno con
  * cualquier oferta mayor que 0. El CASSB-1 se firma con el agente del comprador concreto
  * (su nombre y su broker son campos del formulario), así que lo prepara la broker cuando
@@ -191,6 +200,7 @@ export function buyerCommissionAck(offer: BuyerCompOffer | null): boolean {
  * `fee_pct_value` = % del precio de compra. null cuando no corresponde ningún CASSB-1.
  */
 export function cassb1Tabs(offer: BuyerCompOffer | null): Record<string, string> | null {
+  if (!CASSB1_ENABLED) return null;
   if (!offer || compensationAgreementsFor(offer) === 0) return null;
   if (offer.type === "amount") return { fee_amount: offer.amount.toLocaleString("en-US") };
   if (offer.type === "percent") return { fee_pct_value: String(offer.pct) };

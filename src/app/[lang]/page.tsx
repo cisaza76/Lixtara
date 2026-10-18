@@ -62,12 +62,10 @@ export default async function Home({
   const selectedValue = parseQuizValue(sp.qv);
   const selectedPhoto = parseQuizPhoto(sp.qp);
 
-  // Insignias del hero: solo datos con respaldo (experiencia del equipo, publicación en el
-  // MLS). Nada de "established", "verified" ni porcentajes (site-claims.test.ts).
-  const visibleMetrics: Array<{ value: string; label: string | null }> = [
-    { value: fillBrokerageCopy(copy.metricYearsValue), label: fillBrokerageCopy(copy.metricYearsLabel) },
-    { value: copy.metricMlsValue, label: null },
-  ];
+  // Franja de confianza del hero: solo datos con respaldo (la experiencia de la broker, con su
+  // equipo aparte y sin sumar años; la publicación en el MLS). Nada de "established",
+  // "verified" ni porcentajes (site-claims.test.ts).
+  const experienceLine = fillBrokerageCopy(copy.experienceLine);
   // Con el catálogo vacío, los CTA de compradores van al formulario con el tema "buy".
   const hasListings = await catalogHasListings();
   const licenseText = fillBrokerageCopy(copy.licenseLabel);
@@ -130,28 +128,14 @@ export default async function Home({
             </div>
 
             <div className="border-t border-gold-soft pt-10 mt-4">
-              <dl
-                className={`grid gap-10 ${
-                  visibleMetrics.length === 1
-                    ? "grid-cols-1"
-                    : visibleMetrics.length === 2
-                      ? "grid-cols-2"
-                      : "grid-cols-3"
-                }`}
-              >
-                {visibleMetrics.map((m) => (
-                  <div key={m.label} className="flex flex-col gap-2">
-                    <dd className="font-display text-3xl text-ink font-normal leading-none">
-                      {m.value}
-                    </dd>
-                    {m.label && (
-                      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
-                        {m.label}
-                      </dt>
-                    )}
-                  </div>
-                ))}
-              </dl>
+              <div className="flex flex-col gap-6">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-ink/70 leading-relaxed">
+                  {experienceLine}
+                </p>
+                <p className="font-display text-3xl text-ink font-normal leading-none">
+                  {copy.metricMlsValue}
+                </p>
+              </div>
             </div>
           </div>
 
