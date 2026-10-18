@@ -176,6 +176,7 @@ export default async function SignUpPage({
           lang={lang}
           parts={consentCheckbox("terms", lang)}
           version={CONSENTS.terms.version}
+          requiredMessage={authCopy.errors.termsRequired}
         />
         <TurnstileWidget lang={lang} />
         <SubmitButton>{copy.submit}</SubmitButton>

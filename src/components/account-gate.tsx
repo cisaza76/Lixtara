@@ -47,6 +47,8 @@ interface AccountGateLabels {
   errFailed: string;
   /** Falta la casilla de Términos y Privacidad. */
   errTerms: string;
+  /** "Iniciar sesión con otra cuenta": el borrador de este navegador se pierde. */
+  otherAccountLabel: string;
   /** La contraseña apareció en una filtración (Supabase: weak_password + "pwned"). */
   errLeaked: string;
   /** Supabase la rechazó por otra regla de su política. */
@@ -92,8 +94,19 @@ export function AccountGate({
   resentAt,
   labels,
 }: AccountGateProps) {
+  // Salida para quien ya tiene otra cuenta (/sign-in lo traería de vuelta aquí): /sign-in?other=1
+  // no lo devuelve y le avisa que el borrador de este navegador se pierde.
+  const otherAccount = (
+    <a
+      href={`/${lang}/sign-in?other=1`}
+      className="self-start text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
+    >
+      {labels.otherAccountLabel}
+    </a>
+  );
   if (pendingEmail) {
     return (
+      <>
       <ConfirmEmail
         email={pendingEmail}
         verifyAction={verifyAction}
@@ -104,9 +117,12 @@ export function AccountGate({
         resentAt={resentAt}
         labels={labels}
       />
+      {otherAccount}
+      </>
     );
   }
   return (
+    <>
     <CreateAccount
       registerAction={registerAction}
       draftId={draftId}
@@ -116,6 +132,8 @@ export function AccountGate({
       error={error}
       labels={labels}
     />
+    {otherAccount}
+    </>
   );
 }
 
@@ -271,6 +289,7 @@ function CreateAccount({
         lang={lang === "es" ? "es" : "en"}
         parts={termsConsent.parts}
         version={termsConsent.version}
+        requiredMessage={labels.errTerms}
       />
 
       <button

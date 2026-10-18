@@ -29,12 +29,15 @@ export default async function SignInPage({
   searchParams,
 }: {
   params: Promise<{ lang: string }>;
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; other?: string }>;
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  await returnListingSessionToDraft(lang);
   const sp = await searchParams;
+  // "Iniciar sesión con otra cuenta" (paso 7): quien elige entrar con otra cuenta no vuelve
+  // al borrador; se le avisa que el borrador de este navegador se pierde.
+  const otherAccount = sp.other === "1";
+  if (!otherAccount) await returnListingSessionToDraft(lang);
   const authCopy = t(lang).auth;
   const copy = authCopy.signIn;
   // Viene del paso 1 ("este correo ya tiene una cuenta"): el correo que escribió ahí.
@@ -75,7 +78,8 @@ export default async function SignInPage({
       else if (isCaptchaError(error)) key = "captcha";
       // Un intento fallido no pierde el destino (p. ej. volver al paso 1 con lo escrito).
       const keepNext = next === `/${lang}` ? "" : `&next=${encodeURIComponent(next)}`;
-      redirect(`/${lang}/sign-in?error=${key}${keepNext}`);
+      const keepOther = formData.get("other") === "1" ? "&other=1" : "";
+      redirect(`/${lang}/sign-in?error=${key}${keepNext}${keepOther}`);
     }
 
     redirect(postSignInPath(next, lang, await isStaff(supabase)));
@@ -89,8 +93,14 @@ export default async function SignInPage({
       titleAfter={copy.titleAfter}
     >
       {errorMessage && <ErrorBanner message={errorMessage} />}
+      {otherAccount && (
+        <p role="note" className="border border-gold bg-gold/5 px-4 py-3 text-sm text-ink leading-relaxed">
+          {copy.otherAccountWarning}
+        </p>
+      )}
       <form action={signInAction} className="flex flex-col gap-6">
         <input type="hidden" name="next" value={sp.next ?? `/${lang}`} />
+        {otherAccount && <input type="hidden" name="other" value="1" />}
         <Field
           label={copy.emailLabel}
           name="email"
