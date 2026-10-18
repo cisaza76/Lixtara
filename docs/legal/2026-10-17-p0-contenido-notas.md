@@ -102,4 +102,24 @@ También dependen del equipo, fuera de los planes:
 
 ## "Realtor"
 
-Se mantiene donde ya estaba: bullets de los planes, FAQ y testimonios ("my realtor"). Antes del merge, la broker confirma que las personas descritas así son miembros activos de NAR. Si alguna no lo es, para esa persona se usa "licensed agent" / "agente licenciado". En `/about` no se agregó "Realtor".
+Se mantiene donde ya estaba: bullets de los planes, FAQ y testimonios ("my realtor"). En `/about` no se agregó "Realtor".
+
+**Confirmado por la broker (2026-10-18):** Anamaria y las personas descritas como "Realtor" son miembros activos de NAR. "Realtor" se queda.
+
+## Concierge: la broker dedicada (2026-10-18)
+
+Decisión de la broker: Concierge lo atiende Anamaria.
+- **EN:** "a dedicated broker" pasa a "your dedicated broker, Anamaria Velasquez".
+- **ES:** "un broker dedicado" pasa a "la broker dedicada, Anamaria Velasquez".
+- El nombre sale de `src/config/brokerage.ts` (`{brokerName}`). `fillTierCopy` ahora también reemplaza los datos de la correduría.
+
+Dónde aparece:
+- El bullet del plan Concierge ("Your dedicated broker, … 7 days a week" / "La broker dedicada, … 7 días a la semana").
+- El paso 4 de "Cómo funciona".
+- El "por qué" del quiz.
+- La FAQ "¿Qué plan…?".
+- Loui, que lee los bullets y la FAQ.
+
+En "no incluido" del plan Pro, el bullet "Dedicated broker and full negotiation assistance" / "Broker dedicada y asistencia completa en negociación" no lleva el nombre. Si lo llevara, parecería que Pro no tiene acceso a ella, y Pro sí incluye una llamada con la broker.
+
+Los Términos no mencionan a un broker dedicado. El glosario ya no permite "broker dedicado" en español.

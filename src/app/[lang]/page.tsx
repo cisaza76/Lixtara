@@ -269,7 +269,7 @@ export default async function Home({
                   {s.headline}
                 </h3>
                 <p className="text-sm leading-relaxed text-ink/70 md:max-w-[18rem]">
-                  {fillCommissionCopy(s.body)}
+                  {fillCommissionCopy(fillBrokerageCopy(s.body))}
                 </p>
               </div>
             ))}
@@ -353,7 +353,7 @@ export default async function Home({
             whyByTier={{
               essentials: quizCopy.essentialsWhy,
               pro: quizCopy.proWhy,
-              concierge: quizCopy.conciergeWhy,
+              concierge: fillBrokerageCopy(quizCopy.conciergeWhy),
             }}
             tiers={{
               essentials: quizTier("essentials"),

@@ -7,6 +7,7 @@ import { dictionaries } from "@/lib/i18n";
 import { BROKERAGE, DBPR_BROKER_LICENSE_URL, DBPR_BROKERAGE_LICENSE_URL, fillBrokerageCopy } from "@/config/brokerage";
 import { buyerAgentComp, refundPolicy, termsFaq } from "@/config/legal-terms";
 import { BUYER_COMP_MAX_PCT } from "@/lib/buyer-comp";
+import { fillTierCopy } from "@/lib/pricing-tiers";
 import { termsDoc } from "@/lib/legal/terms";
 import { buyNavHref, buyerContactHref, buyerCtaHref, contactTopicFromQuery } from "@/lib/buyer-entry";
 import { CONTACT_TOPICS } from "@/lib/contact-form";
@@ -109,6 +110,32 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
     const contact = termsDoc[lang].sections.find((s) => s.heading.startsWith("21."));
     expect(contact?.body.join("\n")).toContain(`${BROKERAGE.legalName}, ${BROKERAGE.address}`);
     expect(BROKERAGE.address).toBe("181 Vera Ct, Miami, FL 33143");
+  });
+});
+
+describe("Concierge: la broker dedicada es Anamaria", () => {
+  const name = BROKERAGE.brokerName;
+
+  it.each(["en", "es"] as const)("%s: plan, quiz, pasos y FAQ la nombran", (lang) => {
+    const d = dictionaries[lang];
+    const fill = (t: string) => fillTierCopy(t, "concierge");
+    const dedicated = lang === "en" ? `your dedicated broker, ${name}` : `la broker dedicada, ${name}`;
+    expect(d.pricing.tiers.concierge.features.map(fill).join("\n").toLowerCase()).toContain(dedicated.toLowerCase());
+    expect(fillBrokerageCopy(d.quiz.conciergeWhy)).toContain(dedicated);
+    const faq = d.faq.items.map((i) => fillBrokerageCopy(i.a)).join("\n");
+    expect(faq).toContain(dedicated);
+    const all = siteTexts(lang).map((t) => t.text).join("\n");
+    expect(all).not.toMatch(/\ba dedicated broker\b|\bun broker dedicado\b|\bbroker dedicado\b/i);
+  });
+
+  it("los pasos de 'Cómo funciona' reemplazan {brokerName} al mostrarse", () => {
+    expect(dictionaries.en.howItWorks.steps.some((st) => st.body.includes("{brokerName}"))).toBe(true);
+    expect(read("src/app/[lang]/page.tsx")).toContain("{fillCommissionCopy(fillBrokerageCopy(s.body))}");
+  });
+
+  it("Loui la nombra y no le quedan placeholders", () => {
+    expect(LOUI_SYSTEM_PROMPT).toContain(`Your dedicated broker, ${name}, 7 days a week`);
+    expect(LOUI_SYSTEM_PROMPT).not.toMatch(/\{brokerName\}|\{brokerFirstName\}/);
   });
 });
 

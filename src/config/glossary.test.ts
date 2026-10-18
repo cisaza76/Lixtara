@@ -55,10 +55,10 @@ describe("glosario EN/ES", () => {
     expect(glossaryViolations("habla con el corredor", "es").map((v) => v.key)).toContain("broker");
     expect(glossaryViolations("un corredor hipotecario", "es")).toEqual([]);
     expect(term("theBroker", "es")).toBe("la broker");
-    for (const t of ["habla con el broker", "revisión del broker", "pregúntale al broker"]) {
+    for (const t of ["habla con el broker", "revisión del broker", "pregúntale al broker", "un broker dedicado"]) {
       expect(glossaryViolations(t, "es").map((v) => v.key), t).toContain("theBroker");
     }
-    for (const t of ["habla con la broker", "revisión de la broker", "un broker dedicado", "tu broker"]) {
+    for (const t of ["habla con la broker", "revisión de la broker", "la broker dedicada", "un broker licenciado", "tu broker"]) {
       expect(glossaryViolations(t, "es"), t).toEqual([]);
     }
     expect(glossaryViolations("the buyer-agent commission", "en").map((v) => v.key)).toContain("buyerAgentComp");

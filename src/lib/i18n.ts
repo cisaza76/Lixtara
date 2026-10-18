@@ -75,7 +75,7 @@ export const dictionaries = {
         {
           label: "Step 4",
           headline: "Close with broker support",
-          body: "Every plan includes DocuSign contracts. Pro adds a broker strategy call and a listing coordinator; Concierge adds a dedicated broker who coordinates the contract, negotiation, and closing with the title company.",
+          body: "Every plan includes DocuSign contracts. Pro adds a broker strategy call and a listing coordinator; Concierge adds your dedicated broker, {brokerName}, who coordinates the contract, negotiation, and closing with the title company.",
         },
       ],
     },
@@ -174,7 +174,7 @@ export const dictionaries = {
             "MLS listing with a broker-reviewed description, syndicated to portals like Zillow, Realtor.com, Redfin and Trulia",
             publicationTimeline.text.en.planBullet,
             "Premium photography + drone shots",
-            "Dedicated broker, 7 days a week",
+            "Your dedicated broker, {brokerName}, 7 days a week",
             "Full negotiation assistance",
             "Transaction management through closing",
             "Unlimited Realtor consultations included",
@@ -1364,7 +1364,7 @@ export const dictionaries = {
         "Buyer's agent compensation, if you offer it, and third-party closing costs (title, escrow, transfer taxes), which are the same with any brokerage",
       essentialsWhy: "Best value when you're comfortable shooting your own listing photos, or already have good ones.",
       proWhy: "Most sellers in this range want a pro photo set and a broker strategy call. Both are built into Pro.",
-      conciergeWhy: "Higher-value homes earn back the premium through premium photos with drone, positioning, and a dedicated broker through closing.",
+      conciergeWhy: "Higher-value homes earn back the premium through premium photos with drone, positioning, and your dedicated broker, {brokerName}, through closing.",
     },
     savings: {
       eyebrow: "Radical transparency",
@@ -1699,7 +1699,7 @@ export const dictionaries = {
         },
         {
           q: "Which plan should I pick?",
-          a: "Every plan puts your home on the MLS and its partner sites. Essentials fits sellers comfortable taking their own photos and running the sale from their dashboard. Pro adds professional photography, a 30 minute broker strategy call, and a dedicated listing coordinator. Concierge is full service: premium photography with drone, a dedicated broker 7 days a week, negotiation and transaction management through closing, and unlimited Realtor consultations.",
+          a: "Every plan puts your home on the MLS and its partner sites. Essentials fits sellers comfortable taking their own photos and running the sale from their dashboard. Pro adds professional photography, a 30 minute broker strategy call, and a dedicated listing coordinator. Concierge is full service: premium photography with drone, your dedicated broker, {brokerName}, 7 days a week, negotiation and transaction management through closing, and unlimited Realtor consultations.",
         },
         {
           q: "Is Lixtara a licensed brokerage?",
@@ -1990,7 +1990,7 @@ export const dictionaries = {
         {
           label: "Paso 4",
           headline: "Cierra con respaldo de la broker",
-          body: "Todos los planes incluyen contratos por DocuSign. Pro suma una llamada de estrategia con la broker y un coordinador de listado; Concierge suma un broker dedicado que coordina el contrato, la negociación y el cierre con la compañía de título.",
+          body: "Todos los planes incluyen contratos por DocuSign. Pro suma una llamada de estrategia con la broker y un coordinador de listado; Concierge suma a la broker dedicada, {brokerName}, que coordina el contrato, la negociación y el cierre con la compañía de título.",
         },
       ],
     },
@@ -2075,7 +2075,7 @@ export const dictionaries = {
           ],
           notIncluded: [
             "Tomas con dron",
-            "Broker dedicado y asistencia completa en negociación",
+            "Broker dedicada y asistencia completa en negociación",
             "Gestión de la transacción hasta el cierre",
             "Consultas ilimitadas con Realtor (se pagan por uso)",
             "Consultoría de staging y coordinación de open houses",
@@ -2089,7 +2089,7 @@ export const dictionaries = {
             "Publicación en el MLS con descripción revisada por la broker, distribuida a portales como Zillow, Realtor.com, Redfin y Trulia",
             publicationTimeline.text.es.planBullet,
             "Fotografía premium + tomas con dron",
-            "Broker dedicado, 7 días a la semana",
+            "La broker dedicada, {brokerName}, 7 días a la semana",
             "Asistencia completa en negociación",
             "Gestión de la transacción hasta el cierre",
             "Consultas ilimitadas con Realtor incluidas",
@@ -3279,7 +3279,7 @@ export const dictionaries = {
         "La compensación al agente del comprador, si la ofreces, y los costos de cierre de terceros (título, depósito en garantía, impuestos de transferencia), que son iguales con cualquier inmobiliaria",
       essentialsWhy: "Mejor valor si te sientes cómodo tomando tus propias fotos, o si ya tienes buenas fotos.",
       proWhy: "La mayoría de los vendedores en este rango quiere fotos profesionales y una llamada de estrategia con la broker. Pro incluye ambas.",
-      conciergeWhy: "Las casas de mayor valor recuperan el costo con fotos premium con dron, mejor posicionamiento y un broker dedicado hasta el cierre.",
+      conciergeWhy: "Las casas de mayor valor recuperan el costo con fotos premium con dron, mejor posicionamiento y la broker dedicada, {brokerName}, hasta el cierre.",
     },
     savings: {
       eyebrow: "Transparencia radical",
@@ -3614,7 +3614,7 @@ export const dictionaries = {
         },
         {
           q: "¿Qué plan debería elegir?",
-          a: "Todos los planes publican tu casa en el MLS y en sus sitios asociados. Essentials es para vendedores que toman sus propias fotos y manejan la venta desde su panel. Pro agrega fotografía profesional, una llamada de estrategia de 30 minutos con la broker, y un coordinador de listado dedicado. Concierge es servicio completo: fotografía premium con dron, broker dedicado 7 días a la semana, negociación y gestión de la transacción hasta el cierre, y consultas ilimitadas con Realtor.",
+          a: "Todos los planes publican tu casa en el MLS y en sus sitios asociados. Essentials es para vendedores que toman sus propias fotos y manejan la venta desde su panel. Pro agrega fotografía profesional, una llamada de estrategia de 30 minutos con la broker, y un coordinador de listado dedicado. Concierge es servicio completo: fotografía premium con dron, la broker dedicada, {brokerName}, 7 días a la semana, negociación y gestión de la transacción hasta el cierre, y consultas ilimitadas con Realtor.",
         },
         {
           q: "¿Lixtara es una inmobiliaria licenciada?",
