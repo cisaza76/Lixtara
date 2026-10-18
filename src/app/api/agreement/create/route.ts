@@ -17,7 +17,7 @@ import {
   LIXTARA_BROKER_ROLE,
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
-import { buyerCommissionAck, formatOffer, offerFromRow } from "@/lib/buyer-comp";
+import { buyerCommissionAck, formatOffer, offerFromRow, offerWithinLimit } from "@/lib/buyer-comp";
 import { fetchBuyerComp } from "@/lib/buyer-comp.server";
 import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { brokerSigner } from "@/config/brokerage";
@@ -96,8 +96,15 @@ export async function POST(req: Request) {
     console.error("agreement/create: buyer comp read failed", err);
     return NextResponse.json({ error: "buyer_comp_read_failed" }, { status: 500 });
   }
+  // Sin elección, o con una oferta que el precio de lista nuevo dejó por encima del tope de
+  // Lixtara (3%, también para el monto fijo): de vuelta al paso 6.
+  const step6 = (code: string) =>
+    `/${lang}/listing/new?step=6&id=${encodeURIComponent(property.id)}&error=${code}`;
   if (!buyerOffer) {
-    return NextResponse.json({ error: "buyer_comp_not_set" }, { status: 409 });
+    return NextResponse.json({ error: "buyer_comp_not_set", redirect: step6("buyer_comp_choice_required") }, { status: 409 });
+  }
+  if (!offerWithinLimit(buyerOffer, Number(property.list_price))) {
+    return NextResponse.json({ error: "buyer_comp_over_limit", redirect: step6("buyer_comp_over_limit") }, { status: 409 });
   }
 
   // Reuse any in-flight envelope so we don't create duplicates on retry.
