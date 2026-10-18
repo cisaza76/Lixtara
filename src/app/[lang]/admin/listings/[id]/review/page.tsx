@@ -26,11 +26,12 @@ import {
   formatMiamiDateTime,
   isPlanPaymentSucceeded,
   markPublishedBlockers,
-  parseMiamiDateTime,
+  correctedPublishedAt,
   refundOnCancel,
   toMiamiDateTimeInput,
 } from "@/lib/mls-published";
 import { correctListingMlsPublished, markListingMlsPublished } from "@/lib/mls-published.server";
+import { MarkPublishedForm } from "@/components/admin/mark-published-form";
 import { CASSB1_ENABLED } from "@/lib/buyer-comp";
 import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
 
@@ -285,6 +286,7 @@ export default async function ListingReviewPage({
     apply_failed: "Could not apply the request to the listing. Try again.",
     not_countersigned: "The broker hasn't countersigned the listing agreement in DocuSign yet.",
     docusign_unavailable: "Could not confirm the broker's countersignature with DocuSign. Try again.",
+    listing_not_active: "Approve the listing (active) before marking it as published on the MLS.",
     already_published: "This listing already has an MLS publication date. Only an admin can correct it.",
     mls_number_required: "Enter the MLS number to mark the listing as published.",
     agreement_not_completed: "The listing agreement isn't completed (signed by the seller and countersigned) yet.",
@@ -347,7 +349,14 @@ export default async function ListingReviewPage({
     "use server";
     const { sb, userId } = await assertStaffWithUser(lang);
     const clear = formData.get("clear") === "1";
-    const publishedAt = clear ? null : parseMiamiDateTime(String(formData.get("published_at") ?? ""));
+    // Fecha actual desde la base, no del formulario: si el selector no se tocó, se conserva.
+    const { data: current } = await sb.from("properties").select("mls_published_at").eq("id", id).maybeSingle();
+    const publishedAt = clear
+      ? null
+      : correctedPublishedAt(
+          String(formData.get("published_at") ?? ""),
+          (current as { mls_published_at: string | null } | null)?.mls_published_at ?? null,
+        );
     if (!clear && !publishedAt) redirect(`/${lang}/admin/listings/${id}/review?error=invalid_date`);
     const r = await correctListingMlsPublished(sb, {
       propertyId: id,
@@ -415,12 +424,11 @@ export default async function ListingReviewPage({
   );
   const publishBlockers = markPublishedBlockers({
     publishedAt: prop.mls_published_at,
+    mlsStatus: prop.mls_status,
     mlsNumber: prop.mls_number,
     agreementStatus: agreement?.status ?? null,
     planPaymentSucceeded: planPaid,
   });
-  // El número se puede teclear en el mismo formulario: no bloquea el botón.
-  const hardBlockers = publishBlockers.filter((b) => b !== "mls_number_required");
 
   return (
     <div className="flex flex-col gap-8">
@@ -545,33 +553,13 @@ export default async function ListingReviewPage({
                   : null}
               </span>
             </p>
-            <ul className="text-xs text-ink/70 flex flex-col gap-1">
-              <li>{publishBlockers.includes("agreement_not_completed") ? "✗" : "✓"} Listing agreement completed (seller signed, broker countersigned)</li>
-              <li>{publishBlockers.includes("payment_not_succeeded") ? "✗" : "✓"} Plan payment succeeded</li>
-              <li>{publishBlockers.includes("mls_number_required") ? "✗" : "✓"} MLS number</li>
-            </ul>
-            <form action={markPublished} className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">MLS number</span>
-                <input
-                  name="mls_number"
-                  type="text"
-                  required
-                  autoComplete="off"
-                  spellCheck={false}
-                  defaultValue={prop.mls_number ?? ""}
-                  placeholder="A11234567"
-                  className="w-44 border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink uppercase font-mono focus:outline-none focus:border-gold"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={hardBlockers.length > 0}
-                className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Mark as published on the MLS
-              </button>
-            </form>
+            <MarkPublishedForm
+              action={markPublished}
+              defaultMlsNumber={prop.mls_number}
+              active={!publishBlockers.includes("listing_not_active")}
+              agreementCompleted={!publishBlockers.includes("agreement_not_completed")}
+              planPaid={!publishBlockers.includes("payment_not_succeeded")}
+            />
             <p className="text-xs text-ink/55">
               Do it once the listing is live in Matrix. The date is now; it can&apos;t be edited
               afterwards (only an admin can correct it, with a note).

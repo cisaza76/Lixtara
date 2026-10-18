@@ -4,10 +4,11 @@
 // (legal-terms.ts#refundPolicy) devuelve el total si el vendedor cancela antes de la
 // publicación: esta fecha es la que lo decide.
 //
-// Las reglas viven en la base (migración 20261018170000, guard_properties_mls_published_at):
-// número de MLS, acuerdo `completed`, pago del plan `succeeded`, nunca en el futuro y, una vez
-// fijada, solo un admin la corrige con nota. Aquí está lo mismo para la interfaz y los
-// mensajes; la base es la garantía.
+// Las reglas viven en la base (migraciones 20261018170000 y 20261018190000,
+// guard_properties_mls_published_at): listing aprobado (`active`), número de MLS, acuerdo
+// `completed`, pago del plan `succeeded`, nunca en el futuro y, una vez fijada, solo un admin
+// la corrige con nota. Aquí está lo mismo para la interfaz y los mensajes; la base es la
+// garantía.
 //
 // PURO: sin I/O.
 
@@ -27,6 +28,7 @@ export function refundOnCancel(mlsPublishedAt: string | null | undefined): Refun
 
 export type MarkPublishedBlocker =
   | "already_published"
+  | "listing_not_active"
   | "mls_number_required"
   | "agreement_not_completed"
   | "payment_not_succeeded";
@@ -34,12 +36,15 @@ export type MarkPublishedBlocker =
 /** Lo que falta para poder marcar el listing como publicado, en el orden en que se resuelve. */
 export function markPublishedBlockers(input: {
   publishedAt: string | null;
+  mlsStatus: string | null;
   mlsNumber: string | null;
   agreementStatus: string | null;
   planPaymentSucceeded: boolean;
 }): MarkPublishedBlocker[] {
   if (input.publishedAt) return ["already_published"];
   const out: MarkPublishedBlocker[] = [];
+  // Aprobado por la broker (migración 20261018190000).
+  if (input.mlsStatus !== "active") out.push("listing_not_active");
   if (!input.agreementStatus || input.agreementStatus !== "completed") out.push("agreement_not_completed");
   if (!input.planPaymentSucceeded) out.push("payment_not_succeeded");
   if (!input.mlsNumber) out.push("mls_number_required");
@@ -68,6 +73,7 @@ export function mapMlsPublishedWriteError(
   if (!err) return null;
   const m = err.message ?? "";
   if (err.code === "23505") return "taken";
+  if (m.includes("requires the listing to be approved")) return "listing_not_active";
   if (m.includes("requires the MLS number")) return "mls_number_required";
   if (m.includes("listing agreement to be completed")) return "agreement_not_completed";
   if (m.includes("plan payment to have succeeded")) return "payment_not_succeeded";
@@ -79,8 +85,13 @@ export function mapMlsPublishedWriteError(
 
 const MIAMI = "America/New_York";
 
-/** Diferencia en minutos entre la hora de Miami y UTC en ese instante (-240 o -300). */
-function miamiOffsetMinutes(at: Date): number {
+/**
+ * Diferencia en minutos entre la hora de Miami y UTC en ese instante (-240 o -300). Se mide
+ * sobre el minuto entero: con los segundos, 14:37:45 daba -240.75 → -241 y el selector de la
+ * corrección mostraba un minuto menos que la ficha.
+ */
+function miamiOffsetMinutes(instant: Date): number {
+  const at = new Date(Math.floor(instant.getTime() / 60000) * 60000);
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: MIAMI,
     hourCycle: "h23",
@@ -110,6 +121,16 @@ export function parseMiamiDateTime(local: string): string | null {
   ts = naive - miamiOffsetMinutes(new Date(ts)) * 60000;
   const check = new Date(ts);
   return Number.isNaN(check.getTime()) ? null : check.toISOString();
+}
+
+/**
+ * Fecha que guarda la corrección. Si el admin no tocó el selector (trae el mismo minuto que se
+ * precargó desde la fecha actual), se conserva la fecha actual exacta, segundos incluidos:
+ * guardar sin tocarla no la mueve.
+ */
+export function correctedPublishedAt(input: string, current: string | null): string | null {
+  if (current && input.trim() === toMiamiDateTimeInput(current)) return current;
+  return parseMiamiDateTime(input);
 }
 
 /** ISO UTC → "YYYY-MM-DDTHH:mm" en hora de Miami, para precargar un datetime-local. */

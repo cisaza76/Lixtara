@@ -21,6 +21,7 @@
     "db-check:listing-funnel": "bash scripts/db-checks/run-listing-funnel.sh",
     "db-check:seller-leads-is-test": "bash scripts/db-checks/run-seller-leads-is-test.sh",
     "db-check:buyer-comp": "bash scripts/db-checks/run-buyer-comp.sh",
+    "db-check:mls-published-at": "node scripts/db-checks/mls-published-at.mjs",
     "mls:backfill-numbers": "tsx scripts/backfill-mls-numbers.ts"
   },
   "dependencies": {
@@ -58,6 +59,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.7",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

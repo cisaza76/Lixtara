@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
   MIN_CORRECTION_NOTE,
+  correctedPublishedAt,
+  formatMiamiDateTime,
   isPlanPaymentSucceeded,
   mapMlsPublishedWriteError,
   markPublishedBlockers,
@@ -18,6 +20,7 @@ const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const migration = read("supabase/migrations/20261018170000_properties_mls_published_at_guard.sql");
 const crmView = read("supabase/migrations/20261018170100_crm_sendable_exclude_foreign.sql");
+const requiresActive = read("supabase/migrations/20261018190000_mls_published_requires_active.sql");
 
 describe("reembolso según la fecha de publicación", () => {
   it("sin fecha, reembolso total; con fecha, la tarifa está devengada", () => {
@@ -28,10 +31,24 @@ describe("reembolso según la fecha de publicación", () => {
 });
 
 describe("marcar como publicado en el MLS", () => {
-  const ready = { publishedAt: null, mlsNumber: "A11234567", agreementStatus: "completed", planPaymentSucceeded: true };
+  const ready = {
+    publishedAt: null,
+    mlsStatus: "active",
+    mlsNumber: "A11234567",
+    agreementStatus: "completed",
+    planPaymentSucceeded: true,
+  };
 
   it("sin bloqueos con acuerdo completed, pago del plan y número", () => {
     expect(markPublishedBlockers(ready)).toEqual([]);
+  });
+
+  it("sin aprobar (pending_approval u otro estado): bloqueado", () => {
+    expect(markPublishedBlockers({ ...ready, mlsStatus: "pending_approval" })).toEqual(["listing_not_active"]);
+    expect(markPublishedBlockers({ ...ready, mlsStatus: "draft" })).toEqual(["listing_not_active"]);
+    expect(mapMlsPublishedWriteError({ message: "mls_published_at requires the listing to be approved (active)." })).toBe(
+      "listing_not_active",
+    );
   });
 
   it("acuerdo solo firmado por el vendedor, pago pendiente o sin número: bloqueado", () => {
@@ -73,6 +90,24 @@ describe("hora de Miami en la corrección", () => {
     expect(toMiamiDateTimeInput("2026-10-18T14:00:00Z")).toBe("2026-10-18T10:00");
     expect(toMiamiDateTimeInput("2026-12-01T15:00:00Z")).toBe("2026-12-01T10:00");
   });
+
+  // Probado en preview (2026-10-18): la ficha mostraba 2:37 PM y el selector 2:36 PM.
+  it("el selector muestra el mismo minuto que la ficha, con segundos", () => {
+    for (const iso of ["2026-10-18T18:37:45.123Z", "2026-10-18T18:37:59Z", "2026-12-01T19:37:31Z"]) {
+      const shown = formatMiamiDateTime(iso); // "Oct 18, 2026, 2:37 PM ET"
+      const input = toMiamiDateTimeInput(iso); // "2026-10-18T14:37"
+      const [h, m] = input.slice(11).split(":").map(Number);
+      expect(shown).toContain(`${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`);
+    }
+  });
+
+  it("guardar la corrección sin tocar el selector no mueve la fecha", () => {
+    const current = "2026-10-18T18:37:45.123Z";
+    expect(correctedPublishedAt(toMiamiDateTimeInput(current), current)).toBe(current);
+    expect(correctedPublishedAt("2026-10-18T14:40", current)).toBe("2026-10-18T18:40:00.000Z");
+    expect(correctedPublishedAt("2026-10-18T14:40", null)).toBe("2026-10-18T18:40:00.000Z");
+    expect(correctedPublishedAt("mal", current)).toBeNull();
+  });
 });
 
 describe("migración 20261018170000: guard de mls_published_at", () => {
@@ -100,6 +135,30 @@ describe("migración 20261018170000: guard de mls_published_at", () => {
     );
   });
 
+  it("20261018190000: marcar exige el listing aprobado (active); la corrección no", () => {
+    const mark = requiresActive.slice(
+      requiresActive.indexOf("if old.mls_published_at is null then"),
+      requiresActive.indexOf("-- Ya estaba fijada"),
+    );
+    expect(mark).toContain("if new.mls_status is distinct from 'active' then");
+    expect(requiresActive.slice(requiresActive.indexOf("-- Ya estaba fijada"))).not.toContain("mls_status");
+    // Mismo cuerpo que 20261018170000 más el requisito, y el rollback vuelve a esa versión.
+    const body = (s: string) => {
+      const i = s.indexOf("create or replace function public.guard_properties_mls_published_at");
+      return s.slice(i, s.indexOf("$$;", s.indexOf("as $$", i)) + 3);
+    };
+    const rollback = read("docs/superpowers/runbooks/rollback-20261018190000_mls_published_requires_active.sql");
+    expect(body(rollback)).toBe(body(migration));
+    expect(body(requiresActive).replace(/\n    if new\.mls_status is distinct from 'active' then[\s\S]*?end if;/, "")).toBe(body(migration));
+  });
+
+  it("la ficha marca el ✓ del número al escribirlo, con la regla del servidor", () => {
+    const form = read("src/components/admin/mark-published-form.tsx");
+    expect(form).toContain("parseMlsNumber(mlsNumber).ok");
+    expect(form).toContain("Listing approved (active)");
+    expect(form).toContain("disabled={!ready}");
+  });
+
   it("service_role no la escribe: la fija una persona", () => {
     expect(migration).toContain("if v_role <> 'authenticated' then");
   });
@@ -108,7 +167,7 @@ describe("migración 20261018170000: guard de mls_published_at", () => {
     const server = read("src/lib/mls-published.server.ts");
     expect(server).not.toContain("createService");
     const review = read("src/app/[lang]/admin/listings/[id]/review/page.tsx");
-    expect(review).toContain("Mark as published on the MLS");
+    expect(review).toContain("<MarkPublishedForm");
     expect(review).toContain("const { sb, userId } = await assertStaffWithUser(lang);");
   });
 
