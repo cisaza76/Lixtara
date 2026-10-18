@@ -1,5 +1,5 @@
 // Casos de prueba de Ask Loui para la compensación al agente del comprador (0% y monto fijo),
-// el plazo de publicación y el reembolso (EN/ES). Los corre, junto con loui-legal-cases.ts, la
+// el plazo de publicación, el reembolso y las funciones del catálogo MLS que no están activas (EN/ES). Los corre, junto con loui-legal-cases.ts, la
 // evaluación contra el modelo real: `pnpm exec tsx --env-file=.env.local scripts/loui-legal-evals.ts`.
 
 import type { LouiLegalCase } from "@/lib/loui-legal-cases";
@@ -11,6 +11,9 @@ const SAYS_ON_MLS_ES = /^(?![^\n]*\b(no|nunca|ya no)\b)[^\n]*(se publica|aparece
 /** Términos del glosario en español (src/config/glossary.ts). */
 const NOT_GLOSSARY_ES = /\bflat fee\b|\bcorredor(a)?\b(?! hipotecari)|honorarios de Lixtara|comisi[oó]n del comprador/i;
 const OTHER_TIMING_EN = /\b(24|48|72) ?(h|hours)\b|within (a|one) (business )?day/i;
+/** Ofrece alertas, búsquedas guardadas o avisos de propiedades nuevas (sin negación en la línea). */
+const OFFERS_ALERTS_EN = /^(?![^\n]*(\bnot\b|n't\b|\bno\b|\bnever\b))[^\n]*\b(search alerts?|saved searche?s?|listing alerts?|alerts? for new|notif(y|ied|ications?)[^\n]*(new|listings?|homes?))/im;
+const OFFERS_ALERTS_ES = /^(?![^\n]*\b(no|nunca)\b)[^\n]*\b(alertas?|b[uú]squedas? guardadas?|te avisamos|te avisaremos|notificaciones?)\b/im;
 const OTHER_TIMING_ES = /\b(24|48|72) ?(h|horas)\b|en un d[ií]a/i;
 
 export const LOUI_TERMS_CASES: LouiLegalCase[] = [
@@ -61,5 +64,17 @@ export const LOUI_TERMS_CASES: LouiLegalCase[] = [
     lang: "es",
     mustNot: [/reembolso parcial/i, /dentro de \d+ d[ií]as/i, USTED, NOT_GLOSSARY_ES],
     must: [/devolvemos|reembols|devuelve/i, /antes de (la )?publicaci|antes de que[^.]{0,40}publi(c|qu)/i],
+  },
+  {
+    question: "Can I set up an alert for new condos in Brickell under $600k?",
+    lang: "en",
+    mustNot: [OFFERS_ALERTS_EN, /^\s*(yes|sure|absolutely)\b/i],
+    must: [/\bbroker\b/i],
+  },
+  {
+    question: "¿Me puedes avisar cuando salgan casas nuevas en Coral Gables? ¿Tienen alertas de búsqueda?",
+    lang: "es",
+    mustNot: [OFFERS_ALERTS_ES, /^\s*(s[ií]|claro)\b/i, USTED, NOT_GLOSSARY_ES],
+    must: [/\bbroker\b/i],
   },
 ];

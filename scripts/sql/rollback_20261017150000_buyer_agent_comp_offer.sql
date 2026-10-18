@@ -4,6 +4,12 @@
 -- el historial de ofertas. Si hay ofertas en monto fijo, exportarlas antes:
 --   select id, buyer_agent_comp_amount from public.properties where buyer_agent_comp_type = 'amount';
 
+-- Lectura: vuelve el SELECT de tabla para anon y authenticated (como antes de la migración).
+-- Revocar el de tabla primero borra los de columna que dio la migración.
+drop function if exists public.get_property_buyer_comp(uuid);
+revoke select on public.properties from anon, authenticated;
+grant select on public.properties to anon, authenticated;
+
 drop trigger if exists log_property_buyer_comp_change on public.properties;
 drop function if exists public.log_property_buyer_comp_change();
 drop table if exists public.property_buyer_comp_history;

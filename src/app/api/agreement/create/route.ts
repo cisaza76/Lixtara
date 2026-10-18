@@ -18,6 +18,7 @@ import {
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { buyerCommissionAck, formatOffer, offerFromRow } from "@/lib/buyer-comp";
+import { fetchBuyerComp } from "@/lib/buyer-comp.server";
 import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { brokerSigner } from "@/config/brokerage";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, buyer_agent_commission, buyer_agent_comp_type, buyer_agent_comp_amount, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
+      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
     )
     .eq("id", propertyId)
     .eq("owner_id", user.id)
@@ -86,8 +87,15 @@ export async function POST(req: Request) {
   }
 
   // La oferta al agente del comprador se elige en el paso 6 (0% es válido). Sin elección no
-  // se arma un contrato con un valor que el vendedor no decidió.
-  const buyerOffer = offerFromRow(property);
+  // se arma un contrato con un valor que el vendedor no decidió. Se lee con la función (la
+  // tabla no expone esas columnas a la API); si falla, no se arma el contrato.
+  let buyerOffer;
+  try {
+    buyerOffer = offerFromRow(await fetchBuyerComp(supabase, property.id));
+  } catch (err) {
+    console.error("agreement/create: buyer comp read failed", err);
+    return NextResponse.json({ error: "buyer_comp_read_failed" }, { status: 500 });
+  }
   if (!buyerOffer) {
     return NextResponse.json({ error: "buyer_comp_not_set" }, { status: 409 });
   }

@@ -47,7 +47,7 @@ export const dictionaries = {
         },
         {
           headline: "On the MLS and every major site",
-          body: "Your home goes on the MLS, the system agents across Florida use to find homes for their buyers. From there it reaches Zillow, Realtor.com, Redfin, Trulia and 100+ other sites. The same buyer pool a traditional 6% agent gets you.",
+          body: "Your home goes on the MLS, the system agents across Florida use to find homes for their buyers. From there it's syndicated to portals like Zillow, Realtor.com, Redfin and Trulia. The same buyer pool a traditional 6% agent gets you.",
         },
       ],
     },
@@ -118,7 +118,7 @@ export const dictionaries = {
           tagline: "List on the MLS for less",
           forWhom: "Perfect for: DIY sellers comfortable taking their own photos",
           features: [
-            "Listed on the Florida MLS and syndicated to Zillow, Realtor.com, Redfin, Trulia and 100+ other sites",
+            "Listed on the Florida MLS and syndicated to portals like Zillow, Realtor.com, Redfin and Trulia",
             publicationTimeline.text.en.planBullet,
             "Upload your own photos (10 minimum)",
             "Self-service dashboard",
@@ -144,7 +144,7 @@ export const dictionaries = {
           tagline: "Most chosen by sellers",
           forWhom: "Perfect for: Sellers who want broker support and pro photos",
           features: [
-            "MLS listing with a broker-reviewed description, syndicated to Zillow, Realtor.com, Redfin, Trulia and 100+ other sites",
+            "MLS listing with a broker-reviewed description, syndicated to portals like Zillow, Realtor.com, Redfin and Trulia",
             publicationTimeline.text.en.planBullet,
             "Professional photography ({photoAddonPrice} value, included)",
             "Broker compliance & strategy call (30 min)",
@@ -171,7 +171,7 @@ export const dictionaries = {
           tagline: "White-glove service",
           forWhom: "Perfect for: Sellers who want full white-glove service",
           features: [
-            "MLS listing with a broker-reviewed description, syndicated to Zillow, Realtor.com, Redfin, Trulia and 100+ other sites",
+            "MLS listing with a broker-reviewed description, syndicated to portals like Zillow, Realtor.com, Redfin and Trulia",
             publicationTimeline.text.en.planBullet,
             "Premium photography + drone shots",
             "Dedicated broker, 7 days a week",
@@ -1380,7 +1380,7 @@ export const dictionaries = {
         "With Lixtara {tier} and {pct} to the buyer's agent on both sides, you save {amount} versus a traditional listing agent.",
       howToRead: "How to read this table",
       howToReadBody:
-        "Upfront costs are paid when you list, and with Lixtara that's only the flat fee. Commissions come out of your sale proceeds at closing, and only if your home sells. The traditional column is a listing agent at {traditional}%, who usually includes photos and documents. The buyer's agent compensation you choose (from 0%) is applied to both columns, so your savings come only from the listing side. Every Lixtara plan includes your MLS listing, syndication to Zillow, Realtor.com, Redfin, Trulia and 100+ other sites, and DocuSign contracts. On Essentials you take your own photos with our smartphone guide, while Pro and Concierge include a professional photographer. Other closing costs (title, taxes, recording fees) are not shown here.",
+        "Upfront costs are paid when you list, and with Lixtara that's only the flat fee. Commissions come out of your sale proceeds at closing, and only if your home sells. The traditional column is a listing agent at {traditional}%, who usually includes photos and documents. The buyer's agent compensation you choose (from 0%) is applied to both columns, so your savings come only from the listing side. Every Lixtara plan includes your MLS listing, syndication to portals like Zillow, Realtor.com, Redfin and Trulia, and DocuSign contracts. On Essentials you take your own photos with our smartphone guide, while Pro and Concierge include a professional photographer. Other closing costs (title, taxes, recording fees) are not shown here.",
       infoAriaLabel: "What this means",
       tipListingFee: "The one-time flat fee you pay Lixtara to list your home. A traditional agent charges no flat fee; they take a big commission instead.",
       tipSellerCommission: "The listing-side commission: a % of the sale price, paid at closing and only if your home sells. Lixtara charges {essentials}% on Essentials, {pro}% on Pro and {concierge}% on Concierge, versus ~{traditional}% from a traditional listing agent.",
@@ -1665,7 +1665,7 @@ export const dictionaries = {
       items: [
         {
           q: "What is Lixtara?",
-          a: "Lixtara is a licensed Florida flat-fee real estate brokerage (Lic #{brokerageLicense}). You sell your home for a flat fee plus a low commission paid only if it sells. Your listing goes on the MLS and reaches Zillow, Realtor.com, Redfin, Trulia and 100+ other sites, with a licensed broker behind you and without the traditional 6%.",
+          a: "Lixtara is a licensed Florida flat-fee real estate brokerage (Lic #{brokerageLicense}). You sell your home for a flat fee plus a low commission paid only if it sells. Your listing is published on the MLS and syndicated to portals like Zillow, Realtor.com, Redfin and Trulia, with a licensed broker behind you and without the traditional 6%.",
         },
         termsFaq("en").total,
         {
@@ -1936,7 +1936,7 @@ export const dictionaries = {
         },
         {
           headline: "En el MLS y en todos los sitios principales",
-          body: "Tu casa se publica en el MLS, el sistema que usan los agentes de toda Florida para buscar casas para sus compradores. Desde ahí llega a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios. Los mismos compradores que te daría un agente tradicional del 6%.",
+          body: "Tu casa se publica en el MLS, el sistema que usan los agentes de toda Florida para buscar casas para sus compradores. Desde ahí se distribuye a portales como Zillow, Realtor.com, Redfin y Trulia. Los mismos compradores que te daría un agente tradicional del 6%.",
         },
       ],
     },
@@ -2007,7 +2007,7 @@ export const dictionaries = {
           tagline: "Publica en el MLS por menos",
           forWhom: "Ideal para: vendedores que lo hacen por su cuenta y toman sus propias fotos",
           features: [
-            "Publicado en el MLS de Florida y distribuido a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios",
+            "Publicado en el MLS de Florida y distribuido a portales como Zillow, Realtor.com, Redfin y Trulia",
             publicationTimeline.text.es.planBullet,
             "Sube tus propias fotos (10 mínimo)",
             "Panel de autogestión",
@@ -2033,7 +2033,7 @@ export const dictionaries = {
           tagline: "El más elegido",
           forWhom: "Ideal para: vendedores que quieren respaldo del broker y fotos profesionales",
           features: [
-            "Publicación en el MLS con descripción revisada por el broker, distribuida a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios",
+            "Publicación en el MLS con descripción revisada por el broker, distribuida a portales como Zillow, Realtor.com, Redfin y Trulia",
             publicationTimeline.text.es.planBullet,
             "Fotografía profesional (valor {photoAddonPrice}, incluida)",
             "Llamada de cumplimiento y estrategia con el broker (30 min)",
@@ -2060,7 +2060,7 @@ export const dictionaries = {
           tagline: "Servicio integral y personalizado",
           forWhom: "Ideal para: vendedores que quieren un servicio integral y personalizado",
           features: [
-            "Publicación en el MLS con descripción revisada por el broker, distribuida a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios",
+            "Publicación en el MLS con descripción revisada por el broker, distribuida a portales como Zillow, Realtor.com, Redfin y Trulia",
             publicationTimeline.text.es.planBullet,
             "Fotografía premium + tomas con dron",
             "Broker dedicado, 7 días a la semana",
@@ -3269,7 +3269,7 @@ export const dictionaries = {
         "Con Lixtara {tier} y {pct} para el agente del comprador en los dos lados, ahorras {amount} frente a un agente tradicional del lado vendedor.",
       howToRead: "Cómo leer esta tabla",
       howToReadBody:
-        "Los costos iniciales se pagan al publicar, y con Lixtara son solo la tarifa fija. Las comisiones salen del producto de tu venta al cierre, y solo si la propiedad se vende. La columna tradicional es un agente del lado vendedor al {traditional}%, que normalmente incluye fotos y documentos. La compensación al agente del comprador que eliges (desde 0%) se aplica a las dos columnas, así que tu ahorro viene solo del lado vendedor. Todos los planes de Lixtara incluyen tu listado en el MLS, la difusión en Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios, y los contratos en DocuSign. En Essentials tomas tus propias fotos con nuestra guía para celular; Pro y Concierge incluyen un fotógrafo profesional. Otros costos de cierre (título, impuestos, registro) no se muestran aquí.",
+        "Los costos iniciales se pagan al publicar, y con Lixtara son solo la tarifa fija. Las comisiones salen del producto de tu venta al cierre, y solo si la propiedad se vende. La columna tradicional es un agente del lado vendedor al {traditional}%, que normalmente incluye fotos y documentos. La compensación al agente del comprador que eliges (desde 0%) se aplica a las dos columnas, así que tu ahorro viene solo del lado vendedor. Todos los planes de Lixtara incluyen tu listado en el MLS, la distribución a portales como Zillow, Realtor.com, Redfin y Trulia, y los contratos en DocuSign. En Essentials tomas tus propias fotos con nuestra guía para celular; Pro y Concierge incluyen un fotógrafo profesional. Otros costos de cierre (título, impuestos, registro) no se muestran aquí.",
       infoAriaLabel: "Qué significa",
       tipListingFee: "La tarifa fija única que pagas a Lixtara por publicar tu casa. Un agente tradicional no cobra tarifa fija; en su lugar se lleva una comisión grande.",
       tipSellerCommission: "La comisión del lado vendedor: un % del precio de venta que se paga al cierre, y solo si la propiedad se vende. Lixtara cobra {essentials}% en Essentials, {pro}% en Pro y {concierge}% en Concierge, frente a ~{traditional}% de un agente tradicional.",
@@ -3554,7 +3554,7 @@ export const dictionaries = {
       items: [
         {
           q: "¿Qué es Lixtara?",
-          a: "Lixtara es una inmobiliaria licenciada de tarifa fija en Florida (Lic #{brokerageLicense}). Vendes tu casa con una tarifa fija más una comisión baja que solo pagas si se vende. Tu listado se publica en el MLS y llega a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios, con un broker licenciado respaldándote y sin el 6% tradicional.",
+          a: "Lixtara es una inmobiliaria licenciada de tarifa fija en Florida (Lic #{brokerageLicense}). Vendes tu casa con una tarifa fija más una comisión baja que solo pagas si se vende. Tu listado se publica en el MLS y se distribuye a portales como Zillow, Realtor.com, Redfin y Trulia, con un broker licenciado respaldándote y sin el 6% tradicional.",
         },
         termsFaq("es").total,
         {

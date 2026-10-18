@@ -9,6 +9,9 @@
 -- 3. properties_seller_writable_columns(): las tres columnas nuevas (el paso 6 las escribe).
 -- 4. property_buyer_comp_history: cada cambio de la oferta con su fecha y versión, escrito
 --    solo por un trigger (como property_status_history). Sin FK: sobrevive al listing.
+-- 5. La oferta no se lee con la clave pública: anon y authenticated pierden SELECT sobre las
+--    cuatro columnas de la oferta (decisión del owner 2026-10-17). El dueño, admin y broker la
+--    leen con get_property_buyer_comp(); service_role conserva todo.
 --
 -- Idempotente. Reversión: scripts/sql/rollback_20261017150000_buyer_agent_comp_offer.sql.
 -- Verificación: pnpm db-check:buyer-comp (Postgres desechable en Docker).
@@ -141,3 +144,53 @@ drop trigger if exists log_property_buyer_comp_change on public.properties;
 create trigger log_property_buyer_comp_change
   after insert or update on public.properties
   for each row execute function public.log_property_buyer_comp_change();
+
+-- ── 5. Lectura de la oferta: solo el dueño, admin y broker ──────────────────────────
+-- Un privilegio de columna no distingue filas (el dueño, admin y broker también son
+-- `authenticated`), así que: (a) anon y authenticated leen todas las columnas MENOS las de la
+-- oferta, y (b) get_property_buyer_comp() (definer) se la devuelve solo a quien corresponde.
+-- Un REVOKE de tabla no quita la columna si queda el SELECT de tabla: hay que quitar el de
+-- tabla y dar el de cada columna. Revocar el de tabla también borra los de columna, así que
+-- re-correr esto es idempotente.
+--
+-- OJO, columnas nuevas de properties: después de esta migración NO son legibles por la API
+-- hasta que su migración haga `grant select (<columna>) on public.properties to anon,
+-- authenticated` (src/lib/properties-column-grants.test.ts falla si falta).
+revoke select on public.properties from anon, authenticated;
+do $$
+declare
+  v_cols text;
+begin
+  select string_agg(quote_ident(column_name), ', ' order by ordinal_position)
+    into v_cols
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'properties'
+     and column_name not in ('buyer_agent_commission', 'buyer_agent_comp_type',
+                             'buyer_agent_comp_amount', 'buyer_agent_comp_terms_version');
+  execute format('grant select (%s) on public.properties to anon, authenticated', v_cols);
+end;
+$$;
+grant select on public.properties to service_role;
+
+create or replace function public.get_property_buyer_comp(p_property_id uuid)
+  returns table (
+    buyer_agent_comp_type          text,
+    buyer_agent_commission         numeric,
+    buyer_agent_comp_amount        numeric,
+    buyer_agent_comp_terms_version text
+  )
+  language sql
+  stable
+  security definer
+  set search_path = public, pg_temp
+as $$
+  select p.buyer_agent_comp_type, p.buyer_agent_commission, p.buyer_agent_comp_amount,
+         p.buyer_agent_comp_terms_version
+    from public.properties p
+   where p.id = p_property_id
+     and (p.owner_id = auth.uid() or public.is_admin_or_broker())
+$$;
+
+revoke execute on function public.get_property_buyer_comp(uuid) from public, anon;
+grant execute on function public.get_property_buyer_comp(uuid) to authenticated, service_role;
+

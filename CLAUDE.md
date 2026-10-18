@@ -93,6 +93,14 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   `listing_requests` (`POST /api/listings/[id]/change-request` and `/withdrawal-request`):
   the broker updates Matrix, approves on `/admin/listings/[id]/review`, and only then is the
   change applied. Verified with `pnpm db-check:listing-requests`.
+- The buyer's agent compensation offer (`buyer_agent_commission`, `buyer_agent_comp_type`,
+  `buyer_agent_comp_amount`, `buyer_agent_comp_terms_version`) is not readable with the public
+  key: since migration `20261017150000`, `anon`/`authenticated` have **column-level** SELECT on
+  `properties` without those four. Owner, admin and broker read it via
+  `get_property_buyer_comp()` (`fetchBuyerComp`, `src/lib/buyer-comp.server.ts`). A **new
+  `properties` column** needs `grant select (<col>) on public.properties to anon, authenticated`
+  in its migration, or the API can't read it (`properties-column-grants.test.ts` fails).
+  Verified with `pnpm db-check:buyer-comp`.
 - The seller pays as soon as they sign the listing agreement (`agreements.status = signed`);
   the listing goes `active` only after the broker's countersignature (`completed`, broker signer
   verified live in DocuSign): `checkBrokerCountersigned()` in `src/lib/agreement-refresh.ts`,

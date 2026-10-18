@@ -160,9 +160,24 @@ describe("superficies que leen la configuración", () => {
     expect(LOUI_SYSTEM_PROMPT).not.toContain("2,5%");
   });
 
-  it("casos de Loui: 0%, monto fijo, plazo y reembolso, en EN y ES", () => {
-    expect(LOUI_TERMS_CASES).toHaveLength(8);
-    expect(LOUI_TERMS_CASES.filter((c) => c.lang === "es")).toHaveLength(4);
+  it("Loui no ofrece funciones del catálogo MLS (no están activas)", () => {
+    const offers = LOUI_SYSTEM_PROMPT.split("\n").filter((l) => /search alerts?|saved search|alertas de búsqueda/i.test(l) && !/\bNOT active\b|\bno\b|\bnever\b/i.test(l));
+    expect(offers).toEqual([]);
+    expect(LOUI_SYSTEM_PROMPT).toMatch(/MLS catalog features are NOT active/);
+    expect(LOUI_SYSTEM_PROMPT).not.toMatch(/buyers can (search listings|set up search alerts)/);
+  });
+
+  it("ninguna cifra de portales sin respaldo", async () => {
+    for (const lang of ["en", "es"] as const) {
+      for (const { where, text } of await allTexts(lang)) {
+        expect(text, where).not.toMatch(/\d+\+? (other )?(sites|portals|websites)|m[aá]s de \d+ (sitios|portales)|\d+ (sitios|portales)/i);
+      }
+    }
+  });
+
+  it("casos de Loui: 0%, monto fijo, plazo, reembolso y alertas, en EN y ES", () => {
+    expect(LOUI_TERMS_CASES).toHaveLength(10);
+    expect(LOUI_TERMS_CASES.filter((c) => c.lang === "es")).toHaveLength(5);
     for (const c of LOUI_TERMS_CASES.filter((c) => c.lang === "es")) {
       expect(c.mustNot.map(String).join(" "), c.question).toContain("usted");
     }

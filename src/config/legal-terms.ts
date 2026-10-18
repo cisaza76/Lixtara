@@ -201,7 +201,7 @@ export function termsFaq(lang: Lang) {
       },
       whenPublished: {
         q: "¿Cuándo se publica mi propiedad?",
-        a: `${pub.sentence} Antes, la broker revisa tu listado. Desde el MLS, tu propiedad llega a Zillow, Realtor.com, Redfin, Trulia y más de 100 sitios.`,
+        a: `${pub.sentence} Antes, la broker revisa tu listado. Desde el MLS, tu propiedad se distribuye a portales como Zillow, Realtor.com, Redfin y Trulia; cada portal decide cuándo y cómo la muestra.`,
       },
       refund: {
         q: "¿Me devuelven el dinero si cambio de opinión?",
@@ -232,7 +232,7 @@ export function termsFaq(lang: Lang) {
     },
     whenPublished: {
       q: "When is my property published?",
-      a: `${pub.sentence} Before that, the broker reviews your listing. From the MLS your home reaches Zillow, Realtor.com, Redfin, Trulia and 100+ other sites.`,
+      a: `${pub.sentence} Before that, the broker reviews your listing. From the MLS your home is syndicated to portals like Zillow, Realtor.com, Redfin and Trulia; each portal decides when and how it shows it.`,
     },
     refund: {
       q: "Do I get my money back if I change my mind?",

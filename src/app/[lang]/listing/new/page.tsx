@@ -83,6 +83,7 @@ import {
 import { AppFormValidation } from "@/components/app-form-validation";
 import { passwordRejection } from "@/lib/auth/password-errors";
 import { FootnoteText } from "@/components/footnote-text";
+import { fetchBuyerComp } from "@/lib/buyer-comp.server";
 import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
 import { BuyerCompStep } from "@/components/buyer-comp-step";
 import {
@@ -307,11 +308,20 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,buyer_agent_commission,buyer_agent_comp_type,buyer_agent_comp_amount,appliances",
+        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,appliances",
       )
       .eq("id", draftId)
       .maybeSingle();
     draft = (data as Draft | null) ?? null;
+    // La oferta del paso 6 no viene en el select (la tabla no expone esas columnas a la API).
+    // Si la lectura falla, el paso 6 se muestra sin elección, como un borrador nuevo.
+    if (draft) {
+      const offer = await fetchBuyerComp(supabase, draft.id).catch((err) => {
+        console.error("listing/new: buyer comp read failed", err);
+        return null;
+      });
+      draft = { ...draft, ...offer };
+    }
 
     // Admins and brokers can READ every draft (RLS), so a staff session could
     // walk a seller's listing all the way to step 7 and only then fail with

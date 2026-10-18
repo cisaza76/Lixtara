@@ -122,13 +122,51 @@ check "anon no ve el historial" \
   "select public.intento('anon', null, \$\$select 1 from public.property_buyer_comp_history\$\$)" "ERR:42501"
 check "lista del vendedor incluye las 3 columnas nuevas" \
   "select count(*) from unnest(public.properties_seller_writable_columns()) c where c in ('buyer_agent_comp_type','buyer_agent_comp_amount','buyer_agent_comp_terms_version')" "3"
+
+# Lectura de la oferta (sección 5): la clave pública no la ve; dueño, admin y broker sí, por la función.
+P6="'aaaaaaaa-0000-4000-8000-000000000006'"  # listado activo (lectura pública)
+A="'44444444-4444-4444-8444-444444444444'"   # admin
+check "anon sigue leyendo el listado activo (columnas públicas)" \
+  "select public.intento('anon', null, \$\$select id, list_price, mls_status, description from public.properties where id = $P6\$\$)" "OK:1"
+for col in buyer_agent_commission buyer_agent_comp_type buyer_agent_comp_amount buyer_agent_comp_terms_version; do
+  check "anon no lee $col" \
+    "select public.intento('anon', null, \$\$select $col from public.properties where id = $P6\$\$)" "ERR:42501"
+done
+check "anon no lee la oferta con select *" \
+  "select public.intento('anon', null, \$\$select * from public.properties\$\$)" "ERR:42501"
+check "authenticated (otro vendedor) no lee la oferta de un listado activo" \
+  "select public.intento('authenticated', $O, \$\$select buyer_agent_commission from public.properties where id = $P6\$\$)" "ERR:42501"
+check "ni el dueño la lee directo de la tabla (va por la función)" \
+  "select public.intento('authenticated', $S, \$\$select buyer_agent_comp_amount from public.properties where id = $P1\$\$)" "ERR:42501"
+check "dueño: get_property_buyer_comp devuelve su oferta" \
+  "select public.intento('authenticated', $S, \$\$select 1 from public.get_property_buyer_comp($P1) where buyer_agent_comp_type = 'percent' and buyer_agent_commission = 2.75 and buyer_agent_comp_terms_version = 'buyer_agent_comp@1'\$\$)" "OK:1"
+check "otro vendedor: get_property_buyer_comp no devuelve nada" \
+  "select public.intento('authenticated', $O, \$\$select 1 from public.get_property_buyer_comp($P1)\$\$)" "OK:0"
+check "otro vendedor: tampoco la de un listado activo" \
+  "select public.intento('authenticated', $O, \$\$select 1 from public.get_property_buyer_comp($P6)\$\$)" "OK:0"
+check "broker: get_property_buyer_comp devuelve la oferta" \
+  "select public.intento('authenticated', $B, \$\$select 1 from public.get_property_buyer_comp($P1)\$\$)" "OK:1"
+check "admin: get_property_buyer_comp devuelve la oferta" \
+  "select public.intento('authenticated', $A, \$\$select 1 from public.get_property_buyer_comp($P7)\$\$)" "OK:1"
+check "anon no ejecuta get_property_buyer_comp" \
+  "select public.intento('anon', null, \$\$select 1 from public.get_property_buyer_comp($P6)\$\$)" "ERR:42501"
+check "service_role lee la oferta directo" \
+  "select public.intento('service_role', null, \$\$select buyer_agent_commission, buyer_agent_comp_type from public.properties\$\$)" "OK:4"
+check "el vendedor sigue guardando la oferta sin poder leerla (paso 6)" \
+  "select public.intento('authenticated', $O, \$\$update public.properties set buyer_agent_comp_type='percent', buyer_agent_commission=3, buyer_agent_comp_amount=null, buyer_agent_comp_terms_version='buyer_agent_comp@1' where id = $P7 and owner_id = $O\$\$)" "OK:1"
+check "una columna pública nueva de antes de la migración sigue legible (price_comps)" \
+  "select public.intento('authenticated', $S, \$\$select price_comps, show_phone_on_portals from public.properties where id = $P1\$\$)" "OK:1"
 [ "$fail" = 0 ] || exit 1
 
 { echo "set client_min_messages = warning;"; cat scripts/sql/rollback_20261017150000_buyer_agent_comp_offer.sql; } | psql_
 check "reversión: columnas, tabla y trigger fuera; filas intactas" \
   "select (select count(*) from information_schema.columns where table_name='properties' and column_name like 'buyer_agent_comp_%') || ':' || (select count(*) from pg_tables where tablename='property_buyer_comp_history') || ':' || (select count(*) from public.properties)" "0:0:4"
+check "reversión: anon vuelve a leer buyer_agent_commission y la función ya no existe" \
+  "select public.intento('anon', null, \$\$select buyer_agent_commission from public.properties where id = $P6\$\$) || ':' || (select count(*) from pg_proc where proname = 'get_property_buyer_comp')" "OK:1:0"
 check "reversión: la lista del vendedor vuelve a la de #133" \
   "select count(*) from unnest(public.properties_seller_writable_columns()) c where c like 'buyer_agent_comp_%'" "0"
 { echo "set client_min_messages = warning;"; cat "$MIG"; } | psql_
 echo "re-aplicación ok"
+check "re-aplicación: anon de nuevo sin la oferta" \
+  "select public.intento('anon', null, \$\$select buyer_agent_commission from public.properties where id = $P6\$\$)" "ERR:42501"
 [ "$fail" = 0 ]

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { compensationAgreementsFor, formatOffer, offerFromRow } from "@/lib/buyer-comp";
+import { fetchBuyerComp } from "@/lib/buyer-comp.server";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
@@ -170,12 +171,13 @@ export default async function ListingReviewPage({
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description,buyer_agent_commission,buyer_agent_comp_type,buyer_agent_comp_amount",
+      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description",
     )
     .eq("id", id)
     .maybeSingle();
   if (!property) notFound();
-  const prop = property as Property;
+  // La oferta no viene en el select: la tabla no expone esas columnas a la API.
+  const prop = { ...(property as Property), ...(await fetchBuyerComp(supabase, id)) } as Property;
 
   // property_photos and agreements have no admin/broker SELECT policy (only the
   // owner, and the public for ACTIVE listings' photos), so with the session

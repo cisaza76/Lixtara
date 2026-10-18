@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
   BUYER_COMP_MAX_PCT,
@@ -103,8 +103,10 @@ describe("acuerdo de compensación (CASSB-1)", () => {
     expect(cassb1Tabs({ type: "amount", amount: 12_000 })).toEqual({ fee_amount: "12,000" });
   });
 
-  it("los campos existen en la plantilla CASSB-1 exportada", () => {
-    const tpl = read("docs/docusign/lixtara-templates-2026-09-27/lixtara-compensation-agreement-CASSB-1.json");
+  // La exportación de DocuSign está en .gitignore (docs/docusign/): el caso corre solo donde existe.
+  const CASSB1_EXPORT = "docs/docusign/lixtara-templates-2026-09-27/lixtara-compensation-agreement-CASSB-1.json";
+  it.skipIf(!existsSync(join(ROOT, CASSB1_EXPORT)))("los campos existen en la plantilla CASSB-1 exportada", () => {
+    const tpl = read(CASSB1_EXPORT);
     for (const label of ["fee_amount", "fee_pct_value"]) expect(tpl).toContain(`"tabLabel": "${label}"`);
   });
 
