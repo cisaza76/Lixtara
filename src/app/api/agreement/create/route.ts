@@ -26,6 +26,7 @@ import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import { t } from "@/lib/i18n";
 import { CONSENTS } from "@/lib/legal/consents";
 import { recordAcceptance } from "@/lib/legal/consents.server";
+import { loadFirstIncompleteStep } from "@/lib/listing-completeness.server";
 
 interface Body {
   property_id?: string;
@@ -94,6 +95,27 @@ export async function POST(req: Request) {
   if (property.mls_status !== "draft") {
     return NextResponse.json(
       { error: "property_not_in_draft", status: property.mls_status },
+      { status: 409 },
+    );
+  }
+
+  // Sin acuerdo para un listing incompleto (pasos 1–5 vacíos, p. ej. llegando por URL al paso
+  // 7): de vuelta al primer paso pendiente. El paso 6 lo cubre la comprobación de la oferta,
+  // con su propio mensaje. Si no se puede comprobar, no se arma el contrato.
+  let firstIncomplete: number | null;
+  try {
+    firstIncomplete = await loadFirstIncompleteStep(supabase, property.id);
+  } catch (err) {
+    console.error("agreement/create: completeness check failed", err);
+    return NextResponse.json({ error: "completeness_check_failed" }, { status: 500 });
+  }
+  if (firstIncomplete !== null && firstIncomplete < 6) {
+    return NextResponse.json(
+      {
+        error: "listing_incomplete",
+        step: firstIncomplete,
+        redirect: `/${lang}/listing/new?step=${firstIncomplete}&id=${encodeURIComponent(property.id)}`,
+      },
       { status: 409 },
     );
   }

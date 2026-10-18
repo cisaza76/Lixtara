@@ -8,7 +8,8 @@ import { SITE_URL } from "@/lib/config";
 import { SIGNUP_EMAIL_COOKIE } from "@/lib/auth/signup-code";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { captchaTokenFrom, isCaptchaError } from "@/lib/turnstile";
-import { passwordRejection } from "@/lib/auth/password-errors";
+import { PASSWORD_MIN_LENGTH, passwordRejection } from "@/lib/auth/password-errors";
+import { LocalizedValidation } from "@/components/localized-validation";
 import { createService } from "@/lib/supabase/service";
 import { CONSENTS, consentCheckbox } from "@/lib/legal/consents";
 import { recordAcceptance, termsAcceptedIn } from "@/lib/legal/consents.server";
@@ -62,7 +63,7 @@ export default async function SignUpPage({
     if (!termsAcceptedIn(formData)) {
       redirect(`/${lang}/sign-up?error=terms_required`);
     }
-    if (password.length < 8) {
+    if (password.length < PASSWORD_MIN_LENGTH) {
       redirect(`/${lang}/sign-up?error=weak_password`);
     }
 
@@ -136,6 +137,7 @@ export default async function SignUpPage({
       titleAccent={copy.titleAccent}
       titleAfter={copy.titleAfter}
     >
+      <LocalizedValidation labels={t(lang).listingForm.validation} />
       {errorMessage && <ErrorBanner message={errorMessage} />}
       <form action={signUpAction} className="flex flex-col gap-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -170,6 +172,7 @@ export default async function SignUpPage({
           name="password"
           type="password"
           autoComplete="new-password"
+          minLength={PASSWORD_MIN_LENGTH}
           help={copy.passwordHelp}
         />
         <TermsConsentCheckbox

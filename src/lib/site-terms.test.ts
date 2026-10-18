@@ -92,6 +92,8 @@ describe.each(["en", "es"] as const)("%s: el sitio no contradice legal-terms.ts"
     const bad: string[] = [];
     for (const { where, text } of await allTexts(lang)) {
       if (where === "loui-prompt") continue; // el prompt cita la política: se revisa abajo
+      // Estado de un pago en el panel interno del admin ("Refunded"), no una promesa al vendedor.
+      if (/\.admin\.paymentStatuses\.refunded$/.test(where)) continue;
       const mentions = /refund|non-?refundable|reembols|devolvemos el total|money back|devuelven el dinero/i;
       if (!mentions.test(text)) continue;
       if (text.includes(policy)) continue;

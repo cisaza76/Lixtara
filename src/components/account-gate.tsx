@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { TermsConsentCheckbox } from "@/components/terms-consent-checkbox";
 import type { ConsentParts } from "@/lib/legal/consents";
+import { PASSWORD_MIN_LENGTH } from "@/lib/auth/password-errors";
 
 interface AccountGateLabels {
   createEyebrow: string;
@@ -270,7 +271,7 @@ function CreateAccount({
             name="password"
             type={showPw ? "text" : "password"}
             required
-            minLength={8}
+            minLength={PASSWORD_MIN_LENGTH}
             autoComplete="new-password"
             className="w-full bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 pr-16 text-base text-ink"
           />

@@ -7,6 +7,9 @@ import { sendListingApproved } from "@/lib/email";
 import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
 import { checkBrokerCountersigned } from "@/lib/agreement-refresh";
+import { assertStaffWithUser } from "@/lib/admin-auth";
+import { fetchSellerContacts } from "@/lib/admin-sellers.server";
+import { shortListingId } from "@/lib/admin-sellers";
 import {
   ensureEnterMlsNumberTask,
   mapMlsNumberWriteError,
@@ -40,6 +43,11 @@ interface PaymentRowJoined {
   user_id: string;
 }
 
+/** Estado de un pago en el idioma de la página; un estado desconocido se muestra tal cual. */
+function paymentStatusLabel(labels: Record<string, string>, status: string): string {
+  return labels[status] ?? status;
+}
+
 export default async function AdminPage({
   params,
   searchParams,
@@ -65,24 +73,10 @@ export default async function AdminPage({
     .order("updated_at", { ascending: true });
   const pending = (pendingRows ?? []) as PendingListing[];
 
-  // Owner names (Lovable users table).
-  const ownerIds = Array.from(new Set(pending.map((p) => p.owner_id)));
-  const ownerNameById = new Map<string, string>();
-  if (ownerIds.length > 0) {
-    const { data: owners } = await supabase
-      .from("users")
-      .select("id,first_name,last_name,email")
-      .in("id", ownerIds);
-    for (const o of (owners ?? []) as Array<{
-      id: string;
-      first_name: string | null;
-      last_name: string | null;
-      email: string | null;
-    }>) {
-      const name = [o.first_name, o.last_name].filter(Boolean).join(" ").trim();
-      ownerNameById.set(o.id, name || o.email || o.id.slice(0, 8));
-    }
-  }
+  // Vendedor de cada listing: public.users solo deja leer la fila propia, así que se lee con
+  // la clave de servicio tras comprobar el rol (la página carga en paralelo al guard del layout).
+  await assertStaffWithUser(lang);
+  const sellers = await fetchSellerContacts(pending.map((p) => p.owner_id));
 
   // Recent payments — 20 most recent succeeded/pending across the platform.
   const { data: payRows } = await supabase
@@ -139,10 +133,10 @@ export default async function AdminPage({
     created_at: string;
   }>;
   const kpis = [
-    { label: "Pending Tasks", value: String(pendingTasksCount ?? 0), href: `/${lang}/admin/tasks`, cta: "View Tasks →" },
-    { label: "Pending Approvals", value: String(pendingApprovalsCount ?? 0), href: `/${lang}/admin/listings?status=pending_approval`, cta: "Review Now →" },
-    { label: "Active Deals", value: String(activeDealsCount ?? 0), href: `/${lang}/admin/transactions`, cta: "View Deals →" },
-    { label: "This Month Revenue", value: `$${Math.round(monthRevenue).toLocaleString("en-US")}`, href: `/${lang}/admin/analytics`, cta: "View Report →" },
+    { label: copy.kpiPendingTasks, value: String(pendingTasksCount ?? 0), href: `/${lang}/admin/tasks`, cta: copy.kpiViewTasks },
+    { label: copy.kpiPendingApprovals, value: String(pendingApprovalsCount ?? 0), href: `/${lang}/admin/listings?status=pending_approval`, cta: copy.kpiReviewNow },
+    { label: copy.kpiActiveDeals, value: String(activeDealsCount ?? 0), href: `/${lang}/admin/transactions`, cta: copy.kpiViewDeals },
+    { label: copy.kpiMonthRevenue, value: `$${Math.round(monthRevenue).toLocaleString("en-US")}`, href: `/${lang}/admin/analytics`, cta: copy.kpiViewReport },
   ];
 
   async function approveListing(formData: FormData) {
@@ -293,10 +287,10 @@ export default async function AdminPage({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 lg:mb-20">
           <div className="lg:col-span-2">
             <h2 className="font-display text-2xl text-ink mb-6 border-b border-gold-soft pb-3">
-              Recent Activity
+              {copy.recentActivityHeader}
             </h2>
             {activity.length === 0 ? (
-              <p className="text-sm text-ink/55 italic">No recent activity.</p>
+              <p className="text-sm text-ink/55 italic">{copy.noActivity}</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {activity.map((a, i) => (
@@ -320,27 +314,27 @@ export default async function AdminPage({
           </div>
           <div>
             <h2 className="font-display text-2xl text-ink mb-6 border-b border-gold-soft pb-3">
-              Quick Actions
+              {copy.quickActionsHeader}
             </h2>
             <div className="flex flex-col gap-3">
               <Link
                 href={`/${lang}/admin/listings?status=pending_approval`}
                 className="border border-gold-soft px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-ink/70 hover:border-gold hover:text-ink transition-colors"
               >
-                Review Pending Listings →
+                {copy.quickReviewPending}
               </Link>
               <Link
                 href={`/${lang}/admin/tasks`}
                 className="border border-gold-soft px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-ink/70 hover:border-gold hover:text-ink transition-colors"
               >
-                View All Tasks →
+                {copy.quickViewTasks}
               </Link>
               <button
                 type="button"
                 disabled
                 className="border border-gold-soft px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-ink/30 cursor-not-allowed text-left"
               >
-                Export Revenue Report (soon)
+                {copy.quickExportRevenue}
               </button>
             </div>
           </div>
@@ -373,7 +367,7 @@ export default async function AdminPage({
                   ? p.pricing_tier.charAt(0).toUpperCase() +
                     p.pricing_tier.slice(1)
                   : "—";
-                const ownerName = ownerNameById.get(p.owner_id) ?? "—";
+                const seller = sellers.get(p.owner_id);
                 const submitted = p.updated_at ?? p.created_at;
                 return (
                   <div
@@ -390,10 +384,32 @@ export default async function AdminPage({
                       <p className="text-xs text-ink/60">
                         {p.address_city}, {p.address_state} {p.address_zip}
                       </p>
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                        {copy.listingIdLabel}{" "}
+                        <span className="font-mono normal-case tracking-normal text-ink/70" title={p.id}>
+                          {shortListingId(p.id)}
+                        </span>
+                      </p>
                       <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55 mt-2">
                         {copy.sellerLabel}
                       </p>
-                      <p className="text-sm text-ink">{ownerName}</p>
+                      {seller ? (
+                        <div className="flex flex-col gap-0.5 text-sm text-ink">
+                          <p>{seller.name ?? "—"}</p>
+                          {seller.email && (
+                            <a href={`mailto:${seller.email}`} className="text-xs text-ink/70 hover:text-gold break-all">
+                              {seller.email}
+                            </a>
+                          )}
+                          {seller.phone && (
+                            <a href={`tel:${seller.phone.replace(/[^\d+]/g, "")}`} className="text-xs text-ink/70 hover:text-gold">
+                              {seller.phone}
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-ink">—</p>
+                      )}
                     </div>
 
                     <div className="lg:col-span-3 flex flex-col gap-2">
@@ -440,7 +456,7 @@ export default async function AdminPage({
                         target="_blank"
                         className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
                       >
-                        Preview public page →
+                        {copy.previewPublicPage}
                       </Link>
                       <form
                         action={approveListing}
@@ -530,7 +546,7 @@ export default async function AdminPage({
                                 : "border-gold-soft bg-ivory-strong/40 text-ink/70"
                           }`}
                         >
-                          {p.status}
+                          {paymentStatusLabel(copy.paymentStatuses, p.status)}
                         </span>
                       </td>
                       <td className="py-3 pr-4 text-ink/70 text-xs">

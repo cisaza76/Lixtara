@@ -81,7 +81,7 @@ import {
   suggestedTierParam,
 } from "@/lib/listing-step1-form";
 import { AppFormValidation } from "@/components/app-form-validation";
-import { passwordRejection } from "@/lib/auth/password-errors";
+import { PASSWORD_MIN_LENGTH, passwordRejection } from "@/lib/auth/password-errors";
 import { FootnoteText } from "@/components/footnote-text";
 import { fetchBuyerComp } from "@/lib/buyer-comp.server";
 import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
@@ -111,14 +111,10 @@ import { CONSENTS, consentCheckbox, consentNotice } from "@/lib/legal/consents";
 import { recordAcceptance, termsAcceptedIn } from "@/lib/legal/consents.server";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
+import { PROPERTY_TYPES, allowedStep } from "@/lib/listing-completeness";
+import { loadFirstIncompleteStep } from "@/lib/listing-completeness.server";
 
 const TOTAL_STEPS = 8;
-const PROPERTY_TYPES = [
-  "single_family",
-  "condo",
-  "townhouse",
-  "multi_family",
-] as const;
 
 /** Paso 7: contraseña rechazada por Supabase (filtrada o débil) → clave de `aerror`. */
 function passwordErrorKey(error: unknown): "leaked" | "rejected" | null {
@@ -404,6 +400,17 @@ export default async function ListingNewPage({
     // (paso 5) y cuenta / pago / acuerdo (7–8) siguen disponibles.
     if (draft && draft.mls_status !== "draft" && [1, 2, 3, 4, 6].includes(step)) {
       redirect(`/${lang}/dashboard/listings/${draftId}/requests`);
+    }
+
+    // Sin saltar pasos por URL: ?step=7 con los pasos 2–6 vacíos lleva al primero incompleto.
+    // Si la lectura falla se muestra el paso pedido; el acuerdo vuelve a comprobarlo.
+    if (draft && sessionUser && draft.owner_id === sessionUser.id && draft.mls_status === "draft" && step > 1) {
+      const firstIncomplete = await loadFirstIncompleteStep(supabase, draft.id).catch((err) => {
+        console.error("listing/new: completeness check failed", err);
+        return null;
+      });
+      const target = allowedStep(step, firstIncomplete);
+      if (target !== step) redirect(`/${lang}/listing/new?step=${target}&id=${draft.id}`);
     }
 
     // Step 3 auto-fetch: Miami-Dade autofill (if zip is Miami-Dade + fields
@@ -1456,7 +1463,7 @@ export default async function ListingNewPage({
     // Aceptación expresa de los Términos y la Privacidad: sin la casilla no se crea la cuenta.
     if (!termsAcceptedIn(formData)) redirect(`${back}&aerror=terms_required`);
     if (!firstName || !lastName) redirect(`${back}&aerror=name`);
-    if (password.length < 8) redirect(`${back}&aerror=password`);
+    if (password.length < PASSWORD_MIN_LENGTH) redirect(`${back}&aerror=password`);
 
     const supabase = await createClient();
     const {
