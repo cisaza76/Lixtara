@@ -5,7 +5,12 @@
 // Nunca lanza: un fallo aquí no puede romper el paso, la firma ni el webhook de Stripe.
 
 import { createService } from "@/lib/supabase/service";
-import { funnelIsTest, sanitizeFunnelMetadata, type FunnelEventName } from "@/lib/funnel-events";
+import {
+  funnelIsTest,
+  sanitizeFunnelMetadata,
+  type FunnelEventName,
+  type PageViewEventName,
+} from "@/lib/funnel-events";
 
 export async function recordFunnelEvent(input: {
   event: FunnelEventName;
@@ -65,5 +70,24 @@ export async function recordFunnelEvent(input: {
     if (error) console.error("funnel event insert failed", input.event, error.code, error.message);
   } catch (e) {
     console.error("funnel event failed", input.event, e instanceof Error ? e.message : e);
+  }
+}
+
+/**
+ * Visita a una página de campaña (hoy, /owners): solo el evento y el idioma. Sin usuario,
+ * sesión, listing ni UTM, así que no depende del consentimiento. Nunca lanza.
+ */
+export async function recordPageViewEvent(event: PageViewEventName, lang: string): Promise<void> {
+  try {
+    const { error } = await createService()
+      .from("funnel_events")
+      .insert({
+        event,
+        metadata: sanitizeFunnelMetadata({ lang }),
+        is_test: process.env.VERCEL_ENV !== "production",
+      });
+    if (error) console.error("page view event insert failed", event, error.code, error.message);
+  } catch (e) {
+    console.error("page view event failed", event, e instanceof Error ? e.message : e);
   }
 }

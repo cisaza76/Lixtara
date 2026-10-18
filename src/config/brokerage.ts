@@ -33,6 +33,13 @@ export const DBPR_BROKER_LICENSE_URL =
   "https://www.myfloridalicense.com/LicenseDetail.asp?SID=&id=6A304B94CD44DC8912D08F4918D8C092";
 
 /**
+ * Correo de contacto para bajas y preguntas de la landing de propietarios (/owners): la FAQ
+ * "¿Cómo dejo de recibir correos?" lo muestra. Decisión del owner (2026-10-18): una sola
+ * constante, para cambiarlo después en un solo lugar.
+ */
+export const CONTACT_EMAIL = "camilo@lixtara.com";
+
+/**
  * Años de experiencia en bienes raíces en Florida de Anamaria Velasquez y su equipo (dato del
  * owner, 2026-10-17). Es EXPERIENCIA del equipo, no antigüedad de la licencia de Lixtara ni de
  * la broker: nunca escribir "licensed for 20 years". Se muestra como "20+".
@@ -79,11 +86,12 @@ export function brokerageLicenseLineShort(): string {
 
 /**
  * Fills brokerage placeholders in dictionary copy so no license number or
- * broker name is ever hardcoded in i18n: {brokerageLicense}, {brokerLicense},
+ * broker name is ever hardcoded in i18n: {brokerageName}, {brokerageLicense}, {brokerLicense},
  * {brokerName}, {brokerFirstName}, {teamYears}.
  */
 export function fillBrokerageCopy(text: string): string {
   return text
+    .replaceAll("{brokerageName}", BROKERAGE.legalName)
     .replaceAll("{brokerageLicense}", BROKERAGE.brokerageLicense)
     .replaceAll("{brokerLicense}", BROKERAGE.brokerLicense)
     .replaceAll("{brokerName}", BROKERAGE.brokerName)

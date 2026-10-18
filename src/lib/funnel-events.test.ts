@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  campaignFields,
+  isHumanPageView,
   firstTouchCookieValue,
   funnelIsTest,
   parseFirstTouch,
@@ -59,5 +61,30 @@ describe("UTM de primer contacto", () => {
     expect(parseFirstTouch("|email|")).toEqual({ utm_medium: "email" });
     expect(parseFirstTouch(undefined)).toEqual({});
     expect(parseFirstTouch("x@y.com|<script>|")).toEqual({});
+  });
+});
+
+describe("campaña en lx_page_view (UTM de Instantly)", () => {
+  it("los UTM como campos de campaña de GA4, saneados", () => {
+    const p = new URLSearchParams("utm_source=Instantly&utm_medium=email&utm_campaign=FL Owners Oct");
+    expect(campaignFields(p)).toEqual({ campaign_source: "instantly", campaign_medium: "email", campaign_name: "fl_owners_oct" });
+  });
+  it("sin UTM, nada; un valor con forma de correo se descarta", () => {
+    expect(campaignFields(new URLSearchParams("q=1"))).toEqual({});
+    expect(campaignFields(new URLSearchParams("utm_source=instantly&utm_campaign=juan@x.com"))).toEqual({ campaign_source: "instantly" });
+  });
+});
+
+describe("visitas de navegadores reales (owners_landing_view)", () => {
+  const chrome = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+  it("cuenta un navegador", () => {
+    expect(isHumanPageView({ userAgent: chrome, purpose: null })).toBe(true);
+  });
+  it("no cuenta bots, escáneres de correo, clientes HTTP, prefetch ni peticiones sin user-agent", () => {
+    for (const ua of ["Googlebot/2.1", "Mozilla/5.0 (compatible; Microsoft Safe Links)", "curl/8.4.0", "python-requests/2.31", "Mimecast URL scanner", "HeadlessChrome/120"]) {
+      expect(isHumanPageView({ userAgent: ua, purpose: null }), ua).toBe(false);
+    }
+    expect(isHumanPageView({ userAgent: null, purpose: null })).toBe(false);
+    expect(isHumanPageView({ userAgent: chrome, purpose: "prefetch" })).toBe(false);
   });
 });

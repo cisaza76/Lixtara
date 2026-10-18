@@ -13,14 +13,14 @@ export const dictionaries = {
   en: {
     hero: {
       eyebrow: "Licensed Florida brokerage",
-      headlineBefore: "Your home, ",
-      headlineAccent: "your terms",
-      headlineAfter: ". Sell with confidence and control.",
+      headlineBefore: "Sell your Florida home. ",
+      headlineAccent: "Keep more of what you've earned.",
+      headlineAfter: "",
+      // {minFee} y {minPct}: el plan más bajo de pricing-tiers.ts (src/lib/pricing-from.ts).
       subheadline:
-        "Smart technology and licensed brokers guide every step, and more of your sale stays with you.",
-      ctaPrimary: "Start selling",
-      ctaSecondary: "Browse Florida listings",
-      ctaSecondaryNoListings: "Tell us what you're looking for",
+        "List on the MLS with a licensed brokerage and a team with {teamYears}+ years of experience. Plans from {minFee}, plus {minPct} only if your home sells.",
+      ctaPrimary: "See what you'd pay",
+      ctaSecondary: "Start my listing",
       licenseLabel: "FL License #{brokerageLicense}",
       verifyDbpr: "Verify on DBPR",
       opensNewTab: "(opens in a new tab)",
@@ -1243,6 +1243,40 @@ export const dictionaries = {
       },
       officeLabel: "Office",
     },
+    // Landing de propietarios (/owners): destino de los correos de Instantly. Sin enlace en
+    // el menú y con noindex. {contactEmail} sale de CONTACT_EMAIL (src/config/brokerage.ts).
+    ownersPage: {
+      metaTitle: "For Florida homeowners",
+      metaDescription: "A licensed Florida brokerage. A fraction of the commission.",
+      eyebrow: "For Florida homeowners",
+      titleBefore: "A licensed Florida brokerage. ",
+      titleAccent: "A fraction of the commission.",
+      titleAfter: "",
+      intro:
+        "{brokerName} and her team, {teamYears}+ years in Florida real estate, put your home on the MLS, Zillow, Realtor.com and Redfin. You pay a flat fee, plus a small commission only if it sells.",
+      ctaListing: "Start my listing",
+      ctaTalk: "Talk to our team",
+      whoEyebrow: "Who's writing to you",
+      whoTitle: "{brokerageName}, a licensed Florida brokerage",
+      whoBody: "{brokerName} and her team answer your email. These are our details, the same ones you can check on the Florida DBPR.",
+      faqEyebrow: "Questions",
+      faqTitle: "Common questions",
+      faq: [
+        {
+          q: "Why did I get this email?",
+          a: "Because public records show you own property in Florida, and Lixtara helps owners sell with a lower commission.",
+        },
+        {
+          q: "Where did you get my information?",
+          a: "From public records: the Florida Department of Revenue and, for companies, Sunbiz. We don't buy lists of personal data.",
+        },
+        {
+          q: "How do I stop receiving emails?",
+          a: "Use the \"unsubscribe\" link in any of our emails, or write to {contactEmail}. We'll remove you right away.",
+        },
+      ],
+      finalTitle: "Want to list your home?",
+    },
     aboutPage: {
       metaTitle: "About Lixtara",
       eyebrow: "About",
@@ -1928,14 +1962,13 @@ export const dictionaries = {
   es: {
     hero: {
       eyebrow: "Inmobiliaria licenciada en Florida",
-      headlineBefore: "Tu casa, ",
-      headlineAccent: "tus reglas",
-      headlineAfter: ". Vende con control y confianza.",
+      headlineBefore: "Vende tu casa en Florida. ",
+      headlineAccent: "Quédate con más de lo que ganaste.",
+      headlineAfter: "",
       subheadline:
-        "Tecnología inteligente y brokers licenciados te guían en cada paso, y más de tu venta se queda contigo.",
-      ctaPrimary: "Empieza a vender",
-      ctaSecondary: "Ver propiedades en Florida",
-      ctaSecondaryNoListings: "Cuéntanos qué buscas",
+        "Publica en el MLS con una inmobiliaria licenciada y un equipo con más de {teamYears} años de experiencia. Planes desde {minFee}, más {minPct} solo si tu casa se vende.",
+      ctaPrimary: "Calcula cuánto pagarías",
+      ctaSecondary: "Publicar mi casa",
       licenseLabel: "Licencia FL #{brokerageLicense}",
       verifyDbpr: "Verificar en DBPR",
       opensNewTab: "(se abre en una pestaña nueva)",
@@ -3157,6 +3190,38 @@ export const dictionaries = {
         send_failed: "No pudimos enviar tu mensaje. Intenta de nuevo o escríbenos por WhatsApp.",
       },
       officeLabel: "Oficina",
+    },
+    ownersPage: {
+      metaTitle: "Para propietarios en Florida",
+      metaDescription: "Una inmobiliaria licenciada en Florida. Una fracción de la comisión.",
+      eyebrow: "Para propietarios en Florida",
+      titleBefore: "Una inmobiliaria licenciada en Florida. ",
+      titleAccent: "Una fracción de la comisión.",
+      titleAfter: "",
+      intro:
+        "{brokerName} y su equipo, con más de {teamYears} años en el mercado inmobiliario de Florida, ponen tu casa en el MLS, Zillow, Realtor.com y Redfin. Pagas una tarifa fija, más una comisión baja solo si se vende.",
+      ctaListing: "Publicar mi casa",
+      ctaTalk: "Hablar con nuestro equipo",
+      whoEyebrow: "Quién te escribe",
+      whoTitle: "{brokerageName}, una inmobiliaria licenciada en Florida",
+      whoBody: "{brokerName} y su equipo responden tu correo. Estos son nuestros datos, los mismos que puedes verificar en el DBPR de Florida.",
+      faqEyebrow: "Preguntas",
+      faqTitle: "Preguntas frecuentes",
+      faq: [
+        {
+          q: "¿Por qué recibí este correo?",
+          a: "Porque eres propietario de un inmueble en Florida según registros públicos, y Lixtara ayuda a propietarios a vender con menos comisión.",
+        },
+        {
+          q: "¿De dónde sacaron mis datos?",
+          a: "De registros públicos del Departamento de Ingresos de Florida y, para empresas, de Sunbiz. No compramos listas de datos personales.",
+        },
+        {
+          q: "¿Cómo dejo de recibir correos?",
+          a: "Con el enlace \"unsubscribe\" de cualquier correo, o escribiendo a {contactEmail}. Te quitamos de inmediato.",
+        },
+      ],
+      finalTitle: "¿Quieres publicar tu casa?",
     },
     aboutPage: {
       metaTitle: "Sobre Lixtara",

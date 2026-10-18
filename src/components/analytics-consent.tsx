@@ -30,6 +30,7 @@ import {
   type ConsentChoice,
 } from "@/lib/analytics-config";
 import { disableAnalytics, enableAnalytics, markPageview } from "@/lib/analytics";
+import { campaignFields } from "@/lib/funnel-events";
 
 interface Props {
   lang: string;
@@ -212,17 +213,24 @@ let lastPosthogPath: string | null = null;
 function pageview(): void {
   const path = window.location.pathname;
   const page_location = sanitizeUrl(window.location.href);
+  const campaign = campaignFields(new URLSearchParams(window.location.search));
   if (gtmLoaded && lastGtmPath !== path) {
     lastGtmPath = path;
     const w = window as unknown as { dataLayer: unknown[] };
     w.dataLayer = w.dataLayer ?? [];
-    w.dataLayer.push({ event: "lx_page_view", page_location, page_path: path });
+    // UTM (p. ej. los correos de Instantly) como campos de campaña: la URL va sin parámetros.
+    w.dataLayer.push({ event: "lx_page_view", page_location, page_path: path, ...campaign });
   }
   // Los eventos de la página que esperaban este page_view salen ahora, después de él.
   markPageview(path);
   if (posthogInstance && lastPosthogPath !== path) {
     lastPosthogPath = path;
-    posthogInstance.capture("$pageview", { $current_url: page_location });
+    posthogInstance.capture("$pageview", {
+      $current_url: page_location,
+      ...(campaign.campaign_source ? { utm_source: campaign.campaign_source } : {}),
+      ...(campaign.campaign_medium ? { utm_medium: campaign.campaign_medium } : {}),
+      ...(campaign.campaign_name ? { utm_campaign: campaign.campaign_name } : {}),
+    });
   }
 }
 

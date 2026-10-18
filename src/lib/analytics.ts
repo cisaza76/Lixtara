@@ -36,7 +36,16 @@ export type ListingStepEvent = {
 
 export type PlanTier = "essentials" | "pro" | "concierge";
 /** Dónde está el botón que lleva al registro. */
-export type ListingCtaLocation = "header" | "hero" | "pricing" | "footer" | "plan_quiz" | "about";
+export type ListingCtaLocation =
+  | "header"
+  | "home_hero"
+  | "pricing"
+  | "footer"
+  | "plan_quiz"
+  | "about"
+  // Landing de propietarios (/owners, correos de Instantly): hero y CTA final.
+  | "owners_hero"
+  | "owners_footer";
 export type ListingResumeSource = "email_link" | "broker_link";
 
 export type ListingStepCompleteEvent = {
