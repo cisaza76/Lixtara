@@ -263,7 +263,9 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55">
             {copy.buyerCommissionLabel}
           </span>
-          <div className="grid grid-cols-5 gap-2">
+          {/* En móvil, los 4 porcentajes en una fila y "Personalizado" debajo, a todo el
+              ancho: con 5 columnas no cabe a 375 px y desborda la página. */}
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
             {[
               { value: "0", label: copy.buyerCompNone },
               ...BUYER_COMP_PRESET_PCTS.map((p) => ({ value: String(p), label: `${p}%` })),
@@ -275,6 +277,8 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
                 aria-pressed={choice === o.value}
                 onClick={() => choose({ choice: o.value })}
                 className={`px-2 py-3 text-sm font-medium tracking-wide transition-colors border-2 ${
+                  o.value === "custom" ? "col-span-4 sm:col-span-1" : ""
+                } ${
                   choice === o.value
                     ? "border-gold bg-gold/10 text-ink"
                     : "border-gold-soft bg-ivory text-ink/70 hover:border-gold/60"

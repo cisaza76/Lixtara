@@ -266,7 +266,12 @@ describe("landing de propietarios (/owners)", () => {
     expect(where.a).toMatch(lang === "en" ? /We don't buy lists of personal data/ : /No compramos listas de datos personales/);
     expect(stop.q).toBe(lang === "en" ? "How do I stop receiving emails?" : "¿Cómo dejo de recibir correos?");
     expect(stop.a).toContain("{contactEmail}");
-    expect(stop.a).toContain('"unsubscribe"');
+    // Enlace de baja: de inmediato. Por correo: hasta 10 días hábiles (plazo de CAN-SPAM).
+    expect(stop.a.replace("{contactEmail}", CONTACT_EMAIL)).toBe(
+      lang === "en"
+        ? `Use the unsubscribe link in any email and you're removed right away. If you email ${CONTACT_EMAIL} instead, we'll remove you within 10 business days.`
+        : `Usa el enlace ‘unsubscribe’ de cualquier correo y te quitamos de inmediato. Si prefieres escribir a ${CONTACT_EMAIL}, te quitamos en un máximo de 10 días hábiles.`,
+    );
     expect(JSON.stringify(dictionaries[lang].ownersPage)).not.toMatch(/@lixtara\.com/);
   });
 
@@ -310,6 +315,12 @@ describe("landing de propietarios (/owners)", () => {
     expect(ownersInstantlyUrl("https://lixtara.com", "en", "fl-owners-2026-10")).toBe(
       "https://lixtara.com/en/owners?utm_source=instantly&utm_medium=email&utm_campaign=fl-owners-2026-10",
     );
+  });
+
+  it("calculadora: a 375 px 'Personalizado' va en su propia fila (sin desborde)", () => {
+    const slider = read("src/components/savings-slider.tsx");
+    expect(slider).toContain('className="grid grid-cols-4 sm:grid-cols-5 gap-2"');
+    expect(slider).toContain('o.value === "custom" ? "col-span-4 sm:col-span-1" : ""');
   });
 
   it("cuenta visitas en funnel_events solo con el idioma, después de responder", () => {

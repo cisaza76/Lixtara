@@ -1272,7 +1272,7 @@ export const dictionaries = {
         },
         {
           q: "How do I stop receiving emails?",
-          a: "Use the \"unsubscribe\" link in any of our emails, or write to {contactEmail}. We'll remove you right away.",
+          a: "Use the unsubscribe link in any email and you're removed right away. If you email {contactEmail} instead, we'll remove you within 10 business days.",
         },
       ],
       finalTitle: "Want to list your home?",
@@ -3218,7 +3218,7 @@ export const dictionaries = {
         },
         {
           q: "¿Cómo dejo de recibir correos?",
-          a: "Con el enlace \"unsubscribe\" de cualquier correo, o escribiendo a {contactEmail}. Te quitamos de inmediato.",
+          a: "Usa el enlace ‘unsubscribe’ de cualquier correo y te quitamos de inmediato. Si prefieres escribir a {contactEmail}, te quitamos en un máximo de 10 días hábiles.",
         },
       ],
       finalTitle: "¿Quieres publicar tu casa?",
