@@ -31,8 +31,10 @@ Cada página muestra su versión y su fecha. El pie de página enlaza las siete 
    - **ES:** "…sujeto a lo que establezcan su acuerdo de listado firmado y su Anexo de Terminación Anticipada (Early Termination Addendum)."
    - **Nota:** se reemplazó la frase entera "subject to any obligations… commission obligations". El reemplazo literal habría dejado "subject to" dos veces seguidas.
 2. **Términos, final de §14 (Limitación de responsabilidad) y §15 (Indemnización).**
-   - **EN:** "This does not apply to fraud, gross negligence, willful misconduct, or duties that cannot be limited under Florida law."
-   - **ES:** "Esto no se aplica al fraude, la negligencia grave, la conducta dolosa ni a los deberes que no pueden limitarse conforme a la ley de Florida."
+   - **§14, EN:** "This does not apply to fraud, gross negligence, willful misconduct, or duties that cannot be limited under Florida law."
+   - **§14, ES:** "Esto no se aplica al fraude, la negligencia grave, la conducta dolosa ni a los deberes que no pueden limitarse conforme a la ley de Florida."
+   - **§15, EN** (corrección tras la revisión en preview, ver abajo): "You are not required to indemnify Lixtara for claims caused by Lixtara's own fraud, gross negligence or willful misconduct."
+   - **§15, ES:** "Usted no está obligado a indemnizar a Lixtara por reclamaciones causadas por el fraude, la negligencia grave o la conducta dolosa de la propia Lixtara."
 3. **Casilla de registro (`/sign-up` y paso 7).**
    - **EN:** "I agree to the Terms of Service, including the arbitration agreement in Section 17, and the Privacy Policy."
    - **ES:** "Acepto los Términos de servicio, incluido el acuerdo de arbitraje de la Sección 17, y la Política de privacidad."
@@ -63,6 +65,22 @@ Cada página muestra su versión y su fecha. El pie de página enlaza las siete 
 - **Cookies.**
   - "No usamos cookies de publicidad" se mantiene en el aviso y en todas las variantes de la política, mientras Clarity esté pausado.
   - La tabla de cookies necesarias lista las cookies reales del código, más la clave de almacenamiento local del aviso de cookies.
+
+## Correcciones tras la revisión del owner en preview (2026-10-18)
+
+1. **FAQ de `/owners`, "¿De dónde sacaron mis datos?" (EN y ES).**
+   - **Antes:** "From public records: the Florida Department of Revenue and, for companies, Sunbiz. We don't buy lists of personal data."
+   - **Ahora, EN:** "Names and mailing addresses come from public records (the Florida property tax roll and Sunbiz). Email addresses come from commercial data providers. We never sell your information."
+   - **Ahora, ES:** "Los nombres y direcciones vienen de registros públicos (el padrón del impuesto a la propiedad de Florida y Sunbiz). Los correos vienen de proveedores comerciales de datos. Nunca vendemos tu información."
+   - **Por qué:** la frase anterior contradecía la Privacidad §2.3: los correos sí vienen de proveedores comerciales.
+   - **Resto del repositorio:** ningún otro texto (sitio, Loui, correos, plantillas) dice que no compramos datos. Un test lo impide en todo el diccionario del sitio.
+2. **Términos §15 (Indemnización).** La frase final de excepción se reemplaza por "You are not required to indemnify Lixtara for claims caused by Lixtara's own fraud, gross negligence or willful misconduct." (ES con usted). La §14 conserva la suya. Las versiones siguen en 2026-10-18-v2, porque no se ha registrado ninguna aceptación de la v2.
+3. **`/en/sign-up` con un borrador en el navegador redirige a `/es/listing/new`.** No se pudo reproducir. Se probó con un build local de esta rama contra la base, con un usuario QA en sesión de listado y un borrador `is_test`, ambos borrados después. En los tres caminos la redirección conserva el idioma:
+   - abrir `/en/sign-up` directamente: `307` a `/en/listing/new?id=…&step=7`, `no-store`;
+   - abrir `/en/sign-in` directamente: también conserva el idioma;
+   - navegar desde `/en`.
+
+   En el código, todas las redirecciones de `/sign-up`, `/sign-in`, del borrador y del gate de correo usan el idioma de la URL. Faltan los pasos exactos para reproducirlo: en qué idioma se empezó el borrador, en qué paso estaba, y si se escribió la URL o se llegó por un enlace. Pendiente.
 
 ## Tabla de marcas [VERIFICAR]
 
@@ -134,7 +152,7 @@ Los Términos y la Privacidad publicados son la v1 del #210 con los cambios de e
 | B12 | Términos §8: atestación de titularidad | §7 y §11: el vendedor declara que tiene derecho a publicar; el flujo no pide documentos | Sí |
 | B13 | Términos §8: deber de revelación (Johnson v. Davis) | §4: "required disclosures of known material defects… under Florida law" | Sí |
 | B14 | Términos §15: exigibilidad del tope de responsabilidad | §14 con la frase del cambio 2 | Revisar |
-| B15 | Términos §16: alcance razonable de la indemnización | §15 (v1, más amplia que el borrador: incluye "your use of the Services" y disputas con terceros) con la frase del cambio 2 | **Sí: revisar el alcance** |
+| B15 | Términos §16: alcance razonable de la indemnización | §15 (v1, más amplia que el borrador: incluye "your use of the Services" y disputas con terceros); termina con "You are not required to indemnify Lixtara for claims caused by Lixtara's own fraud, gross negligence or willful misconduct." | **Sí: revisar el alcance** |
 | B16 | Términos §17: arbitraje (proveedor, reglas, opt-out) | §17 del owner: AAA Consumer Arbitration Rules, opt-out de 30 días por correo a legal@, sin arbitraje masivo | Revisar |
 | B17 | Privacidad §2.3: fuente de los correos de prospección | Texto del owner (cambio 4) | Revisar los contratos con los proveedores de datos |
 | B18 | Privacidad §2.4/§8: conservación de las pruebas de consentimiento | §7.1 (v1): cinco años después de que termine la relación | Sí: punto 1 del memo v1 (purga) |

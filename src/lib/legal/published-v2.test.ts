@@ -124,15 +124,23 @@ describe("los cinco cambios de la v2", () => {
     expect(es).not.toMatch(/plazo de publicación de 24 meses y cualquier obligación de comisión/);
   });
 
-  it("2. Términos §14 y §15 terminan con la excepción de fraude, negligencia grave y dolo", () => {
-    for (const n of [14, 15]) {
-      expect(section("en", n).body.at(-1), `§${n}`).toBe(
-        "This does not apply to fraud, gross negligence, willful misconduct, or duties that cannot be limited under Florida law.",
-      );
-      expect(section("es", n).body.at(-1), `§${n}`).toBe(
-        "Esto no se aplica al fraude, la negligencia grave, la conducta dolosa ni a los deberes que no pueden limitarse conforme a la ley de Florida.",
-      );
-    }
+  it("2. Términos §14 termina con la excepción de fraude, negligencia grave y dolo", () => {
+    expect(section("en", 14).body.at(-1)).toBe(
+      "This does not apply to fraud, gross negligence, willful misconduct, or duties that cannot be limited under Florida law.",
+    );
+    expect(section("es", 14).body.at(-1)).toBe(
+      "Esto no se aplica al fraude, la negligencia grave, la conducta dolosa ni a los deberes que no pueden limitarse conforme a la ley de Florida.",
+    );
+  });
+
+  it("2b. Términos §15: sin indemnizar a Lixtara por su propio fraude, negligencia grave o dolo (revisión en preview)", () => {
+    expect(section("en", 15).body.at(-1)).toBe(
+      "You are not required to indemnify Lixtara for claims caused by Lixtara's own fraud, gross negligence or willful misconduct.",
+    );
+    expect(section("es", 15).body.at(-1)).toBe(
+      "Usted no está obligado a indemnizar a Lixtara por reclamaciones causadas por el fraude, la negligencia grave o la conducta dolosa de la propia Lixtara.",
+    );
+    for (const lang of LANGS) expect(JSON.stringify(section(lang, 15))).not.toMatch(/This does not apply|Esto no se aplica/);
   });
 
   it("3. casilla de registro con el arbitraje de la §17 y enlaces (sign-up y paso 7 usan la misma)", () => {

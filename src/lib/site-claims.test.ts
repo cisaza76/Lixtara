@@ -325,8 +325,15 @@ describe("landing de propietarios (/owners)", () => {
     const [why, where, stop] = dictionaries[lang].ownersPage.faq;
     expect(why.q).toBe(lang === "en" ? "Why did I get this email?" : "¿Por qué recibí este correo?");
     expect(where.q).toBe(lang === "en" ? "Where did you get my information?" : "¿De dónde sacaron mis datos?");
-    expect(where.a).toMatch(/Sunbiz/);
-    expect(where.a).toMatch(lang === "en" ? /We don't buy lists of personal data/ : /No compramos listas de datos personales/);
+    // Fuentes reales (decisión del owner, 2026-10-18; igual que Privacidad §2.3): registros
+    // públicos para nombres y direcciones, proveedores comerciales para los correos.
+    expect(where.a).toBe(
+      lang === "en"
+        ? "Names and mailing addresses come from public records (the Florida property tax roll and Sunbiz). Email addresses come from commercial data providers. We never sell your information."
+        : "Los nombres y direcciones vienen de registros públicos (el padrón del impuesto a la propiedad de Florida y Sunbiz). Los correos vienen de proveedores comerciales de datos. Nunca vendemos tu información.",
+    );
+    // Ningún texto del sitio dice que no compramos datos.
+    expect(JSON.stringify(dictionaries[lang])).not.toMatch(/don.t buy|do not buy|never buy|no compramos|nunca compramos|listas de datos personales/i);
     expect(stop.q).toBe(lang === "en" ? "How do I stop receiving emails?" : "¿Cómo dejo de recibir correos?");
     expect(stop.a).toContain("{contactEmail}");
     // Enlace de baja: de inmediato. Por correo: hasta 10 días hábiles (plazo de CAN-SPAM).

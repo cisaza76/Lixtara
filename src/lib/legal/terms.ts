@@ -39,10 +39,16 @@ function withSectionIds(doc: LegalDoc): LegalDoc {
   };
 }
 
-/** Frase final de §14 y §15 (v2). */
+/** Frase final de §14, Limitación de responsabilidad (v2). */
 const NOT_LIMITED = {
   en: "This does not apply to fraud, gross negligence, willful misconduct, or duties that cannot be limited under Florida law.",
   es: "Esto no se aplica al fraude, la negligencia grave, la conducta dolosa ni a los deberes que no pueden limitarse conforme a la ley de Florida.",
+};
+
+/** Frase final de §15, Indemnización (v2, texto del owner). */
+const NO_INDEMNITY_FOR_OWN_FAULT = {
+  en: "You are not required to indemnify Lixtara for claims caused by Lixtara's own fraud, gross negligence or willful misconduct.",
+  es: "Usted no está obligado a indemnizar a Lixtara por reclamaciones causadas por el fraude, la negligencia grave o la conducta dolosa de la propia Lixtara.",
 };
 
 const terms: LegalContent = {
@@ -213,7 +219,7 @@ const terms: LegalContent = {
         body: [
           "You agree to indemnify, defend, and hold harmless Lixtara and its officers, directors, employees, agents, and licensors from and against any claims, demands, losses, liabilities, damages, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to: (a) your use of the Services; (b) your Listing Content; (c) your breach of these Terms or of any signed agreement; (d) your violation of any law or of the rights of any third party, including fair housing, intellectual property, or privacy rights; or (e) any transaction or dispute between you and a buyer, seller, agent, or other third party.",
           "We reserve the right, at our own expense, to assume the exclusive defense and control of any matter otherwise subject to indemnification by you, in which case you agree to cooperate with our defense of that claim.",
-          NOT_LIMITED.en,
+          NO_INDEMNITY_FOR_OWN_FAULT.en,
         ],
       },
       {
@@ -438,7 +444,7 @@ const terms: LegalContent = {
         body: [
           "Usted acepta indemnizar, defender y eximir de responsabilidad a Lixtara y a sus directivos, directores, empleados, agentes y licenciantes frente a cualquier reclamación, demanda, pérdida, responsabilidad, daño, costo y gasto (incluidos los honorarios razonables de abogados) que surja de o se relacione con: (a) su uso de los Servicios; (b) su Contenido de la Publicación; (c) su incumplimiento de estos Términos o de cualquier acuerdo firmado; (d) su violación de cualquier ley o de los derechos de cualquier tercero, incluidos los derechos de vivienda justa, propiedad intelectual o privacidad; o (e) cualquier transacción o disputa entre usted y un comprador, vendedor, agente u otro tercero.",
           "Nos reservamos el derecho, a nuestro propio cargo, de asumir la defensa y el control exclusivos de cualquier asunto que de otro modo esté sujeto a indemnización por su parte, en cuyo caso usted acepta cooperar con nuestra defensa de dicha reclamación.",
-          NOT_LIMITED.es,
+          NO_INDEMNITY_FOR_OWN_FAULT.es,
         ],
       },
       {
