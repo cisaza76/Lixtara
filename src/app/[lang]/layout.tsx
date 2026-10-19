@@ -21,6 +21,7 @@ import { RecordingGuard } from "@/components/recording-guard";
 import { analyticsConfig, consentTools } from "@/lib/analytics-config";
 import { LEGAL_DOCS, type LegalDocId } from "@/lib/legal/config";
 import { MobileMenu } from "@/components/mobile-menu";
+import { LanguageSwitchLink } from "@/components/language-switch-link";
 import { Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import "../globals.css";
 
@@ -174,14 +175,14 @@ export default async function RootLayout({
                 </span>
               )}
               <div className="flex items-center gap-4 border-l border-gold-soft pl-5">
-                <Link
-                  href={`/${altLang}`}
-                  aria-label={navCopy.switchLanguage}
+                <LanguageSwitchLink
+                  altLang={altLang}
+                  ariaLabel={navCopy.switchLanguage}
                   className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55 hover:text-gold transition-colors"
                 >
                   <Globe className="w-4 h-4" />
                   {langCode}
-                </Link>
+                </LanguageSwitchLink>
                 {signedIn ? (
                   <>
                     <Link

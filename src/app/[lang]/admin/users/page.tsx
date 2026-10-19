@@ -1,8 +1,9 @@
+import { assertStaffWithUser } from "@/lib/admin-auth";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createService } from "@/lib/supabase/service";
 
 interface UserRow {
   id: string;
@@ -24,15 +25,8 @@ const ROLE_BADGE: Record<string, string> = {
   seller: "border-gold-soft bg-ivory-strong/40 text-ink/70",
 };
 
-// Service client — the `users` table only allows own-record reads under RLS,
-// so listing/managing all users needs the service role. The page is already
-// gated to admin/broker by the admin layout.
-function serviceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) return null;
-  return createServiceClient(url, key, { auth: { persistSession: false } });
-}
+// The `users` table only allows own-record reads under RLS, so listing/managing all users
+// needs the service role (createService), after checking the role (assertStaffWithUser).
 
 export default async function AdminUsersPage({
   params,
@@ -49,7 +43,9 @@ export default async function AdminUsersPage({
     : "all";
   const q = (sp.q ?? "").trim();
 
-  const svc = serviceClient();
+  // public.users solo deja leer la fila propia: clave de servicio, tras comprobar el rol (#212).
+  await assertStaffWithUser(lang);
+  const svc = createService();
   let users: UserRow[] = [];
   if (svc) {
     let query = svc
@@ -90,8 +86,8 @@ export default async function AdminUsersPage({
       redirect(`/${lang}/admin/users?error=self_lockout`);
     }
 
-    const svc = serviceClient();
-    if (!svc) redirect(`/${lang}/admin/users?error=no_service`);
+    // Ya se comprobó arriba que es admin.
+    const svc = createService();
 
     await svc
       .from("users")

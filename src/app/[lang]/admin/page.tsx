@@ -9,6 +9,8 @@ import { parseMlsNumber } from "@/lib/listing-mls-number";
 import { checkBrokerCountersigned } from "@/lib/agreement-refresh";
 import { assertStaffWithUser } from "@/lib/admin-auth";
 import { fetchSellerContacts } from "@/lib/admin-sellers.server";
+import { fetchSubmittedAt } from "@/lib/admin-submitted.server";
+import { activityText } from "@/lib/admin-activity";
 import { shortListingId } from "@/lib/admin-sellers";
 import {
   ensureEnterMlsNumberTask,
@@ -71,7 +73,12 @@ export default async function AdminPage({
     )
     .eq("mls_status", "pending_approval")
     .order("updated_at", { ascending: true });
-  const pending = (pendingRows ?? []) as PendingListing[];
+  // "Enviado": cuándo entró en revisión (property_status_history), no la última edición.
+  // La cola va en orden de envío, el más antiguo primero.
+  const submittedAt = await fetchSubmittedAt(supabase, (pendingRows ?? []).map((p) => p.id as string));
+  const pending = ((pendingRows ?? []) as PendingListing[]).sort((a, b) =>
+    (submittedAt.get(a.id) ?? "9999").localeCompare(submittedAt.get(b.id) ?? "9999"),
+  );
 
   // Vendedor de cada listing: public.users solo deja leer la fila propia, así que se lee con
   // la clave de servicio tras comprobar el rol (la página carga en paralelo al guard del layout).
@@ -299,7 +306,7 @@ export default async function AdminPage({
                     className="flex items-baseline justify-between gap-4 text-sm border-b border-gold-soft/50 pb-2"
                   >
                     <span className="text-ink/80">
-                      {a.description ?? a.action_type}
+                      {activityText(a, copy.activity, lang)}
                     </span>
                     <span className="text-[10px] uppercase tracking-[0.18em] text-ink/45 whitespace-nowrap">
                       {new Date(a.created_at).toLocaleDateString(lang, {
@@ -368,7 +375,7 @@ export default async function AdminPage({
                     p.pricing_tier.slice(1)
                   : "—";
                 const seller = sellers.get(p.owner_id);
-                const submitted = p.updated_at ?? p.created_at;
+                const submitted = submittedAt.get(p.id) ?? null;
                 return (
                   <div
                     key={p.id}
@@ -444,11 +451,13 @@ export default async function AdminPage({
                           {copy.submittedLabel}
                         </p>
                         <p className="text-xs text-ink/70">
-                          {new Date(submitted).toLocaleDateString(lang, {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {submitted
+                            ? new Date(submitted).toLocaleDateString(lang, {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "—"}
                         </p>
                       </div>
                       <Link

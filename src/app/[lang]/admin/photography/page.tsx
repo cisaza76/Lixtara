@@ -1,10 +1,10 @@
-import { assertStaff } from "@/lib/admin-auth";
+import { assertStaff, assertStaffWithUser } from "@/lib/admin-auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createService } from "@/lib/supabase/service";
 
 interface OrderRow {
   id: string;
@@ -34,12 +34,6 @@ const SLOTS: Record<string, string> = {
   evening: "Evening (4 to 7)",
 };
 
-function serviceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) return null;
-  return createServiceClient(url, key, { auth: { persistSession: false } });
-}
 
 export default async function AdminPhotographyPage({
   params,
@@ -72,7 +66,9 @@ export default async function AdminPhotographyPage({
     string,
     { name: string; email: string | null; phone: string | null }
   >();
-  const svc = serviceClient();
+  // public.users solo deja leer la fila propia: clave de servicio, tras comprobar el rol (#212).
+  await assertStaffWithUser(lang);
+  const svc = createService();
   if (svc && sellerIds.length > 0) {
     const { data: us } = await svc
       .from("users")

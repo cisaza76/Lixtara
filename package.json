@@ -24,7 +24,8 @@
     "db-check:seller-leads-is-test": "bash scripts/db-checks/run-seller-leads-is-test.sh",
     "db-check:buyer-comp": "bash scripts/db-checks/run-buyer-comp.sh",
     "db-check:mls-published-at": "node scripts/db-checks/mls-published-at.mjs",
-    "mls:backfill-numbers": "tsx scripts/backfill-mls-numbers.ts"
+    "mls:backfill-numbers": "tsx scripts/backfill-mls-numbers.ts",
+    "cleanup:test-data": "tsx --env-file=.env.local scripts/cleanup/prelaunch-test-data.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.78",
