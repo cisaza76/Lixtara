@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createService } from "@/lib/supabase/service";
 import { SITE_URL } from "@/lib/config";
 import { sendListingEmailCode, sendListingResumeLink } from "@/lib/email";
+import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import {
   CODE_TTL_MINUTES,
   MAX_SENDS_PER_HOUR,
@@ -51,15 +52,44 @@ export async function emailTakenByAnotherUser(
 
 export type StartResult = "sent" | "limit" | "send_failed" | "not_configured";
 
+/**
+ * Límites del envío del código del paso 1, además de Turnstile (la sesión anónima del paso 1
+ * solo se crea con captcha) y del tope por sesión (MAX_SENDS_PER_HOUR, en la base). Un bot
+ * puede crear muchas sesiones; no muchos correos ni muchas IP: así no agota el tope de gasto
+ * de Resend. Los límites son por correo y por IP, nunca globales, para que un ataque no corte
+ * los registros reales. Upstash (src/lib/ratelimit.ts); sin Upstash, fail-open con log.
+ */
+export const EMAIL_CODE_LIMITS = [
+  { name: "listing:code-email-10m", by: "email", max: 3, window: "10 m" },
+  { name: "listing:code-email-1d", by: "email", max: 10, window: "1 d" },
+  { name: "listing:code-ip-10m", by: "ip", max: 10, window: "10 m" },
+  { name: "listing:code-ip-1d", by: "ip", max: 30, window: "1 d" },
+] as const;
+
+/** ¿Se puede enviar un código a `email` desde `ip`? Consume un intento de cada límite. */
+export async function emailCodeSendAllowed(email: string, ip: string): Promise<boolean> {
+  for (const l of EMAIL_CODE_LIMITS) {
+    const blocked = await enforceLimit(apiLimiter(l.name, l.max, l.window), l.by === "email" ? email : ip, {
+      label: "listing:email-code",
+      message: "rate_limited",
+    });
+    if (blocked) return false;
+  }
+  return true;
+}
+
 export async function startEmailChallenge(input: {
   userId: string;
   email: string;
   lang: Lang;
+  /** IP del cliente (primer valor de x-forwarded-for). */
+  ip: string;
 }): Promise<StartResult> {
   if (!pepper()) {
     console.error("listing email gate: EMAIL_CODE_PEPPER not configured");
     return "not_configured";
   }
+  if (!(await emailCodeSendAllowed(input.email.toLowerCase(), input.ip))) return "limit";
   const svc = createService();
 
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();

@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ListingCtaLink } from "@/components/listing-cta-link";
+import { LanguageSwitchLink } from "@/components/language-switch-link";
+import type { Locale } from "@/lib/i18n";
 import { Menu, X, Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 
 interface Props {
   lang: string;
-  altLang: string;
+  altLang: Locale;
   langCode: string;
   user: boolean;
   firstName: string | null;
@@ -96,13 +98,13 @@ export function MobileMenu({
             </nav>
 
             <div className="flex items-center gap-5 pt-3 mt-2 border-t border-gold-soft">
-              <Link
-                href={`/${altLang}`}
-                aria-label={switchLanguageLabel}
+              <LanguageSwitchLink
+                altLang={altLang}
+                ariaLabel={switchLanguageLabel}
                 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/55"
               >
                 <Globe className="w-4 h-4" /> {langCode}
-              </Link>
+              </LanguageSwitchLink>
               {user ? (
                 <>
                   <Link

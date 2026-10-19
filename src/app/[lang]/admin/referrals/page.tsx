@@ -1,10 +1,10 @@
-import { assertStaff } from "@/lib/admin-auth";
+import { assertStaff, assertStaffWithUser } from "@/lib/admin-auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createService } from "@/lib/supabase/service";
 
 interface Referral {
   id: string;
@@ -20,12 +20,6 @@ interface Referral {
 
 const STATUSES = ["all", "pending", "sent", "signed_up", "closed"] as const;
 
-function serviceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) return null;
-  return createServiceClient(url, key, { auth: { persistSession: false } });
-}
 
 export default async function AdminReferralsPage({
   params,
@@ -60,7 +54,9 @@ export default async function AdminReferralsPage({
     ),
   );
   const userName = new Map<string, string>();
-  const svc = serviceClient();
+  // public.users solo deja leer la fila propia: clave de servicio, tras comprobar el rol (#212).
+  await assertStaffWithUser(lang);
+  const svc = createService();
   if (svc && userIds.length > 0) {
     const { data: us } = await svc
       .from("users")

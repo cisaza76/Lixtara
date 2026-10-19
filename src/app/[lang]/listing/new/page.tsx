@@ -117,6 +117,12 @@ import { loadFirstIncompleteStep } from "@/lib/listing-completeness.server";
 const TOTAL_STEPS = 8;
 
 /** Paso 7: contraseña rechazada por Supabase (filtrada o débil) → clave de `aerror`. */
+/** IP del cliente para los límites de envío del código (primer valor de x-forwarded-for). */
+async function requestIp(): Promise<string> {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+}
+
 function passwordErrorKey(error: unknown): "leaked" | "rejected" | null {
   const r = passwordRejection(error);
   return r === "leaked" ? "leaked" : r === "weak" ? "rejected" : null;
@@ -635,7 +641,7 @@ export default async function ListingNewPage({
           : {};
       stepCompleted(lang, 1, propertyId, uid, firstTouch);
       if (!askEmail) redirect(`/${lang}/listing/new?id=${propertyId}&step=2&done=1`);
-      const sent = await startEmailChallenge({ userId: uid, email: gateEmail, lang: locale });
+      const sent = await startEmailChallenge({ userId: uid, email: gateEmail, lang: locale, ip: await requestIp() });
       const err = sent === "sent" ? "" : sent === "limit" ? "&gerror=limit" : "&gerror=send";
       redirect(`/${lang}/listing/new?step=1&id=${propertyId}&done=1${err}`);
     };
@@ -769,7 +775,7 @@ export default async function ListingNewPage({
     if (!user) redirect(`/${lang}/listing/continue`);
     const email = await pendingChallengeEmail(user.id);
     if (!email) redirect(`${back}&change=1`);
-    const sent = await startEmailChallenge({ userId: user.id, email, lang: locale });
+    const sent = await startEmailChallenge({ userId: user.id, email, lang: locale, ip: await requestIp() });
     if (sent === "limit") redirect(`${back}&gerror=limit`);
     if (sent !== "sent") redirect(`${back}&gerror=send`);
     redirect(`${back}&gresent=1`);

@@ -2,12 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { assertStaffWithUser } from "@/lib/admin-auth";
+import { fetchSellerContacts } from "@/lib/admin-sellers.server";
 
 interface TxRow {
   id: string;
   purchase_price: number | null;
   closing_date: string | null;
   status: string;
+  seller_id: string | null;
   buyer_id: string | null;
   properties: { address_street: string; address_city: string } | null;
 }
@@ -49,7 +52,7 @@ export default async function AdminTransactionsPage({
   let query = supabase
     .from("transactions")
     .select(
-      "id,purchase_price,closing_date,status,buyer_id,properties(address_street,address_city)",
+      "id,purchase_price,closing_date,status,seller_id,buyer_id,properties(address_street,address_city)",
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -57,30 +60,16 @@ export default async function AdminTransactionsPage({
   const { data } = await query;
   const txs = (data ?? []) as unknown as TxRow[];
 
-  // Buyer names.
-  const buyerIds = Array.from(
-    new Set(txs.map((t) => t.buyer_id).filter(Boolean) as string[]),
+  // Vendedor y comprador: public.users solo deja leer la fila propia, así que con la sesión
+  // del admin salían "—". Se leen con la clave de servicio tras comprobar el rol (#212).
+  await assertStaffWithUser(lang);
+  const contacts = await fetchSellerContacts(
+    txs.flatMap((t) => [t.seller_id, t.buyer_id]).filter(Boolean) as string[],
   );
-  const buyerName = new Map<string, string>();
-  if (buyerIds.length > 0) {
-    const { data: buyers } = await supabase
-      .from("users")
-      .select("id,first_name,last_name,email")
-      .in("id", buyerIds);
-    for (const b of (buyers ?? []) as Array<{
-      id: string;
-      first_name: string | null;
-      last_name: string | null;
-      email: string | null;
-    }>) {
-      buyerName.set(
-        b.id,
-        [b.first_name, b.last_name].filter(Boolean).join(" ").trim() ||
-          b.email ||
-          b.id.slice(0, 8),
-      );
-    }
-  }
+  const contactLine = (id: string | null) => {
+    const c = id ? contacts.get(id) : undefined;
+    return c?.name ?? c?.email ?? "—";
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -114,6 +103,7 @@ export default async function AdminTransactionsPage({
             <thead>
               <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-ink/55 border-b border-gold-soft">
                 <th className="py-3 pr-4">Property</th>
+                <th className="py-3 pr-4">Seller</th>
                 <th className="py-3 pr-4">Buyer</th>
                 <th className="py-3 pr-4">Purchase price</th>
                 <th className="py-3 pr-4">Closing</th>
@@ -130,7 +120,10 @@ export default async function AdminTransactionsPage({
                       : "—"}
                   </td>
                   <td className="py-3 pr-4 text-ink/70">
-                    {t.buyer_id ? (buyerName.get(t.buyer_id) ?? "—") : "—"}
+                    {contactLine(t.seller_id)}
+                  </td>
+                  <td className="py-3 pr-4 text-ink/70">
+                    {contactLine(t.buyer_id)}
                   </td>
                   <td className="py-3 pr-4 font-display text-ink whitespace-nowrap">
                     {t.purchase_price
