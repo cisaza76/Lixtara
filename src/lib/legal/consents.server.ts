@@ -3,9 +3,18 @@ import { createService } from "@/lib/supabase/service";
 import type { PricingTierId } from "@/lib/pricing-tiers";
 import { CONSENTS, consentFullText, type ConsentDocument, type ConsentLang } from "./consents";
 
-/** SHA-256 (hex) del texto exacto que se mostró (con el precio del plan, si lo lleva). */
-export function consentTextHash(doc: ConsentDocument, lang: ConsentLang, tier?: PricingTierId | null): string {
-  return createHash("sha256").update(consentFullText(doc, lang, tier), "utf8").digest("hex");
+/**
+ * SHA-256 (hex) del texto exacto que se mostró (con el precio del plan, si lo lleva). Sin
+ * `version`, el de la versión vigente; con ella, el de una versión anterior (para comprobar
+ * una aceptación ya registrada).
+ */
+export function consentTextHash(
+  doc: ConsentDocument,
+  lang: ConsentLang,
+  tier?: PricingTierId | null,
+  version?: string,
+): string {
+  return createHash("sha256").update(consentFullText(doc, lang, tier, version), "utf8").digest("hex");
 }
 
 const IPV4 = /^(\d{1,3}\.){3}\d{1,3}$/;

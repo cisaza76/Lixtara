@@ -1,95 +1,107 @@
 import type { LegalContent } from "./types";
-import { BROKERAGE, LEGAL_EMAIL } from "@/config/brokerage";
 
+// Avisos Legales v2 (2026-10-18), publicados por decisión del owner sin revisión del abogado
+// todavía: docs/legal/2026-10-18-textos-v2-memo.md. Marcadores: src/lib/legal/config.ts.
+// Base de la sección "idx": los textos literales que muestra el sitio están en
+// src/lib/mls/display-compliance.ts (reliabilityDisclaimer y mlsCopyrightNotice).
 export const disclaimersDoc: LegalContent = {
   en: {
     title: "Disclaimers",
     intro: [
-      `These Disclaimers explain important limitations on the information, tools, and services that Lixtara (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), operated by ${BROKERAGE.legalName}, makes available through its website, applications, and related services (the \"Services\"). Lixtara is a real-estate platform based in Miami, Florida that combines for-sale-by-owner (FSBO) tools with licensed-broker support.`,
-      "Please read these Disclaimers carefully. They are part of, and should be read together with, our Terms of Service. By accessing or using the Services, you acknowledge that you have read and understood the limitations described below. If you do not agree with them, please do not use the Services.",
+      "These Disclaimers explain important limits on the information, tools and services that {legalName} (\"Lixtara,\" \"we,\" \"us\" or \"our\") makes available through lixtara.com and related services (the \"Services\"). Lixtara is a licensed Florida real estate brokerage that combines tools for owners selling their own homes with licensed-broker support.",
+      "These Disclaimers are part of, and should be read together with, our Terms of Service. By using the Services you acknowledge the limits described below.",
     ],
     sections: [
       {
-        heading: "1. General Disclaimer / No Professional Advice",
+        id: "no-advice",
+        heading: "1. No Legal, Tax or Financial Advice",
         body: [
-          "The information made available through the Services is provided for general informational purposes only. It is not, and should not be relied upon as, professional advice of any kind.",
-          "Lixtara is not a law firm, tax advisor, accountant, financial or investment advisor, lender, mortgage broker, appraiser, home inspector, surveyor, or title or escrow company, and nothing in the Services creates any such relationship. Lixtara does not provide legal, tax, financial, investment, or appraisal advice.",
-          "Real-estate transactions involve significant financial and legal consequences. You should obtain independent advice from your own qualified professionals before making any decision based on information you obtain through the Services.",
+          "Information on the Services is general information. It is not legal, tax, accounting, financial, investment, lending, appraisal, inspection or survey advice, and Lixtara is not a law firm, tax advisor, lender, appraiser, inspector, surveyor, or title or escrow company.",
+          "Real estate transactions have significant legal and financial consequences. Before making a decision, get independent advice from qualified professionals.",
         ],
         bullets: [
-          "Consult a licensed attorney for legal questions about contracts, disclosures, title, or your transaction.",
-          "Consult a qualified tax advisor or accountant about the tax consequences of buying or selling property.",
-          "Consult a licensed lender or financial professional about financing, affordability, and investment decisions.",
-          "Consult a licensed appraiser or home inspector to evaluate a property's value and condition.",
+          "An attorney, for contracts, disclosures, title and legal questions.",
+          "A tax advisor or accountant, for the tax consequences of a sale or purchase.",
+          "A lender or financial professional, for financing and affordability.",
+          "A licensed appraiser or home inspector, for a property's value and condition.",
         ],
       },
       {
-        heading: "2. Real Estate Disclaimer",
+        id: "no-guarantee",
+        heading: "2. No Guarantee of Sale, Price or Timing",
         body: [
-          "Lixtara provides tools and broker support that help owners list and sell their own homes. When you list a property, you do so as the seller in a for-sale-by-owner capacity, with the assistance of broker services made available through Lixtara under the terms of the listing agreement that you sign.",
-          "Lixtara does not guarantee that any property will sell, that it will sell at any particular price, or that it will sell within any particular timeframe. Real-estate outcomes depend on market conditions, pricing, property condition, buyer demand, financing availability, and many other factors that are outside Lixtara's control. Past results and general market information are not a promise of future results.",
-          `Lixtara holds an active Florida real-estate brokerage license (license number ${BROKERAGE.brokerageLicense}), with ${BROKERAGE.brokerName} as principal broker of record. The nature and scope of any brokerage relationship, including the duties owed to you, are defined solely by the written listing agreement you enter into, together with applicable Florida law.`,
-          "Any pricing suggestions, marketing recommendations, or strategy guidance provided through the Services are informational and do not guarantee any specific result.",
+          "{legalName} does not guarantee that a property will sell, that it will sell at any price, or that it will sell within any period. Results depend on the market, the price, the property's condition, buyer demand, financing and other factors outside our control. General market information and past results are not a promise of future results.",
+          "Pricing suggestions, marketing recommendations and strategy guidance are informational. The brokerage services you receive, and the duties we owe you, are those stated in the listing agreement you sign and in Florida law. See our Brokerage, Fair Housing & Fraud Notices for how brokerage relationships work in Florida.",
+          "{legalName} is a Real Estate Corporation licensed in Florida, FL #{brokerageLicense}; qualifying broker {brokerName}, FL #{brokerLicense}.",
         ],
       },
       {
-        heading: "3. Fair Housing / Equal Housing Opportunity",
+        id: "idx",
+        heading: "3. MLS and IDX Listing Information",
         body: [
-          "Lixtara supports and is committed to the principles of equal housing opportunity. We comply with, and require users of the Services to comply with, the federal Fair Housing Act and the Florida Fair Housing Act.",
-          "Listings, communications, and other content submitted through the Services must not express any preference, limitation, or discrimination, and users must not otherwise discriminate, on the basis of race, color, religion, sex, national origin, disability, familial status, or any other characteristic protected under applicable federal, state, or local law.",
-          "We reserve the right to remove any content that violates these principles or applicable fair-housing law and to take appropriate action with respect to the responsible user's account.",
+          "When the Services show listings from other brokerages, that information comes from the multiple listing service operated by MIAMI Association of REALTORS® (Southeast Florida MLS, \"SEFMLS\") through Internet Data Exchange (IDX). Wherever that content appears, it is shown with a notice that the MLS data is deemed reliable but is not guaranteed accurate by MIAMI REALTORS®, the SEFMLS copyright notice for the current year, and the name of the brokerage that holds each listing.",
+          "IDX information is provided exclusively for consumers' personal, non-commercial use, solely to identify properties that consumers may be interested in purchasing. Any other use, including copying, redistributing or using it to build a database, is prohibited and may violate federal and state law. Listing information, including square footage, lot size, school assignments and prices, may be inaccurate, incomplete or out of date; verify every fact independently.",
+          "Properties may have been sold, withdrawn or changed since the data was last updated.",
         ],
       },
       {
-        heading: "4. AI-Generated Content Disclaimer",
+        id: "valuations",
+        heading: "4. Price Estimates and Comparable Sales",
         body: [
-          "The Services include features that produce AI-generated imagery and video, including \"AI virtual staging\" and the \"Living Listing\" AI motion video. These features are artificially generated and are intended to be illustrative only.",
-          "AI-generated content is clearly labeled within the Services. It does not depict the actual current condition, furnishings, fixtures, or features of any property. Furnishings, finishes, lighting, and other elements shown in AI-generated imagery or video may not exist at the property and may differ materially from reality.",
-          "AI-generated content must not be relied upon as a representation, warranty, or accurate depiction of a property's true condition. Original, unedited photographs of the property are available on request. Buyers and other viewers should review the original photos, inspect the property in person, and conduct their own due diligence before making any decision.",
+          "Price ranges, value estimates and comparable sales shown on the Services are produced automatically with data from Rentcast and our own calculations. They are estimates for general information only.",
+          "They are not an appraisal, a broker price opinion (BPO), a comparative market analysis prepared by a licensee for a specific transaction, or a guarantee of value. They may be inaccurate, incomplete or out of date and may not reflect the property's condition, improvements or current market. Do not rely on them to set a price, obtain financing or make an investment decision without independent verification.",
         ],
       },
       {
-        heading: "5. Property Data, Valuations & Tax Estimates",
+        id: "public-records",
+        heading: "5. Public Records and Autofill",
         body: [
-          "The Services may display property characteristics, price and value estimates, and tax estimates that are drawn from third-party data sources and automated calculations. Price and value estimates are generated using Rentcast. Property characteristics and certain records are drawn from the Miami-Dade County Property Appraiser public records, and tax figures are produced using an estimated millage calculation.",
-          "All such data and estimates are provided for informational purposes only. They may be inaccurate, incomplete, or out of date, and they are not appraisals, professional valuations, or guarantees of value, taxes, or any other figure.",
-          "You should not rely on this information when making a purchase, sale, financing, or investment decision. Always verify property characteristics, values, taxes, and any other material facts independently through your own professionals and official sources.",
+          "When you enter an address, we may fill in property facts (bedrooms, bathrooms, square footage, lot size, year built, property type, folio, legal description and an estimated annual tax) from the public records of the Miami-Dade County Property Appraiser. Tax figures are an estimate based on the most recent taxable value and an average millage rate; the actual tax bill may differ.",
+          "Public records can be incomplete, outdated or wrong, and an address can match a different parcel (for example, another unit in the same building). You are responsible for reviewing and correcting every prefilled field before you publish or sign. The legal description and folio used in your listing agreement must match your deed and title records.",
         ],
       },
       {
-        heading: "6. The \"Loui\" AI Assistant",
+        id: "ai",
+        heading: "6. Artificial Intelligence",
         body: [
-          "The Services include \"Loui,\" an AI-powered assistant designed to provide general information and help you navigate the platform. Loui provides general information only and does not provide legal, tax, financial, real-estate, or other professional advice.",
-          "Loui's responses are generated automatically and may be inaccurate, incomplete, or out of date. Do not rely on Loui for any decision with legal or financial consequences. For advice specific to your situation, consult a qualified professional and refer to official sources and your signed agreements.",
+          "Loui, our AI assistant, answers automatically. Its answers are general information, not legal, tax, financial or real estate brokerage advice, and they may be wrong, incomplete or out of date. Loui is not a person and is not a licensed professional. Do not rely on Loui for a decision with legal or financial consequences; check with your broker, your own professionals, your signed agreements and official sources.",
+          "Listing descriptions improved with AI are suggestions. You must review them, make sure every statement is true and complete, and correct anything that is not before publishing; you remain responsible for the content of your listing.",
+          "Virtual staging and AI motion video (\"Living Listing\") are illustrative. They are labeled as such, do not show the property's actual condition, furnishings or features, and must not be relied upon as a representation of the property. Original, unedited photos are available on request; inspect the property in person before making any decision.",
         ],
       },
       {
-        heading: "7. Third-Party Information, Links & Services",
+        id: "fair-housing",
+        heading: "7. Fair Housing",
         body: [
-          "The Services may include information, content, tools, links, or integrations provided by third parties, including data providers, payment processors, electronic-signature providers, mapping services, and email providers. Lixtara does not control and is not responsible for the accuracy, completeness, availability, or practices of any third-party information or service.",
-          "Any reference to a third party, or any link to a third-party website or service, is provided for convenience only and does not constitute an endorsement. Your use of third-party services may be governed by those parties' own terms and privacy policies, and you are responsible for reviewing them.",
+          "{legalName} is an Equal Housing Opportunity brokerage. Listings and messages on the Services must not express any preference, limitation or discrimination prohibited by federal, state or local fair-housing laws, and we may remove any content that does. See our Brokerage, Fair Housing & Fraud Notices for details and how to report discrimination.",
         ],
       },
       {
-        heading: "8. \"As Is\" / No Warranty",
+        id: "third-parties",
+        heading: "8. Third-Party Information, Links and Services",
         body: [
-          "The Services and all information, content, and materials made available through them are provided on an \"as is\" and \"as available\" basis, without warranties of any kind, whether express, implied, or statutory.",
-          "To the fullest extent permitted by law, Lixtara disclaims all warranties, including any implied warranties of merchantability, fitness for a particular purpose, title, and non-infringement, and any warranty that the Services will be uninterrupted, secure, timely, error-free, or that any information will be accurate or reliable.",
+          "The Services include information, tools and links from third parties, such as data providers, payment processing, electronic signature, maps and email. We do not control, and are not responsible for, the accuracy, availability or practices of third-party information or services. A link or reference is not an endorsement, and your use of a third-party service is governed by its own terms and privacy policy.",
         ],
       },
       {
-        heading: "9. Limitation of Liability",
+        id: "as-is",
+        heading: "9. \"As Is\" and No Warranty",
         body: [
-          "To the maximum extent permitted by law, Lixtara and its affiliates, officers, employees, and agents will not be liable for any loss or damage arising out of or relating to your use of, or reliance on, the Services or any information provided through them.",
-          "These Disclaimers do not expand any liability and are subject to, and qualified by, the limitation-of-liability provisions set out in our Terms of Service. Please refer to the Terms of Service for the full terms governing liability.",
+          "The Services and the information on them are provided \"as is\" and \"as available,\" without warranties of any kind, express, implied or statutory, to the fullest extent permitted by law, including warranties of merchantability, fitness for a particular purpose, title, non-infringement, accuracy and uninterrupted or error-free operation.",
         ],
       },
       {
-        heading: "10. Contact Us",
+        id: "liability",
+        heading: "10. Limitation of Liability",
         body: [
-          "If you have questions about these Disclaimers, please contact us:",
-          `${BROKERAGE.legalName}, ${BROKERAGE.address}, United States`,
-          `Email: ${LEGAL_EMAIL}`,
+          "To the maximum extent permitted by law, {legalName} and its officers, employees and agents are not liable for loss or damage arising from your use of, or reliance on, the Services or the information on them. These Disclaimers do not expand any liability and are subject to the limitation-of-liability terms of our Terms of Service.",
+        ],
+      },
+      {
+        id: "contact",
+        heading: "11. Contact",
+        body: [
+          "Questions about these Disclaimers: {legalName}, {brokerageAddress}. Email: {legalEmail}.",
         ],
       },
     ],
@@ -97,91 +109,100 @@ export const disclaimersDoc: LegalContent = {
   es: {
     title: "Avisos Legales",
     intro: [
-      `Estos Avisos Legales explican limitaciones importantes sobre la informacion, las herramientas y los servicios que Lixtara (\"Lixtara\", \"nosotros\" o \"nuestro\"), operada por ${BROKERAGE.legalName}, pone a disposicion a traves de su sitio web, sus aplicaciones y los servicios relacionados (los \"Servicios\"). Lixtara es una plataforma inmobiliaria con sede en Miami, Florida, que combina herramientas de venta por el propietario (FSBO) con el apoyo de un corredor con licencia.`,
-      "Por favor, lea estos Avisos Legales con atencion. Forman parte de nuestros Terminos del Servicio y deben leerse junto con ellos. Al acceder o utilizar los Servicios, usted reconoce que ha leido y comprendido las limitaciones que se describen a continuacion. Si no esta de acuerdo con ellas, por favor no utilice los Servicios.",
+      "Estos Avisos Legales explican límites importantes de la información, las herramientas y los servicios que {legalName} (\"Lixtara\", \"nosotros\" o \"nuestro\") ofrece en lixtara.com y en los servicios relacionados (los \"Servicios\"). Lixtara es una correduría inmobiliaria con licencia en Florida que combina herramientas para que los propietarios vendan su propia vivienda con el respaldo de una corredora con licencia.",
+      "Estos Avisos Legales forman parte de nuestros Términos de Servicio y deben leerse junto con ellos. Al usar los Servicios, usted reconoce los límites que se describen a continuación.",
     ],
     sections: [
       {
-        heading: "1. Aviso General / No Constituye Asesoramiento Profesional",
+        id: "no-advice",
+        heading: "1. No Ofrecemos Asesoría Legal, Fiscal ni Financiera",
         body: [
-          "La informacion disponible a traves de los Servicios se proporciona unicamente con fines informativos generales. No constituye, ni debe considerarse como, asesoramiento profesional de ningun tipo.",
-          "Lixtara no es un bufete de abogados, asesor fiscal, contador, asesor financiero o de inversiones, prestamista, corredor hipotecario, tasador, inspector de viviendas, agrimensor, ni compania de titulos o de deposito en garantia (escrow), y nada en los Servicios crea ninguna de esas relaciones. Lixtara no brinda asesoramiento legal, fiscal, financiero, de inversiones ni de tasacion.",
-          "Las transacciones inmobiliarias conllevan consecuencias financieras y legales significativas. Usted debe obtener asesoramiento independiente de sus propios profesionales calificados antes de tomar cualquier decision basada en la informacion que obtenga a traves de los Servicios.",
+          "La información de los Servicios es información general. No es asesoría legal, fiscal, contable, financiera, de inversión, hipotecaria, de tasación, de inspección ni de agrimensura, y Lixtara no es un bufete de abogados, un asesor fiscal, un prestamista, un tasador, un inspector, un agrimensor ni una compañía de títulos o de depósito en garantía (escrow).",
+          "Las operaciones inmobiliarias tienen consecuencias legales y económicas importantes. Antes de tomar una decisión, consulte a profesionales calificados e independientes.",
         ],
         bullets: [
-          "Consulte a un abogado con licencia para preguntas legales sobre contratos, divulgaciones, titulo de propiedad o su transaccion.",
-          "Consulte a un asesor fiscal o contador calificado sobre las consecuencias fiscales de comprar o vender una propiedad.",
-          "Consulte a un prestamista con licencia o a un profesional financiero sobre financiamiento, capacidad de pago y decisiones de inversion.",
-          "Consulte a un tasador con licencia o a un inspector de viviendas para evaluar el valor y la condicion de una propiedad.",
+          "A un abogado, sobre contratos, divulgaciones, títulos y cuestiones legales.",
+          "A un asesor fiscal o contador, sobre las consecuencias tributarias de una venta o una compra.",
+          "A un prestamista o profesional financiero, sobre financiamiento y capacidad de pago.",
+          "A un tasador o inspector con licencia, sobre el valor y el estado de una propiedad.",
         ],
       },
       {
-        heading: "2. Aviso sobre Bienes Raices",
+        id: "no-guarantee",
+        heading: "2. No Garantizamos la Venta, el Precio ni los Plazos",
         body: [
-          "Lixtara ofrece herramientas y apoyo de corredor que ayudan a los propietarios a publicar y vender sus propias viviendas. Cuando usted publica una propiedad, lo hace como vendedor en calidad de venta por el propietario (FSBO), con la asistencia de los servicios de corretaje disponibles a traves de Lixtara conforme a los terminos del acuerdo de listado que usted firma.",
-          "Lixtara no garantiza que una propiedad se venda, que se venda a un precio determinado, ni que se venda dentro de un plazo determinado. Los resultados inmobiliarios dependen de las condiciones del mercado, el precio, la condicion de la propiedad, la demanda de los compradores, la disponibilidad de financiamiento y muchos otros factores que escapan al control de Lixtara. Los resultados pasados y la informacion general del mercado no constituyen una promesa de resultados futuros.",
-          `Lixtara posee una licencia activa de corretaje inmobiliario en Florida (numero de licencia ${BROKERAGE.brokerageLicense}), con ${BROKERAGE.brokerName} como corredora principal a cargo. La naturaleza y el alcance de cualquier relacion de corretaje, incluidos los deberes que se le deben a usted, se definen unicamente por el acuerdo de listado escrito que usted celebre, junto con la ley aplicable de Florida.`,
-          "Cualquier sugerencia de precio, recomendacion de mercadeo u orientacion estrategica proporcionada a traves de los Servicios es informativa y no garantiza ningun resultado especifico.",
+          "{legalName} no garantiza que una propiedad se venda, que se venda a un precio determinado ni que se venda dentro de un plazo determinado. El resultado depende del mercado, del precio, del estado de la propiedad, de la demanda, del financiamiento y de otros factores que no controlamos. La información general del mercado y los resultados anteriores no son una promesa de resultados futuros.",
+          "Las sugerencias de precio, las recomendaciones de promoción y las orientaciones de estrategia son informativas. Los servicios de corretaje que usted recibe, y los deberes que tenemos con usted, son los que establecen el contrato de listado que usted firma y la ley de Florida. En nuestros Avisos de Corretaje, Vivienda Justa y Fraude explicamos cómo funcionan las relaciones de corretaje en Florida.",
+          "{legalName} es una Real Estate Corporation con licencia en Florida, FL #{brokerageLicense}; corredora calificada: {brokerName}, FL #{brokerLicense}.",
         ],
       },
       {
-        heading: "3. Igualdad de Oportunidades de Vivienda (Fair Housing)",
+        id: "idx",
+        heading: "3. Información de Listados del MLS e IDX",
         body: [
-          "Lixtara apoya y se compromete con los principios de igualdad de oportunidades de vivienda. Cumplimos con, y exigimos a los usuarios de los Servicios que cumplan con, la Ley Federal de Vivienda Justa (Fair Housing Act) y la Ley de Vivienda Justa de Florida.",
-          "Los listados, las comunicaciones y demas contenido enviado a traves de los Servicios no deben expresar ninguna preferencia, limitacion o discriminacion, y los usuarios no deben discriminar de ningun otro modo por motivos de raza, color, religion, sexo, origen nacional, discapacidad, situacion familiar o cualquier otra caracteristica protegida por la ley federal, estatal o local aplicable.",
-          "Nos reservamos el derecho de eliminar cualquier contenido que infrinja estos principios o la ley de vivienda justa aplicable, y de tomar las medidas correspondientes respecto de la cuenta del usuario responsable.",
+          "Cuando los Servicios muestran listados de otras corredurías, esa información proviene del servicio de listados múltiples que opera MIAMI Association of REALTORS® (Southeast Florida MLS, \"SEFMLS\"), mediante el intercambio de datos por internet (IDX). Donde aparece ese contenido, se muestra con un aviso de que los datos del MLS se consideran confiables pero MIAMI REALTORS® no garantiza su exactitud, el aviso de derechos de autor de SEFMLS del año en curso y el nombre de la correduría titular de cada listado.",
+          "La información IDX se ofrece exclusivamente para el uso personal y no comercial de los consumidores, con el único fin de identificar propiedades que podrían interesarles comprar. Cualquier otro uso, incluido copiarla, redistribuirla o usarla para formar una base de datos, está prohibido y puede infringir leyes federales y estatales. La información de los listados, incluidos los pies cuadrados, el tamaño del lote, la asignación de escuelas y los precios, puede ser inexacta, incompleta o estar desactualizada; verifique cada dato por su cuenta.",
+          "Las propiedades pueden haberse vendido, retirado o modificado desde la última actualización de los datos.",
         ],
       },
       {
-        heading: "4. Aviso sobre Contenido Generado por Inteligencia Artificial",
+        id: "valuations",
+        heading: "4. Estimaciones de Precio y Ventas Comparables",
         body: [
-          "Los Servicios incluyen funciones que producen imagenes y videos generados por inteligencia artificial, entre ellos la \"ambientacion virtual con IA\" (AI virtual staging) y el video con movimiento generado por IA \"Living Listing\". Estas funciones son generadas artificialmente y tienen un caracter unicamente ilustrativo.",
-          "El contenido generado por IA esta claramente identificado dentro de los Servicios. No representa la condicion actual, el mobiliario, los accesorios ni las caracteristicas reales de ninguna propiedad. El mobiliario, los acabados, la iluminacion y otros elementos que aparecen en las imagenes o videos generados por IA pueden no existir en la propiedad y pueden diferir de manera importante de la realidad.",
-          "No debe confiarse en el contenido generado por IA como una representacion, garantia o reproduccion fiel de la condicion verdadera de una propiedad. Las fotografias originales y sin editar de la propiedad estan disponibles a solicitud. Los compradores y demas personas deben revisar las fotos originales, inspeccionar la propiedad en persona y realizar su propia diligencia debida antes de tomar cualquier decision.",
+          "Los rangos de precio, las estimaciones de valor y las ventas comparables que aparecen en los Servicios se generan de forma automática con datos de Rentcast y cálculos propios. Son estimaciones de carácter informativo.",
+          "No son una tasación, una opinión de precio de un corredor (BPO), un análisis comparativo de mercado preparado por un profesional con licencia para una operación concreta ni una garantía de valor. Pueden ser inexactas, estar incompletas o desactualizadas y no reflejar el estado de la propiedad, sus mejoras ni el mercado actual. No las use para fijar un precio, obtener financiamiento o tomar una decisión de inversión sin verificarlas por su cuenta.",
         ],
       },
       {
-        heading: "5. Datos de Propiedad, Valoraciones y Estimaciones de Impuestos",
+        id: "public-records",
+        heading: "5. Registros Públicos y Autocompletado",
         body: [
-          "Los Servicios pueden mostrar caracteristicas de la propiedad, estimaciones de precio y valor, y estimaciones de impuestos que provienen de fuentes de datos de terceros y de calculos automatizados. Las estimaciones de precio y valor se generan utilizando Rentcast. Las caracteristicas de la propiedad y ciertos registros provienen de los registros publicos del Tasador de Propiedades del Condado de Miami-Dade, y las cifras de impuestos se producen mediante un calculo estimado de la tasa de gravamen (millage).",
-          "Todos esos datos y estimaciones se proporcionan unicamente con fines informativos. Pueden ser inexactos, incompletos o estar desactualizados, y no constituyen tasaciones, valoraciones profesionales ni garantias de valor, impuestos o cualquier otra cifra.",
-          "Usted no debe confiar en esta informacion al tomar una decision de compra, venta, financiamiento o inversion. Verifique siempre de forma independiente las caracteristicas de la propiedad, los valores, los impuestos y cualquier otro hecho relevante a traves de sus propios profesionales y de fuentes oficiales.",
+          "Cuando usted ingresa una dirección, podemos completar datos de la propiedad (habitaciones, baños, pies cuadrados, tamaño del lote, año de construcción, tipo de propiedad, número de folio, descripción legal y un impuesto anual estimado) con los registros públicos del Tasador de Propiedades del Condado de Miami-Dade. El impuesto es una estimación basada en el último valor imponible y una tasa de millaje promedio; la factura real puede ser distinta.",
+          "Los registros públicos pueden estar incompletos, desactualizados o contener errores, y una dirección puede coincidir con otra parcela (por ejemplo, otra unidad del mismo edificio). Usted es responsable de revisar y corregir cada campo autocompletado antes de publicar o firmar. La descripción legal y el folio de su contrato de listado deben coincidir con su escritura y con los registros del título.",
         ],
       },
       {
-        heading: "6. El Asistente de IA \"Loui\"",
+        id: "ai",
+        heading: "6. Inteligencia Artificial",
         body: [
-          "Los Servicios incluyen a \"Loui\", un asistente impulsado por inteligencia artificial disenado para brindar informacion general y ayudarle a navegar por la plataforma. Loui proporciona unicamente informacion general y no brinda asesoramiento legal, fiscal, financiero, inmobiliario ni de ningun otro tipo profesional.",
-          "Las respuestas de Loui se generan de forma automatica y pueden ser inexactas, incompletas o estar desactualizadas. No confie en Loui para ninguna decision con consecuencias legales o financieras. Para obtener asesoramiento especifico para su situacion, consulte a un profesional calificado y remitase a las fuentes oficiales y a los acuerdos que usted haya firmado.",
+          "Loui, nuestro asistente de inteligencia artificial, responde de forma automática. Sus respuestas son información general, no asesoría legal, fiscal, financiera ni de corretaje inmobiliario, y pueden ser erróneas, incompletas o estar desactualizadas. Loui no es una persona ni un profesional con licencia. No tome decisiones con consecuencias legales o económicas basándose en Loui; consulte a su corredora, a sus propios profesionales, sus acuerdos firmados y las fuentes oficiales.",
+          "Las descripciones de listados mejoradas con inteligencia artificial son sugerencias. Usted debe revisarlas, asegurarse de que cada afirmación sea verdadera y completa y corregir lo que no lo sea antes de publicar; usted sigue siendo responsable del contenido de su listado.",
+          "La ambientación virtual (virtual staging) y el video con movimiento generado por inteligencia artificial (\"Living Listing\") son ilustrativos. Están identificados como tales, no muestran el estado, los muebles ni las características reales de la propiedad y no deben tomarse como una descripción de ella. Las fotos originales, sin editar, están disponibles a solicitud; visite la propiedad en persona antes de tomar cualquier decisión.",
         ],
       },
       {
-        heading: "7. Informacion, Enlaces y Servicios de Terceros",
+        id: "fair-housing",
+        heading: "7. Vivienda Justa",
         body: [
-          "Los Servicios pueden incluir informacion, contenido, herramientas, enlaces o integraciones proporcionados por terceros, entre ellos proveedores de datos, procesadores de pagos, proveedores de firma electronica, servicios de mapas y proveedores de correo electronico. Lixtara no controla ni es responsable de la exactitud, integridad, disponibilidad o practicas de ninguna informacion o servicio de terceros.",
-          "Cualquier referencia a un tercero, o cualquier enlace a un sitio web o servicio de terceros, se proporciona unicamente por conveniencia y no constituye un respaldo. Su uso de servicios de terceros puede estar regido por los propios terminos y politicas de privacidad de esas partes, y usted es responsable de revisarlos.",
+          "{legalName} es una correduría que ofrece igualdad de oportunidades en la vivienda. Los listados y mensajes de los Servicios no pueden expresar preferencias, limitaciones ni discriminación prohibidas por las leyes federales, estatales o locales de vivienda justa, y podemos retirar el contenido que lo haga. En nuestros Avisos de Corretaje, Vivienda Justa y Fraude encontrará más detalles y cómo denunciar una discriminación.",
         ],
       },
       {
-        heading: "8. \"Tal Cual\" / Sin Garantia",
+        id: "third-parties",
+        heading: "8. Información, Enlaces y Servicios de Terceros",
         body: [
-          "Los Servicios y toda la informacion, el contenido y los materiales disponibles a traves de ellos se proporcionan \"tal cual\" y \"segun disponibilidad\", sin garantias de ningun tipo, ya sean expresas, implicitas o legales.",
-          "En la maxima medida permitida por la ley, Lixtara renuncia a todas las garantias, incluidas las garantias implicitas de comerciabilidad, idoneidad para un proposito particular, titularidad y no infraccion, y a cualquier garantia de que los Servicios seran ininterrumpidos, seguros, oportunos o estaran libres de errores, o de que cualquier informacion sera exacta o confiable.",
+          "Los Servicios incluyen información, herramientas y enlaces de terceros, como proveedores de datos, procesamiento de pagos, firma electrónica, mapas y correo electrónico. No controlamos la exactitud, la disponibilidad ni las prácticas de la información o los servicios de terceros, ni somos responsables de ellas. Un enlace o una mención no implica respaldo, y el uso de un servicio de terceros se rige por sus propios términos y su política de privacidad.",
         ],
       },
       {
-        heading: "9. Limitacion de Responsabilidad",
+        id: "as-is",
+        heading: "9. \"Tal Cual\" y Sin Garantía",
         body: [
-          "En la maxima medida permitida por la ley, Lixtara y sus afiliadas, directivos, empleados y agentes no seran responsables de ninguna perdida o dano que surja de o se relacione con su uso de los Servicios, o con la confianza que usted deposite en ellos o en cualquier informacion proporcionada a traves de ellos.",
-          "Estos Avisos Legales no amplian ninguna responsabilidad y estan sujetos y limitados por las disposiciones de limitacion de responsabilidad establecidas en nuestros Terminos del Servicio. Por favor, remitase a los Terminos del Servicio para conocer los terminos completos que rigen la responsabilidad.",
+          "Los Servicios y la información que contienen se ofrecen \"tal cual\" y \"según disponibilidad\", sin garantías de ningún tipo, expresas, implícitas o legales, en la mayor medida que permita la ley, incluidas las garantías de comerciabilidad, idoneidad para un fin determinado, titularidad, no infracción, exactitud y funcionamiento ininterrumpido o sin errores.",
         ],
       },
       {
-        heading: "10. Contactenos",
+        id: "liability",
+        heading: "10. Limitación de Responsabilidad",
         body: [
-          "Si tiene preguntas sobre estos Avisos Legales, por favor contactenos:",
-          `${BROKERAGE.legalName}, ${BROKERAGE.address}, Estados Unidos`,
-          `Correo electronico: ${LEGAL_EMAIL}`,
+          "En la mayor medida que permita la ley, {legalName} y sus directivos, empleados y agentes no son responsables de las pérdidas o los daños que resulten del uso de los Servicios o de la confianza depositada en su información. Estos Avisos Legales no amplían ninguna responsabilidad y están sujetos a las cláusulas de limitación de responsabilidad de nuestros Términos de Servicio.",
+        ],
+      },
+      {
+        id: "contact",
+        heading: "11. Contacto",
+        body: [
+          "Consultas sobre estos Avisos Legales: {legalName}, {brokerageAddress}. Correo electrónico: {legalEmail}.",
         ],
       },
     ],

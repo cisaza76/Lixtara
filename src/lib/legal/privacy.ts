@@ -1,5 +1,10 @@
 import type { LegalContent } from "./types";
 import { BROKERAGE, PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
+import { PRIVACY_PROVIDERS, providerBullet } from "./providers";
+
+// Política de Privacidad v2 (2026-10-18), publicada por decisión del owner sin revisión del
+// abogado todavía: docs/legal/2026-10-18-textos-v2-memo.md. La lista de proveedores (§4.1)
+// sale de providers.ts, que providers.test.ts compara con el código.
 
 export const privacyDoc: LegalContent = {
   en: {
@@ -53,11 +58,12 @@ export const privacyDoc: LegalContent = {
           {
             heading: "2.3 Information We Receive from Third Parties",
             body: [
-              "We may receive information about a property or transaction from third parties to support the Service.",
+              "We may receive information about a property, a transaction, or a property owner from third parties to support the Service.",
             ],
             bullets: [
               "Public property records: property records obtained from the Miami-Dade County Property Appraiser to help describe and verify listings.",
               "Property value estimates: estimated property values and related data obtained from Rentcast.",
+              "Public records and data providers: names and mailing addresses of Florida property owners from the Florida property tax roll and Sunbiz, and email addresses from commercial data providers, used to tell owners about our services. You can unsubscribe at any time.",
             ],
           },
         ],
@@ -92,20 +98,7 @@ export const privacyDoc: LegalContent = {
               "We share information with trusted service providers who process information on our behalf to deliver the Service. These providers are authorized to use your information only as necessary to provide services to us. They include:",
             ],
             bullets: [
-              "Supabase, for authentication, database hosting, and file storage.",
-              "Stripe, for payment processing.",
-              "DocuSign, for electronic signature of agreements.",
-              "Resend, for sending transactional email.",
-              "Mapbox and Google Maps, for maps and geocoding.",
-              "Rentcast, for property value estimates.",
-              "Miami-Dade County Property Appraiser, for public property records lookup.",
-              "Anthropic, the AI provider that powers the Loui AI assistant.",
-              "Luma, for AI image and video generation used in virtual staging and the Living Listing feature.",
-              "Upstash, for rate-limiting and abuse protection.",
-              "Cloudflare (Turnstile), for bot protection on sign-in, sign-up, password-reset, and listing forms.",
-              "Vercel, for hosting the Service.",
-              "Google LLC (Google Analytics), for usage analytics, only if you accept analytics cookies.",
-              "Microsoft (Clarity), for usage analytics and session recording, only if you accept analytics cookies (see Section 6.1).",
+              ...PRIVACY_PROVIDERS.map((p) => providerBullet(p, "en")),
             ],
           },
           {
@@ -144,7 +137,7 @@ export const privacyDoc: LegalContent = {
         heading: "5. AI Processing of Your Content",
         body: [
           "When you use our AI features, the text and images you submit are processed by our AI providers to generate responses and content. Specifically:",
-          "When you chat with the Loui AI assistant, your messages are sent to Anthropic to generate responses. When you use virtual staging or the Living Listing feature, the images and related inputs you submit are sent to Luma to generate staged images or video content.",
+          "When you chat with the Loui AI assistant, your messages are sent to Anthropic to generate responses. If you are a seller and ask Loui about offers on your listing, the details of those offers, which may include the buyer's name and notes, are also sent to Anthropic to answer you. When you use virtual staging or the Living Listing feature, the images and related inputs you submit are sent to Luma to generate staged images or video content.",
           "AI-generated outputs, including staged images and Living Listing media, are illustrative and intended to help visualize possibilities. They may not accurately reflect the actual condition, dimensions, or features of a property and should not be relied upon as a factual representation. Do not submit information through AI features that you do not wish to be processed for these purposes.",
         ],
       },
@@ -177,7 +170,7 @@ export const privacyDoc: LegalContent = {
         ],
         sub: [
           {
-            // Texto v1 (2026-10-18), PENDIENTE DE APROBACIÓN LEGAL. Registro: terms_acceptances.
+            // Desde la v1 (2026-10-18). Registro: terms_acceptances.
             heading: "7.1 Proof of Consent",
             body: [
               "When you accept a legal text on the Service (for example, the refund acknowledgment before you pay for a plan, or the consent to sign documents electronically), we record the date and time, your IP address, your browser's user agent, and the version of the text you accepted.",
@@ -205,7 +198,7 @@ export const privacyDoc: LegalContent = {
           {
             heading: "9.1 California Residents",
             body: [
-              "If you are a California resident, the California Consumer Privacy Act (CCPA), as amended by the California Privacy Rights Act (CPRA), provides you with certain rights regarding your personal information. These include the right to know what personal information we collect, use, and disclose; the right to request deletion of your personal information; the right to correct inaccurate personal information; the right to opt out of the sale or sharing of personal information; and the right not to be discriminated against for exercising your rights.",
+              "If you are a California resident, the California Consumer Privacy Act (CCPA), as amended by the California Privacy Rights Act (CPRA), may give you certain rights regarding your personal information, depending on whether that law applies to us. These may include the right to know what personal information we collect, use, and disclose; the right to request deletion of your personal information; the right to correct inaccurate personal information; the right to opt out of the sale or sharing of personal information; and the right not to be discriminated against for exercising your rights.",
               `As stated above, Lixtara does not sell your personal information for money and does not currently share personal information for cross-context behavioral advertising. To exercise your California rights, contact us at ${PRIVACY_EMAIL}.`,
             ],
           },
@@ -312,11 +305,12 @@ export const privacyDoc: LegalContent = {
           {
             heading: "2.3 Información que Recibimos de Terceros",
             body: [
-              "Podemos recibir información sobre una propiedad o transacción de terceros para apoyar el Servicio.",
+              "Podemos recibir de terceros información sobre una propiedad, una transacción o el propietario de un inmueble para apoyar el Servicio.",
             ],
             bullets: [
               "Registros públicos de propiedad: registros de propiedad obtenidos del Tasador de Propiedades del Condado de Miami-Dade (Miami-Dade County Property Appraiser) para ayudar a describir y verificar las publicaciones.",
               "Estimaciones de valor de la propiedad: valores estimados de propiedad y datos relacionados obtenidos de Rentcast.",
+              "Registros públicos y proveedores de datos: nombres y direcciones postales de propietarios de inmuebles en Florida, tomados del registro del impuesto a la propiedad de Florida (Florida property tax roll) y de Sunbiz, y direcciones de correo electrónico de proveedores comerciales de datos, que usamos para informar a los propietarios sobre nuestros servicios. Puede darse de baja en cualquier momento.",
             ],
           },
         ],
@@ -351,20 +345,7 @@ export const privacyDoc: LegalContent = {
               "Compartimos información con proveedores de servicios de confianza que procesan información en nuestro nombre para prestar el Servicio. Estos proveedores están autorizados a usar su información únicamente en la medida necesaria para prestarnos servicios. Incluyen:",
             ],
             bullets: [
-              "Supabase, para autenticación, alojamiento de la base de datos y almacenamiento de archivos.",
-              "Stripe, para el procesamiento de pagos.",
-              "DocuSign, para la firma electrónica de acuerdos.",
-              "Resend, para el envío de correo electrónico transaccional.",
-              "Mapbox y Google Maps, para mapas y geocodificación.",
-              "Rentcast, para estimaciones de valor de propiedades.",
-              "Tasador de Propiedades del Condado de Miami-Dade, para la consulta de registros públicos de propiedad.",
-              "Anthropic, el proveedor de IA que impulsa el asistente de IA Loui.",
-              "Luma, para la generación de imágenes y video con IA utilizada en la preparación virtual de espacios y la función Living Listing.",
-              "Upstash, para la limitación de tasa (rate-limiting) y la protección contra abusos.",
-              "Cloudflare (Turnstile), para la protección contra bots en los formularios de inicio de sesión, registro, restablecimiento de contraseña y listing.",
-              "Vercel, para el alojamiento del Servicio.",
-              "Google LLC (Google Analytics), para análisis de uso, solo si usted acepta las cookies de analítica.",
-              "Microsoft (Clarity), para análisis de uso y grabación de sesiones, solo si usted acepta las cookies de analítica (consulte la Sección 6.1).",
+              ...PRIVACY_PROVIDERS.map((p) => providerBullet(p, "es")),
             ],
           },
           {
@@ -403,7 +384,7 @@ export const privacyDoc: LegalContent = {
         heading: "5. Procesamiento de su Contenido por IA",
         body: [
           "Cuando utiliza nuestras funciones de IA, el texto y las imágenes que envía son procesados por nuestros proveedores de IA para generar respuestas y contenido. En concreto:",
-          "Cuando conversa con el asistente de IA Loui, sus mensajes se envían a Anthropic para generar respuestas. Cuando utiliza la preparación virtual de espacios o la función Living Listing, las imágenes y los datos relacionados que envía se transmiten a Luma para generar imágenes preparadas o contenido de video.",
+          "Cuando conversa con el asistente de IA Loui, sus mensajes se envían a Anthropic para generar respuestas. Si usted es vendedor y le pregunta a Loui por las ofertas de su listado, los datos de esas ofertas, que pueden incluir el nombre y las notas del comprador, también se envían a Anthropic para responderle. Cuando utiliza la preparación virtual de espacios o la función Living Listing, las imágenes y los datos relacionados que envía se transmiten a Luma para generar imágenes preparadas o contenido de video.",
           "Los resultados generados por IA, incluidas las imágenes preparadas y el contenido de Living Listing, son ilustrativos y están destinados a ayudar a visualizar posibilidades. Es posible que no reflejen con exactitud la condición, las dimensiones o las características reales de una propiedad y no deben considerarse como una representación fáctica. No envíe a través de las funciones de IA información que no desee que sea procesada para estos fines.",
         ],
       },
@@ -463,7 +444,7 @@ export const privacyDoc: LegalContent = {
           {
             heading: "9.1 Residentes de California",
             body: [
-              "Si usted es residente de California, la Ley de Privacidad del Consumidor de California (CCPA), en su versión modificada por la Ley de Derechos de Privacidad de California (CPRA), le otorga ciertos derechos sobre su información personal. Estos incluyen el derecho a saber qué información personal recopilamos, usamos y divulgamos; el derecho a solicitar la eliminación de su información personal; el derecho a corregir información personal inexacta; el derecho a oponerse a la venta o la compartición de información personal; y el derecho a no ser discriminado por ejercer sus derechos.",
+              "Si usted es residente de California, la Ley de Privacidad del Consumidor de California (CCPA), en su versión modificada por la Ley de Derechos de Privacidad de California (CPRA), puede otorgarle ciertos derechos sobre su información personal, según si esa ley nos aplica. Estos pueden incluir el derecho a saber qué información personal recopilamos, usamos y divulgamos; el derecho a solicitar la eliminación de su información personal; el derecho a corregir información personal inexacta; el derecho a oponerse a la venta o la compartición de información personal; y el derecho a no ser discriminado por ejercer sus derechos.",
               `Como se indicó anteriormente, Lixtara no vende su información personal por dinero y actualmente no comparte información personal para publicidad conductual de contexto cruzado. Para ejercer sus derechos en California, comuníquese con nosotros en ${PRIVACY_EMAIL}.`,
             ],
           },

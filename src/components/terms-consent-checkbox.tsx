@@ -1,16 +1,18 @@
 "use client";
 
-// Casilla obligatoria "Acepto los Términos de servicio y la Política de privacidad" al crear la
-// cuenta (/sign-up y registro del paso 7). Texto versionado de src/lib/legal/consents.ts
-// (`terms`); el servidor la exige (termsAcceptedIn) y registra la aceptación en
-// terms_acceptances.
+// Casilla obligatoria "Acepto los Términos de servicio, incluido el acuerdo de arbitraje de la
+// Sección 17, y la Política de privacidad" al crear la cuenta (/sign-up y registro del paso 7).
+// Texto versionado y enlaces de src/lib/legal/consents.ts (`terms`); el servidor la exige
+// (termsAcceptedIn) y registra la aceptación en terms_acceptances.
 //
 // Sin `required` del navegador: su burbuja sale en el idioma del navegador, no en el de la
 // página. Si falta la casilla, se detiene el envío y se muestra `requiredMessage` aquí mismo.
 // Sin JavaScript el formulario se envía y el servidor responde con el mismo aviso.
 import { useEffect, useRef, useState } from "react";
-import type { ConsentParts } from "@/lib/legal/consents";
-import { LEGAL_DOCS } from "@/lib/legal/config";
+import { CONSENTS, type ConsentParts } from "@/lib/legal/consents";
+
+/** Rutas de los enlaces de la casilla: /terms, /terms#section-17 y /privacy (LEGAL_DOCS). */
+const LINKS = CONSENTS.terms.links ?? [];
 
 export function TermsConsentCheckbox({
   lang,
@@ -59,14 +61,22 @@ export function TermsConsentCheckbox({
         <input type="hidden" name="terms_version" value={version} />
         <span>
           {parts.before}
-          <a href={`/${lang}${LEGAL_DOCS.terms.path}`} target="_blank" rel="noopener" className={link}>
-            {parts.link}
-          </a>
-          {parts.middle}
-          <a href={`/${lang}${LEGAL_DOCS.privacy.path}`} target="_blank" rel="noopener" className={link}>
-            {parts.link2}
-          </a>
-          {parts.after}
+          {[
+            [parts.link, LINKS[0]],
+            [parts.middle],
+            [parts.link2, LINKS[1]],
+            [parts.middle2],
+            [parts.link3, LINKS[2]],
+            [parts.after],
+          ].map(([text, path], i) =>
+            !text ? null : path ? (
+              <a key={i} href={`/${lang}${path}`} target="_blank" rel="noopener" className={link}>
+                {text}
+              </a>
+            ) : (
+              <span key={i}>{text}</span>
+            ),
+          )}
         </span>
       </label>
       {missing && (

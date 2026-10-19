@@ -1,6 +1,8 @@
-// Paquete para el abogado (textos legales v1, 2026-10-18): exporta a PDF, desde el MISMO código
-// que publica el sitio, los Términos y la Privacidad (EN), el aviso E-SIGN del paso 7 (EN y ES)
-// y una hoja con la casilla del checkout y la compensación al agente del comprador.
+// Paquete para el abogado (textos legales v2 publicados, 2026-10-18): exporta a PDF, desde el
+// MISMO código que publica el sitio, los Términos, la Privacidad, las Cookies, los Avisos
+// legales, los Avisos de corretaje y la Accesibilidad (EN), el aviso E-SIGN del paso 7 (EN y
+// ES) y una hoja con las casillas de registro y del checkout y la compensación al agente del
+// comprador. Memo: docs/legal/2026-10-18-textos-v2-memo.md.
 //
 //   pnpm legal:package            → docs/legal/paquete-abogado-2026-10/*.pdf
 //
@@ -11,8 +13,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { termsDoc } from "@/lib/legal/terms";
 import { privacyDoc } from "@/lib/legal/privacy";
+import { cookiesDocFor } from "@/lib/legal/cookies";
+import { disclaimersDoc } from "@/lib/legal/disclaimers";
+import { noticesDoc } from "@/lib/legal/notices";
+import { accessibilityDoc } from "@/lib/legal/accessibility";
 import type { LegalDoc, LegalSection } from "@/lib/legal/types";
-import { LEGAL_DOCS } from "@/lib/legal/config";
+import { LEGAL_DOCS, fillLegalDoc } from "@/lib/legal/config";
 import { CONSENTS, consentCheckbox, consentFullText, consentNotice } from "@/lib/legal/consents";
 import { buyerAgentComp, refundPolicy } from "@/config/legal-terms";
 import { legalServicesDisclosure } from "@/config/legalPartner";
@@ -27,7 +33,8 @@ const CHROME =
     process.env.HOME ?? "",
     "Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell",
   );
-const STATUS = "DRAFT v1 — PENDING LEGAL APPROVAL (pendiente de aprobación legal)";
+const STATUS =
+  "PUBLISHED v2 (2026-10-18) — published on lixtara.com by owner decision before attorney review; decisions made without counsel are listed in the memo (docs/legal/2026-10-18-textos-v2-memo.md)";
 const GENERATED = "2026-10-18";
 
 const esc = (s: string) =>
@@ -57,11 +64,17 @@ function section(s: LegalSection, level: number): string {
     `<${h}>${esc(s.heading)}</${h}>`,
     ...s.body.map((p) => `<p>${esc(p)}</p>`),
     s.bullets ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : "",
+    s.table
+      ? `<table><tr>${s.table.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>${s.table.rows
+          .map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`)
+          .join("")}</table>`
+      : "",
     ...(s.sub ?? []).map((x) => section(x, level + 1)),
   ].join("");
 }
 
-function legalDoc(doc: LegalDoc, meta: { version: string; updated: string }, extra = ""): string {
+function legalDoc(raw: LegalDoc, meta: { version: string; updated: string }, extra = ""): string {
+  const doc = fillLegalDoc(raw);
   return page(
     doc.title,
     `<h1>${esc(doc.title)}</h1><div class="meta">Last updated: ${meta.updated} · Version ${esc(meta.version)} · ${esc(
@@ -79,7 +92,7 @@ function esignNotice(): string {
     "E-SIGN notice — step 7",
     `<h1>E-SIGN notice and consent (listing flow, step 7)</h1><div class="meta">Version ${esc(
       CONSENTS.esign.version,
-    )} · shown before the seller opens DocuSign; the server requires the checkbox and records date, IP, user agent, version and SHA-256 of this exact text (terms_acceptances).</div>${block(
+    )} · shown before the seller opens DocuSign; the server requires the checkbox and records date, IP, user agent, version and SHA-256 of this exact text (terms_acceptances). v2 change: “at any time before signing” → “at any time”.</div>${block(
       "en",
       "English",
     )}${block("es", "Español (shown to Spanish-language users; informal “tú”, like the rest of the seller flow)")}`,
@@ -101,7 +114,7 @@ function onePager(): string {
       buyerAgentComp.version,
     )} · refund policy v${esc(refundPolicy.version)}.</div>
     <h2>0. Account creation (/sign-up and step 7)</h2>
-    <p>Required; without it the account is not created. Links to the Terms of Service and the Privacy Policy. Version ${esc(CONSENTS.terms.version)}.</p>
+    <p>Required; without it the account is not created. Links to the Terms of Service (/terms), the arbitration agreement (/terms#section-17) and the Privacy Policy (/privacy). Version ${esc(CONSENTS.terms.version)}; accounts created before 2026-10-18 v2 accepted the v1 text (“I agree to the Terms of Service and Privacy Policy.”).</p>
     <table><tr><th>English</th><th>Español</th></tr><tr><td>☐ ${esc(consentFullText("terms", "en"))}</td><td>☐ ${esc(consentFullText("terms", "es"))}</td></tr></table>
     <h2>1. Checkout checkbox (listing flow, step 8)</h2>
     <p>Required before “Pay with Stripe”. {fee} and {pct} come from the seller's plan; the exact text shown (with the plan's amounts) is what is hashed and recorded.</p>
@@ -130,6 +143,11 @@ function main() {
       ),
     ],
     ["privacy-policy-en.pdf", legalDoc(privacyDoc.en, LEGAL_DOCS.privacy)],
+    // La variante con GTM (GA4 + Clarity), la más completa: es la que se publica con analítica.
+    ["cookie-policy-en.pdf", legalDoc(cookiesDocFor("en", { gtm: true, posthog: false }), LEGAL_DOCS.cookies)],
+    ["disclaimers-en.pdf", legalDoc(disclaimersDoc.en, LEGAL_DOCS.disclaimers)],
+    ["brokerage-fair-housing-notices-en.pdf", legalDoc(noticesDoc.en, LEGAL_DOCS.notices)],
+    ["accessibility-statement-en.pdf", legalDoc(accessibilityDoc.en, LEGAL_DOCS.accessibility)],
     ["esign-notice-step7-en-es.pdf", esignNotice()],
     ["checkout-checkbox-and-compensation.pdf", onePager()],
   ];

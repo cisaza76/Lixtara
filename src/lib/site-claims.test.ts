@@ -5,7 +5,7 @@ import { dictionaryTexts, legalTermTexts, sentences, type Lang, type SiteText } 
 import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
 import { dictionaries } from "@/lib/i18n";
 import { BROKERAGE, CONTACT_EMAIL, DBPR_BROKER_LICENSE_URL, DBPR_BROKERAGE_LICENSE_URL, fillBrokerageCopy } from "@/config/brokerage";
-import { buyerAgentComp, refundPolicy, termsFaq } from "@/config/legal-terms";
+import { buyerAgentComp, refundPolicy, refundPolicyTerms, termsFaq } from "@/config/legal-terms";
 import { BUYER_COMP_MAX_PCT } from "@/lib/buyer-comp";
 import { PRICING_TIERS, TIER_ORDER, fillTierCopy, formatPrice } from "@/lib/pricing-tiers";
 import { fillFromPricing, minCommissionPct, minFlatFee } from "@/lib/pricing-from";
@@ -108,7 +108,14 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
 
   it("Términos §6: el reembolso es la política publicada, sin 'all fees are non-refundable'", () => {
     const body = termsDoc[lang].sections.flatMap((s) => s.body).join("\n");
-    expect(body).toContain(refundPolicy.text[lang]);
+    // Misma política v2; en español, con usted (registro de los Términos).
+    expect(body).toContain(refundPolicyTerms[lang]);
+    if (lang === "en") expect(refundPolicyTerms.en).toBe(refundPolicy.text.en);
+    else {
+      expect(refundPolicyTerms.es).not.toMatch(/\b(tú|tu|te|cancelas)\b/);
+      for (const k of [/se cobra se venda o no/, /no se reembolsa una vez/, /broker no aprueba/, /dos veces/, /error técnico/, /antes de la publicación/])
+        expect(refundPolicyTerms.es).toMatch(k);
+    }
     expect(body).not.toMatch(/all fees paid to Lixtara are non-refundable|todas las tarifas pagadas a Lixtara no son reembolsables/);
     expect(body).not.toMatch(/flat plan fee is non-refundable\.|tarifa fija del plan no es reembolsable\./);
   });
@@ -318,8 +325,15 @@ describe("landing de propietarios (/owners)", () => {
     const [why, where, stop] = dictionaries[lang].ownersPage.faq;
     expect(why.q).toBe(lang === "en" ? "Why did I get this email?" : "¿Por qué recibí este correo?");
     expect(where.q).toBe(lang === "en" ? "Where did you get my information?" : "¿De dónde sacaron mis datos?");
-    expect(where.a).toMatch(/Sunbiz/);
-    expect(where.a).toMatch(lang === "en" ? /We don't buy lists of personal data/ : /No compramos listas de datos personales/);
+    // Fuentes reales (decisión del owner, 2026-10-18; igual que Privacidad §2.3): registros
+    // públicos para nombres y direcciones, proveedores comerciales para los correos.
+    expect(where.a).toBe(
+      lang === "en"
+        ? "Names and mailing addresses come from public records (the Florida property tax roll and Sunbiz). Email addresses come from commercial data providers. We never sell your information."
+        : "Los nombres y direcciones vienen de registros públicos (el padrón del impuesto a la propiedad de Florida y Sunbiz). Los correos vienen de proveedores comerciales de datos. Nunca vendemos tu información.",
+    );
+    // Ningún texto del sitio dice que no compramos datos.
+    expect(JSON.stringify(dictionaries[lang])).not.toMatch(/don.t buy|do not buy|never buy|no compramos|nunca compramos|listas de datos personales/i);
     expect(stop.q).toBe(lang === "en" ? "How do I stop receiving emails?" : "¿Cómo dejo de recibir correos?");
     expect(stop.a).toContain("{contactEmail}");
     // Enlace de baja: de inmediato. Por correo: hasta 10 días hábiles (plazo de CAN-SPAM).

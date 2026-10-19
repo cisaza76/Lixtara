@@ -1,10 +1,57 @@
-import type { LegalContent } from "./types";
+import type { LegalContent, LegalDoc } from "./types";
 import { BROKERAGE, LEGAL_EMAIL, NOTICES_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
-import { buyerAgentComp, refundPolicy } from "@/config/legal-terms";
+import { buyerAgentComp, refundPolicyTerms } from "@/config/legal-terms";
+import { PRICING_TIERS, TIER_ORDER, formatPrice } from "@/lib/pricing-tiers";
+
+// Términos de Servicio v2 (2026-10-18), publicados por decisión del owner sin revisión del
+// abogado todavía: docs/legal/2026-10-18-textos-v2-memo.md. Precios, porcentajes, plazo,
+// licencias, nombre legal, dirección y correos salen de pricing-tiers.ts, brokerage.ts y
+// legal-terms.ts. Cada sección numerada tiene el ancla #section-N (la casilla de registro
+// enlaza a /terms#section-17).
 
 const B = BROKERAGE;
+const TERM_MONTHS = PRICING_TIERS.essentials.termMonths;
+const tierName = (id: (typeof TIER_ORDER)[number]) => id.charAt(0).toUpperCase() + id.slice(1);
+const joinTiers = (parts: string[], and: string) => `${parts.slice(0, -1).join("; ")}; ${and} ${parts[parts.length - 1]}`;
+const TIERS_EN = joinTiers(
+  TIER_ORDER.map(
+    (id) =>
+      `${tierName(id)}: ${formatPrice(PRICING_TIERS[id].flatFee)} flat fee plus a ${PRICING_TIERS[id].commissionPct}% seller-side commission on sale`,
+  ),
+  "and",
+);
+const TIERS_ES = joinTiers(
+  TIER_ORDER.map(
+    (id) =>
+      `${tierName(id)}: tarifa fija de ${formatPrice(PRICING_TIERS[id].flatFee)} más una comisión del lado del vendedor del ${PRICING_TIERS[id].commissionPct}% sobre la venta`,
+  ),
+  "y",
+);
 
-export const termsDoc: LegalContent = {
+/** Cada sección numerada ("17. …") recibe el ancla "section-17". */
+function withSectionIds(doc: LegalDoc): LegalDoc {
+  return {
+    ...doc,
+    sections: doc.sections.map((s) => {
+      const n = /^(\d+)\./.exec(s.heading)?.[1];
+      return n && !s.id ? { ...s, id: `section-${n}` } : s;
+    }),
+  };
+}
+
+/** Frase final de §14, Limitación de responsabilidad (v2). */
+const NOT_LIMITED = {
+  en: "This does not apply to fraud, gross negligence, willful misconduct, or duties that cannot be limited under Florida law.",
+  es: "Esto no se aplica al fraude, la negligencia grave, la conducta dolosa ni a los deberes que no pueden limitarse conforme a la ley de Florida.",
+};
+
+/** Frase final de §15, Indemnización (v2, texto del owner). */
+const NO_INDEMNITY_FOR_OWN_FAULT = {
+  en: "You are not required to indemnify Lixtara for claims caused by Lixtara's own fraud, gross negligence or willful misconduct.",
+  es: "Usted no está obligado a indemnizar a Lixtara por reclamaciones causadas por el fraude, la negligencia grave o la conducta dolosa de la propia Lixtara.",
+};
+
+const terms: LegalContent = {
   en: {
     title: "Terms of Service",
     intro: [
@@ -17,7 +64,7 @@ export const termsDoc: LegalContent = {
         body: [
           "By accessing or using the Services in any way, you acknowledge that you have read, understood, and agree to be bound by these Terms and by our Privacy Policy, which is incorporated by reference. These Terms form a binding agreement between you and Lixtara.",
           "If you use the Services on behalf of a company, trust, estate, or other legal entity, you represent that you have authority to bind that entity to these Terms, and \"you\" refers to both you individually and that entity.",
-          "We may publish additional terms, policies, or guidelines for specific features (for example, listing agreements, add-on services, or payment terms). If these Terms conflict with a listing agreement, buyer agreement, or any other brokerage agreement you sign with Lixtara LLC, that agreement controls.",
+          `We may publish additional terms, policies, or guidelines for specific features (for example, listing agreements, add-on services, or payment terms). If these Terms conflict with a listing agreement, buyer agreement, or any other brokerage agreement you sign with ${B.legalName}, that agreement controls.`,
         ],
       },
       {
@@ -76,10 +123,10 @@ export const termsDoc: LegalContent = {
       {
         heading: "6. Plans, Fees, Commissions, and Payments",
         body: [
-          "Lixtara offers three plans. Each plan consists of a flat, one-time fee plus a low seller-side commission that becomes payable only if and when your property sells. Each plan carries a listing term of 24 months.",
-          "The plan tiers are: Essentials: $199 flat fee plus a 0.5% seller-side commission on sale; Pro: $495 flat fee plus a 1% seller-side commission on sale; and Concierge: $995 flat fee plus a 1.5% seller-side commission on sale. The flat fee for each plan is one-time. The seller-side commission is owed only if the property sells. Buyer's agent compensation (Section 4.1) is separate from these amounts and is your decision; it can be 0%.",
-          // Política de reembolso publicada (FAQ, Loui, paso 8): una sola fuente en legal-terms.ts.
-          refundPolicy.text.en,
+          `Lixtara offers three plans. Each plan consists of a flat, one-time fee plus a low seller-side commission that becomes payable only if and when your property sells. Each plan carries a listing term of ${TERM_MONTHS} months.`,
+          `The plan tiers are: ${TIERS_EN}. The flat fee for each plan is one-time. The seller-side commission is owed only if the property sells. Buyer's agent compensation (Section 4.1) is separate from these amounts and is your decision; it can be 0%.`,
+          // Política de reembolso publicada (FAQ, Loui, paso 8): legal-terms.ts (con usted en ES).
+          refundPolicyTerms.en,
           "Optional add-ons, such as professional photography and AI virtual staging, may be available for an additional charge that will be disclosed to you before you purchase them. Add-on fees are non-refundable except where required by law.",
           "Payments are processed through our third-party payment processor, Stripe. By submitting payment information, you authorize us and Stripe to charge the applicable amounts. Lixtara does not store your full card number; payment card data is handled by Stripe under its terms. You are responsible for any taxes that apply to your purchase, other than taxes on Lixtara's net income.",
         ],
@@ -87,7 +134,7 @@ export const termsDoc: LegalContent = {
           {
             heading: "6.1 Listing Term",
             body: [
-              "Your listing term runs for 24 months from the start of your listing, unless terminated earlier in accordance with your signed listing agreement and these Terms. The seller-side commission for your plan applies to a qualifying sale of the property as set out in your listing agreement.",
+              `Your listing term runs for ${TERM_MONTHS} months from the start of your listing, unless terminated earlier in accordance with your signed listing agreement and these Terms. The seller-side commission for your plan applies to a qualifying sale of the property as set out in your listing agreement.`,
             ],
           },
         ],
@@ -164,6 +211,7 @@ export const termsDoc: LegalContent = {
           "TO THE FULLEST EXTENT PERMITTED BY LAW, LIXTARA AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, AND LICENSORS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR BUSINESS OPPORTUNITY, ARISING OUT OF OR RELATING TO YOUR USE OF, OR INABILITY TO USE, THE SERVICES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.",
           "TO THE FULLEST EXTENT PERMITTED BY LAW, THE TOTAL AGGREGATE LIABILITY OF LIXTARA ARISING OUT OF OR RELATING TO THE SERVICES AND THESE TERMS WILL NOT EXCEED THE GREATER OF (A) THE TOTAL AMOUNT OF FEES YOU PAID TO LIXTARA FOR THE SERVICES IN THE TWELVE MONTHS BEFORE THE EVENT GIVING RISE TO THE LIABILITY, OR (B) ONE HUNDRED U.S. DOLLARS ($100).",
           "These limitations apply regardless of the legal theory on which a claim is based and are an essential basis of the bargain between you and Lixtara. Some jurisdictions do not allow the limitation or exclusion of certain damages, so some of the above limitations may not apply to you.",
+          NOT_LIMITED.en,
         ],
       },
       {
@@ -171,22 +219,22 @@ export const termsDoc: LegalContent = {
         body: [
           "You agree to indemnify, defend, and hold harmless Lixtara and its officers, directors, employees, agents, and licensors from and against any claims, demands, losses, liabilities, damages, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to: (a) your use of the Services; (b) your Listing Content; (c) your breach of these Terms or of any signed agreement; (d) your violation of any law or of the rights of any third party, including fair housing, intellectual property, or privacy rights; or (e) any transaction or dispute between you and a buyer, seller, agent, or other third party.",
           "We reserve the right, at our own expense, to assume the exclusive defense and control of any matter otherwise subject to indemnification by you, in which case you agree to cooperate with our defense of that claim.",
+          NO_INDEMNITY_FOR_OWN_FAULT.en,
         ],
       },
       {
         heading: "16. Term and Termination",
         body: [
-          `These Terms apply while you use the Services. You may stop using the Services at any time. You may close your account by contacting us at ${SUPPORT_EMAIL}, subject to any obligations that survive under a signed listing agreement, including a 24-month listing term and any commission obligations.`,
+          `These Terms apply while you use the Services. You may stop using the Services at any time. You may close your account by contacting us at ${SUPPORT_EMAIL}, subject to your signed listing agreement and its Early Termination Addendum.`,
           "We may suspend or terminate your access to the Services, in whole or in part, at any time if we reasonably believe you have violated these Terms or applicable law, if needed to protect the Services or other users, or as otherwise permitted by law. Where reasonable and lawful, we will provide notice.",
           "Termination of your account does not by itself terminate a signed listing agreement, which is governed by its own terms. Sections of these Terms that by their nature should survive termination (including provisions on fees already incurred, intellectual property, disclaimers, limitation of liability, indemnification, dispute resolution, and governing law) will survive.",
         ],
       },
       {
-        // Texto v1 del owner (2026-10-18), PENDIENTE DE APROBACIÓN LEGAL. Sin arbitraje masivo
-        // por lotes. docs/legal/2026-10-18-textos-v1-memo.md.
+        // Texto del owner (v1, 2026-10-18). Sin arbitraje masivo por lotes.
         heading: "17. Dispute Resolution; Arbitration; Class Action Waiver",
         body: [
-          "(a) Except for Excluded Claims, you and Lixtara LLC agree that any dispute arising out of or relating to these Terms or your use of the Services will be resolved by binding individual arbitration administered by the American Arbitration Association under its Consumer Arbitration Rules. The Federal Arbitration Act governs this Section.",
+          `(a) Except for Excluded Claims, you and ${B.legalName} agree that any dispute arising out of or relating to these Terms or your use of the Services will be resolved by binding individual arbitration administered by the American Arbitration Association under its Consumer Arbitration Rules. The Federal Arbitration Act governs this Section.`,
           "(b) Excluded Claims: (i) individual claims within the jurisdiction of a small claims court; (ii) disputes arising under a listing agreement, buyer agreement or other brokerage agreement, which are governed by that agreement; (iii) complaints to the Florida Department of Business and Professional Regulation, the Florida Real Estate Commission or any other government agency.",
           "(c) Claims may be brought only in an individual capacity, not as a plaintiff or class member in any class, collective or representative proceeding.",
           `(d) You may opt out of this Section within thirty (30) days after you first accept these Terms by emailing ${LEGAL_EMAIL} with your name and a statement that you opt out of arbitration.`,
@@ -212,7 +260,7 @@ export const termsDoc: LegalContent = {
         heading: "20. Miscellaneous",
         body: [
           "Severability. If any provision of these Terms is held invalid or unenforceable, that provision will be limited or removed to the minimum extent necessary, and the remaining provisions will remain in full force and effect.",
-          "Entire Agreement. These Terms, together with the Privacy Policy and any agreements you sign through the Services, constitute the entire agreement between you and Lixtara regarding the Services and supersede any prior agreements on that subject. If these Terms conflict with an agreement you sign with Lixtara LLC, Section 1 explains which controls.",
+          `Entire Agreement. These Terms, together with the Privacy Policy and any agreements you sign through the Services, constitute the entire agreement between you and Lixtara regarding the Services and supersede any prior agreements on that subject. If these Terms conflict with an agreement you sign with ${B.legalName}, Section 1 explains which controls.`,
           "No Waiver. Our failure to enforce any provision of these Terms is not a waiver of that provision or of our right to enforce it later.",
           "Assignment. You may not assign or transfer these Terms without our prior written consent. We may assign these Terms in connection with a merger, acquisition, reorganization, or sale of assets, or by operation of law.",
           "Force Majeure. Lixtara is not liable for any delay or failure to perform caused by events beyond our reasonable control, including acts of God, natural disasters, severe weather, war, terrorism, civil unrest, labor disputes, governmental actions, utility or internet failures, or failures of third-party service providers.",
@@ -224,7 +272,7 @@ export const termsDoc: LegalContent = {
         body: [
           "If you have questions about these Terms or the Services, please contact us:",
           `${B.legalName}, ${B.address}, United States.`,
-          `Legal: ${LEGAL_EMAIL}. Formal notices to Lixtara LLC: ${NOTICES_EMAIL}. Support: ${SUPPORT_EMAIL}.`,
+          `Legal: ${LEGAL_EMAIL}. Formal notices to ${B.legalName}: ${NOTICES_EMAIL}. Support: ${SUPPORT_EMAIL}.`,
           `Licensed Florida real estate brokerage. Brokerage license number: ${B.brokerageLicense}. Principal broker of record: ${B.brokerName} (license ${B.brokerLicense}).`,
         ],
       },
@@ -242,7 +290,7 @@ export const termsDoc: LegalContent = {
         body: [
           "Al acceder o utilizar los Servicios de cualquier manera, usted reconoce que ha leído, comprendido y aceptado quedar obligado por estos Términos y por nuestra Política de Privacidad, que se incorpora por referencia. Estos Términos constituyen un acuerdo vinculante entre usted y Lixtara.",
           "Si utiliza los Servicios en nombre de una empresa, fideicomiso, sucesión u otra entidad legal, usted declara que tiene la autoridad para obligar a esa entidad a estos Términos, y \"usted\" se refiere tanto a usted como individuo como a esa entidad.",
-          "Podemos publicar términos, políticas o lineamientos adicionales para funciones específicas (por ejemplo, acuerdos de publicación, servicios adicionales o condiciones de pago). Si estos Términos entran en conflicto con un acuerdo de listado, un acuerdo con el comprador o cualquier otro acuerdo de correduría que usted firme con Lixtara LLC, prevalece ese acuerdo.",
+          `Podemos publicar términos, políticas o lineamientos adicionales para funciones específicas (por ejemplo, acuerdos de publicación, servicios adicionales o condiciones de pago). Si estos Términos entran en conflicto con un acuerdo de listado, un acuerdo con el comprador o cualquier otro acuerdo de correduría que usted firme con ${B.legalName}, prevalece ese acuerdo.`,
         ],
       },
       {
@@ -285,7 +333,7 @@ export const termsDoc: LegalContent = {
         sub: [
           {
             heading: "4.1 Compensación al Agente del Comprador",
-            // Mismo texto que la FAQ y Loui (con tú: el registro de los Términos queda para el #203).
+            // Mismo texto que la FAQ y Loui, con usted (policyTerms en legal-terms.ts).
             body: [buyerAgentComp.text.es.termsSummary],
           },
         ],
@@ -301,9 +349,9 @@ export const termsDoc: LegalContent = {
       {
         heading: "6. Planes, Tarifas, Comisiones y Pagos",
         body: [
-          "Lixtara ofrece tres planes. Cada plan consiste en una tarifa fija de pago único más una baja comisión del lado del vendedor que se vuelve pagadera únicamente si su propiedad se vende y cuando se venda. Cada plan tiene un plazo de publicación de 24 meses.",
-          "Los niveles de los planes son: Essentials: tarifa fija de $199 más una comisión del lado del vendedor del 0.5% sobre la venta; Pro: tarifa fija de $495 más una comisión del lado del vendedor del 1% sobre la venta; y Concierge: tarifa fija de $995 más una comisión del lado del vendedor del 1.5% sobre la venta. La tarifa fija de cada plan es de pago único. La comisión del lado del vendedor se adeuda únicamente si la propiedad se vende. La compensación al agente del comprador (Sección 4.1) es aparte de estos montos y es su decisión; puede ser 0%.",
-          refundPolicy.text.es,
+          `Lixtara ofrece tres planes. Cada plan consiste en una tarifa fija de pago único más una baja comisión del lado del vendedor que se vuelve pagadera únicamente si su propiedad se vende y cuando se venda. Cada plan tiene un plazo de publicación de ${TERM_MONTHS} meses.`,
+          `Los niveles de los planes son: ${TIERS_ES}. La tarifa fija de cada plan es de pago único. La comisión del lado del vendedor se adeuda únicamente si la propiedad se vende. La compensación al agente del comprador (Sección 4.1) es aparte de estos montos y es su decisión; puede ser 0%.`,
+          refundPolicyTerms.es,
           "Los servicios adicionales opcionales, como la fotografía profesional y el home staging virtual con IA, pueden estar disponibles por un cargo adicional que se le informará antes de que los compre. Las tarifas de los servicios adicionales no son reembolsables, salvo cuando la ley lo exija.",
           "Los pagos se procesan a través de nuestro procesador de pagos externo, Stripe. Al enviar información de pago, usted nos autoriza a nosotros y a Stripe a cobrar los montos correspondientes. Lixtara no almacena el número completo de su tarjeta; los datos de la tarjeta de pago son manejados por Stripe bajo sus propios términos. Usted es responsable de cualquier impuesto que aplique a su compra, salvo los impuestos sobre los ingresos netos de Lixtara.",
         ],
@@ -311,7 +359,7 @@ export const termsDoc: LegalContent = {
           {
             heading: "6.1 Plazo de Publicación",
             body: [
-              "Su plazo de publicación es de 24 meses a partir del inicio de su publicación, a menos que se cancele antes de conformidad con el acuerdo de publicación firmado y estos Términos. La comisión del lado del vendedor de su plan se aplica a una venta calificada de la propiedad según se establece en su acuerdo de publicación.",
+              `Su plazo de publicación es de ${TERM_MONTHS} meses a partir del inicio de su publicación, a menos que se cancele antes de conformidad con el acuerdo de publicación firmado y estos Términos. La comisión del lado del vendedor de su plan se aplica a una venta calificada de la propiedad según se establece en su acuerdo de publicación.`,
             ],
           },
         ],
@@ -388,6 +436,7 @@ export const termsDoc: LegalContent = {
           "EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY, LIXTARA Y SUS DIRECTIVOS, DIRECTORES, EMPLEADOS, AGENTES Y LICENCIANTES NO SERÁN RESPONSABLES DE NINGÚN DAÑO INDIRECTO, INCIDENTAL, ESPECIAL, CONSECUENTE, EJEMPLAR O PUNITIVO, NI DE NINGUNA PÉRDIDA DE GANANCIAS, INGRESOS, DATOS, REPUTACIÓN U OPORTUNIDAD DE NEGOCIO, QUE SURJA DE O SE RELACIONE CON SU USO DE, O INCAPACIDAD DE USAR, LOS SERVICIOS, INCLUSO SI SE LE HUBIERA ADVERTIDO DE LA POSIBILIDAD DE TALES DAÑOS.",
           "EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY, LA RESPONSABILIDAD TOTAL AGREGADA DE LIXTARA QUE SURJA DE O SE RELACIONE CON LOS SERVICIOS Y ESTOS TÉRMINOS NO EXCEDERÁ EL MAYOR DE (A) EL MONTO TOTAL DE LAS TARIFAS QUE USTED PAGÓ A LIXTARA POR LOS SERVICIOS EN LOS DOCE MESES ANTERIORES AL HECHO QUE DIO ORIGEN A LA RESPONSABILIDAD, O (B) CIEN DÓLARES ESTADOUNIDENSES ($100).",
           "Estas limitaciones se aplican independientemente de la teoría legal en la que se base una reclamación y constituyen una base esencial del acuerdo entre usted y Lixtara. Algunas jurisdicciones no permiten la limitación o exclusión de ciertos daños, por lo que algunas de las limitaciones anteriores pueden no aplicarse a usted.",
+          NOT_LIMITED.es,
         ],
       },
       {
@@ -395,21 +444,22 @@ export const termsDoc: LegalContent = {
         body: [
           "Usted acepta indemnizar, defender y eximir de responsabilidad a Lixtara y a sus directivos, directores, empleados, agentes y licenciantes frente a cualquier reclamación, demanda, pérdida, responsabilidad, daño, costo y gasto (incluidos los honorarios razonables de abogados) que surja de o se relacione con: (a) su uso de los Servicios; (b) su Contenido de la Publicación; (c) su incumplimiento de estos Términos o de cualquier acuerdo firmado; (d) su violación de cualquier ley o de los derechos de cualquier tercero, incluidos los derechos de vivienda justa, propiedad intelectual o privacidad; o (e) cualquier transacción o disputa entre usted y un comprador, vendedor, agente u otro tercero.",
           "Nos reservamos el derecho, a nuestro propio cargo, de asumir la defensa y el control exclusivos de cualquier asunto que de otro modo esté sujeto a indemnización por su parte, en cuyo caso usted acepta cooperar con nuestra defensa de dicha reclamación.",
+          NO_INDEMNITY_FOR_OWN_FAULT.es,
         ],
       },
       {
         heading: "16. Vigencia y Terminación",
         body: [
-          `Estos Términos se aplican mientras usted utilice los Servicios. Usted puede dejar de usar los Servicios en cualquier momento. Puede cerrar su cuenta comunicándose con nosotros a ${SUPPORT_EMAIL}, sujeto a cualquier obligación que subsista bajo un acuerdo de publicación firmado, incluido un plazo de publicación de 24 meses y cualquier obligación de comisión.`,
+          `Estos Términos se aplican mientras usted utilice los Servicios. Usted puede dejar de usar los Servicios en cualquier momento. Puede cerrar su cuenta comunicándose con nosotros a ${SUPPORT_EMAIL}, sujeto a lo que establezcan su acuerdo de listado firmado y su Anexo de Terminación Anticipada (Early Termination Addendum).`,
           "Podemos suspender o cancelar su acceso a los Servicios, en su totalidad o en parte, en cualquier momento si razonablemente creemos que ha violado estos Términos o la ley aplicable, si es necesario para proteger los Servicios u otros usuarios, o según lo permita la ley. Cuando sea razonable y lícito, le proporcionaremos aviso.",
           "La terminación de su cuenta no termina por sí misma un acuerdo de publicación firmado, el cual se rige por sus propios términos. Las secciones de estos Términos que por su naturaleza deban subsistir tras la terminación (incluidas las disposiciones sobre tarifas ya incurridas, propiedad intelectual, renuncias de garantías, limitación de responsabilidad, indemnización, resolución de disputas y ley aplicable) subsistirán.",
         ],
       },
       {
-        // Traducción con usted del texto v1 (2026-10-18), PENDIENTE DE APROBACIÓN LEGAL.
+        // Traducción con usted del texto del owner (v1, 2026-10-18).
         heading: "17. Resolución de Disputas; Arbitraje; Renuncia a Acciones Colectivas",
         body: [
-          "(a) Salvo las Reclamaciones Excluidas, usted y Lixtara LLC acuerdan que cualquier disputa que surja de estos Términos o del uso que usted haga de los Servicios, o que se relacione con ellos, se resolverá mediante arbitraje individual y vinculante administrado por la American Arbitration Association conforme a su Reglamento de Arbitraje de Consumo (Consumer Arbitration Rules). Esta Sección se rige por la Ley Federal de Arbitraje (Federal Arbitration Act).",
+          `(a) Salvo las Reclamaciones Excluidas, usted y ${B.legalName} acuerdan que cualquier disputa que surja de estos Términos o del uso que usted haga de los Servicios, o que se relacione con ellos, se resolverá mediante arbitraje individual y vinculante administrado por la American Arbitration Association conforme a su Reglamento de Arbitraje de Consumo (Consumer Arbitration Rules). Esta Sección se rige por la Ley Federal de Arbitraje (Federal Arbitration Act).`,
           "(b) Reclamaciones Excluidas: (i) las reclamaciones individuales que sean de competencia de un tribunal de reclamos menores (small claims court); (ii) las disputas que surjan de un acuerdo de listado, un acuerdo con el comprador u otro acuerdo de correduría, que se rigen por ese acuerdo; (iii) las quejas ante el Departamento de Negocios y Regulación Profesional de Florida (DBPR), la Comisión de Bienes Raíces de Florida (FREC) o cualquier otra agencia gubernamental.",
           "(c) Las reclamaciones solo pueden presentarse a título individual, y no como demandante o miembro de un grupo en ningún procedimiento colectivo, conjunto o representativo.",
           `(d) Usted puede excluirse de esta Sección dentro de los treinta (30) días siguientes a la fecha en que acepte por primera vez estos Términos, enviando un correo electrónico a ${LEGAL_EMAIL} con su nombre y una declaración de que se excluye del arbitraje.`,
@@ -435,7 +485,7 @@ export const termsDoc: LegalContent = {
         heading: "20. Disposiciones Varias",
         body: [
           "Divisibilidad. Si alguna disposición de estos Términos se considera inválida o inexigible, dicha disposición se limitará o eliminará en la medida mínima necesaria, y las disposiciones restantes permanecerán en pleno vigor y efecto.",
-          "Acuerdo Íntegro. Estos Términos, junto con la Política de Privacidad y cualquier acuerdo que usted firme a través de los Servicios, constituyen el acuerdo íntegro entre usted y Lixtara respecto de los Servicios y reemplazan cualquier acuerdo anterior sobre ese tema. Si estos Términos entran en conflicto con un acuerdo que usted firme con Lixtara LLC, la Sección 1 explica cuál prevalece.",
+          `Acuerdo Íntegro. Estos Términos, junto con la Política de Privacidad y cualquier acuerdo que usted firme a través de los Servicios, constituyen el acuerdo íntegro entre usted y Lixtara respecto de los Servicios y reemplazan cualquier acuerdo anterior sobre ese tema. Si estos Términos entran en conflicto con un acuerdo que usted firme con ${B.legalName}, la Sección 1 explica cuál prevalece.`,
           "No Renuncia. Nuestra falta de exigir el cumplimiento de cualquier disposición de estos Términos no constituye una renuncia a dicha disposición ni a nuestro derecho de exigir su cumplimiento posteriormente.",
           "Cesión. Usted no podrá ceder ni transferir estos Términos sin nuestro consentimiento previo por escrito. Nosotros podremos ceder estos Términos en relación con una fusión, adquisición, reorganización o venta de activos, o por ministerio de la ley.",
           "Fuerza Mayor. Lixtara no será responsable de ningún retraso o incumplimiento causado por hechos fuera de nuestro control razonable, incluidos casos fortuitos, desastres naturales, clima severo, guerra, terrorismo, disturbios civiles, conflictos laborales, acciones gubernamentales, fallas de servicios públicos o de internet, o fallas de proveedores de servicios de terceros.",
@@ -447,10 +497,12 @@ export const termsDoc: LegalContent = {
         body: [
           "Si tiene preguntas sobre estos Términos o los Servicios, comuníquese con nosotros:",
           `${B.legalName}, ${B.address}, Estados Unidos.`,
-          `Legal: ${LEGAL_EMAIL}. Notificaciones formales a Lixtara LLC: ${NOTICES_EMAIL}. Soporte: ${SUPPORT_EMAIL}.`,
+          `Legal: ${LEGAL_EMAIL}. Notificaciones formales a ${B.legalName}: ${NOTICES_EMAIL}. Soporte: ${SUPPORT_EMAIL}.`,
           `Correduría de bienes raíces licenciada en Florida. Número de licencia de correduría: ${B.brokerageLicense}. La broker a cargo: ${B.brokerName} (licencia ${B.brokerLicense}).`,
         ],
       },
     ],
   },
 };
+
+export const termsDoc: LegalContent = { en: withSectionIds(terms.en), es: withSectionIds(terms.es) };

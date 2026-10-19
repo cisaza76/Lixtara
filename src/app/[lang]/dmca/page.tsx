@@ -22,5 +22,5 @@ export default async function DmcaPage({
 }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  return <LegalDocument lang={lang as Locale} doc={dmcaDoc[lang as Locale]} />;
+  return <LegalDocument lang={lang as Locale} doc={dmcaDoc[lang as Locale]} docId="dmca" />;
 }

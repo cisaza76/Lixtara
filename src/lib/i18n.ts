@@ -1320,7 +1320,7 @@ export const dictionaries = {
         },
         {
           q: "Where did you get my information?",
-          a: "From public records: the Florida Department of Revenue and, for companies, Sunbiz. We don't buy lists of personal data.",
+          a: "Names and mailing addresses come from public records (the Florida property tax roll and Sunbiz). Email addresses come from commercial data providers. We never sell your information.",
         },
         {
           q: "How do I stop receiving emails?",
@@ -1401,13 +1401,17 @@ export const dictionaries = {
         cookies: "Cookies",
         disclaimers: "Disclaimers",
         dmca: "Copyright / DMCA",
+        notices: "Brokerage & Fair Housing notices",
+        accessibility: "Accessibility",
       },
       copyright: "All rights reserved.",
       equalHousing: "Equal Housing Opportunity",
+      licensedBrokerage: "Licensed Real Estate Brokerage",
     },
     legal: {
       backHome: "Back to home",
       lastUpdated: "Last updated",
+      version: "Version",
       englishControls:
         "This document is maintained in English. A Spanish translation is provided for convenience; if there is any conflict, the English-language version governs.",
     },
@@ -3317,7 +3321,7 @@ export const dictionaries = {
         },
         {
           q: "¿De dónde sacaron mis datos?",
-          a: "De registros públicos del Departamento de Ingresos de Florida y, para empresas, de Sunbiz. No compramos listas de datos personales.",
+          a: "Los nombres y direcciones vienen de registros públicos (el padrón del impuesto a la propiedad de Florida y Sunbiz). Los correos vienen de proveedores comerciales de datos. Nunca vendemos tu información.",
         },
         {
           q: "¿Cómo dejo de recibir correos?",
@@ -3398,13 +3402,17 @@ export const dictionaries = {
         cookies: "Cookies",
         disclaimers: "Avisos legales",
         dmca: "Derechos de autor / DMCA",
+        notices: "Avisos de corretaje y vivienda justa",
+        accessibility: "Accesibilidad",
       },
       copyright: "Todos los derechos reservados.",
       equalHousing: "Igualdad de oportunidades de vivienda",
+      licensedBrokerage: "Correduría inmobiliaria con licencia",
     },
     legal: {
       backHome: "Volver al inicio",
       lastUpdated: "Última actualización",
+      version: "Versión",
       englishControls:
         "Este documento se mantiene en inglés. La traducción al español se ofrece por conveniencia; en caso de cualquier conflicto, prevalece la versión en inglés.",
     },
