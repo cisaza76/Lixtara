@@ -72,9 +72,9 @@ describe("Clarity (2026-10-16): graba el embudo, nunca /account, sin datos del u
       expect(s4, lang).toContain("Google LLC (Google Analytics)");
       expect(s4, lang).toContain("Microsoft (Clarity)");
     }
-    // 2026-10-18: 7.1 prueba del consentimiento (textos legales v1); la 6.1 sigue igual.
+    // 2026-10-18: textos legales v2 (Privacidad §2.3 y §4.1, Cookies con tablas); la 6.1 sigue igual.
     expect(PRIVACY_LAST_UPDATED >= "2026-10-16").toBe(true);
-    expect(COOKIES_LAST_UPDATED).toBe("2026-10-16");
+    expect(COOKIES_LAST_UPDATED).toBe("2026-10-18");
     expect(LEGAL_LAST_UPDATED).toBe("2026-09-02");
   });
 });

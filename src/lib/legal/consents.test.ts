@@ -3,11 +3,11 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { CONSENTS, PUBLISHED_CONSENT_HASHES, consentCheckbox, consentFullText, consentNotice } from "./consents";
 import { consentTextHash } from "./consents.server";
-import { LEGAL_DOCS } from "./config";
+import { LEGAL_DOCS, fillLegalDoc } from "./config";
 import { termsDoc } from "./terms";
 import { privacyDoc } from "./privacy";
 import { disclaimersDoc } from "./disclaimers";
-import { refundPolicy, termsFaq } from "@/config/legal-terms";
+import { refundPolicy, refundPolicyTerms, termsFaq } from "@/config/legal-terms";
 import {
   BROKERAGE,
   CONTACT_EMAIL,
@@ -19,7 +19,8 @@ import {
 } from "@/config/brokerage";
 import { PRICING_TIERS, TIER_ORDER, formatPrice } from "@/lib/pricing-tiers";
 
-// Textos legales v1 (2026-10-18), pendientes de aprobación legal.
+// Textos legales v2 (2026-10-18), publicados por decisión del owner; la v1 se conserva para
+// reconstruir las aceptaciones registradas con ella.
 const ROOT = resolve(__dirname, "../../..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
@@ -48,7 +49,8 @@ describe("casilla del paso 8 (terms_refund)", () => {
       expect(r).toMatch(lang === "en" ? /non-refundable once your property is published on the MLS/ : /no se reembolsa una vez tu propiedad está publicada en el MLS/);
       expect(r).toMatch(lang === "en" ? /full refund/ : /Te devolvemos el total/);
       expect(r).toMatch(lang === "en" ? /cancel before it's published/ : /cancelas antes de la publicación/);
-      expect(termsDoc[lang].sections.find((s) => s.heading.startsWith("6."))?.body).toContain(r);
+      // Los Términos dicen lo mismo; en español, con usted (refundPolicyTerms).
+      expect(termsDoc[lang].sections.find((s) => s.heading.startsWith("6."))?.body).toContain(refundPolicyTerms[lang]);
       expect(termsFaq(lang).refund.a).toBe(r);
     }
     // La comisión solo si se vende: también en los Términos §6.
@@ -66,13 +68,35 @@ describe("casilla del paso 8 (terms_refund)", () => {
 });
 
 describe("aceptación de Términos y Privacidad al crear la cuenta (terms)", () => {
-  it("texto exacto y versión que nombra los dos documentos", () => {
-    expect(consentFullText("terms", "en")).toBe("I agree to the Terms of Service and Privacy Policy.");
-    expect(consentFullText("terms", "es")).toBe("Acepto los Términos de servicio y la Política de privacidad.");
+  it("texto exacto (v2, con el arbitraje de la §17) y versión que nombra los dos documentos", () => {
+    expect(consentFullText("terms", "en")).toBe(
+      "I agree to the Terms of Service, including the arbitration agreement in Section 17, and the Privacy Policy.",
+    );
+    expect(consentFullText("terms", "es")).toBe(
+      "Acepto los Términos de servicio, incluido el acuerdo de arbitraje de la Sección 17, y la Política de privacidad.",
+    );
     expect(CONSENTS.terms.version).toBe(`terms-${LEGAL_DOCS.terms.version}+privacy-${LEGAL_DOCS.privacy.version}`);
+    expect(CONSENTS.terms.version).toBe("terms-2026-10-18-v2+privacy-2026-10-18-v2");
     expect(CONSENTS.terms.version.length).toBeLessThanOrEqual(64); // check de la columna
     const parts = consentCheckbox("terms", "en");
-    expect([parts.link, parts.link2]).toEqual(["Terms of Service", "Privacy Policy"]);
+    expect([parts.link, parts.link2, parts.link3]).toEqual(["Terms of Service", "arbitration agreement in Section 17", "Privacy Policy"]);
+    expect(CONSENTS.terms.links).toEqual(["/terms", "/terms#section-17", "/privacy"]);
+    // La §17 existe con esa ancla, en EN y ES.
+    for (const lang of ["en", "es"] as const) {
+      const s17 = termsDoc[lang].sections.find((s) => s.id === "section-17");
+      expect(s17?.heading, lang).toMatch(/^17\. /);
+      expect(JSON.stringify(s17), lang).toMatch(/arbitra/i);
+    }
+  });
+
+  it("la v1 sigue reconstruyéndose (las cuentas creadas con ella conservan su prueba)", () => {
+    expect(consentFullText("terms", "en", null, "terms-2026-10-18-v1+privacy-2026-10-18-v1")).toBe(
+      "I agree to the Terms of Service and Privacy Policy.",
+    );
+    expect(consentFullText("terms", "es", null, "terms-2026-10-18-v1+privacy-2026-10-18-v1")).toBe(
+      "Acepto los Términos de servicio y la Política de privacidad.",
+    );
+    expect(() => consentFullText("terms", "en", null, "no-existe")).toThrow();
   });
 
   it("la migración admite el documento 'terms'", () => {
@@ -102,15 +126,15 @@ describe("aceptación de Términos y Privacidad al crear la cuenta (terms)", () 
     expect(read("src/components/account-gate.tsx")).toContain("<TermsConsentCheckbox");
   });
 
-  it("la casilla es obligatoria (mensaje propio, no la burbuja del navegador) y enlaza a /terms y /privacy", () => {
+  it("la casilla es obligatoria (mensaje propio, no la burbuja del navegador) y enlaza a /terms, /terms#section-17 y /privacy", () => {
     const box = read("src/components/terms-consent-checkbox.tsx");
     expect(box).toContain('name="accept_terms"');
     // Sin `required` nativo: el envío se detiene y se muestra requiredMessage en el idioma de la página.
     expect(box).not.toMatch(/^\s*required\s*$/m);
     expect(box).toContain("e.preventDefault()");
     expect(box).toContain("{requiredMessage}");
-    expect(box).toContain("LEGAL_DOCS.terms.path");
-    expect(box).toContain("LEGAL_DOCS.privacy.path");
+    expect(box).toContain("CONSENTS.terms.links");
+    for (const k of ["parts.link,", "parts.link2,", "parts.link3,"]) expect(box).toContain(k);
   });
 });
 
@@ -122,6 +146,14 @@ describe("aviso E-SIGN del paso 7", () => {
       expect(n.join(" ")).not.toMatch(/\{\w+\}/);
     }
     expect(consentCheckbox("esign", "en").before).toBe("I agree to receive and sign these documents electronically.");
+    // v2: el consentimiento se retira "en cualquier momento" (sin "antes de firmar").
+    expect(CONSENTS.esign.version).toBe("2026-10-18-v2");
+    expect(consentNotice("esign", "en")[2]).toBe(
+      "You can withdraw this consent at any time by writing to the same address; we'll then arrange paper signing, which may delay your listing. Withdrawing doesn't affect documents you already signed.",
+    );
+    expect(consentNotice("esign", "es")[2]).toMatch(/^Puedes retirar este consentimiento en cualquier momento escribiendo/);
+    for (const lang of ["en", "es"] as const) expect(consentNotice("esign", lang).join(" ")).not.toMatch(/before signing|antes de firmar/);
+    expect(consentNotice("esign", "en", "2026-10-18-v1")[2]).toContain("at any time before signing");
     // Paso del embudo: español con tú.
     expect(consentNotice("esign", "es").join(" ")).not.toMatch(/\busted\b|Firmará(?!s)|Puede pedir/);
     const route = read("src/app/api/agreement/create/route.ts");
@@ -130,14 +162,17 @@ describe("aviso E-SIGN del paso 7", () => {
 });
 
 describe("hashes de los textos publicados", () => {
-  it("cada versión registrable conserva su hash (un texto publicado no se edita)", () => {
+  it("cada versión registrada, vigente o anterior, se reconstruye con su hash (un texto publicado no se edita)", () => {
     for (const [key, byLang] of Object.entries(PUBLISHED_CONSENT_HASHES)) {
       const [docVer, tier] = key.split(":");
       const [doc, version] = docVer.split("@") as [keyof typeof CONSENTS, string];
-      if (CONSENTS[doc].version !== version) continue; // versión anterior: se conserva el hash
       for (const lang of ["en", "es"] as const) {
-        expect(consentTextHash(doc, lang, (tier as never) ?? null), `${key} ${lang}`).toBe(byLang[lang]);
+        expect(consentTextHash(doc, lang, (tier as never) ?? null, version), `${key} ${lang}`).toBe(byLang[lang]);
       }
+    }
+    // La v1 sigue en la lista: las aceptaciones registradas con ella conservan su prueba.
+    for (const k of ["terms@terms-2026-10-18-v1+privacy-2026-10-18-v1", "terms_refund@2026-10-18-v1:pro", "esign@2026-10-18-v1"]) {
+      expect(PUBLISHED_CONSENT_HASHES[k], k).toBeDefined();
     }
   });
 
@@ -154,7 +189,7 @@ describe("hashes de los textos publicados", () => {
   });
 });
 
-describe("textos legales v1", () => {
+describe("textos legales: correos y Términos", () => {
   it("correos legales: constantes en brokerage.ts", () => {
     expect([LEGAL_EMAIL, PRIVACY_EMAIL, NOTICES_EMAIL, DMCA_EMAIL]).toEqual([
       "legal@lixtara.com",
@@ -231,7 +266,7 @@ describe("textos legales v1", () => {
   it("Privacidad y Avisos legales nombran a Lixtara LLC con su dirección", () => {
     for (const doc of [privacyDoc, disclaimersDoc]) {
       for (const lang of ["en", "es"] as const) {
-        const all = JSON.stringify(doc[lang]);
+        const all = JSON.stringify(fillLegalDoc(doc[lang]));
         expect(all, lang).toContain(BROKERAGE.legalName);
         expect(all, lang).toContain(BROKERAGE.address);
         expect(all, lang).not.toMatch(/operated by Lixtara[.,]|operada por Lixtara[.,]/);

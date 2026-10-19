@@ -67,7 +67,7 @@ export interface BuyerCompTexts {
   publicNote: string;
 }
 
-// v3 (2026-10-18, texto v1 del owner, PENDIENTE DE APROBACIÓN LEGAL): Lixtara comunica y
+// v3 (2026-10-18, texto del owner; publicado en los Términos v2): Lixtara comunica y
 // documenta ofertas de hasta BUYER_COMP_MAX_PCT del precio de compra según lo que indique el
 // vendedor; un monto mayor lo puede acordar el vendedor directamente con el agente del
 // comprador, sin que Lixtara lo impida. Sitio, FAQ, Términos §4.1 y Loui dicen lo mismo.
@@ -155,6 +155,16 @@ export const refundPolicy: TermDefinition<string> = {
     en: "The flat fee is charged whether or not your home sells. The flat fee is non-refundable once your property is published on the MLS. You get a full refund if the broker doesn't approve your listing or it can't be published, if you were charged twice or because of a technical error, or if you cancel before it's published.",
     es: "La tarifa fija se cobra se venda o no tu propiedad. La tarifa fija no se reembolsa una vez tu propiedad está publicada en el MLS. Te devolvemos el total si la broker no aprueba tu listado o no se puede publicar, si te cobramos dos veces o por un error técnico, o si cancelas antes de la publicación.",
   },
+};
+
+/**
+ * La misma política de reembolso v2, en el registro de los Términos §6 (en español, con usted).
+ * El contenido es el de `refundPolicy` (site-claims.test.ts compara las dos); si cambia uno,
+ * cambian los dos.
+ */
+export const refundPolicyTerms: Record<Lang, string> = {
+  en: refundPolicy.text.en,
+  es: "La tarifa fija se cobra se venda o no su propiedad. La tarifa fija no se reembolsa una vez que su propiedad está publicada en el MLS. Le devolvemos el total si la broker no aprueba su listado o no se puede publicar, si le cobramos dos veces o por un error técnico, o si usted cancela antes de la publicación.",
 };
 
 // ── 5. Servicios legales (texto en legalPartner.ts) ─────────────────────────────────

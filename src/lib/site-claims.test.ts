@@ -5,7 +5,7 @@ import { dictionaryTexts, legalTermTexts, sentences, type Lang, type SiteText } 
 import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
 import { dictionaries } from "@/lib/i18n";
 import { BROKERAGE, CONTACT_EMAIL, DBPR_BROKER_LICENSE_URL, DBPR_BROKERAGE_LICENSE_URL, fillBrokerageCopy } from "@/config/brokerage";
-import { buyerAgentComp, refundPolicy, termsFaq } from "@/config/legal-terms";
+import { buyerAgentComp, refundPolicy, refundPolicyTerms, termsFaq } from "@/config/legal-terms";
 import { BUYER_COMP_MAX_PCT } from "@/lib/buyer-comp";
 import { PRICING_TIERS, TIER_ORDER, fillTierCopy, formatPrice } from "@/lib/pricing-tiers";
 import { fillFromPricing, minCommissionPct, minFlatFee } from "@/lib/pricing-from";
@@ -108,7 +108,14 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
 
   it("Términos §6: el reembolso es la política publicada, sin 'all fees are non-refundable'", () => {
     const body = termsDoc[lang].sections.flatMap((s) => s.body).join("\n");
-    expect(body).toContain(refundPolicy.text[lang]);
+    // Misma política v2; en español, con usted (registro de los Términos).
+    expect(body).toContain(refundPolicyTerms[lang]);
+    if (lang === "en") expect(refundPolicyTerms.en).toBe(refundPolicy.text.en);
+    else {
+      expect(refundPolicyTerms.es).not.toMatch(/\b(tú|tu|te|cancelas)\b/);
+      for (const k of [/se cobra se venda o no/, /no se reembolsa una vez/, /broker no aprueba/, /dos veces/, /error técnico/, /antes de la publicación/])
+        expect(refundPolicyTerms.es).toMatch(k);
+    }
     expect(body).not.toMatch(/all fees paid to Lixtara are non-refundable|todas las tarifas pagadas a Lixtara no son reembolsables/);
     expect(body).not.toMatch(/flat plan fee is non-refundable\.|tarifa fija del plan no es reembolsable\./);
   });

@@ -1,3 +1,5 @@
+> **Superado (2026-10-18):** la v2 está publicada. Ver `2026-10-18-textos-v2-memo.md`. Este memo describe la v1, con la que quedan registradas las aceptaciones anteriores.
+
 # Textos legales v1: memo para el abogado
 
 **Para:** abogado de Lixtara LLC

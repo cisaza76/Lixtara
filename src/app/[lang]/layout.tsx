@@ -10,7 +10,8 @@ import { SITE_URL } from "@/lib/config";
 import { localeAlternates, PATHNAME_HEADER } from "@/lib/seo";
 import { isLocale, locales, t, type Locale } from "@/lib/i18n";
 import { BROKERAGE_LOCATION } from "@/lib/broker";
-import { brokerageLicenseLine, brokerageLicenseLineShort } from "@/config/brokerage";
+import { BROKERAGE, brokerageLicenseLine, brokerageLicenseLineShort } from "@/config/brokerage";
+import { Fragment } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isListingSession, listingResumeHref } from "@/lib/auth/verified-user";
 import { LouiWidget } from "@/components/loui-widget";
@@ -18,9 +19,13 @@ import { CookieNotice } from "@/components/cookie-notice";
 import { AnalyticsConsent, CookieSettingsLink } from "@/components/analytics-consent";
 import { RecordingGuard } from "@/components/recording-guard";
 import { analyticsConfig, consentTools } from "@/lib/analytics-config";
+import { LEGAL_DOCS, type LegalDocId } from "@/lib/legal/config";
 import { MobileMenu } from "@/components/mobile-menu";
 import { Globe, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import "../globals.css";
+
+/** Orden de las páginas legales en el pie de página. */
+const LEGAL_FOOTER_ORDER: LegalDocId[] = ["terms", "privacy", "cookies", "disclaimers", "notices", "accessibility", "dmca"];
 
 const inter = Inter({
   variable: "--font-inter",
@@ -286,7 +291,9 @@ export default async function RootLayout({
                 {/* Licencias verificadas en el DBPR (src/config/brokerage.ts). Sin mayúsculas
                     forzadas: nombres y números se muestran tal como constan en el registro. */}
                 <p className="text-[11px] leading-relaxed text-ink/60 max-w-md">
-                  <span className="md:hidden">{brokerageLicenseLineShort()}</span>
+                  <span className="md:hidden">
+                    {brokerageLicenseLineShort()} · {footerCopy.licensedBrokerage}
+                  </span>
                   <span className="hidden md:inline">{brokerageLicenseLine(lang)}</span>
                   <br />
                   <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
@@ -347,41 +354,22 @@ export default async function RootLayout({
                 <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
                   {footerCopy.cols.legal}
                 </div>
-                <Link
-                  href={`/${lang}/terms`}
-                  className="text-sm text-ink/70 hover:text-gold transition-colors"
-                >
-                  {footerCopy.links.terms}
-                </Link>
-                <Link
-                  href={`/${lang}/privacy`}
-                  className="text-sm text-ink/70 hover:text-gold transition-colors"
-                >
-                  {footerCopy.links.privacy}
-                </Link>
-                <Link
-                  href={`/${lang}/cookies`}
-                  className="text-sm text-ink/70 hover:text-gold transition-colors"
-                >
-                  {footerCopy.links.cookies}
-                </Link>
-                {analytics.enabled && (
-                  <span className="text-sm text-ink/70 hover:text-gold transition-colors text-left">
-                    <CookieSettingsLink label={cookieCopy.settings} />
-                  </span>
-                )}
-                <Link
-                  href={`/${lang}/disclaimers`}
-                  className="text-sm text-ink/70 hover:text-gold transition-colors"
-                >
-                  {footerCopy.links.disclaimers}
-                </Link>
-                <Link
-                  href={`/${lang}/dmca`}
-                  className="text-sm text-ink/70 hover:text-gold transition-colors"
-                >
-                  {footerCopy.links.dmca}
-                </Link>
+                {/* Todas las páginas legales, desde LEGAL_DOCS (una sola configuración). */}
+                {LEGAL_FOOTER_ORDER.map((id) => (
+                  <Fragment key={id}>
+                    <Link
+                      href={`/${lang}${LEGAL_DOCS[id].path}`}
+                      className="text-sm text-ink/70 hover:text-gold transition-colors"
+                    >
+                      {footerCopy.links[id]}
+                    </Link>
+                    {id === "cookies" && analytics.enabled && (
+                      <span className="text-sm text-ink/70 hover:text-gold transition-colors text-left">
+                        <CookieSettingsLink label={cookieCopy.settings} />
+                      </span>
+                    )}
+                  </Fragment>
+                ))}
               </div>
             </div>
 
@@ -426,8 +414,14 @@ export default async function RootLayout({
             </div>
 
             <div className="mt-10 pt-6 border-t border-gold-soft flex flex-col md:flex-row md:items-center justify-between gap-3 text-[10px] uppercase tracking-[0.18em] text-ink/50">
-              <p>© {year} Lixtara. {footerCopy.copyright}</p>
-              <p>{footerCopy.equalHousing}</p>
+              {/* Nombre registrado de la correduría (src/config/brokerage.ts). */}
+              <p>© {year} {BROKERAGE.legalName}. {footerCopy.copyright}</p>
+              <Link
+                href={`/${lang}${LEGAL_DOCS.notices.path}#fair-housing`}
+                className="hover:text-gold transition-colors"
+              >
+                {footerCopy.equalHousing}
+              </Link>
             </div>
           </div>
         </footer>
