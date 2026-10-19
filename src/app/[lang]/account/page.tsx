@@ -4,7 +4,8 @@ import { PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import { Field, SubmitButton, ErrorBanner, SuccessBanner } from "@/components/auth-shell";
-import { passwordRejection } from "@/lib/auth/password-errors";
+import { PASSWORD_MIN_LENGTH, passwordRejection } from "@/lib/auth/password-errors";
+import { LocalizedValidation } from "@/components/localized-validation";
 import { buyerContactHref } from "@/lib/buyer-entry";
 import { catalogHasListings } from "@/lib/catalog-status.server";
 
@@ -86,7 +87,7 @@ export default async function AccountPage({
     "use server";
     const password = String(formData.get("password") ?? "");
     const confirm = String(formData.get("confirm") ?? "");
-    if (password.length < 8) redirect(`${back}?error=weak#password`);
+    if (password.length < PASSWORD_MIN_LENGTH) redirect(`${back}?error=weak#password`);
     if (password !== confirm) redirect(`${back}?error=mismatch#password`);
 
     const sb = await createClient();
@@ -220,8 +221,9 @@ export default async function AccountPage({
             <h2 className={h2}>{hasPassword ? copy.passwordTitle : copy.passwordSetTitle}</h2>
             <p className={lead2}>{hasPassword ? copy.passwordBody : copy.passwordSetBody}</p>
           </div>
-          <Field label={copy.newPassword} name="password" type="password" required autoComplete="new-password" help={copy.passwordHint} />
-          <Field label={copy.confirmPassword} name="confirm" type="password" required autoComplete="new-password" />
+          <LocalizedValidation labels={t(lang).listingForm.validation} />
+          <Field label={copy.newPassword} name="password" type="password" required autoComplete="new-password" minLength={PASSWORD_MIN_LENGTH} help={copy.passwordHint} />
+          <Field label={copy.confirmPassword} name="confirm" type="password" required autoComplete="new-password" minLength={PASSWORD_MIN_LENGTH} />
           <SubmitButton>{hasPassword ? copy.changePassword : copy.setPassword}</SubmitButton>
         </form>
 

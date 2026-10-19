@@ -4,6 +4,12 @@
 // otras razones ("length", "characters") salen de la política de largo y caracteres.
 // Verificado en @supabase/auth-js 2.105.4 (lib/errors.d.ts, lib/types.d.ts).
 
+/**
+ * Largo mínimo de una contraseña nueva: el `minLength` de cada campo (sign-up, paso 7, reset y
+ * cambio en /account) y la comprobación de su server action leen este número.
+ */
+export const PASSWORD_MIN_LENGTH = 8;
+
 export type PasswordRejection = "leaked" | "weak";
 
 /** null = el error no es de la contraseña (red, captcha, correo existente…). */

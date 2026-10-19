@@ -44,6 +44,7 @@ interface FieldProps {
   help?: string;
   autofilled?: boolean;
   autofilledLabel?: string;
+  minLength?: number;
 }
 
 export function Field({
@@ -56,6 +57,7 @@ export function Field({
   help,
   autofilled,
   autofilledLabel,
+  minLength,
 }: FieldProps) {
   return (
     <label className="flex flex-col gap-2">
@@ -74,6 +76,7 @@ export function Field({
         required={required}
         defaultValue={defaultValue}
         autoComplete={autoComplete}
+        minLength={minLength}
         className="bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 text-base text-ink"
       />
       {help && (

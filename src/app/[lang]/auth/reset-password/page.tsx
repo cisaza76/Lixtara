@@ -9,7 +9,8 @@ import {
   ErrorBanner,
   SuccessBanner,
 } from "@/components/auth-shell";
-import { passwordRejection } from "@/lib/auth/password-errors";
+import { PASSWORD_MIN_LENGTH, passwordRejection } from "@/lib/auth/password-errors";
+import { LocalizedValidation } from "@/components/localized-validation";
 
 export default async function ResetPasswordPage({
   params,
@@ -46,7 +47,7 @@ export default async function ResetPasswordPage({
     if (password !== confirm) {
       redirect(`/${lang}/auth/reset-password?error=mismatch`);
     }
-    if (password.length < 8) {
+    if (password.length < PASSWORD_MIN_LENGTH) {
       redirect(`/${lang}/auth/reset-password?error=weak`);
     }
 
@@ -82,6 +83,7 @@ export default async function ResetPasswordPage({
         </>
       ) : (
         <>
+          <LocalizedValidation labels={t(lang).listingForm.validation} />
           {errorMessage && <ErrorBanner message={errorMessage} />}
           <form action={resetAction} className="flex flex-col gap-6">
             <Field
@@ -89,12 +91,14 @@ export default async function ResetPasswordPage({
               name="password"
               type="password"
               autoComplete="new-password"
+              minLength={PASSWORD_MIN_LENGTH}
             />
             <Field
               label={copy.confirmLabel}
               name="confirm"
               type="password"
               autoComplete="new-password"
+              minLength={PASSWORD_MIN_LENGTH}
             />
             <SubmitButton>{copy.submit}</SubmitButton>
           </form>

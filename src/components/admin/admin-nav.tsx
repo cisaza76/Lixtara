@@ -24,36 +24,58 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+export interface AdminNavLabels {
+  dashboard: string;
+  tasks: string;
+  buyerLeads: string;
+  sellerLeads: string;
+  crm: string;
+  listings: string;
+  photography: string;
+  virtualStaging: string;
+  consultations: string;
+  transactions: string;
+  users: string;
+  agents: string;
+  investorClub: string;
+  referrals: string;
+  analytics: string;
+  logOut: string;
+  expand: string;
+  collapse: string;
+}
+
 interface NavItem {
-  title: string;
+  label: keyof AdminNavLabels;
   segment: string; // "" for the dashboard root
   icon: LucideIcon;
 }
 
 const NAV: NavItem[] = [
-  { title: "Dashboard", segment: "", icon: Home },
-  { title: "Tasks", segment: "tasks", icon: CheckSquare },
-  { title: "Buyer Leads", segment: "buyer-leads", icon: UserSearch },
-  { title: "Seller Leads", segment: "seller-leads", icon: MailCheck },
-  { title: "CRM", segment: "crm", icon: Contact },
-  { title: "Listings", segment: "listings", icon: Building2 },
-  { title: "Photography", segment: "photography", icon: Camera },
-  { title: "Virtual Staging", segment: "virtual-staging", icon: Sparkles },
-  { title: "Consultations", segment: "consultations", icon: Calendar },
-  { title: "Transactions", segment: "transactions", icon: TrendingUp },
-  { title: "Users", segment: "users", icon: Users },
-  { title: "Partner Agents", segment: "agents", icon: Award },
-  { title: "Investor Club", segment: "investor-club", icon: Briefcase },
-  { title: "Referrals", segment: "referrals", icon: Gift },
-  { title: "Analytics", segment: "analytics", icon: BarChart3 },
+  { label: "dashboard", segment: "", icon: Home },
+  { label: "tasks", segment: "tasks", icon: CheckSquare },
+  { label: "buyerLeads", segment: "buyer-leads", icon: UserSearch },
+  { label: "sellerLeads", segment: "seller-leads", icon: MailCheck },
+  { label: "crm", segment: "crm", icon: Contact },
+  { label: "listings", segment: "listings", icon: Building2 },
+  { label: "photography", segment: "photography", icon: Camera },
+  { label: "virtualStaging", segment: "virtual-staging", icon: Sparkles },
+  { label: "consultations", segment: "consultations", icon: Calendar },
+  { label: "transactions", segment: "transactions", icon: TrendingUp },
+  { label: "users", segment: "users", icon: Users },
+  { label: "agents", segment: "agents", icon: Award },
+  { label: "investorClub", segment: "investor-club", icon: Briefcase },
+  { label: "referrals", segment: "referrals", icon: Gift },
+  { label: "analytics", segment: "analytics", icon: BarChart3 },
 ];
 
 interface Props {
   lang: string;
   pendingTasks: number;
+  labels: AdminNavLabels;
 }
 
-export function AdminNav({ lang, pendingTasks }: Props) {
+export function AdminNav({ lang, pendingTasks, labels }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const base = `/${lang}/admin`;
@@ -72,7 +94,7 @@ export function AdminNav({ lang, pendingTasks }: Props) {
         )}
         <button
           type="button"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? labels.expand : labels.collapse}
           onClick={() => setCollapsed((v) => !v)}
           className="text-ink/55 hover:text-gold transition-colors"
         >
@@ -97,7 +119,7 @@ export function AdminNav({ lang, pendingTasks }: Props) {
             <li key={item.segment || "dashboard"}>
               <Link
                 href={href}
-                title={item.title}
+                title={labels[item.label]}
                 className={`flex items-center gap-3 px-4 py-2.5 text-xs tracking-wide transition-colors ${
                   active
                     ? "bg-gold/10 text-ink border-l-2 border-gold"
@@ -105,7 +127,7 @@ export function AdminNav({ lang, pendingTasks }: Props) {
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                {!collapsed && <span className="flex-1">{item.title}</span>}
+                {!collapsed && <span className="flex-1">{labels[item.label]}</span>}
                 {badge && (
                   <span
                     className={`text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-gold text-ivory ${
@@ -130,7 +152,7 @@ export function AdminNav({ lang, pendingTasks }: Props) {
           type="submit"
           className="w-full text-left text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors px-1 py-2"
         >
-          {collapsed ? "↩" : "Log out"}
+          {collapsed ? "↩" : labels.logOut}
         </button>
       </form>
     </nav>
