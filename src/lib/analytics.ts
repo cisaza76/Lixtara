@@ -46,7 +46,22 @@ export type ListingCtaLocation =
   // Landing de propietarios (/owners, correos de Instantly): hero y CTA final.
   | "owners_hero"
   | "owners_footer";
-export type ListingResumeSource = "email_link" | "broker_link";
+/**
+ * De dónde volvió quien retoma un registro a medias (spec del CMO, 2026-10-19 y 10-20):
+ * email = el enlace que pide el vendedor en /listing/continue; broker = el que manda la broker;
+ * account = desde su panel; direct = cualquier otro caso (URL guardada, volver al sitio).
+ * Los enlaces no llevan UTM (le quitarían el crédito a la campaña que trajo al vendedor): el
+ * marcador propio ?resumed= dice quién lo mandó, y el navegador lo quita de la URL.
+ */
+export type ListingResumeSource = "email" | "broker" | "account" | "direct";
+
+/** Marcador `?resumed=` de la URL → source de listing_resumed. */
+export function resumeSourceFromMarker(marker: string | null): Exclude<ListingResumeSource, "direct"> | null {
+  if (marker === "email_link") return "email";
+  if (marker === "broker_link") return "broker";
+  if (marker === "account") return "account";
+  return null;
+}
 
 export type ListingStepCompleteEvent = {
   event: "listing_step_complete";
@@ -69,13 +84,11 @@ export type AnalyticsEvent =
   | { event: "listing_resumed"; step: number; source: ListingResumeSource; lang: string }
   | { event: "agreement_signed"; plan_tier?: PlanTier; lang: string }
   | { event: "begin_checkout"; plan_tier: PlanTier; value: number; currency: "USD"; lang: string }
-  // buyer_commission_pct: the % for a percentage offer, 0 for no offer, null for a fixed amount
-  // (the amount itself is never sent).
+  // commission_mode: the kind of buyer's agent offer picked in the calculator (never an amount).
   | {
       event: "calculator_used";
       home_price_range: HomePriceRange;
-      buyer_comp_type: "none" | "percent" | "amount";
-      buyer_commission_pct: number | null;
+      commission_mode: "none" | "percent" | "amount";
       lang: string;
     }
   // Embudo comprador
@@ -109,16 +122,16 @@ export function listingStepEvent(step: number, lang: string, planTier?: string |
   return e;
 }
 
-export type HomePriceRange = "200-400k" | "400-600k" | "600-800k" | "800k-1m" | "1-1.5m" | "1.5-2m";
+// Rangos exactos de la spec del CMO (2026-10-19): GTM y GA4 los esperan tal cual.
+export type HomePriceRange = "under_300k" | "300k_500k" | "500k_1m" | "1m_2m" | "2m_plus";
 
-/** Rango del precio de la calculadora (200k–2M): nunca el valor exacto. */
+/** Rango del precio de la calculadora: nunca el valor exacto. */
 export function homePriceRange(price: number): HomePriceRange {
-  if (price < 400_000) return "200-400k";
-  if (price < 600_000) return "400-600k";
-  if (price < 800_000) return "600-800k";
-  if (price < 1_000_000) return "800k-1m";
-  if (price < 1_500_000) return "1-1.5m";
-  return "1.5-2m";
+  if (price < 300_000) return "under_300k";
+  if (price < 500_000) return "300k_500k";
+  if (price < 1_000_000) return "500k_1m";
+  if (price < 2_000_000) return "1m_2m";
+  return "2m_plus";
 }
 
 export function isPlanTier(v: unknown): v is PlanTier {
@@ -294,7 +307,7 @@ export function markPageview(path: string): void {
  * Con GTM cargado, `done` corre en el eventCallback; sin consentimiento, sin GTM o si GTM no
  * responde, corre igual a los `timeoutMs`. Siempre una sola vez.
  */
-export function trackThen(e: AnalyticsEvent, done: () => void, timeoutMs = 1000): void {
+export function trackThen(e: AnalyticsEvent, done: () => void, timeoutMs = 1200): void {
   let called = false;
   const once = () => {
     if (called) return;
@@ -312,7 +325,8 @@ export function trackThen(e: AnalyticsEvent, done: () => void, timeoutMs = 1000)
   window.dataLayer.push({ ...e, eventCallback: once, eventTimeout: timeoutMs });
   const { event, ...props } = e;
   if (posthogClient) posthogClient.capture(event, props);
-  setTimeout(once, timeoutMs + 100);
+  // Respaldo propio por si GTM nunca llama al eventCallback: nunca más de 1,5 s (spec del CMO).
+  setTimeout(once, timeoutMs + 300);
 }
 
 /**

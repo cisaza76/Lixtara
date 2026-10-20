@@ -102,6 +102,18 @@ interface Column {
   savings: number;
 }
 
+// "Visit" = this browser tab's session: the home page and /owners both show the calculator.
+const CALCULATOR_USED_KEY = "lx_calc_used";
+function calculatorUsedThisVisit(): boolean {
+  try {
+    if (window.sessionStorage.getItem(CALCULATOR_USED_KEY) === "1") return true;
+    window.sessionStorage.setItem(CALCULATOR_USED_KEY, "1");
+  } catch {
+    /* storage blocked: the ref still limits it to once per page */
+  }
+  return false;
+}
+
 function usd(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
@@ -109,7 +121,7 @@ function usd(n: number): string {
 export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
   const [price, setPrice] = useState(500_000);
   const touched = useRef(false);
-  const lastSent = useRef<string | null>(null);
+  const sent = useRef(false);
   const [choice, setChoice] = useState(String(DEFAULT_BUYER_COMMISSION_PCT));
   const [customKind, setCustomKind] = useState<"percent" | "amount">("percent");
   const [customValue, setCustomValue] = useState("");
@@ -138,22 +150,17 @@ export function SavingsSlider({ lang, copy, tierNames }: SavingsSliderProps) {
         .replace("{maxAmount}", formatOffer({ type: "amount", amount: buyerCompMaxAmount(price) }))
     : null;
 
-  // calculator_used: once the person stops moving the controls (1.5 s), with the price
-  // RANGE (never the exact value) and the kind of offer. Again only if either changes.
+  // calculator_used: ONCE per visit (CMO spec), the first time the person stops moving the
+  // controls (1.5 s), with the price RANGE (never the exact value) and the kind of offer.
   useEffect(() => {
-    if (!touched.current) return;
+    if (!touched.current || sent.current) return;
     const timer = setTimeout(() => {
-      const range = homePriceRange(price);
-      // Only the kind and, for a percentage, the %: never a dollar amount.
-      const pct = offer.type === "percent" ? offer.pct : offer.type === "none" ? 0 : null;
-      const key = `${range}|${offer.type}|${pct}`;
-      if (key === lastSent.current) return;
-      lastSent.current = key;
+      if (sent.current || calculatorUsedThisVisit()) return;
+      sent.current = true;
       track({
         event: "calculator_used",
-        home_price_range: range,
-        buyer_comp_type: offer.type,
-        buyer_commission_pct: pct,
+        home_price_range: homePriceRange(price),
+        commission_mode: offer.type,
         lang,
       });
     }, 1500);
