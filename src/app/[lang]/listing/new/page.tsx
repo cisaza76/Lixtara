@@ -381,13 +381,14 @@ export default async function ListingNewPage({
     }
 
     // Llegó por un enlace para retomar (correo pedido por el vendedor o enviado por la
-    // broker). El navegador lo reporta con listing_resumed y quita el marcador de la URL.
+    // broker, o el botón del panel). El navegador lo reporta con listing_resumed y quita el
+    // marcador de la URL.
     const resumedSource = sp.resumed;
     if (
       draft &&
       sessionUser &&
       draft.owner_id === sessionUser.id &&
-      (resumedSource === "email_link" || resumedSource === "broker_link")
+      (resumedSource === "email_link" || resumedSource === "broker_link" || resumedSource === "account")
     ) {
       const resumedId = draft.id;
       after(() =>
@@ -1773,6 +1774,10 @@ export default async function ListingNewPage({
           latestAgreement?.status === "signed" || latestAgreement?.status === "completed"
         }
         errorField={listingErrorField(sp.error)}
+        listingId={draft?.id ?? null}
+        resumable={
+          !!draft && !!sessionUser && draft.owner_id === sessionUser.id && draft.mls_status === "draft" && step >= 2
+        }
       />
       {/* Browser validation bubbles in the page's language, not the browser's. */}
       <LocalizedValidation labels={copy.validation} />

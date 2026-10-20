@@ -8,7 +8,7 @@ vi.hoisted(() => {
 });
 import {
   LISTING_STEP_SLUGS, disableAnalytics, enableAnalytics, listingErrorField, listingStepCompleteEvent, listingStepEvent,
-  homePriceRange, markPageview, resultsBucket, track, trackThen,
+  homePriceRange, markPageview, resultsBucket, resumeSourceFromMarker, track, trackThen,
 } from "@/lib/analytics";
 import {
   ANALYTICS_COOKIE_RE, GRANTED_CONSENT, analyticsConfig, consentTools, isAnalyticsExcludedPath, isRecordingExcludedPath, needsFullLoad,
@@ -36,10 +36,18 @@ describe("listingStepEvent", () => {
     expect(listingStepEvent(4, "en", null)).not.toHaveProperty("plan_tier");
   });
 
-  it("calculator: price range, never the exact value", () => {
-    expect([200_000, 399_999, 400_000, 625_000, 999_999, 1_000_000, 1_500_000, 2_000_000].map(homePriceRange)).toEqual([
-      "200-400k", "200-400k", "400-600k", "600-800k", "800k-1m", "1-1.5m", "1.5-2m", "1.5-2m",
+  it("calculator: price range (the CMO's five values), never the exact value", () => {
+    expect([200_000, 299_999, 300_000, 499_999, 500_000, 999_999, 1_000_000, 1_999_999, 2_000_000].map(homePriceRange)).toEqual([
+      "under_300k", "under_300k", "300k_500k", "300k_500k", "500k_1m", "500k_1m", "1m_2m", "1m_2m", "2m_plus",
     ]);
+  });
+
+  it("listing_resumed source: email (seller's or broker's link), account (dashboard), else none", () => {
+    expect(resumeSourceFromMarker("email_link")).toBe("email");
+    expect(resumeSourceFromMarker("broker_link")).toBe("email");
+    expect(resumeSourceFromMarker("account")).toBe("account");
+    expect(resumeSourceFromMarker("direct")).toBeNull();
+    expect(resumeSourceFromMarker(null)).toBeNull();
   });
 
   it("falls back for an out-of-range step", () => {
@@ -93,7 +101,7 @@ describe("trackThen: begin_checkout antes de salir a Stripe", () => {
     const done = vi.fn();
     trackThen(begin, done);
     const pushed = dl()[0];
-    expect(pushed).toMatchObject({ ...begin, eventTimeout: 1000 });
+    expect(pushed).toMatchObject({ ...begin, eventTimeout: 1200 });
     expect(done).not.toHaveBeenCalled();
     (pushed.eventCallback as () => void)();
     vi.advanceTimersByTime(2000);
@@ -104,7 +112,9 @@ describe("trackThen: begin_checkout antes de salir a Stripe", () => {
     enableAnalytics(null);
     const done = vi.fn();
     trackThen(begin, done);
-    vi.advanceTimersByTime(1100);
+    vi.advanceTimersByTime(1499);
+    expect(done).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
     expect(done).toHaveBeenCalledTimes(1);
   });
 });

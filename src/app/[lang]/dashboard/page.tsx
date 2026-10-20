@@ -555,7 +555,7 @@ export default async function DashboardPage({
                 nextStep = {
                   text: cc.nsComplete,
                   ctaLabel: cc.nsCompleteCta,
-                  ctaHref: `${flowHref}&step=6`,
+                  ctaHref: `${flowHref}&step=6&resumed=account`,
                 };
               else if (!paymentDone)
                 nextStep = { text: cc.nsPay, ctaLabel: cc.nsPayCta, ctaHref: flowHref };
@@ -616,7 +616,7 @@ export default async function DashboardPage({
                     workstreams={workstreams}
                     metrics={metrics}
                     nextStep={nextStep}
-                    primaryHref={isDraft ? `${flowHref}&step=6` : publicHref}
+                    primaryHref={isDraft ? `${flowHref}&step=6&resumed=account` : publicHref}
                     primaryLabel={
                       isDraft ? copy.continueListingButton : copy.viewListingButton
                     }

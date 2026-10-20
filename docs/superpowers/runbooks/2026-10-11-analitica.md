@@ -119,7 +119,7 @@ Borrar `NEXT_PUBLIC_GTM_ID` y `NEXT_PUBLIC_POSTHOG_KEY` en Vercel y hacer Redepl
 Los textos del banner y de la variante con analítica de la política de cookies son un **borrador**. Están en el paquete del abogado: `docs/planning/2026-10-compradores/05-textos-consentimiento-cookies.md` (pregunta 17 del brief).
 
 ## Embudo del vendedor y compras (2026-10-14)
-- **dataLayer:** `listing_cta_click`, `listing_step_complete` (1–7), `agreement_signed`, `begin_checkout` (espera el `eventCallback`, máx. 1 s), `listing_step_error`, `listing_resumed`, `calculator_used` (rango de precio, nunca el valor). `listing_step_view` lleva `plan_tier` desde el paso 3. En cada ruta, `lx_page_view` sale **antes** que los eventos de la página (esperan hasta 3 s).
+- **dataLayer:** `listing_cta_click`, `listing_step_complete` (1–7), `agreement_signed`, `begin_checkout` (`eventTimeout` 1,2 s; sin respuesta de GTM redirige igual a los 1,5 s), `listing_step_error`, `listing_resumed`, `calculator_used`. Valores según la spec del CMO del 2026-10-19 (ver "Spec de eventos del CMO"). `listing_step_view` lleva `plan_tier` desde el paso 3. En cada ruta, `lx_page_view` sale **antes** que los eventos de la página (esperan hasta 3 s).
 - **Supabase:** `funnel_events` (con `is_test`) → `listing_funnel_v`, una fila por listing real. `is_test` = entorno distinto de Production, propiedad `is_test` o Stripe `livemode=false`.
 - **`broker_countersigned`** (solo servidor, `funnel_events`, con `is_test`): la broker contrafirmó en DocuSign. Se registra una vez, en la transición del acuerdo a `completed`, y solo si la firma de la broker está verificada. Aún no es columna de `listing_funnel_v` (requiere otra migración).
 - **GA4 `purchase`** desde el webhook de Stripe (Measurement Protocol): solo con consentimiento `granted` guardado en el Checkout, `livemode`, Production y propiedad no `is_test`. `transaction_id` = id de la sesión de Stripe.
@@ -169,3 +169,15 @@ Cambio solo en el contenedor; el código no cambió.
 
 ### Pendiente para cuando se active Google Ads
 - **Política de cookies y banner:** mencionar `gclid`, `gbraid` y `wbraid` (IDs de clic de Google Ads que la etiqueta `page_view` conserva en `page_location` y envía a GA4). Hoy Google Ads no está aprobado y la política dice que no se usa publicidad; el texto se cambia el mismo día en que se active, junto con el párrafo de privacidad del punto 4 de "Contenedor del CMO".
+
+## Spec de eventos del CMO (2026-10-19, GTM-5KGLHNL4 v11)
+Nombres y valores que GTM y GA4 esperan tal cual; cambiar uno parte los datos en dos, así que se avisa al CMO **antes**. Lo fija `src/lib/analytics-cmo-spec.test.ts`.
+- **`listing_step_view`:** `plan_tier` desde el paso 3 (el plan se elige en el 2); antes no se manda.
+- **`agreement_signed`:** al volver de DocuSign con la firma ya confirmada en la base (`signed` o `completed`). Una vez por listing: se quita el marcador `?signed=1` y la pestaña recuerda el listing en `sessionStorage` (el ID nunca sale del navegador). Lleva `plan_tier` y `lang`.
+- **`begin_checkout`:** ya creada la sesión de Stripe, antes de redirigir. `value` = `flatFee` del plan (`pricing-tiers.ts`), el mismo monto que cobra Stripe; `currency: "USD"`. Sin consentimiento redirige enseguida.
+- **`listing_resumed`:** `step` y `source`:
+  - `email`: enlace de un correo (el que pide el vendedor en `/listing/continue` o el que manda la broker; marcadores `?resumed=email_link|broker_link`);
+  - `account`: botón "Continuar" del panel (`?resumed=account`);
+  - `direct`: primera vista del flujo en la pestaña, sin marcador, en un borrador propio a partir del paso 2.
+  En `funnel_events` (servidor) se guarda el marcador original (`email_link`, `broker_link`, `account`); `direct` solo existe en el navegador.
+- **`calculator_used`:** una vez por visita (por pestaña; la calculadora está en la portada y en `/owners`), cuando la persona deja de mover los controles 1,5 s. `home_price_range`: `under_300k`, `300k_500k`, `500k_1m`, `1m_2m`, `2m_plus`. `commission_mode`: `none`, `percent` o `amount` (nunca el monto). **Sin `plan`:** la calculadora compara los tres planes y no elige ni recomienda uno; pendiente de definir con el CMO.

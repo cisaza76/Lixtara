@@ -73,9 +73,9 @@ export function CheckoutButton({ propertyId, lang, planTier, value, labels, refu
       const go = () => {
         window.location.href = url;
       };
-      // begin_checkout right before leaving for Stripe; the redirect waits for GTM (≤1 s).
+      // begin_checkout right before leaving for Stripe; the redirect waits for GTM (≤1.5 s).
       if (planTier && value !== null) {
-        trackThen({ event: "begin_checkout", plan_tier: planTier, value, currency: "USD", lang }, go, 1000);
+        trackThen({ event: "begin_checkout", plan_tier: planTier, value, currency: "USD", lang }, go);
       } else go();
     } catch (e) {
       // Localized message; a machine code (e.g. "agreement_not_signed") may
