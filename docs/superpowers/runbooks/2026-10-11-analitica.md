@@ -63,7 +63,7 @@
 3. **En GTM, crear:**
    - variables de capa de datos `page_location` y `page_path`;
    - una etiqueta **Google tag** con el Measurement ID, disparador *Initialization – All Pages*, en *Consent settings* exigir `analytics_storage`, y en *Configuration settings* el parámetro **`send_page_view` = `false`**;
-   - una etiqueta **GA4 Event** `page_view` con el parámetro `page_location` = `{{DLV page_location}}`, disparada por el *Custom Event* `lx_page_view`. Así GA4 recibe un pageview por ruta, con la URL **sin parámetros**;
+   - una etiqueta **GA4 Event** `page_view` con el parámetro `page_location` = `{{DLV page_location}}`, disparada por el *Custom Event* `lx_page_view`. Así GA4 recibe un pageview por ruta, con la URL **sin parámetros** (en el contenedor del CMO, desde la versión 10, `page_location` se reconstruye: ver **"GTM versión 10"**);
    - una etiqueta **GA4 Event** con el nombre `{{Event}}`, disparada por un *Custom Event* con la regex `^(listing_step_view|email_verified|property_search|property_open|showing_request_started|showing_request_submitted|loui_open|loui_message_sent|contact_form_submitted|whatsapp_click|phone_click)$`, y en ella también `page_location` = `{{DLV page_location}}`;
    - etiquetas de publicidad y Clarity: ver **"Contenedor del CMO"** más abajo.
 4. **Activar la vista previa de GTM**, comprobarla y **Publicar**.
@@ -133,7 +133,7 @@ Los textos del banner y de la variante con analítica de la política de cookies
 https://lixtara.com/en/owners?utm_source=instantly&utm_medium=email&utm_campaign=<campaña>
 https://lixtara.com/es/owners?utm_source=instantly&utm_medium=email&utm_campaign=<campaña>
 ```
-- `<campaña>`: minúsculas, números, `.`, `_` o `-`, hasta 64 caracteres (p. ej. `fl-owners-2026-10`). Los espacios pasan a `_`. Si trae otra cosa (`@`, acentos), se descarta.
+- `<campaña>`: minúsculas, números, `.`, `_` o `-`, hasta 64 caracteres. Las campañas de Instantly llevan el prefijo `lx_` (p. ej. `lx_fl-owners-2026-10`). Los espacios pasan a `_`. Si trae otra cosa (`@`, acentos), se descarta.
 - **Nunca** se agrega al enlace ningún dato del propietario: ni nombre, ni dirección, ni email, ni `owner_key`, ni variables de Instantly como `{{firstName}}`. La página no se personaliza.
 - Helper: `ownersInstantlyUrl()` (`src/lib/owners-landing.ts`).
 
@@ -159,3 +159,13 @@ select date_trunc('day', created_at at time zone 'America/New_York') as dia,
 4. **GA4 → Admin → Custom definitions:** dimensión de evento `location` (y `tier`, si no existe).
 5. **Informes:** donde se filtraba `location = hero`, ahora es `home_hero`.
 6. **Verificar en GTM Preview y en GA4 DebugView:** abrir `/en/owners?utm_source=instantly&utm_medium=email&utm_campaign=prueba`, aceptar cookies y comprobar que `page_view` lleva `campaign_source = instantly`. Pulsar "Start my listing" y comprobar `listing_cta_click` con `location = owners_hero`.
+
+### GTM versión 10 (publicada por el CMO, 2026-10-19)
+Cambio solo en el contenedor; el código no cambió.
+- **`page_location` de la etiqueta `page_view`:** se reconstruye a partir de la URL original, de la que conserva **solo** los parámetros `utm_*` y los IDs de clic de Google Ads (`gclid`, `gbraid`, `wbraid`). Cualquier otro parámetro se descarta.
+- **Si la URL no trae UTM**, la etiqueta agrega a `page_location` solo `utm_source`, `utm_medium` y `utm_campaign`, tomados de `campaign_source`, `campaign_medium` y `campaign_name` de `lx_page_view`.
+- **`lx_page_view` no se cambia:** el CMO depende de `campaign_source`, `campaign_medium` y `campaign_name`. En el dataLayer, `page_location` sigue sin parámetros; la reconstrucción la hace GTM.
+- **Campañas de Instantly:** prefijo `lx_` en `utm_campaign` (ver "Enlace de Instantly").
+
+### Pendiente para cuando se active Google Ads
+- **Política de cookies y banner:** mencionar `gclid`, `gbraid` y `wbraid` (IDs de clic de Google Ads que la etiqueta `page_view` conserva en `page_location` y envía a GA4). Hoy Google Ads no está aprobado y la política dice que no se usa publicidad; el texto se cambia el mismo día en que se active, junto con el párrafo de privacidad del punto 4 de "Contenedor del CMO".
