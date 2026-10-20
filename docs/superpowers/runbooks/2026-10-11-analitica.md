@@ -170,14 +170,16 @@ Cambio solo en el contenedor; el código no cambió.
 ### Pendiente para cuando se active Google Ads
 - **Política de cookies y banner:** mencionar `gclid`, `gbraid` y `wbraid` (IDs de clic de Google Ads que la etiqueta `page_view` conserva en `page_location` y envía a GA4). Hoy Google Ads no está aprobado y la política dice que no se usa publicidad; el texto se cambia el mismo día en que se active, junto con el párrafo de privacidad del punto 4 de "Contenedor del CMO".
 
-## Spec de eventos del CMO (2026-10-19, GTM-5KGLHNL4 v11)
+## Spec de eventos del CMO (2026-10-19 y 10-20, GTM-5KGLHNL4 v12)
 Nombres y valores que GTM y GA4 esperan tal cual; cambiar uno parte los datos en dos, así que se avisa al CMO **antes**. Lo fija `src/lib/analytics-cmo-spec.test.ts`.
 - **`listing_step_view`:** `plan_tier` desde el paso 3 (el plan se elige en el 2); antes no se manda.
 - **`agreement_signed`:** al volver de DocuSign con la firma ya confirmada en la base (`signed` o `completed`). Una vez por listing: se quita el marcador `?signed=1` y la pestaña recuerda el listing en `sessionStorage` (el ID nunca sale del navegador). Lleva `plan_tier` y `lang`.
 - **`begin_checkout`:** ya creada la sesión de Stripe, antes de redirigir. `value` = `flatFee` del plan (`pricing-tiers.ts`), el mismo monto que cobra Stripe; `currency: "USD"`. Sin consentimiento redirige enseguida.
 - **`listing_resumed`:** `step` y `source`:
-  - `email`: enlace de un correo (el que pide el vendedor en `/listing/continue` o el que manda la broker; marcadores `?resumed=email_link|broker_link`);
+  - `email`: el enlace que pide el vendedor en `/listing/continue` (`?resumed=email_link`);
+  - `broker`: el enlace que manda la broker desde `/admin/seller-leads` (`?resumed=broker_link`);
   - `account`: botón "Continuar" del panel (`?resumed=account`);
   - `direct`: primera vista del flujo en la pestaña, sin marcador, en un borrador propio a partir del paso 2.
+  **Sin UTM en estos enlaces** (decisión del CMO, 2026-10-20): le quitarían el crédito a la campaña que trajo al vendedor. El marcador propio `?resumed=` cumple el papel del `?from=` que propuso el CMO; el navegador lo quita de la URL y, desde GTM v10, `page_location` solo conserva `utm_*` y los IDs de clic.
   En `funnel_events` (servidor) se guarda el marcador original (`email_link`, `broker_link`, `account`); `direct` solo existe en el navegador.
-- **`calculator_used`:** una vez por visita (por pestaña; la calculadora está en la portada y en `/owners`), cuando la persona deja de mover los controles 1,5 s. `home_price_range`: `under_300k`, `300k_500k`, `500k_1m`, `1m_2m`, `2m_plus`. `commission_mode`: `none`, `percent` o `amount` (nunca el monto). **Sin `plan`:** la calculadora compara los tres planes y no elige ni recomienda uno; pendiente de definir con el CMO.
+- **`calculator_used`:** una vez por visita (por pestaña; la calculadora está en la portada y en `/owners`), cuando la persona deja de mover los controles 1,5 s. `home_price_range`: `under_300k`, `300k_500k`, `500k_1m`, `1m_2m`, `2m_plus`. `commission_mode`: `none`, `percent` o `amount` (nunca el monto). **Sin `plan`** (decisión del CMO, 2026-10-20): la calculadora compara los tres planes; el plan se ve en `listing_cta_click` (`tier`) y en `plan_tier`. `commission_mode` está conectado en GTM v12 y en GA4.

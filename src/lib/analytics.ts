@@ -47,15 +47,18 @@ export type ListingCtaLocation =
   | "owners_hero"
   | "owners_footer";
 /**
- * De dónde volvió quien retoma un registro a medias (spec del CMO, 2026-10-19):
- * email = enlace de un correo (el que pide el vendedor en /listing/continue o el que manda la
- * broker); account = desde su panel; direct = cualquier otro caso (URL guardada, volver al sitio).
+ * De dónde volvió quien retoma un registro a medias (spec del CMO, 2026-10-19 y 10-20):
+ * email = el enlace que pide el vendedor en /listing/continue; broker = el que manda la broker;
+ * account = desde su panel; direct = cualquier otro caso (URL guardada, volver al sitio).
+ * Los enlaces no llevan UTM (le quitarían el crédito a la campaña que trajo al vendedor): el
+ * marcador propio ?resumed= dice quién lo mandó, y el navegador lo quita de la URL.
  */
-export type ListingResumeSource = "email" | "account" | "direct";
+export type ListingResumeSource = "email" | "broker" | "account" | "direct";
 
 /** Marcador `?resumed=` de la URL → source de listing_resumed. */
 export function resumeSourceFromMarker(marker: string | null): Exclude<ListingResumeSource, "direct"> | null {
-  if (marker === "email_link" || marker === "broker_link") return "email";
+  if (marker === "email_link") return "email";
+  if (marker === "broker_link") return "broker";
   if (marker === "account") return "account";
   return null;
 }

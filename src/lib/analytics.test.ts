@@ -42,9 +42,9 @@ describe("listingStepEvent", () => {
     ]);
   });
 
-  it("listing_resumed source: email (seller's or broker's link), account (dashboard), else none", () => {
+  it("listing_resumed source: email (seller's link), broker (broker's link), account (dashboard), else none", () => {
     expect(resumeSourceFromMarker("email_link")).toBe("email");
-    expect(resumeSourceFromMarker("broker_link")).toBe("email");
+    expect(resumeSourceFromMarker("broker_link")).toBe("broker");
     expect(resumeSourceFromMarker("account")).toBe("account");
     expect(resumeSourceFromMarker("direct")).toBeNull();
     expect(resumeSourceFromMarker(null)).toBeNull();
