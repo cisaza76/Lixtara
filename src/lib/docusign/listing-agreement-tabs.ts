@@ -19,8 +19,8 @@
 //   - protection period (line 123) and retained deposits (line 128) from
 //     src/config/listing-agreement.ts;
 //   - cancellation fee (line 207) = the flat fee of the seller's plan;
-//   - paragraph 15 (lines 230–233): ADDITIONAL_TERMS, the cancellation fee only after MLS
-//     publication (Terms of Service §6).
+//   - paragraph 15 (lines 230–231): ADDITIONAL_TERMS, the cancellation fee is the flat fee
+//     already paid, nothing more is due; full refund before MLS publication (Terms §6).
 
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import type { BuyerCompOffer } from "@/lib/buyer-comp";
@@ -97,7 +97,7 @@ const plainNumber = (n: number) => n.toLocaleString("en-US", { maximumFractionDi
  * Terms of Service §6 say the same.
  */
 export const ADDITIONAL_TERMS =
-  "The cancellation fee in Paragraph 12 applies only if the Property has been published in the MLS. If Seller cancels before MLS publication, Seller receives a full refund as stated in Lixtara's Terms of Service, Section 6.";
+  "The cancellation fee in Paragraph 12 equals the fixed fee Seller already paid and is deemed satisfied by that payment; no additional amount is due. If Seller cancels before MLS publication, Seller receives a full refund as stated in Lixtara's Terms of Service, Section 6.";
 export const ADDITIONAL_TERMS_LABELS = ["additional_terms_1", "additional_terms_2", "additional_terms_3", "additional_terms_4"];
 
 /**

@@ -84,9 +84,9 @@ Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-lay
 | 159 | `single_agent_broker` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p4 x135 y85 · 439×11 · 9 pt | no | — |
 | 171 | `transaction_broker` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p4 x161 y404 · 414×11 · 9 pt | no | — |
 | 207 | `cancellation_fee` | text | Plan, `flatFee` (sin «$»): la tarifa fija del plan comprado | sí | no | p5 x408 y56 · 107×11 · 9 pt | no | — |
-| 230 | `additional_terms_1` | text | `ADDITIONAL_TERMS` (`listing-agreement-tabs.ts`): la tarifa de cancelación solo después de publicar en el MLS | no | no | p5 x160 y337 · 408×11 · 9 pt | no | — |
+| 230 | `additional_terms_1` | text | `ADDITIONAL_TERMS` (`listing-agreement-tabs.ts`): la tarifa de cancelación es la tarifa fija ya pagada, sin monto adicional; reembolso total antes de publicar | no | no | p5 x160 y337 · 408×11 · 9 pt | no | — |
 | 231 | `additional_terms_2` | text | `ADDITIONAL_TERMS`, segunda línea | no | no | p5 x53 y357 · 513×11 · 9 pt | no | — |
-| 232 | `additional_terms_3` | text | `ADDITIONAL_TERMS`, tercera línea (vacía hoy) | no | no | p5 x53 y377 · 513×11 · 9 pt | no | — |
+| 232 | `additional_terms_3` | text | `ADDITIONAL_TERMS`, tercera línea | no | no | p5 x53 y377 · 513×11 · 9 pt | no | — |
 | 233 | `additional_terms_4` | text | `ADDITIONAL_TERMS`, cuarta línea (vacía hoy) | no | no | p5 x53 y397 · 513×11 · 9 pt | no | — |
 | 255 | `brokerage_firm_name` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p6 x157 y240 · 246×11 · 9 pt | no | — |
 | 255 | `brokerage_phone` | text | `CONTACT.phoneDisplay` (`src/config/contact.ts`) | sí | no | p6 x463 y240 · 107×11 · 9 pt | no | — |

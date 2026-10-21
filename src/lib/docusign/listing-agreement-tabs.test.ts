@@ -212,11 +212,14 @@ describe("Listing Agreement: valores por línea", () => {
     expect(fitsOnLine("cancellation_fee", r.text.cancellation_fee)).toBe(true);
   });
 
-  it("párrafo 15 (L230–233): el texto de la tarifa de cancelación cabe en las líneas, completo y de solo lectura", () => {
+  it("párrafo 15: el texto de la tarifa de cancelación cabe completo en L230–232, sin anexo, de solo lectura", () => {
     const r = run();
     const lines = ADDITIONAL_TERMS_LABELS.map((l) => r.text[l]);
     expect(lines.filter(Boolean).join(" ")).toBe(ADDITIONAL_TERMS);
-    expect(lines[0]).toMatch(/^The cancellation fee in Paragraph 12 applies only if/);
+    expect(lines[0]).toMatch(/^The cancellation fee in Paragraph 12 equals the fixed fee Seller already paid/);
+    expect(ADDITIONAL_TERMS).toContain("no additional amount is due");
+    // L230–231 no alcanzan (2026-10-21): ocupa tres de las líneas del párrafo 15; L233 queda vacía.
+    expect(lines.map(Boolean)).toEqual([true, true, true, false]);
     for (const l of ADDITIONAL_TERMS_LABELS) {
       expect(r.lockedText, l).toContain(l);
       expect(fitsOnLine(l, r.text[l]), l).toBe(true);
