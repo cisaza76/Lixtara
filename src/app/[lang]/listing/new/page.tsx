@@ -104,7 +104,7 @@ import {
   refundPolicy,
 } from "@/config/legal-terms";
 import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
-import { recentOwnDraftId } from "@/lib/listing-step1-dedupe.server";
+import { duplicateDraftId } from "@/lib/listing-step1-dedupe.server";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
@@ -696,8 +696,9 @@ export default async function ListingNewPage({
       longitude: finalLng,
     };
 
-    // Sin id: si este dueño acaba de crear un borrador (doble envío), se actualiza ese.
-    const existingId = id || (await recentOwnDraftId(supabase, user.id));
+    // Sin id: si este dueño acaba de crear un borrador con la MISMA dirección (doble envío),
+    // se actualiza ese. Otra dirección crea un listing nuevo.
+    const existingId = id || (await duplicateDraftId(supabase, user.id, { street, zip }));
     if (existingId) {
       const { error } = await supabase
         .from("properties")
