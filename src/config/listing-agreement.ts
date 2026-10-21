@@ -1,11 +1,10 @@
 // Terms of the seller's listing agreement that the site, the contract (ERS-21tn) and the legal
-// texts all state. One source: the DocuSign tabs, the Terms and the early-termination addendum
-// read from here; nobody writes these numbers apart. Decisions of the broker (Anamaria,
-// 2026-10-21).
+// texts all state. One source: the DocuSign tabs and the Terms read from here; nobody writes
+// these numbers apart. Decisions of the broker (Anamaria, 2026-10-21).
 
 /**
  * Protection period, in days after the termination date: a sale to a prospect introduced during
- * the listing still owes the commission (ERS-21tn line 123; early-termination addendum).
+ * the listing still owes the commission (ERS-21tn line 123).
  */
 export const PROTECTION_PERIOD_DAYS = 90;
 
