@@ -22,6 +22,7 @@ export interface AgreementListing {
   address_city: string | null;
   address_state: string | null;
   address_zip: string | null;
+  folio: string | null;
   list_price: number;
   cash_only: boolean | null;
   occupancy_status: "vacant" | "owner_occupied" | "tenant_occupied" | string | null;
@@ -58,6 +59,8 @@ export interface AgreementTabs {
   radio: Record<string, { value: string | null; locked: boolean }>;
   /** Sections of the "Attachment to the Listing Agreement" document, if any. */
   attachment: AttachmentSection[];
+  /** "pending" = no county-verified legal description: the admin can't approve (#217). */
+  legalStatus: "verified" | "pending";
 }
 
 const LONG_DATE: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
@@ -101,11 +104,19 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
   const legalOneLine = (input.verifiedLegal ?? "").replace(/\s*\n\s*/g, "; ").trim();
   const legalLines = legalOneLine ? splitOverLines(legalOneLine, "legal_description", "legal_description_2") : null;
   if (!legalLines) {
+    // Owner, 2026-10-21: folio, full address and county, plus the description (or the note
+    // that the broker provides it). Only Miami-Dade parcels are verified today.
+    const fullAddress = [p.address_street, p.address_city, [p.address_state, p.address_zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    const verified = input.verifiedLegal?.trim() || null;
     attachment.push({
       heading: "Legal Description (line 15)",
-      body: input.verifiedLegal?.trim()
-        ? input.verifiedLegal.trim()
-        : "To be provided by Broker from the official county property record for the Property described in line 13.",
+      body: [
+        `Folio (Parcel ID): ${p.folio?.trim() || "Not available"}`,
+        `Property address: ${fullAddress}`,
+        `County: ${verified ? "Miami-Dade" : "To be confirmed by Broker from the county property record"}`,
+        "",
+        verified ?? "To be provided by Broker from the official county property record for the Property described in line 13.",
+      ].join("\n"),
     });
   }
 
@@ -143,8 +154,8 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
 
   return {
     text,
-    // The lease date stays editable when step 3 didn't give one (the seller writes it).
-    lockedText: Object.keys(text).filter((k) => k !== "lease_end_date" || text.lease_end_date !== ""),
+    // Everything the site writes is read-only, the lease date included (empty = "I don't know").
+    lockedText: Object.keys(text),
     checkbox: {
       legal_see_attachment: !legalLines,
       personal_property_see_attachment: !personalFits,
@@ -155,6 +166,7 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     lockedCheckbox: ["legal_see_attachment", "personal_property_see_attachment", "lockbox_authorized", "buyer_commission_ack"],
     radio: { occupancy: { value: occupancy, locked: occupancy !== null } },
     attachment,
+    legalStatus: input.verifiedLegal?.trim() ? "verified" : "pending",
   };
 }
 

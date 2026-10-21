@@ -106,6 +106,7 @@ import {
 import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { duplicateDraftId } from "@/lib/listing-step1-dedupe.server";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { isoToUsDate, parseLeaseEnd } from "@/lib/lease-end";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
@@ -865,8 +866,12 @@ export default async function ListingNewPage({
       isTenant && rentRaw !== "" && Number.isFinite(Number(rentRaw))
         ? Number(rentRaw)
         : null;
-    const leaseEndRaw = String(formData.get("lease_end_date") ?? "").trim();
-    const leaseEndDate = isTenant && leaseEndRaw !== "" ? leaseEndRaw : null;
+    // Con inquilino: MM/DD/YYYY futura o «No la sé» (null). Va al acuerdo de listado (L20).
+    const lease = isTenant
+      ? parseLeaseEnd(String(formData.get("lease_end_date") ?? ""), formData.get("lease_end_unknown") === "1")
+      : ({ ok: true, iso: null } as const);
+    if (!lease.ok) redirect(`/${lang}/listing/new?step=3&id=${id}&error=${lease.error}`);
+    const leaseEndDate = lease.iso;
     const coopRaw = String(formData.get("tenant_cooperation") ?? "");
     const tenantCooperation =
       isTenant &&
@@ -1721,7 +1726,13 @@ export default async function ListingNewPage({
                                           ? copy.stepErrors.invalidHoa
                                           : sp.error === "invalid_tax"
                                             ? copy.stepErrors.invalidTax
-                                            : buyerCompError(sp.error);
+                                            : sp.error === "lease_end_required"
+                                              ? copy.stepErrors.leaseEndRequired
+                                              : sp.error === "lease_end_invalid"
+                                                ? copy.stepErrors.leaseEndInvalid
+                                                : sp.error === "lease_end_past"
+                                                  ? copy.stepErrors.leaseEndPast
+                                                  : buyerCompError(sp.error);
   function buyerCompError(code: string | undefined): string | null {
     const c = copy.step6.buyerComp;
     const fill = (s: string) =>
@@ -2361,7 +2372,8 @@ export default async function ListingNewPage({
                 initialRent={
                   draft?.monthly_rent != null ? String(draft.monthly_rent) : ""
                 }
-                initialLeaseEnd={draft?.lease_end_date ?? ""}
+                initialLeaseEnd={isoToUsDate(draft?.lease_end_date)}
+                initialLeaseUnknown={draft?.occupancy_status === "tenant_occupied" && !draft?.lease_end_date}
                 initialCooperation={
                   (draft?.tenant_cooperation ?? "") as
                     | ""
@@ -2378,6 +2390,9 @@ export default async function ListingNewPage({
                   leaseInfoTitle: copy.step3.leaseInfoTitle,
                   monthlyRentLabel: copy.step3.monthlyRentLabel,
                   leaseEndLabel: copy.step3.leaseEndLabel,
+                  leaseEndPlaceholder: copy.step3.leaseEndPlaceholder,
+                  leaseEndHelp: copy.step3.leaseEndHelp,
+                  leaseEndUnknown: copy.step3.leaseEndUnknown,
                   tenantCoopLabel: copy.step3.tenantCoopLabel,
                   coopCooperative: copy.step3.coopCooperative,
                   coopAdvanceNotice: copy.step3.coopAdvanceNotice,

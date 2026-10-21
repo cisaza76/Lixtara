@@ -65,14 +65,14 @@ Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-lay
 | 17 | `personal_property` | text | Paso 3, electrodomésticos incluidos (`properties.appliances`) | no | no | p1 x286 y314 · 288×11 · 9 pt | no | — |
 | 18 | `personal_property_see_attachment` | checkbox | Marcada si la lista no cabe en L17 | no | no | p1 x380 y327 | — | — |
 | 20 | `occupancy` | radio | Paso 3, `occupancy_status` (inquilino → is; vacía u ocupada por el dueño → is not) | sí | sí | is: p1 x128 y357 · is_not: p1 x152 y357 | — | — |
-| 20 | `lease_end_date` | text | Paso 3, `lease_end_date` (MM/DD/YYYY, solo con inquilino) | no | sí | p1 x491 y359 · 79×11 · 9 pt | no | solo si `occupancy` = is |
+| 20 | `lease_end_date` | text | Paso 3, `lease_end_date` (MM/DD/YYYY, solo con inquilino) | no | no | p1 x491 y359 · 79×11 · 9 pt | no | solo si `occupancy` = is |
 | 22 | `list_price` | text | Paso 3, `list_price` (sin «$») | sí | no | p1 x125 y388 · 107×11 · 9 pt | no | — |
-| 23 | `financing_cash` | checkbox | Paso 3, `cash_only` | no | sí | p1 x172 y397 | — | — |
-| 23 | `financing_conventional` | checkbox | Lo llena quien firma | no | sí | p1 x213 y397 | — | — |
-| 23 | `financing_va` | checkbox | Lo llena quien firma | no | sí | p1 x289 y397 | — | — |
-| 23 | `financing_fha` | checkbox | Lo llena quien firma | no | sí | p1 x319 y397 | — | — |
-| 23 | `financing_other` | checkbox | Lo llena quien firma | no | sí | p1 x357 y397 | — | — |
-| 23 | `financing_other_specify` | text | Lo llena quien firma | sí | sí | p1 x444 y400 · 129×11 · 9 pt | no | solo si `financing_other` = on |
+| 23 | `financing_cash` | checkbox | Paso 3, `cash_only` | no | no | p1 x172 y397 | — | — |
+| 23 | `financing_conventional` | checkbox | Lo llena quien firma | no | no | p1 x213 y397 | — | — |
+| 23 | `financing_va` | checkbox | Lo llena quien firma | no | no | p1 x289 y397 | — | — |
+| 23 | `financing_fha` | checkbox | Lo llena quien firma | no | no | p1 x319 y397 | — | — |
+| 23 | `financing_other` | checkbox | Lo llena quien firma | no | no | p1 x357 y397 | — | — |
+| 23 | `financing_other_specify` | text | Lo llena quien firma | no | no | p1 x444 y400 · 129×11 · 9 pt | no | solo si `financing_other` = on |
 | 71 | `lockbox_authorized` | checkbox | Plan: Concierge siempre; Pro si la casa está vacía | no | no | p2 x187 y291 | — | — |
 | 110 | `commission_pct` | text | Plan, `commissionPct` (sin «%») | sí | no | p3 x89 y71 · 51×11 · 9 pt | no | — |
 | 110 | `flat_fee` | text | Plan, `flatFee` (sin «$») | sí | no | p3 x301 y71 · 107×11 · 9 pt | no | — |

@@ -12,6 +12,7 @@ const base: AgreementInput = {
     address_city: "Miami",
     address_state: "FL",
     address_zip: "33131",
+    folio: "0102060101010",
     list_price: 650000,
     cash_only: true,
     occupancy_status: "vacant",
@@ -67,7 +68,16 @@ describe("Listing Agreement: valores por línea", () => {
     expect([r.text.legal_description, r.text.legal_description_2]).toEqual(["", ""]);
     expect(r.checkbox.legal_see_attachment).toBe(true);
     expect(r.attachment[0].heading).toMatch(/Legal Description/);
-    expect(r.attachment[0].body).toMatch(/county property record/);
+    expect(r.attachment[0].body.split("\n")).toEqual([
+      "Folio (Parcel ID): 0102060101010",
+      "Property address: 200 S Biscayne Blvd, Unit 4, Miami, FL 33131",
+      "County: To be confirmed by Broker from the county property record",
+      "",
+      "To be provided by Broker from the official county property record for the Property described in line 13.",
+    ]);
+    expect(r.legalStatus).toBe("pending");
+    expect(run({}, { folio: null }).attachment).toEqual([]); // la de base sí se verificó y cabe
+    expect(run({ verifiedLegal: null }, { folio: null }).attachment[0].body).toMatch(/^Folio \(Parcel ID\): Not available\n/);
   });
 
   it("descripción legal verificada demasiado larga: «See Attachment» con el texto completo del condado", () => {
@@ -76,7 +86,8 @@ describe("Listing Agreement: valores por línea", () => {
     const r = run({ verifiedLegal: long });
     expect([r.text.legal_description, r.text.legal_description_2]).toEqual(["", ""]);
     expect(r.checkbox.legal_see_attachment).toBe(true);
-    expect(r.attachment[0].body).toBe(long);
+    expect(r.attachment[0].body).toBe(`Folio (Parcel ID): 0102060101010\nProperty address: 200 S Biscayne Blvd, Unit 4, Miami, FL 33131\nCounty: Miami-Dade\n\n${long}`);
+    expect(r.legalStatus).toBe("verified");
   });
 
   it("personal property: una línea; si no cabe, «See Attachment» y la lista en el anexo", () => {
@@ -104,8 +115,10 @@ describe("Listing Agreement: valores por línea", () => {
     const unset = run({}, { occupancy_status: null });
     expect(unset.radio.occupancy).toEqual({ value: null, locked: false });
 
-    // Con inquilino y sin fecha en el paso 3, el vendedor la escribe en DocuSign.
-    expect(run({}, { occupancy_status: "tenant_occupied", lease_end_date: null }).lockedText).not.toContain("lease_end_date");
+    // Con inquilino y «No la sé» en el paso 3: vacía y de solo lectura.
+    const unknown = run({}, { occupancy_status: "tenant_occupied", lease_end_date: null });
+    expect(unknown.text.lease_end_date).toBe("");
+    expect(unknown.lockedText).toContain("lease_end_date");
   });
 
   it("«Other (specify)» nunca lo llena el sitio; «Cash» va como casilla", () => {

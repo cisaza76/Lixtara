@@ -27,6 +27,7 @@ import { CONSENTS } from "@/lib/legal/consents";
 import { recordAcceptance } from "@/lib/legal/consents.server";
 import { loadFirstIncompleteStep } from "@/lib/listing-completeness.server";
 import { verifiedLegalDescription } from "@/lib/miami-dade";
+import { recordAgreementSent } from "@/lib/agreement-legal.server";
 import { attachmentHtml, listingAgreementTabs } from "@/lib/docusign/listing-agreement-tabs";
 
 interface Body {
@@ -264,6 +265,8 @@ export async function POST(req: Request) {
         console.error("agreements insert failed:", JSON.stringify(insErr));
       }
       agreementRowId = inserted?.id ?? null;
+      // Con la descripción legal pendiente, el admin no puede aprobar el listing (#217).
+      await recordAgreementSent({ propertyId, userId: user.id, envelopeId, legal: contract.legalStatus });
     }
 
     const view = await getRecipientView({

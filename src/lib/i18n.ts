@@ -376,6 +376,9 @@ export const dictionaries = {
         leaseInfoTitle: "Lease information",
         monthlyRentLabel: "Current monthly rent ($)",
         leaseEndLabel: "Lease end date",
+        leaseEndPlaceholder: "MM/DD/YYYY",
+        leaseEndHelp: "Month/day/year, a future date. It goes on the listing agreement.",
+        leaseEndUnknown: "I don't know",
         tenantCoopLabel: "Tenant cooperation",
         coopCooperative: "Tenant is cooperative with showings",
         coopAdvanceNotice: "Tenant prefers advance notice (24 to 48h)",
@@ -717,6 +720,9 @@ export const dictionaries = {
         invalidParking: "Parking spaces must be between 0 and 50.",
         invalidHoa: "HOA fee must be a dollar amount of 0 or more.",
         invalidTax: "Property tax must be a dollar amount of 0 or more.",
+        leaseEndRequired: "With a tenant, enter the lease end date (MM/DD/YYYY) or check \"I don't know\".",
+        leaseEndInvalid: "Write the lease end date as MM/DD/YYYY (e.g. 12/31/2026).",
+        leaseEndPast: "The lease end date must be in the future.",
       },
       validation: {
         valueMissing: "Please fill out this field.",
@@ -744,6 +750,7 @@ export const dictionaries = {
         sqft: "Enter the square footage.",
         list_price: "Enter the list price.",
         photos_rights_confirmed: "Confirm you have the rights to the photos.",
+        lease_end_date: "Enter the lease end date (MM/DD/YYYY) or check \"I don't know\".",
       },
     },
     auth: {
@@ -1048,6 +1055,8 @@ export const dictionaries = {
           closed: "closed",
         },
         fixed: {
+          "Listing agreement sent (legal description verified)": "Listing agreement sent (legal description verified)",
+          "Listing agreement sent (legal description pending)": "Listing agreement sent (legal description pending)",
           "Seller uploaded a source video": "Seller uploaded a source video",
           "Seller removed their source video": "Seller removed their source video",
           "Source video archived by retention": "Source video archived by retention",
@@ -2411,6 +2420,9 @@ export const dictionaries = {
         leaseInfoTitle: "Información del arrendamiento",
         monthlyRentLabel: "Renta mensual actual ($)",
         leaseEndLabel: "Fecha de fin del contrato",
+        leaseEndPlaceholder: "MM/DD/AAAA",
+        leaseEndHelp: "Mes/día/año, una fecha futura. Va en el acuerdo de listado.",
+        leaseEndUnknown: "No la sé",
         tenantCoopLabel: "Cooperación del inquilino",
         coopCooperative: "El inquilino coopera con las visitas",
         coopAdvanceNotice: "El inquilino prefiere aviso previo (de 24 a 48h)",
@@ -2752,6 +2764,9 @@ export const dictionaries = {
         invalidParking: "Los espacios de parqueo deben estar entre 0 y 50.",
         invalidHoa: "La cuota HOA debe ser un monto en dólares de 0 o más.",
         invalidTax: "El impuesto a la propiedad debe ser un monto en dólares de 0 o más.",
+        leaseEndRequired: "Con inquilino, escribe la fecha de fin del contrato (MM/DD/AAAA) o marca «No la sé».",
+        leaseEndInvalid: "Escribe la fecha de fin del contrato como MM/DD/AAAA (p. ej. 12/31/2026).",
+        leaseEndPast: "La fecha de fin del contrato tiene que ser futura.",
       },
       validation: {
         valueMissing: "Completa este campo.",
@@ -2779,6 +2794,7 @@ export const dictionaries = {
         sqft: "Ingresa los pies cuadrados.",
         list_price: "Ingresa el precio de venta.",
         photos_rights_confirmed: "Confirma que tienes los derechos de las fotos.",
+        lease_end_date: "Escribe la fecha de fin del contrato (MM/DD/AAAA) o marca «No la sé».",
       },
     },
     auth: {
@@ -3083,6 +3099,8 @@ export const dictionaries = {
           closed: "cerrado",
         },
         fixed: {
+          "Listing agreement sent (legal description verified)": "Acuerdo de listado enviado (descripción legal verificada)",
+          "Listing agreement sent (legal description pending)": "Acuerdo de listado enviado (descripción legal pendiente)",
           "Seller uploaded a source video": "El vendedor subió un video de origen",
           "Seller removed their source video": "El vendedor eliminó su video de origen",
           "Source video archived by retention": "Video de origen archivado por la política de conservación",

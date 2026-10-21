@@ -12,6 +12,8 @@ import { fetchSellerContacts } from "@/lib/admin-sellers.server";
 import { fetchSubmittedAt } from "@/lib/admin-submitted.server";
 import { activityText } from "@/lib/admin-activity";
 import { shortListingId } from "@/lib/admin-sellers";
+import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
+import { legalPendingMessage } from "@/lib/agreement-legal";
 import {
   ensureEnterMlsNumberTask,
   mapMlsNumberWriteError,
@@ -76,6 +78,7 @@ export default async function AdminPage({
   // "Enviado": cuándo entró en revisión (property_status_history), no la última edición.
   // La cola va en orden de envío, el más antiguo primero.
   const submittedAt = await fetchSubmittedAt(supabase, (pendingRows ?? []).map((p) => p.id as string));
+  const legalPending = await pendingLegalByProperty((pendingRows ?? []).map((p) => p.id as string));
   const pending = ((pendingRows ?? []) as PendingListing[]).sort((a, b) =>
     (submittedAt.get(a.id) ?? "9999").localeCompare(submittedAt.get(b.id) ?? "9999"),
   );
@@ -164,6 +167,9 @@ export default async function AdminPage({
     if (!mls.ok && mls.reason === "invalid_format") {
       redirect(`/${lang}/admin?error=mls_number_invalid`);
     }
+
+    // Acuerdo enviado sin descripción legal verificada: no se publica (#217).
+    if ((await pendingLegalByProperty([id])).has(id)) redirect(`/${lang}/admin?error=legal_pending`);
 
     // Sin la contrafirma de la broker en DocuSign no se publica (el vendedor ya pagó al firmar).
     const gate = await checkBrokerCountersigned(id);
@@ -254,6 +260,11 @@ export default async function AdminPage({
         {sp.error === "mls_number_taken" && (
           <div className="mb-8">
             <ErrorBanner message={copy.mlsNumberTaken} />
+          </div>
+        )}
+        {sp.error === "legal_pending" && (
+          <div className="mb-8">
+            <ErrorBanner message={legalPendingMessage(lang)} />
           </div>
         )}
         {sp.error === "not_countersigned" && (
@@ -491,10 +502,16 @@ export default async function AdminPage({
                         </label>
                         <button
                           type="submit"
-                          className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
+                          disabled={legalPending.has(p.id)}
+                          className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {copy.approveButton}
                         </button>
+                        {legalPending.has(p.id) && (
+                          <span data-legal-pending className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
+                            {legalPendingMessage(lang)}
+                          </span>
+                        )}
                       </form>
                     </div>
                   </div>
