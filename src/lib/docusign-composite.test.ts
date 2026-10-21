@@ -11,7 +11,7 @@ const input: CreateEnvelopeInput = {
   clientUserId: "prop-1",
   brokerSigner: { roleName: "Broker", name: "Broker Name", email: "broker@example.com" },
   textTabs: { list_price: "650,000" },
-  radioGroupTabs: { occupancy: { value: "is", locked: true } },
+  radioGroupTabs: { occupancy: { value: "is", locked: true, options: ["is", "is_not"] } },
   attachments: [{ name: "Attachment to Listing Agreement", html: "<p>x</p>" }],
 };
 
@@ -54,7 +54,10 @@ describe("sobre con anexo", () => {
       const mod = await import("./docusign");
       await mod.createEnvelopeFromTemplate({ ...input, attachments: undefined, checkboxTabs: { lockbox_authorized: true }, lockedCheckboxTabs: ["lockbox_authorized"] });
       const tabs = (sent[0].templateRoles as Array<{ tabs?: Record<string, unknown> }>)[0].tabs!;
-      expect(tabs.radioGroupTabs).toEqual([{ groupName: "occupancy", radios: [{ value: "is", selected: "true", locked: "true" }] }]);
+      // Las dos opciones bloqueadas: el vendedor no puede pasar a «is not».
+      expect(tabs.radioGroupTabs).toEqual([
+        { groupName: "occupancy", radios: [{ value: "is", selected: "true", locked: "true" }, { value: "is_not", selected: "false", locked: "true" }] },
+      ]);
       expect(tabs.checkboxTabs).toEqual([{ tabLabel: "lockbox_authorized", selected: "true", locked: "true" }]);
 
       await mod.createEnvelopeFromTemplate({ ...input, attachments: undefined, radioGroupTabs: { occupancy: { value: null, locked: false } } });

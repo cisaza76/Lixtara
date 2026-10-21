@@ -103,17 +103,17 @@ describe("Listing Agreement: valores por línea", () => {
 
   it("ocupación: una sola opción desde el paso 3; el vencimiento del alquiler solo con «is», MM/DD/YYYY", () => {
     const tenant = run({}, { occupancy_status: "tenant_occupied", lease_end_date: "2026-12-31" });
-    expect(tenant.radio.occupancy).toEqual({ value: "is", locked: true });
+    expect(tenant.radio.occupancy).toEqual({ value: "is", locked: true, options: ["is", "is_not"] });
     expect(tenant.text.lease_end_date).toBe("12/31/2026");
     expect(tenant.lockedText).toContain("lease_end_date");
 
     const vacant = run({}, { occupancy_status: "vacant", lease_end_date: "2026-12-31" });
-    expect(vacant.radio.occupancy).toEqual({ value: "is_not", locked: true });
+    expect(vacant.radio.occupancy).toEqual({ value: "is_not", locked: true, options: ["is", "is_not"] });
     expect(vacant.text.lease_end_date).toBe("");
 
     expect(run({}, { occupancy_status: "owner_occupied" }).radio.occupancy.value).toBe("is_not");
     const unset = run({}, { occupancy_status: null });
-    expect(unset.radio.occupancy).toEqual({ value: null, locked: false });
+    expect(unset.radio.occupancy).toEqual({ value: null, locked: false, options: ["is", "is_not"] });
 
     // Con inquilino y «No la sé» en el paso 3: vacía y de solo lectura.
     const unknown = run({}, { occupancy_status: "tenant_occupied", lease_end_date: null });
@@ -125,9 +125,14 @@ describe("Listing Agreement: valores por línea", () => {
     const a = run({}, { financing_terms: ["cash", "conventional"], financing_other: null });
     expect(a.checkbox).toMatchObject({ financing_cash: true, financing_conventional: true, financing_va: false, financing_fha: false, financing_other: false });
     expect(a.text.financing_other_specify).toBe("");
-    const b = run({}, { financing_terms: ["other"], financing_other: "Seller financing, 20% down" });
+    const b = run({}, { financing_terms: ["other"], financing_other: "Lease-purchase" });
     expect(b.checkbox).toMatchObject({ financing_cash: false, financing_other: true });
-    expect(b.text.financing_other_specify).toBe("Seller financing, 20% down");
+    expect(b.text.financing_other_specify).toBe("Lease-purchase");
+    expect(b.attachment).toEqual([]);
+    // No cabe en L23 (~26 caracteres): «See Attachment» y el texto completo en el anexo.
+    const long = run({}, { financing_terms: ["other"], financing_other: "Seller financing with 20% down, 5 years" });
+    expect(long.text.financing_other_specify).toBe("See Attachment");
+    expect(long.attachment).toEqual([{ heading: "Financing Terms, Other (line 23)", body: "Seller financing with 20% down, 5 years" }]);
     // Texto guardado sin Other: no se escribe (nunca «Cash» ni nada en Other).
     expect(run({}, { financing_terms: ["cash"], financing_other: "Cash" }).text.financing_other_specify).toBe("");
     // Listing anterior a la migración: desde cash_only.

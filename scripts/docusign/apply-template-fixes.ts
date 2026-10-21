@@ -134,7 +134,13 @@ async function main() {
   if (steps.length === 0) return console.log("\nNothing to change.");
 
   await apply(templateId, seller.recipientId, steps);
-  const left = planTemplateFixes((await sellerOf(templateId)).tabs ?? {}, { anchors: ANCHORS });
+  let left = planTemplateFixes((await sellerOf(templateId)).tabs ?? {}, { anchors: ANCHORS });
+  // A condition on a tab created or renamed in the same call (occupancy, financing_other) is
+  // dropped by DocuSign: a second pass sets it once the parent exists (seen on 2026-10-21).
+  if (left.length > 0 && left.every((s) => s.action === "update")) {
+    await apply(templateId, seller.recipientId, left);
+    left = planTemplateFixes((await sellerOf(templateId)).tabs ?? {}, { anchors: ANCHORS });
+  }
   console.log(left.length === 0 ? `\n✓ Applied. The template now matches the layout (template ${templateId}).` : `\n✗ Still different after applying:\n${formatPlan(left)}`);
   if (left.length > 0) process.exitCode = 1;
 }

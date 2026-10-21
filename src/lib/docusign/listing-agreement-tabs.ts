@@ -60,7 +60,7 @@ export interface AgreementTabs {
   checkbox: Record<string, boolean>;
   lockedCheckbox: string[];
   /** groupName → selected value, or null to let the seller choose. */
-  radio: Record<string, { value: string | null; locked: boolean }>;
+  radio: Record<string, { value: string | null; locked: boolean; options: string[] }>;
   /** Sections of the "Attachment to the Listing Agreement" document, if any. */
   attachment: AttachmentSection[];
   /** "pending" = no county-verified legal description: the admin can't approve (#217). */
@@ -138,6 +138,10 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
   // Line 23: financing from step 3.
   const financing = new Set(savedFinancing(p));
   const otherText = financing.has("other") ? (p.financing_other ?? "").trim() : "";
+  // Line 23 holds ~26 characters after "Other (specify)"; step 3 allows 120. Longer → the line
+  // says "See Attachment" and the attachment has the full text (seen on a test envelope, 2026-10-21).
+  const otherFits = !otherText || fitsOnLine("financing_other_specify", otherText);
+  if (!otherFits) attachment.push({ heading: "Financing Terms, Other (line 23)", body: otherText });
 
   // Lockbox: Concierge always; Pro when the home is vacant. Essentials buys it as an add-on.
   const lockbox = tier.id === "concierge" || (tier.id === "pro" && p.occupancy_status === "vacant");
@@ -158,7 +162,7 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     flat_fee: plainNumber(tier.flatFee),
     buyer_comp_pct: buyerOffer.type === "percent" ? plainNumber(buyerOffer.pct) : "",
     buyer_comp_amount: buyerOffer.type === "amount" ? plainNumber(buyerOffer.amount) : "",
-    financing_other_specify: otherText,
+    financing_other_specify: otherFits ? otherText : "See Attachment",
   };
 
   return {
@@ -187,7 +191,7 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
       "lockbox_authorized",
       "buyer_commission_ack",
     ],
-    radio: { occupancy: { value: occupancy, locked: occupancy !== null } },
+    radio: { occupancy: { value: occupancy, locked: occupancy !== null, options: ["is", "is_not"] } },
     attachment,
     legalStatus: input.verifiedLegal?.trim() ? "verified" : "pending",
   };

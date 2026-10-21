@@ -10,8 +10,9 @@
 // licensed production form may be a real PDF: apply-template-fixes takes an `anchor` per field
 // and uses it when the PDF has text.
 //
-// How DocuSign draws them (checked on a completed Demo envelope, 2026-10-15):
-//   - a text tab's value is centered vertically in its height → y = underline − 10, height 11;
+// How DocuSign draws them (checked on signed Demo envelopes, 2026-10-15 and 2026-10-21):
+//   - a 9 pt text tab's value has its middle ~9.5 pt below the tab's top, whatever its height
+//     → y = underline − 14 puts the text just above the line (−10 struck it through);
 //   - a checkbox tab is drawn ~4 pt right of and below its position → x/y = printed box − 4.
 
 export const ERS21TN_FONT_SIZE_PT = 9;
@@ -61,7 +62,7 @@ const text = (f: Omit<TextField, "kind">): TextField => ({ kind: "text", ...f })
 const box = (f: Omit<CheckboxField, "kind">): CheckboxField => ({ kind: "checkbox", ...f });
 
 /** Text tab on the blank that runs from x0 to x1 with its underline at u (all in points). */
-const onBlank = (x0: number, x1: number, u: number) => ({ x: x0 + 2, y: u - 10, width: x1 - x0 - 4 });
+const onBlank = (x0: number, x1: number, u: number) => ({ x: x0 + 2, y: u - 14, width: x1 - x0 - 4 });
 /** Checkbox tab over the printed box whose top-left corner is (bx, by). */
 const overBox = (bx: number, by: number) => ({ x: bx - 4, y: by - 4 });
 

@@ -169,8 +169,11 @@ export interface CreateEnvelopeInput {
   lockedTextTabs?: string[];
   /** Checkbox labels the signer must NOT change. */
   lockedCheckboxTabs?: string[];
-  /** Radio groups (one choice): groupName → selected value (null = signer picks). */
-  radioGroupTabs?: Record<string, { value: string | null; locked: boolean }>;
+  /**
+   * Radio groups (one choice): groupName → selected value (null = signer picks). With
+   * `locked`, every option in `options` is locked too, so the signer can't switch to another.
+   */
+  radioGroupTabs?: Record<string, { value: string | null; locked: boolean; options?: string[] }>;
   /**
    * Extra documents added after the template's (e.g. the "See Attachment" annex), as HTML:
    * DocuSign converts them to PDF. With any, the envelope is built with composite templates.
@@ -261,7 +264,11 @@ export async function createEnvelopeFromTemplate(
     .filter(([, g]) => g.value !== null)
     .map(([groupName, g]) => ({
       groupName,
-      radios: [{ value: g.value, selected: "true", ...(g.locked ? { locked: "true" } : {}) }],
+      radios: [...new Set([g.value!, ...(g.locked ? (g.options ?? []) : [])])].map((value) => ({
+        value,
+        selected: value === g.value ? "true" : "false",
+        ...(g.locked ? { locked: "true" } : {}),
+      })),
     }));
 
   const tabs: Record<string, unknown> = {};
