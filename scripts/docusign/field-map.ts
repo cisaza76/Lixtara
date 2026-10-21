@@ -11,7 +11,7 @@ import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
-import { ERS21TN_FIELDS, ERS21TN_TEXT_HEIGHT } from "../../src/lib/docusign/ers21tn-layout";
+import { ERS21TN_FIELDS, ERS21TN_SELLER_SIGNATURES, ERS21TN_TEXT_HEIGHT } from "../../src/lib/docusign/ers21tn-layout";
 import { TEMPLATE_ENVS } from "./dump-templates";
 
 type Tab = Record<string, unknown> & { tabLabel?: string; pageNumber?: string; xPosition?: string; yPosition?: string; width?: string; height?: string };
@@ -61,6 +61,17 @@ const ERS_SOURCE: Record<string, string> = {
   brokerage_phone: "`CONTACT.phoneDisplay` (`src/config/contact.ts`)",
   brokerage_address: "`BROKERAGE.address` (`src/config/brokerage.ts`)",
   lockbox_authorized: "Plan: Concierge siempre; Pro si la casa está vacía",
+  protection_period_days: "`PROTECTION_PERIOD_DAYS` (`src/config/listing-agreement.ts`): 90 días",
+  retained_deposits_pct: "`RETAINED_DEPOSITS_PCT` (`src/config/listing-agreement.ts`): 0 (sin «%»)",
+  cancellation_fee: "Plan, `flatFee` (sin «$»): la tarifa fija del plan comprado",
+  additional_terms_1: "`ADDITIONAL_TERMS` (`listing-agreement-tabs.ts`): la tarifa de cancelación solo después de publicar en el MLS",
+  additional_terms_2: "`ADDITIONAL_TERMS`, segunda línea",
+  additional_terms_3: "`ADDITIONAL_TERMS`, tercera línea (vacía hoy)",
+  additional_terms_4: "`ADDITIONAL_TERMS`, cuarta línea (vacía hoy)",
+  single_agent_signature: "Firma del vendedor en el aviso de single agent (L171); L173 (segundo vendedor) sin tab: el sitio tiene un vendedor por acuerdo",
+  single_agent_date: "Fecha de firma del vendedor (L171)",
+  transition_consent_signature: "Firma del vendedor en el consentimiento a transaction broker (L201); L203 sin tab",
+  transition_consent_date: "Fecha de firma del vendedor (L201)",
 };
 const CASSB1_SOURCE: Record<string, string> = {
   fee_amount: "`cassb1Tabs`: monto fijo (hoy apagado: `CASSB1_ENABLED = false`)",
@@ -240,11 +251,15 @@ function ersAfter(): string {
     const cond = f.kind === "text" && f.conditional ? `solo si \`${f.conditional.parentLabel}\` = ${f.conditional.parentValue}` : "—";
     return `| ${f.line} | \`${name}\` | ${f.kind} | ${ERS_SOURCE[name] ?? "Lo llena quien firma"} | ${"required" in f && f.required ? "sí" : "no"} | ${f.locked ? "no" : "sí"} | ${geo} | ${f.kind === "text" ? "no" : "—"} | ${cond} |`;
   });
+  for (const f of ERS21TN_SELLER_SIGNATURES) {
+    const geo = `p${f.page} x${Math.round(f.x)} y${Math.round(f.y)}${f.scale ? ` · escala ${f.scale}` : " · 9 pt"}`;
+    rows.push(`| ${f.line} | \`${f.label}\` | ${f.kind.replace("Tabs", "")} | ${ERS_SOURCE[f.label] ?? "Lo llena quien firma"} | sí | — | ${geo} | — | — |`);
+  }
   return [
     "",
     "## Después del arreglo (`scripts/docusign/apply-template-fixes.ts`)",
     "",
-    "Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5). Firmas, fechas de firma y pie de Lixtara no cambian.",
+    "Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5). El vendedor firma y fecha además el aviso de single agent (L171) y el consentimiento a transaction broker (L201) (`ERS21TN_SELLER_SIGNATURES`, escala 0.65); L173 y L203 (segundo vendedor) quedan en blanco: el sitio tiene un vendedor por acuerdo. La firma y la fecha de la página 6 y el pie de Lixtara no cambian.",
     "",
     "| Línea | Campo | Tipo | Origen del dato | Obligatorio | Editable | Posición y tamaño | Auto-grow | Condición |",
     "|---|---|---|---|---|---|---|---|---|",

@@ -125,6 +125,9 @@ export const ERS21TN_FIELDS: LayoutField[] = [
   // ── Page 3 ──
   text({ label: "commission_pct", line: 110, page: 3, ...onBlank(87, 142, 81), locked: true, required: true }),
   text({ label: "flat_fee", line: 110, page: 3, ...onBlank(299, 410, 81), anchor: "purchase price plus $", locked: true, required: true }),
+  // Paragraph 8(d)(3) and 8(e): PROTECTION_PERIOD_DAYS and RETAINED_DEPOSITS_PCT (src/config/listing-agreement.ts).
+  text({ label: "protection_period_days", line: 123, page: 3, ...onBlank(297.5, 330.5, 229), locked: true, required: true }),
+  text({ label: "retained_deposits_pct", line: 128, page: 3, ...onBlank(485.5, 518.5, 288), locked: true, required: true }),
   {
     // Paragraph 10, one option: Lixtara's model is that the seller pays the buyer's broker apart
     // from Lixtara's commission → 10(b), with the amount on line 150; 0% → 10(c). Never 10(a)
@@ -147,6 +150,14 @@ export const ERS21TN_FIELDS: LayoutField[] = [
   text({ label: "single_agent_broker", line: 159, page: 4, ...onBlank(132.5, 575.5, 98.5), anchor: "As a single agent,", locked: true, required: true }),
   // The form prints "171" a second time, after line 181.
   text({ label: "transaction_broker", line: 171, page: 4, ...onBlank(158.5, 576, 417.5), anchor: "As a transaction broker,", locked: true, required: true }),
+  // ── Page 5 ──
+  // Paragraph 12: the cancellation fee is the plan's flat fee (pricing-tiers.ts).
+  text({ label: "cancellation_fee", line: 207, page: 5, ...onBlank(406, 517, 69.5), anchor: "cancellation fee of $", locked: true, required: true }),
+  // Paragraph 15, Additional Terms: one tab per printed line (20 pt apart), filled in order.
+  text({ label: "additional_terms_1", line: 230, page: 5, ...onBlank(157.5, 569, 350.5), anchor: "Additional Terms:", locked: true, required: false }),
+  text({ label: "additional_terms_2", line: 231, page: 5, ...onBlank(50.5, 567.5, 370.5), locked: true, required: false }),
+  text({ label: "additional_terms_3", line: 232, page: 5, ...onBlank(50.5, 567.5, 390.5), locked: true, required: false }),
+  text({ label: "additional_terms_4", line: 233, page: 5, ...onBlank(50.5, 567.5, 410.5), locked: true, required: false }),
   // ── Page 6 ── the broker signs and dates line 254 herself.
   text({ label: "brokerage_firm_name", line: 255, page: 6, ...onBlank(154.5, 404.5, 253.5), anchor: "Brokerage Firm Name:", locked: true, required: true }),
   text({ label: "brokerage_phone", line: 255, page: 6, ...onBlank(460.5, 571.5, 253.5), locked: true, required: true }),
@@ -167,6 +178,31 @@ const FOOTER_BLANK = { Seller: 77.5, Broker: 267 } as const;
 export const ERS21TN_INITIALS: InitialField[] = ([1, 2, 3, 4, 5, 6] as const).flatMap((page) =>
   (["Seller", "Broker"] as const).map((role) => ({ role, page, x: FOOTER_BLANK[role] + 3, y: 708, scale: 0.5 })),
 );
+
+/**
+ * The seller's signature and date on page 4: the single agent notice (lines 171–172) and the
+ * consent to transition to transaction broker (lines 201–202). Owner, 2026-10-21: single agent
+ * with consent to transition (paragraph 6(f)); both required.
+ *
+ * Lines 173–174 and 203–204 are for a second seller. The site has one seller per agreement (one
+ * "Seller" role on the envelope, no co-owner in the listing), so they get no tabs: they stay
+ * blank. A second seller needs a second role on the template and the co-owner in the data first.
+ *
+ * Signature: 22 pt of free space between the text above and the line (measured on the template
+ * image, 2026-10-21); the full-size stamp with its frame is ~34 pt, at `scale` 0.65 ~22 pt. Its
+ * frame is drawn from ~4 pt to ~37.5 pt below the tab's y (× scale), so y puts the frame's
+ * bottom 1.5 pt below the line. Date: same rule as a 9 pt text tab.
+ */
+export type SignatureField = { kind: "signHereTabs" | "dateSignedTabs"; label: string; line: number; page: number; x: number; y: number; scale?: number };
+const SIGN_SCALE = 0.65;
+const signOnLine = (x0: number, u: number) => ({ x: x0 + 2, y: Math.round(u + 1.5 - 37.5 * SIGN_SCALE), scale: SIGN_SCALE });
+const dateOnLine = (x0: number, u: number) => ({ x: x0 + 2, y: u - 14 });
+export const ERS21TN_SELLER_SIGNATURES: SignatureField[] = [
+  { kind: "signHereTabs", label: "single_agent_signature", line: 171, page: 4, ...signOnLine(50.5, 255) },
+  { kind: "dateSignedTabs", label: "single_agent_date", line: 171, page: 4, ...dateOnLine(436, 255) },
+  { kind: "signHereTabs", label: "transition_consent_signature", line: 201, page: 4, ...signOnLine(50.5, 666) },
+  { kind: "dateSignedTabs", label: "transition_consent_date", line: 201, page: 4, ...dateOnLine(436, 666) },
+];
 
 /** Height of every text tab: one line, no auto-grow. */
 export const ERS21TN_TEXT_HEIGHT = TEXT_HEIGHT;

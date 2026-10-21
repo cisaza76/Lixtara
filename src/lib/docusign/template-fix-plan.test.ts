@@ -1,8 +1,8 @@
 // Plan de arreglos de la plantilla del Listing Agreement (ERS-21tn): con los errores que tenía
 // la plantilla Demo (2026-10-21), y que aplicarlo una vez deja la plantilla igual al layout. Sin red.
 import { describe, it, expect } from "vitest";
-import { ERS21TN_FIELDS, ERS21TN_INITIALS } from "./ers21tn-layout";
-import { formatPlan, planInitialFixes, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "./template-fix-plan";
+import { ERS21TN_FIELDS, ERS21TN_INITIALS, ERS21TN_SELLER_SIGNATURES } from "./ers21tn-layout";
+import { formatPlan, planInitialFixes, planSignatureFixes, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "./template-fix-plan";
 
 let n = 0;
 const tab = (tabLabel: string, page: number, x: number, y: number, extra: Record<string, unknown> = {}) => ({
@@ -144,6 +144,32 @@ describe("arreglos de la plantilla ERS-21tn", () => {
     for (const i of ERS21TN_INITIALS) expect(i.x).toBeGreaterThanOrEqual(i.role === "Seller" ? 77 : 266);
     const after = applyLocally(demoTemplate(), seller);
     expect(planInitialFixes(after, "Seller")).toEqual([]);
+  });
+
+  it("firmas del vendedor: aviso de single agent (L171) y consentimiento a transaction broker (L201), con fecha; sin segundo vendedor", () => {
+    // La plantilla tenía solo la firma y la fecha de la página 6: se crean las cuatro de la página 4.
+    const live: LiveSellerTabs = { signHereTabs: [tab("Signature", 6, 163, 10)], dateSignedTabs: [tab("Date Signed", 6, 444, 28)] } as LiveSellerTabs;
+    const plan = planSignatureFixes(live);
+    expect(plan.map((s) => [s.action, s.kind, s.label])).toEqual([
+      ["create", "signHereTabs", "single_agent_signature"],
+      ["create", "dateSignedTabs", "single_agent_date"],
+      ["create", "signHereTabs", "transition_consent_signature"],
+      ["create", "dateSignedTabs", "transition_consent_date"],
+    ]);
+    for (const s of plan) expect(s.tab).toMatchObject({ pageNumber: "4", documentId: "1" });
+    expect(plan.filter((s) => s.kind === "signHereTabs").every((s) => (s.tab as Record<string, string>).optional === "false")).toBe(true);
+    // Sobre la línea de firma (L171 en y 255, L201 en y 666), sin pisar el texto de arriba (termina en 232.7 y 643.7).
+    const sig = (l: string) => ERS21TN_SELLER_SIGNATURES.find((f) => f.label === l)!;
+    for (const [l, top, line] of [["single_agent_signature", 232.7, 255], ["transition_consent_signature", 643.7, 666]] as const) {
+      const f = sig(l);
+      expect(f.y + 4 * f.scale!).toBeGreaterThan(top);
+      expect(f.y + 37.5 * f.scale!).toBeLessThanOrEqual(line + 2);
+    }
+    // Ningún tab en L173 ni L203 (segundo vendedor): el sitio tiene un vendedor por acuerdo.
+    expect(ERS21TN_SELLER_SIGNATURES.map((f) => f.line)).toEqual([171, 171, 201, 201]);
+    // La firma de la página 6 no se toca, y aplicado una vez el plan queda vacío.
+    expect(plan.some((s) => s.label === "Signature" || s.label === "Date Signed")).toBe(false);
+    expect(planSignatureFixes(applyLocally(live, plan))).toEqual([]);
   });
 
   it("aplicado una vez, el siguiente plan está vacío (idempotente)", () => {

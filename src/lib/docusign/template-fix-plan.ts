@@ -14,12 +14,17 @@
 //   - buyer's broker compensation: one locked choice for paragraph 10 (a / b / c; the site
 //     sends b, or c with 0%), "%" and "$" on line 150 (10(b)); the old 10(a) box is removed;
 //   - brokerage name on lines 159 and 171 (the second), name, phone and address on 255–256;
-//   - initials (seller and broker) in their blank of each page's footer.
+//   - initials (seller and broker) in their blank of each page's footer;
+//   - protection period (L123), retained deposits (L128), cancellation fee (L207) and the
+//     additional terms (L230–233), read-only;
+//   - the seller's signature and date on the single agent notice (L171) and on the consent to
+//     transition to transaction broker (L201).
 
 import {
   ERS21TN_FIELDS,
   ERS21TN_FONT_SIZE_PT,
   ERS21TN_INITIALS,
+  ERS21TN_SELLER_SIGNATURES,
   ERS21TN_TEXT_HEIGHT,
   type CheckboxField,
   type LayoutField,
@@ -42,9 +47,11 @@ export interface LiveSellerTabs {
   radioGroupTabs?: Array<LiveTab & { groupName?: string; radios?: LiveTab[] }>;
   tabGroups?: LiveTab[];
   initialHereTabs?: LiveTab[];
+  signHereTabs?: LiveTab[];
+  dateSignedTabs?: LiveTab[];
 }
 
-export type TabKind = "textTabs" | "checkboxTabs" | "listTabs" | "radioGroupTabs" | "tabGroups" | "initialHereTabs";
+export type TabKind = "textTabs" | "checkboxTabs" | "listTabs" | "radioGroupTabs" | "tabGroups" | "initialHereTabs" | "signHereTabs" | "dateSignedTabs";
 
 export interface PlanStep {
   action: "update" | "create" | "delete";
@@ -249,6 +256,43 @@ export function planInitialFixes(live: LiveSellerTabs, role: "Seller" | "Broker"
   return steps;
 }
 
+/**
+ * The seller's signatures and dates on page 4 (ERS21TN_SELLER_SIGNATURES), matched by label: the
+ * signature and date of page 6 have other labels and stay as they are.
+ */
+export function planSignatureFixes(live: LiveSellerTabs): PlanStep[] {
+  const steps: PlanStep[] = [];
+  for (const f of ERS21TN_SELLER_SIGNATURES) {
+    const want: Record<string, string> = {
+      tabLabel: f.label,
+      pageNumber: String(f.page),
+      xPosition: String(Math.round(f.x)),
+      yPosition: String(Math.round(f.y)),
+      ...(f.scale ? { scaleValue: String(f.scale) } : { fontSize: `size${ERS21TN_FONT_SIZE_PT}` }),
+    };
+    const found = (live[f.kind] ?? []).find((t) => t.tabLabel === f.label);
+    const what = f.kind === "signHereTabs" ? "signature" : "date";
+    if (!found) {
+      steps.push({
+        action: "create",
+        kind: f.kind,
+        label: f.label,
+        reason: `seller's ${what}, line ${f.line}`,
+        tab: { ...want, documentId: "1", tabType: f.kind === "signHereTabs" ? "signHere" : "dateSigned", ...(f.kind === "signHereTabs" ? { optional: "false" } : { font: "arial" }) },
+      });
+      continue;
+    }
+    const changes: Record<string, [string, string]> = {};
+    for (const [k, v] of Object.entries(want)) {
+      const before = fmt(found[k]);
+      const same = k === "scaleValue" || k === "xPosition" || k === "yPosition" || k === "pageNumber" ? Number(before || NaN) === Number(v) : before.toLowerCase() === v.toLowerCase();
+      if (!same) changes[k] = [before, v];
+    }
+    if (Object.keys(changes).length > 0) steps.push({ action: "update", kind: f.kind, tabId: found.tabId, label: f.label, reason: `seller's ${what}, line ${f.line}`, changes });
+  }
+  return steps;
+}
+
 /** The plan as a readable diff (what --dry-run prints and what the owner approves). */
 export function formatPlan(steps: PlanStep[]): string {
   const lines: string[] = [];
@@ -259,6 +303,7 @@ export function formatPlan(steps: PlanStep[]): string {
     if (s.action === "create" && s.tab) {
       const t = s.tab as Record<string, unknown>;
       if (t.radios) for (const r of t.radios as Array<Record<string, string>>) lines.push(`    radio ${r.value}: p${r.pageNumber} x${r.xPosition} y${r.yPosition} required=${r.required}`);
+      else if (t.locked === undefined) lines.push(`    p${t.pageNumber} x${t.xPosition} y${t.yPosition}${t.scaleValue ? ` scale ${t.scaleValue}` : ""}`);
       else lines.push(`    p${t.pageNumber} x${t.xPosition} y${t.yPosition}${t.width ? ` w${t.width} h${t.height}` : ""} locked=${t.locked} required=${t.required}${t.conditionalParentLabel ? ` if ${t.conditionalParentLabel}=${t.conditionalParentValue}` : ""}`);
     }
   }

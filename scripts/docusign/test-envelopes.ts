@@ -13,17 +13,18 @@
 // that was just sent downloads as the blank form (seen on 2026-10-21). To review values, sign
 // each one as the TEST seller (--sign-urls), then --download.
 //
-// (a) tenant + lease end date, financing Cash + Conventional; buyer's broker 2.5% → 10(b)
-// (b) vacant (Pro → lock box), financing Other with text; buyer's broker $12,000 → 10(b)
-// (c) owner-occupied, VA + FHA, legal description not verified → "See Attachment" +
-//     attachment; buyer's broker 0% → 10(c)
+// One plan each, so the cancellation fee (line 207) shows all three flat fees:
+// (a) Essentials; tenant + lease end date, financing Cash + Conventional; buyer's broker 2.5% → 10(b)
+// (b) Pro; vacant (→ lock box), financing Other with text; buyer's broker $12,000 → 10(b)
+// (c) Concierge (→ lock box); owner-occupied, VA + FHA, legal description not verified →
+//     "See Attachment" + attachment; buyer's broker 0% → 10(c)
 import "./env";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createEnvelopeFromTemplate, getAccessToken, getRecipientView, LIXTARA_BROKER_ROLE } from "../../src/lib/docusign";
 import { attachmentHtml, listingAgreementTabs, type AgreementListing } from "../../src/lib/docusign/listing-agreement-tabs";
 import type { BuyerCompOffer } from "../../src/lib/buyer-comp";
-import { PRICING_TIERS } from "../../src/lib/pricing-tiers";
+import { PRICING_TIERS, type PricingTierId } from "../../src/lib/pricing-tiers";
 import { t } from "../../src/lib/i18n";
 import { apiBase, dsGet } from "./dump-templates";
 
@@ -50,22 +51,25 @@ const base: AgreementListing = {
 };
 const VERIFIED = "TEST SUBDIVISION PB 00-00\nLOT 4 BLK 1 (TEST DATA)";
 
-const CASES: Array<{ key: string; listing: AgreementListing; verifiedLegal: string | null; buyerOffer: BuyerCompOffer }> = [
+const CASES: Array<{ key: string; tier: PricingTierId; listing: AgreementListing; verifiedLegal: string | null; buyerOffer: BuyerCompOffer }> = [
   {
     key: "a-tenant-cash-conventional",
-    listing: { ...base, occupancy_status: "tenant_occupied", lease_end_date: "2027-03-31", financing_terms: ["cash", "conventional"] },
+    tier: "essentials",
+    listing: { ...base, pricing_tier: "essentials", occupancy_status: "tenant_occupied", lease_end_date: "2027-03-31", financing_terms: ["cash", "conventional"] },
     verifiedLegal: VERIFIED,
     buyerOffer: { type: "percent", pct: 2.5 },
   },
   {
     key: "b-no-tenant-other",
+    tier: "pro",
     listing: { ...base, occupancy_status: "vacant", financing_terms: ["other"], financing_other: "TEST: seller financing with 20% down" },
     verifiedLegal: VERIFIED,
     buyerOffer: { type: "amount", amount: 12000 },
   },
   {
     key: "c-legal-pending",
-    listing: { ...base, occupancy_status: "owner_occupied", financing_terms: ["va", "fha"] },
+    tier: "concierge",
+    listing: { ...base, pricing_tier: "concierge", occupancy_status: "owner_occupied", financing_terms: ["va", "fha"] },
     verifiedLegal: null,
     buyerOffer: { type: "none" },
   },
@@ -104,7 +108,7 @@ async function main() {
   for (const c of CASES.filter((x) => !only || x.key === only)) {
     const contract = listingAgreementTabs({
       listing: c.listing,
-      tier: PRICING_TIERS.pro,
+      tier: PRICING_TIERS[c.tier],
       sellerName: "TEST Seller (made-up data)",
       brokerName: "Lixtara LLC",
       buyerOffer: c.buyerOffer,

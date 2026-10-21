@@ -5,8 +5,18 @@ import { PRICING_TIERS } from "@/lib/pricing-tiers";
 import { BROKERAGE } from "@/config/brokerage";
 import { CONTACT } from "@/config/contact";
 import { t } from "@/lib/i18n";
+import { PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
 import { ERS21TN_FIELDS, fitsOnLine } from "./ers21tn-layout";
-import { attachmentHtml, listingAgreementTabs, splitOverLines, usDate, type AgreementInput } from "./listing-agreement-tabs";
+import {
+  ADDITIONAL_TERMS,
+  ADDITIONAL_TERMS_LABELS,
+  attachmentHtml,
+  listingAgreementTabs,
+  splitOverLabels,
+  splitOverLines,
+  usDate,
+  type AgreementInput,
+} from "./listing-agreement-tabs";
 
 const base: AgreementInput = {
   listing: {
@@ -181,6 +191,41 @@ describe("Listing Agreement: valores por línea", () => {
     expect(Object.keys(r.text).some((k) => /signature|sign_date|broker_date/.test(k))).toBe(false);
   });
 
+  it("período de protección (L123) y depósitos retenidos (L128) desde src/config/listing-agreement.ts, de solo lectura", () => {
+    expect(PROTECTION_PERIOD_DAYS).toBe(90);
+    expect(RETAINED_DEPOSITS_PCT).toBe(0);
+    const r = run();
+    expect(r.text).toMatchObject({ protection_period_days: "90", retained_deposits_pct: "0" });
+    for (const k of ["protection_period_days", "retained_deposits_pct"]) {
+      expect(r.lockedText, k).toContain(k);
+      expect(fitsOnLine(k, r.text[k]), k).toBe(true);
+    }
+    const line = (l: string) => ERS21TN_FIELDS.find((f) => f.kind === "text" && f.label === l)!.line;
+    expect([line("protection_period_days"), line("retained_deposits_pct"), line("cancellation_fee")]).toEqual([123, 128, 207]);
+  });
+
+  it.each(["essentials", "pro", "concierge"] as const)("tarifa de cancelación (L207) = la tarifa fija del plan %s, sin «$», de solo lectura", (id) => {
+    const r = run({ tier: PRICING_TIERS[id] }, { pricing_tier: id });
+    expect(r.text.cancellation_fee).toBe(PRICING_TIERS[id].flatFee.toLocaleString("en-US"));
+    expect(r.text.cancellation_fee).toBe(r.text.flat_fee);
+    expect(r.lockedText).toContain("cancellation_fee");
+    expect(fitsOnLine("cancellation_fee", r.text.cancellation_fee)).toBe(true);
+  });
+
+  it("párrafo 15 (L230–233): el texto de la tarifa de cancelación cabe en las líneas, completo y de solo lectura", () => {
+    const r = run();
+    const lines = ADDITIONAL_TERMS_LABELS.map((l) => r.text[l]);
+    expect(lines.filter(Boolean).join(" ")).toBe(ADDITIONAL_TERMS);
+    expect(lines[0]).toMatch(/^The cancellation fee in Paragraph 12 applies only if/);
+    for (const l of ADDITIONAL_TERMS_LABELS) {
+      expect(r.lockedText, l).toContain(l);
+      expect(fitsOnLine(l, r.text[l]), l).toBe(true);
+    }
+    expect(r.attachment.some((a) => /Additional/i.test(a.heading))).toBe(false);
+    expect(ADDITIONAL_TERMS).toContain("Terms of Service, Section 6");
+    expect(ERS21TN_FIELDS.filter((f) => f.kind === "text" && ADDITIONAL_TERMS_LABELS.includes(f.label)).map((f) => f.line)).toEqual([230, 231, 232, 233]);
+  });
+
   it("fechas del plazo: hoy y hoy + 24 meses", () => {
     expect(run().text).toMatchObject({ start_date: "October 21, 2026", termination_date: "October 21, 2028" });
   });
@@ -189,6 +234,8 @@ describe("Listing Agreement: valores por línea", () => {
     expect(usDate("2027-03-05")).toBe("03/05/2027");
     expect(usDate("31/12/2026")).toBe("");
     expect(splitOverLines("A B", "legal_description", "legal_description_2")).toEqual(["A B", ""]);
+    expect(splitOverLabels("A B", ["additional_terms_1", "additional_terms_2"])).toEqual(["A B", ""]);
+    expect(splitOverLabels("word ".repeat(400), ["additional_terms_1", "additional_terms_2"])).toBeNull();
     expect(attachmentHtml([{ heading: "X", body: "<b>1</b>\n2" }], "1 Main St")).toContain("&lt;b&gt;1&lt;/b&gt;<br>2");
   });
 

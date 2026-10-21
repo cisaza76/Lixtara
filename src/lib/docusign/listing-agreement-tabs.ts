@@ -14,12 +14,20 @@
 //     with the % or amount on line 150; 0% → 10(c); never 10(a). One choice, read-only;
 //   - the brokerage on lines 159, 171 (the second one) and 254–256: name, address, phone. The
 //     broker signs and dates line 254 herself.
+//
+// Broker's decisions (Anamaria, 2026-10-21):
+//   - protection period (line 123) and retained deposits (line 128) from
+//     src/config/listing-agreement.ts;
+//   - cancellation fee (line 207) = the flat fee of the seller's plan;
+//   - paragraph 15 (lines 230–233): ADDITIONAL_TERMS, the cancellation fee only after MLS
+//     publication (Terms of Service §6).
 
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import type { BuyerCompOffer } from "@/lib/buyer-comp";
 import { buyerCompOption } from "@/lib/buyer-comp";
 import { BROKERAGE } from "@/config/brokerage";
 import { CONTACT } from "@/config/contact";
+import { PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
 import type { PricingTier } from "@/lib/pricing-tiers";
 import { savedFinancing } from "@/lib/financing-terms";
 import { fitsOnLine, textWidthPt, textField } from "./ers21tn-layout";
@@ -85,22 +93,42 @@ export function usDate(iso: string | null): string {
 const plainNumber = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 /**
+ * Paragraph 15, Additional Terms (owner and broker, 2026-10-21). Read-only on lines 230–233; the
+ * Terms of Service §6 say the same.
+ */
+export const ADDITIONAL_TERMS =
+  "The cancellation fee in Paragraph 12 applies only if the Property has been published in the MLS. If Seller cancels before MLS publication, Seller receives a full refund as stated in Lixtara's Terms of Service, Section 6.";
+export const ADDITIONAL_TERMS_LABELS = ["additional_terms_1", "additional_terms_2", "additional_terms_3", "additional_terms_4"];
+
+/**
+ * Splits `text` over the lines `labels`, in order, word by word. null when it doesn't fit in
+ * all of them: the caller then uses the attachment.
+ */
+export function splitOverLabels(text: string, labels: string[]): string[] | null {
+  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const out: string[] = [];
+  let i = 0;
+  for (const label of labels) {
+    const room = textField(label).width - 2;
+    let line = "";
+    for (; i < words.length; i++) {
+      const next = line ? `${line} ${words[i]}` : words[i];
+      if (textWidthPt(next) > room) break;
+      line = next;
+    }
+    // A word longer than the whole line never fits.
+    if (!line && i < words.length) return null;
+    out.push(line);
+  }
+  return i === words.length ? out : null;
+}
+
+/**
  * Splits `text` over two lines (labels `first`, `second`) word by word. null when it doesn't fit
  * in both: the caller then uses the attachment.
  */
 export function splitOverLines(text: string, first: string, second: string): [string, string] | null {
-  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-  const room = (label: string) => textField(label).width - 2;
-  let a = "";
-  let i = 0;
-  for (; i < words.length; i++) {
-    const next = a ? `${a} ${words[i]}` : words[i];
-    if (textWidthPt(next) > room(first)) break;
-    a = next;
-  }
-  const b = words.slice(i).join(" ");
-  if (!a && words.length > 0) return null;
-  return textWidthPt(b) <= room(second) ? [a, b] : null;
+  return splitOverLabels(text, [first, second]) as [string, string] | null;
 }
 
 export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
@@ -152,6 +180,10 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
   // Lockbox: Concierge always; Pro when the home is vacant. Essentials buys it as an add-on.
   const lockbox = tier.id === "concierge" || (tier.id === "pro" && p.occupancy_status === "vacant");
 
+  // Paragraph 15: a fixed text, checked to fit by the tests; never in the attachment.
+  const additional = splitOverLabels(ADDITIONAL_TERMS, ADDITIONAL_TERMS_LABELS);
+  if (!additional) throw new Error("ADDITIONAL_TERMS doesn't fit on lines 230–233");
+
   const text: Record<string, string> = {
     seller_name: input.sellerName,
     broker_name: input.brokerName,
@@ -166,6 +198,9 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     list_price: plainNumber(Number(p.list_price)),
     commission_pct: plainNumber(tier.commissionPct),
     flat_fee: plainNumber(tier.flatFee),
+    protection_period_days: String(PROTECTION_PERIOD_DAYS),
+    retained_deposits_pct: plainNumber(RETAINED_DEPOSITS_PCT),
+    cancellation_fee: plainNumber(tier.flatFee),
     buyer_comp_pct: buyerOffer.type === "percent" ? plainNumber(buyerOffer.pct) : "",
     buyer_comp_amount: buyerOffer.type === "amount" ? plainNumber(buyerOffer.amount) : "",
     financing_other_specify: otherFits ? otherText : "See Attachment",
@@ -174,6 +209,7 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     brokerage_firm_name: BROKERAGE.legalName,
     brokerage_phone: CONTACT.phoneDisplay,
     brokerage_address: BROKERAGE.address,
+    ...Object.fromEntries(ADDITIONAL_TERMS_LABELS.map((label, i) => [label, additional[i]])),
   };
 
   return {

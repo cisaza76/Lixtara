@@ -49,7 +49,7 @@ PDF: imagen escaneada, sin texto (no se pueden usar anclas: posiciones por coord
 
 ## Después del arreglo (`scripts/docusign/apply-template-fixes.ts`)
 
-Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5). Firmas, fechas de firma y pie de Lixtara no cambian.
+Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5). El vendedor firma y fecha además el aviso de single agent (L171) y el consentimiento a transaction broker (L201) (`ERS21TN_SELLER_SIGNATURES`, escala 0.65); L173 y L203 (segundo vendedor) quedan en blanco: el sitio tiene un vendedor por acuerdo. La firma y la fecha de la página 6 y el pie de Lixtara no cambian.
 
 | Línea | Campo | Tipo | Origen del dato | Obligatorio | Editable | Posición y tamaño | Auto-grow | Condición |
 |---|---|---|---|---|---|---|---|---|
@@ -76,11 +76,22 @@ Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-lay
 | 71 | `lockbox_authorized` | checkbox | Plan: Concierge siempre; Pro si la casa está vacía | no | no | p2 x187 y291 | — | — |
 | 110 | `commission_pct` | text | Plan, `commissionPct` (sin «%») | sí | no | p3 x89 y67 · 51×11 · 9 pt | no | — |
 | 110 | `flat_fee` | text | Plan, `flatFee` (sin «$») | sí | no | p3 x301 y67 · 107×11 · 9 pt | no | — |
+| 123 | `protection_period_days` | text | `PROTECTION_PERIOD_DAYS` (`src/config/listing-agreement.ts`): 90 días | sí | no | p3 x300 y215 · 29×11 · 9 pt | no | — |
+| 128 | `retained_deposits_pct` | text | `RETAINED_DEPOSITS_PCT` (`src/config/listing-agreement.ts`): 0 (sin «%») | sí | no | p3 x488 y274 · 29×11 · 9 pt | no | — |
 | 145 | `buyer_comp_option` | radio | Paso 6: 10(b) si ofrece compensación (> 0; la paga el vendedor, aparte de la comisión de Lixtara), 10(c) con 0%; nunca 10(a) | sí | no | a: p3 x119 y494 · b: p3 x119 y546 · c: p3 x119 y586 | — | — |
 | 150 | `buyer_comp_pct` | text | Paso 6, oferta en % (sin «%»), L150 = 10(b) | no | no | p3 x125 y558 · 30×11 · 9 pt | no | — |
 | 150 | `buyer_comp_amount` | text | Paso 6, oferta en monto fijo (sin «$»), L150 = 10(b) | no | no | p3 x283 y558 · 80×11 · 9 pt | no | — |
 | 159 | `single_agent_broker` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p4 x135 y85 · 439×11 · 9 pt | no | — |
 | 171 | `transaction_broker` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p4 x161 y404 · 414×11 · 9 pt | no | — |
+| 207 | `cancellation_fee` | text | Plan, `flatFee` (sin «$»): la tarifa fija del plan comprado | sí | no | p5 x408 y56 · 107×11 · 9 pt | no | — |
+| 230 | `additional_terms_1` | text | `ADDITIONAL_TERMS` (`listing-agreement-tabs.ts`): la tarifa de cancelación solo después de publicar en el MLS | no | no | p5 x160 y337 · 408×11 · 9 pt | no | — |
+| 231 | `additional_terms_2` | text | `ADDITIONAL_TERMS`, segunda línea | no | no | p5 x53 y357 · 513×11 · 9 pt | no | — |
+| 232 | `additional_terms_3` | text | `ADDITIONAL_TERMS`, tercera línea (vacía hoy) | no | no | p5 x53 y377 · 513×11 · 9 pt | no | — |
+| 233 | `additional_terms_4` | text | `ADDITIONAL_TERMS`, cuarta línea (vacía hoy) | no | no | p5 x53 y397 · 513×11 · 9 pt | no | — |
 | 255 | `brokerage_firm_name` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p6 x157 y240 · 246×11 · 9 pt | no | — |
 | 255 | `brokerage_phone` | text | `CONTACT.phoneDisplay` (`src/config/contact.ts`) | sí | no | p6 x463 y240 · 107×11 · 9 pt | no | — |
 | 256 | `brokerage_address` | text | `BROKERAGE.address` (`src/config/brokerage.ts`) | sí | no | p6 x95 y263 · 475×11 · 9 pt | no | — |
+| 171 | `single_agent_signature` | signHere | Firma del vendedor en el aviso de single agent (L171); L173 (segundo vendedor) sin tab: el sitio tiene un vendedor por acuerdo | sí | — | p4 x53 y232 · escala 0.65 | — | — |
+| 171 | `single_agent_date` | dateSigned | Fecha de firma del vendedor (L171) | sí | — | p4 x438 y241 · 9 pt | — | — |
+| 201 | `transition_consent_signature` | signHere | Firma del vendedor en el consentimiento a transaction broker (L201); L203 sin tab | sí | — | p4 x53 y643 · escala 0.65 | — | — |
+| 201 | `transition_consent_date` | dateSigned | Fecha de firma del vendedor (L201) | sí | — | p4 x438 y652 · 9 pt | — | — |
