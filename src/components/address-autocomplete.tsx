@@ -119,6 +119,13 @@ function loadGoogleMaps(apiKey: string, language: string): Promise<void> {
   });
 }
 
+/** Whether Google's suggestion list (legacy Places Autocomplete) is showing. */
+function suggestionsOpen(): boolean {
+  return Array.from(document.querySelectorAll<HTMLElement>(".pac-container")).some(
+    (el) => el.offsetParent !== null && el.querySelector(".pac-item") !== null,
+  );
+}
+
 export function AddressAutocomplete({
   streetLabel,
   streetPlaceholder,
@@ -268,6 +275,11 @@ export function AddressAutocomplete({
           defaultValue={defaultStreet}
           autoComplete="section-property address-line1"
           placeholder={streetPlaceholder}
+          // Enter on a Google suggestion picks it; it must not also submit step 1 (that sent
+          // the form with the half-typed street, and "Next" then sent it again).
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && suggestionsOpen()) e.preventDefault();
+          }}
           className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
         />
         <span

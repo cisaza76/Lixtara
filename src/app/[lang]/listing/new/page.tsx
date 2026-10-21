@@ -104,6 +104,8 @@ import {
   refundPolicy,
 } from "@/config/legal-terms";
 import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
+import { recentOwnDraftId } from "@/lib/listing-step1-dedupe.server";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
@@ -694,16 +696,18 @@ export default async function ListingNewPage({
       longitude: finalLng,
     };
 
-    if (id) {
+    // Sin id: si este dueño acaba de crear un borrador (doble envío), se actualiza ese.
+    const existingId = id || (await recentOwnDraftId(supabase, user.id));
+    if (existingId) {
       const { error } = await supabase
         .from("properties")
         .update(addressUpdate)
-        .eq("id", id)
+        .eq("id", existingId)
         .eq("owner_id", user.id);
       if (error) {
         await backToStep1("save_failed");
       }
-      await continueTo(id, user.id);
+      await continueTo(existingId, user.id);
     }
 
     const suggestedTierRaw = String(formData.get("suggested_tier") ?? "");
@@ -1864,7 +1868,7 @@ export default async function ListingNewPage({
             {/* Only a visitor without a session triggers the anonymous
                 sign-up in saveStep1; that's the only call needing a token. */}
             {!sessionUser && <TurnstileWidget lang={lang} />}
-            <SubmitButton>{copy.nextLabel} →</SubmitButton>
+            <PendingSubmitButton>{copy.nextLabel} →</PendingSubmitButton>
             {!sessionUser && (
               <Link
                 href={`/${lang}/listing/continue`}
