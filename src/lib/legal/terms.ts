@@ -225,7 +225,7 @@ const terms: LegalContent = {
       {
         heading: "16. Term and Termination",
         body: [
-          `These Terms apply while you use the Services. You may stop using the Services at any time. You may close your account by contacting us at ${SUPPORT_EMAIL}, subject to your signed listing agreement and its Early Termination Addendum.`,
+          `These Terms apply while you use the Services. You may stop using the Services at any time. You may close your account by contacting us at ${SUPPORT_EMAIL}, subject to your signed listing agreement, including its Paragraph 12 (Conditional Termination).`,
           "We may suspend or terminate your access to the Services, in whole or in part, at any time if we reasonably believe you have violated these Terms or applicable law, if needed to protect the Services or other users, or as otherwise permitted by law. Where reasonable and lawful, we will provide notice.",
           "Termination of your account does not by itself terminate a signed listing agreement, which is governed by its own terms. Sections of these Terms that by their nature should survive termination (including provisions on fees already incurred, intellectual property, disclaimers, limitation of liability, indemnification, dispute resolution, and governing law) will survive.",
         ],
@@ -450,7 +450,7 @@ const terms: LegalContent = {
       {
         heading: "16. Vigencia y Terminación",
         body: [
-          `Estos Términos se aplican mientras usted utilice los Servicios. Usted puede dejar de usar los Servicios en cualquier momento. Puede cerrar su cuenta comunicándose con nosotros a ${SUPPORT_EMAIL}, sujeto a lo que establezcan su acuerdo de listado firmado y su Anexo de Terminación Anticipada (Early Termination Addendum).`,
+          `Estos Términos se aplican mientras usted utilice los Servicios. Usted puede dejar de usar los Servicios en cualquier momento. Puede cerrar su cuenta comunicándose con nosotros a ${SUPPORT_EMAIL}, sujeto a lo que establezca su acuerdo de listado firmado, incluido su párrafo 12 (Conditional Termination, terminación condicional).`,
           "Podemos suspender o cancelar su acceso a los Servicios, en su totalidad o en parte, en cualquier momento si razonablemente creemos que ha violado estos Términos o la ley aplicable, si es necesario para proteger los Servicios u otros usuarios, o según lo permita la ley. Cuando sea razonable y lícito, le proporcionaremos aviso.",
           "La terminación de su cuenta no termina por sí misma un acuerdo de publicación firmado, el cual se rige por sus propios términos. Las secciones de estos Términos que por su naturaleza deban subsistir tras la terminación (incluidas las disposiciones sobre tarifas ya incurridas, propiedad intelectual, renuncias de garantías, limitación de responsabilidad, indemnización, resolución de disputas y ley aplicable) subsistirán.",
         ],

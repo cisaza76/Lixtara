@@ -6,7 +6,8 @@
 //
 // v2 publicada el 2026-10-18 por decisión del owner, sin revisión del abogado todavía
 // (docs/legal/2026-10-18-textos-v2-memo.md). v3 de los Términos (2026-10-21, decisión de la
-// broker): §6 con la tarifa de cancelación después de publicar en el MLS; los demás documentos
+// broker y del owner): §6 con la tarifa de cancelación después de publicar en el MLS y §16 con
+// el párrafo 12 del acuerdo de listado; los demás documentos
 // siguen en la v2 (docs/legal/2026-10-21-textos-v3-memo.md). Al publicar una versión nueva: cambiar `version`
 // aquí (y la fecha en types.ts). Las aceptaciones ya registradas conservan su versión.
 import { BROKERAGE, LEGAL_EMAIL, NOTICES_EMAIL, PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";

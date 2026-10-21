@@ -116,12 +116,12 @@ describe("nada de borradores en lo que se publica", () => {
 describe("los cinco cambios de la v2", () => {
   const section = (lang: Lang, n: number) => termsDoc[lang].sections.find((s) => s.id === `section-${n}`)!;
 
-  it("1. Términos §16: el listing agreement y su Early Termination Addendum, sin '24-month listing term'", () => {
+  // La v2 remitía al "Early Termination Addendum"; la v3 remite al párrafo 12 del acuerdo de
+  // listado (published-v3.test.ts). Lo que sigue de la v2: sin "24-month listing term".
+  it("1. Términos §16: sin '24-month listing term' ni 'any commission obligations'", () => {
     const en = section("en", 16).body.join(" ");
-    expect(en).toContain("subject to your signed listing agreement and its Early Termination Addendum.");
     expect(en).not.toMatch(/24-month listing term|any commission obligations/);
     const es = section("es", 16).body.join(" ");
-    expect(es).toContain("sujeto a lo que establezcan su acuerdo de listado firmado y su Anexo de Terminación Anticipada (Early Termination Addendum).");
     expect(es).not.toMatch(/plazo de publicación de 24 meses y cualquier obligación de comisión/);
   });
 

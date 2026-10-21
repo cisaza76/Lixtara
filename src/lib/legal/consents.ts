@@ -93,16 +93,17 @@ const TERMS_REFUND_CHECKBOX_V1: Record<ConsentLang, ConsentParts> = {
   },
 };
 
-// v3 (2026-10-21): menciona la tarifa de cancelación después de publicar en el MLS (igual a la
-// tarifa fija del plan, ERS-21tn línea 207). Pendiente de revisión del abogado.
+// v3 (2026-10-21): menciona la tarifa de cancelación después de publicar en el MLS: igual a la
+// tarifa fija ya pagada y cubierta por ella, sin monto adicional (ERS-21tn línea 207 y
+// párrafo 15). Pendiente de revisión del abogado.
 const TERMS_REFUND_CHECKBOX: Record<ConsentLang, ConsentParts> = {
   en: {
     before:
-      "I understand that the {fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. If I cancel after publication, I pay a {fee} cancellation fee, equal to my plan's flat fee. The {pct} commission is due only if a sale closes.",
+      "I understand that the {fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. If I cancel after publication, the cancellation fee in my listing agreement equals the {fee} flat fee I already paid and is deemed paid by it; I pay nothing additional. The {pct} commission is due only if a sale closes.",
   },
   es: {
     before:
-      "Entiendo que la tarifa fija de {fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. Si cancelo después de la publicación, pago una tarifa de cancelación de {fee}, igual a la tarifa fija de mi plan. La comisión del {pct} solo se paga si la venta se cierra.",
+      "Entiendo que la tarifa fija de {fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. Si cancelo después de la publicación, la tarifa de cancelación de mi acuerdo de listado es igual a la tarifa fija de {fee} que ya pagué y se considera pagada con ella; no pago nada adicional. La comisión del {pct} solo se paga si la venta se cierra.",
   },
 };
 
@@ -297,15 +298,15 @@ export const PUBLISHED_CONSENT_HASHES: Record<string, Record<ConsentLang, string
     es: "971219881754a9fde2d0243a491213ae7bdcadf90005650b52d8b1afe07c90c1",
   },
   "terms_refund@2026-10-21-v3:essentials": {
-    en: "35c51c903d63284f82985752e2c73cd4064d8b19fb59cbf1c55425d2062994eb",
-    es: "7f7780585d09b66777736dc1a607f22b4c182b2bae2ef8ff72a5a74feb868538",
+    en: "1f87af34b6e15e3f57bb2ab21353db6d620266e116e2c6e5165d00e5a2365641",
+    es: "a91d62229c5c9e02fac445ccd3bce3f410022452b4740725cd40ad6df607d8aa",
   },
   "terms_refund@2026-10-21-v3:pro": {
-    en: "29892f22606be0b9e55e9eaf497ec39577102c037df85f439d2de3a4e96f612a",
-    es: "1200c1493442711751206018361c2dab2b6a51d4296dd3bb662aaaf82102e085",
+    en: "f490118af49b0faa6dd1c3ddc2680f7fb9640661fddf7245931c4dcfed45266b",
+    es: "e0f272f66ff788c1d7a24214307b77824726adb40ccba0b8cc7d1e50d1628972",
   },
   "terms_refund@2026-10-21-v3:concierge": {
-    en: "44eb26090c72820be88c6a50f62093e5730af1b21b3fad9e08b97ab1bb79e2a1",
-    es: "b3221325fe3578aaac166a874a86e2517c89ee7d0762de9a457048b09a843732",
+    en: "ee330958d4a9f63969ec953cf008129ae4613dd03440deaed868cd9296fa80bd",
+    es: "77101d12ba07f5950abece9c7e88c5a48983117e56edd669ca095665260b6a5f",
   },
 };

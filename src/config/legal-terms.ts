@@ -146,9 +146,10 @@ export const publicationTimeline: TermDefinition<PublicationTexts> = {
 };
 
 // ── 4. Política de reembolso ────────────────────────────────────────────────────────
-// v3 (2026-10-21, decisión de la broker): si el vendedor cancela después de publicar en el
-// MLS, paga una tarifa de cancelación igual a la tarifa fija de su plan (ERS-21tn línea 207 y
-// párrafo 15); antes de publicar, el reembolso sigue siendo total. Pendiente de revisión del
+// v3 (2026-10-21, decisión de la broker y del owner): si el vendedor cancela después de
+// publicar en el MLS, la tarifa de cancelación del acuerdo de listado (ERS-21tn línea 207 y
+// párrafo 15) es igual a la tarifa fija ya pagada y se considera pagada con ella: no se cobra
+// nada adicional. Antes de publicar, el reembolso sigue siendo total. Pendiente de revisión del
 // abogado (docs/legal/2026-10-21-textos-v3-memo.md).
 // v2 (2026-10-18): empieza con "se cobra se venda o no", como la casilla del paso 8
 // (src/lib/legal/consents.ts, terms_refund). Los Términos §6, la FAQ y Loui leen de aquí.
@@ -156,8 +157,8 @@ export const refundPolicy: TermDefinition<string> = {
   version: "3",
   date: "2026-10-21",
   text: {
-    en: `The flat fee is charged whether or not your home sells. The flat fee is non-refundable once your property is published on the MLS. You get a full refund if the broker doesn't approve your listing or it can't be published, if you were charged twice or because of a technical error, or if you cancel before it's published. If you cancel after it's published on the MLS, you pay a cancellation fee equal to your plan's flat fee (${fees()}), as set out in your listing agreement.`,
-    es: `La tarifa fija se cobra se venda o no tu propiedad. La tarifa fija no se reembolsa una vez tu propiedad está publicada en el MLS. Te devolvemos el total si la broker no aprueba tu listado o no se puede publicar, si te cobramos dos veces o por un error técnico, o si cancelas antes de la publicación. Si cancelas después de que esté publicada en el MLS, pagas una tarifa de cancelación igual a la tarifa fija de tu plan (${fees()}), según tu acuerdo de listado.`,
+    en: `The flat fee is charged whether or not your home sells. The flat fee is non-refundable once your property is published on the MLS. You get a full refund if the broker doesn't approve your listing or it can't be published, if you were charged twice or because of a technical error, or if you cancel before it's published. If you cancel after it's published on the MLS, the cancellation fee in your listing agreement equals the flat fee you already paid for your plan (${fees()}) and is deemed paid by it: you pay nothing additional.`,
+    es: `La tarifa fija se cobra se venda o no tu propiedad. La tarifa fija no se reembolsa una vez tu propiedad está publicada en el MLS. Te devolvemos el total si la broker no aprueba tu listado o no se puede publicar, si te cobramos dos veces o por un error técnico, o si cancelas antes de la publicación. Si cancelas después de que esté publicada en el MLS, la tarifa de cancelación de tu acuerdo de listado es igual a la tarifa fija que ya pagaste por tu plan (${fees()}) y se considera pagada con ella: no pagas nada adicional.`,
   },
 };
 
@@ -168,7 +169,7 @@ export const refundPolicy: TermDefinition<string> = {
  */
 export const refundPolicyTerms: Record<Lang, string> = {
   en: refundPolicy.text.en,
-  es: `La tarifa fija se cobra se venda o no su propiedad. La tarifa fija no se reembolsa una vez que su propiedad está publicada en el MLS. Le devolvemos el total si la broker no aprueba su listado o no se puede publicar, si le cobramos dos veces o por un error técnico, o si usted cancela antes de la publicación. Si usted cancela después de que su propiedad esté publicada en el MLS, pagará una tarifa de cancelación igual a la tarifa fija de su plan (${fees()}), según su acuerdo de listado.`,
+  es: `La tarifa fija se cobra se venda o no su propiedad. La tarifa fija no se reembolsa una vez que su propiedad está publicada en el MLS. Le devolvemos el total si la broker no aprueba su listado o no se puede publicar, si le cobramos dos veces o por un error técnico, o si usted cancela antes de la publicación. Si usted cancela después de que su propiedad esté publicada en el MLS, la tarifa de cancelación de su acuerdo de listado es igual a la tarifa fija que usted ya pagó por su plan (${fees()}) y se considera pagada con ella: no se le cobra ningún monto adicional.`,
 };
 
 // ── 5. Servicios legales (texto en legalPartner.ts) ─────────────────────────────────
