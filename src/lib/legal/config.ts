@@ -5,7 +5,9 @@
 // src/config/legal-terms.ts y src/lib/pricing-tiers.ts.
 //
 // v2 publicada el 2026-10-18 por decisión del owner, sin revisión del abogado todavía
-// (docs/legal/2026-10-18-textos-v2-memo.md). Al publicar una versión nueva: cambiar `version`
+// (docs/legal/2026-10-18-textos-v2-memo.md). v3 de los Términos (2026-10-21, decisión de la
+// broker): §6 con la tarifa de cancelación después de publicar en el MLS; los demás documentos
+// siguen en la v2 (docs/legal/2026-10-21-textos-v3-memo.md). Al publicar una versión nueva: cambiar `version`
 // aquí (y la fecha en types.ts). Las aceptaciones ya registradas conservan su versión.
 import { BROKERAGE, LEGAL_EMAIL, NOTICES_EMAIL, PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
 import { PUBLICATION_BUSINESS_DAYS } from "@/config/legal-terms";
@@ -35,7 +37,7 @@ export interface LegalDocMeta {
 }
 
 export const LEGAL_DOCS = {
-  terms: { path: "/terms", version: "2026-10-18-v2", updated: TERMS_LAST_UPDATED },
+  terms: { path: "/terms", version: "2026-10-21-v3", updated: TERMS_LAST_UPDATED },
   privacy: { path: "/privacy", version: "2026-10-18-v2", updated: PRIVACY_LAST_UPDATED },
   cookies: { path: "/cookies", version: "2026-10-18-v2", updated: COOKIES_LAST_UPDATED },
   disclaimers: { path: "/disclaimers", version: "2026-10-18-v2", updated: DISCLAIMERS_LAST_UPDATED },

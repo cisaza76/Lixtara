@@ -28,13 +28,24 @@ describe("casilla del paso 8 (terms_refund)", () => {
   it.each(TIER_ORDER)("%s: texto exacto con el precio y la comisión del plan", (tier) => {
     const fee = formatPrice(PRICING_TIERS[tier].flatFee);
     const pct = `${PRICING_TIERS[tier].commissionPct}%`;
+    // v3 (2026-10-21): la tarifa de cancelación después de publicar es la tarifa fija del plan.
     expect(consentCheckbox("terms_refund", "en", tier).before).toBe(
-      `I understand that the ${fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. The ${pct} commission is due only if a sale closes.`,
+      `I understand that the ${fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. If I cancel after publication, I pay a ${fee} cancellation fee, equal to my plan's flat fee. The ${pct} commission is due only if a sale closes.`,
     );
     expect(consentCheckbox("terms_refund", "es", tier).before).toBe(
-      `Entiendo que la tarifa fija de ${fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. La comisión del ${pct} solo se paga si la venta se cierra.`,
+      `Entiendo que la tarifa fija de ${fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. Si cancelo después de la publicación, pago una tarifa de cancelación de ${fee}, igual a la tarifa fija de mi plan. La comisión del ${pct} solo se paga si la venta se cierra.`,
     );
     expect(pct).not.toMatch(/,/); // decimal con punto
+  });
+
+  it.each(TIER_ORDER)("%s: las v1 y v2 (sin tarifa de cancelación) siguen reconstruyéndose", (tier) => {
+    const fee = formatPrice(PRICING_TIERS[tier].flatFee);
+    const pct = `${PRICING_TIERS[tier].commissionPct}%`;
+    for (const v of ["2026-10-18-v1", "2026-10-18-v2"]) {
+      expect(consentCheckbox("terms_refund", "en", tier, v).before, v).toBe(
+        `I understand that the ${fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. The ${pct} commission is due only if a sale closes.`,
+      );
+    }
   });
 
   it("sin plan no se puede armar (el texto lleva {fee} y {pct})", () => {
@@ -49,6 +60,9 @@ describe("casilla del paso 8 (terms_refund)", () => {
       expect(r).toMatch(lang === "en" ? /non-refundable once your property is published on the MLS/ : /no se reembolsa una vez tu propiedad está publicada en el MLS/);
       expect(r).toMatch(lang === "en" ? /full refund/ : /Te devolvemos el total/);
       expect(r).toMatch(lang === "en" ? /cancel before it's published/ : /cancelas antes de la publicación/);
+      // v3: después de publicar, tarifa de cancelación igual a la tarifa fija del plan.
+      expect(r).toMatch(lang === "en" ? /cancellation fee equal to your plan's flat fee/ : /tarifa de cancelación igual a la tarifa fija de tu plan/);
+      for (const t of TIER_ORDER) expect(r, `${lang} ${t}`).toContain(formatPrice(PRICING_TIERS[t].flatFee));
       // Los Términos dicen lo mismo; en español, con usted (refundPolicyTerms).
       expect(termsDoc[lang].sections.find((s) => s.heading.startsWith("6."))?.body).toContain(refundPolicyTerms[lang]);
       expect(termsFaq(lang).refund.a).toBe(r);
@@ -68,7 +82,7 @@ describe("casilla del paso 8 (terms_refund)", () => {
 });
 
 describe("aceptación de Términos y Privacidad al crear la cuenta (terms)", () => {
-  it("texto exacto (v2, con el arbitraje de la §17) y versión que nombra los dos documentos", () => {
+  it("texto exacto (desde la v2, con el arbitraje de la §17) y versión que nombra los dos documentos", () => {
     expect(consentFullText("terms", "en")).toBe(
       "I agree to the Terms of Service, including the arbitration agreement in Section 17, and the Privacy Policy.",
     );
@@ -76,7 +90,8 @@ describe("aceptación de Términos y Privacidad al crear la cuenta (terms)", () 
       "Acepto los Términos de servicio, incluido el acuerdo de arbitraje de la Sección 17, y la Política de privacidad.",
     );
     expect(CONSENTS.terms.version).toBe(`terms-${LEGAL_DOCS.terms.version}+privacy-${LEGAL_DOCS.privacy.version}`);
-    expect(CONSENTS.terms.version).toBe("terms-2026-10-18-v2+privacy-2026-10-18-v2");
+    // v3: cambian los Términos (§6); la Privacidad sigue en la v2.
+    expect(CONSENTS.terms.version).toBe("terms-2026-10-21-v3+privacy-2026-10-18-v2");
     expect(CONSENTS.terms.version.length).toBeLessThanOrEqual(64); // check de la columna
     const parts = consentCheckbox("terms", "en");
     expect([parts.link, parts.link2, parts.link3]).toEqual(["Terms of Service", "arbitration agreement in Section 17", "Privacy Policy"]);
@@ -96,6 +111,7 @@ describe("aceptación de Términos y Privacidad al crear la cuenta (terms)", () 
     expect(consentFullText("terms", "es", null, "terms-2026-10-18-v1+privacy-2026-10-18-v1")).toBe(
       "Acepto los Términos de servicio y la Política de privacidad.",
     );
+    expect(consentFullText("terms", "en", null, "terms-2026-10-18-v2+privacy-2026-10-18-v2")).toBe(consentFullText("terms", "en"));
     expect(() => consentFullText("terms", "en", null, "no-existe")).toThrow();
   });
 

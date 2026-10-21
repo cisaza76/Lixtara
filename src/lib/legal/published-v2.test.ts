@@ -68,8 +68,9 @@ describe("páginas legales: todas, en los dos idiomas, desde una sola configurac
     }
   });
 
-  it("versión 2026-10-18-v2 en Términos, Privacidad, Cookies, Avisos legales, Avisos de corretaje y Accesibilidad", () => {
-    for (const id of ["terms", "privacy", "cookies", "disclaimers", "notices", "accessibility"] as const) {
+  // Los Términos pasaron a la v3 (2026-10-21): published-v3.test.ts.
+  it("versión 2026-10-18-v2 en Privacidad, Cookies, Avisos legales, Avisos de corretaje y Accesibilidad", () => {
+    for (const id of ["privacy", "cookies", "disclaimers", "notices", "accessibility"] as const) {
       expect(LEGAL_DOCS[id].version, id).toBe("2026-10-18-v2");
       expect(LEGAL_DOCS[id].updated, id).toBe("2026-10-18");
     }
