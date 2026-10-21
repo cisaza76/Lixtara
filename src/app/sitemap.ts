@@ -3,22 +3,7 @@ import { SITE_URL } from "@/lib/config";
 import { locales } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { localeAlternates } from "@/lib/seo";
-
-// Public, indexable pages. /about is left out while it shows "Coming soon".
-const STATIC_PATHS = [
-  "/contact",
-  "",
-  "/properties",
-  "/services",
-  "/consultations",
-  "/privacy",
-  "/terms",
-  "/cookies",
-  "/disclaimers",
-  "/notices",
-  "/accessibility",
-  "/dmca",
-];
+import { SITEMAP_PATHS } from "@/lib/sitemap-routes";
 
 export const revalidate = 3600;
 
@@ -45,7 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const properties = await activePropertyIds();
   return [
-    ...STATIC_PATHS.flatMap((p) => entries(p)),
+    ...SITEMAP_PATHS.flatMap((p) => entries(p)),
     ...properties.flatMap((p) => entries(`/property/${p.id}`, p.updated)),
   ];
 }
