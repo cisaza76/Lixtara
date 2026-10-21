@@ -5,11 +5,11 @@ import { PRICING_TIERS } from "@/lib/pricing-tiers";
 import { BROKERAGE } from "@/config/brokerage";
 import { CONTACT } from "@/config/contact";
 import { t } from "@/lib/i18n";
-import { PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
+import { PROTECTION_NOTICE_DAYS, PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
 import { ERS21TN_FIELDS, fitsOnLine } from "./ers21tn-layout";
 import {
-  ADDITIONAL_TERMS,
   ADDITIONAL_TERMS_LABELS,
+  additionalTermsClauses,
   attachmentHtml,
   listingAgreementTabs,
   splitOverLabels,
@@ -57,7 +57,7 @@ describe("Listing Agreement: valores por línea", () => {
 
   it("sin «$» ni «%» repetidos: el formulario ya los imprime (L22, L110, L150)", () => {
     const r = run();
-    expect(r.text).toMatchObject({ list_price: "650,000", commission_pct: "1", flat_fee: "495", buyer_comp_pct: "2.5", buyer_comp_amount: "" });
+    expect(r.text).toMatchObject({ list_price: "650,000", commission_pct: "1", flat_fee: "", buyer_comp_pct: "2.5", buyer_comp_amount: "" });
     expect(run({ buyerOffer: { type: "amount", amount: 12000 } }).text).toMatchObject({ buyer_comp_pct: "", buyer_comp_amount: "12,000" });
     expect(run({ buyerOffer: { type: "none" } }).text).toMatchObject({ buyer_comp_pct: "", buyer_comp_amount: "" });
     for (const v of Object.values(r.text)) expect(v).not.toMatch(/^\$|%$/);
@@ -204,29 +204,31 @@ describe("Listing Agreement: valores por línea", () => {
     expect([line("protection_period_days"), line("retained_deposits_pct"), line("cancellation_fee")]).toEqual([123, 128, 207]);
   });
 
-  it.each(["essentials", "pro", "concierge"] as const)("tarifa de cancelación (L207) = la tarifa fija del plan %s, sin «$», de solo lectura", (id) => {
-    const r = run({ tier: PRICING_TIERS[id] }, { pricing_tier: id });
-    expect(r.text.cancellation_fee).toBe(PRICING_TIERS[id].flatFee.toLocaleString("en-US"));
-    expect(r.text.cancellation_fee).toBe(r.text.flat_fee);
-    expect(r.lockedText).toContain("cancellation_fee");
-    expect(fitsOnLine("cancellation_fee", r.text.cancellation_fee)).toBe(true);
+  it("dos cobros: 8(a) solo el %; el «plus $» (L110) y la tarifa de cancelación (L207) vacíos y de solo lectura", () => {
+    const r = run();
+    expect(r.text).toMatchObject({ commission_pct: "1", flat_fee: "", cancellation_fee: "" });
+    for (const k of ["flat_fee", "cancellation_fee"]) {
+      expect(r.lockedText, k).toContain(k);
+      expect(ERS21TN_FIELDS.find((f) => f.kind === "text" && f.label === k)).toMatchObject({ locked: true, required: false });
+    }
   });
 
-  it("párrafo 15: el texto de la tarifa de cancelación cabe completo en L230–232, sin anexo, de solo lectura", () => {
-    const r = run();
+  it.each(["essentials", "pro", "concierge"] as const)("párrafo 15 (plan %s): cabe completo en L230–244 a 9 pt, cada cláusula en su línea, con la tarifa y los días de la configuración", (id) => {
+    const tier = PRICING_TIERS[id];
+    const r = run({ tier }, { pricing_tier: id });
     const lines = ADDITIONAL_TERMS_LABELS.map((l) => r.text[l]);
-    expect(lines.filter(Boolean).join(" ")).toBe(ADDITIONAL_TERMS);
-    expect(lines[0]).toMatch(/^The cancellation fee in Paragraph 12 equals the fixed fee Seller already paid/);
-    expect(ADDITIONAL_TERMS).toContain("no additional amount is due");
-    // L230–231 no alcanzan (2026-10-21): ocupa tres de las líneas del párrafo 15; L233 queda vacía.
-    expect(lines.map(Boolean)).toEqual([true, true, true, false]);
+    const clauses = additionalTermsClauses(tier);
+    expect(lines.filter(Boolean).join(" ")).toBe(clauses.join(" "));
+    expect(clauses.map((c) => lines.some((l) => l.startsWith(c.slice(0, 20))))).toEqual(Array(5).fill(true));
+    expect(clauses[0]).toContain(`a flat fee of $${tier.flatFee.toLocaleString("en-US")} at checkout`);
+    expect(clauses[3]).toContain(`within ${PROTECTION_NOTICE_DAYS} days after termination`);
+    expect(clauses[2]).toContain("Paragraph 12 does not apply, and no cancellation fee, expense reimbursement or other amount is due.");
     for (const l of ADDITIONAL_TERMS_LABELS) {
       expect(r.lockedText, l).toContain(l);
       expect(fitsOnLine(l, r.text[l]), l).toBe(true);
     }
     expect(r.attachment.some((a) => /Additional/i.test(a.heading))).toBe(false);
-    expect(ADDITIONAL_TERMS).toContain("Terms of Service, Section 6");
-    expect(ERS21TN_FIELDS.filter((f) => f.kind === "text" && ADDITIONAL_TERMS_LABELS.includes(f.label)).map((f) => f.line)).toEqual([230, 231, 232, 233]);
+    expect(ERS21TN_FIELDS.filter((f) => f.kind === "text" && ADDITIONAL_TERMS_LABELS.includes(f.label)).map((f) => f.line)).toEqual(Array.from({ length: 15 }, (_, i) => 230 + i));
   });
 
   it("fechas del plazo: hoy y hoy + 24 meses", () => {

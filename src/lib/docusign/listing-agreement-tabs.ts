@@ -18,16 +18,16 @@
 // Broker's decisions (Anamaria, 2026-10-21):
 //   - protection period (line 123) and retained deposits (line 128) from
 //     src/config/listing-agreement.ts;
-//   - cancellation fee (line 207) = the flat fee of the seller's plan;
-//   - paragraph 15 (lines 230–231): ADDITIONAL_TERMS, the cancellation fee is the flat fee
-//     already paid, nothing more is due; full refund before MLS publication (Terms §6).
+//   - two charges: the flat fee at checkout and the 8(a) % only if a sale closes. Line 110's
+//     "plus $" and line 207's cancellation fee stay empty and read-only;
+//   - paragraph 15 (lines 230–244): additionalTerms(), which controls over the printed clauses.
 
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import type { BuyerCompOffer } from "@/lib/buyer-comp";
 import { buyerCompOption } from "@/lib/buyer-comp";
 import { BROKERAGE } from "@/config/brokerage";
 import { CONTACT } from "@/config/contact";
-import { PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
+import { PROTECTION_NOTICE_DAYS, PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
 import type { PricingTier } from "@/lib/pricing-tiers";
 import { savedFinancing } from "@/lib/financing-terms";
 import { fitsOnLine, textWidthPt, textField } from "./ers21tn-layout";
@@ -93,12 +93,37 @@ export function usDate(iso: string | null): string {
 const plainNumber = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 /**
- * Paragraph 15, Additional Terms (owner and broker, 2026-10-21). Read-only on lines 230–233; the
- * Terms of Service §6 say the same.
+ * Paragraph 15, Additional Terms (owner and broker, 2026-10-21): the two-charge model. The flat
+ * fee at checkout (refunded unless published), the 8(a) % only if a sale closes, termination at
+ * any time at no charge, a narrow protection period. Read-only on lines 230–244; the Terms of
+ * Service §6 and §16 say the same. Lawyer review pending (docs/legal, memo v3).
  */
-export const ADDITIONAL_TERMS =
-  "The cancellation fee in Paragraph 12 equals the fixed fee Seller already paid and is deemed satisfied by that payment; no additional amount is due. If Seller cancels before MLS publication, Seller receives a full refund as stated in Lixtara's Terms of Service, Section 6.";
-export const ADDITIONAL_TERMS_LABELS = ["additional_terms_1", "additional_terms_2", "additional_terms_3", "additional_terms_4"];
+export function additionalTermsClauses(tier: PricingTier): string[] {
+  return [
+    `(1) Flat Fee. Seller pays Broker a flat fee of $${plainNumber(tier.flatFee)} at checkout, before publication. It is earned and non-refundable upon first publication of the Property on the MLS, whether or not the Property sells. Seller receives a full refund if Broker does not approve the listing or the Property is not published on the MLS for any other reason.`,
+    `(2) Commission. The Paragraph 8(a) percentage is due only if a sale of the Property closes; the sentence "closing is not a prerequisite for Broker's fee being earned" and Paragraph 8(d)(2) do not apply.`,
+    "(3) Termination. Seller may terminate this Agreement at any time by written notice to Broker. Paragraph 12 does not apply, and no cancellation fee, expense reimbursement or other amount is due.",
+    `(4) Protection Period. Paragraph 8(d)(3) applies only to buyers who toured the Property or made a written offer during this Agreement and whose names Broker delivers to Seller in writing within ${PROTECTION_NOTICE_DAYS} days after termination.`,
+    "(5) This Paragraph 15 controls over any conflicting provision of this Agreement and over Lixtara's Terms of Service.",
+  ];
+}
+
+/**
+ * Lays the clauses over the lines `labels`, each clause starting on a new line. null when they
+ * don't all fit.
+ */
+export function clausesOverLabels(clauses: string[], labels: string[]): string[] | null {
+  const out: string[] = [];
+  for (const clause of clauses) {
+    const rest = labels.slice(out.length);
+    let lines: string[] | null = null;
+    for (let k = 1; k <= rest.length && !lines; k++) lines = splitOverLabels(clause, rest.slice(0, k));
+    if (!lines) return null;
+    out.push(...lines);
+  }
+  return [...out, ...labels.slice(out.length).map(() => "")];
+}
+export const ADDITIONAL_TERMS_LABELS = Array.from({ length: 15 }, (_, i) => `additional_terms_${i + 1}`);
 
 /**
  * Splits `text` over the lines `labels`, in order, word by word. null when it doesn't fit in
@@ -181,8 +206,8 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
   const lockbox = tier.id === "concierge" || (tier.id === "pro" && p.occupancy_status === "vacant");
 
   // Paragraph 15: a fixed text, checked to fit by the tests; never in the attachment.
-  const additional = splitOverLabels(ADDITIONAL_TERMS, ADDITIONAL_TERMS_LABELS);
-  if (!additional) throw new Error("ADDITIONAL_TERMS doesn't fit on lines 230–233");
+  const additional = clausesOverLabels(additionalTermsClauses(tier), ADDITIONAL_TERMS_LABELS);
+  if (!additional) throw new Error("paragraph 15 doesn't fit on lines 230–244");
 
   const text: Record<string, string> = {
     seller_name: input.sellerName,
@@ -197,10 +222,12 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     lease_end_date: occupancy === "is" ? usDate(p.lease_end_date) : "",
     list_price: plainNumber(Number(p.list_price)),
     commission_pct: plainNumber(tier.commissionPct),
-    flat_fee: plainNumber(tier.flatFee),
+    // 8(a): only the %. The flat fee is charged at checkout (paragraph 15), not at closing.
+    flat_fee: "",
     protection_period_days: String(PROTECTION_PERIOD_DAYS),
     retained_deposits_pct: plainNumber(RETAINED_DEPOSITS_PCT),
-    cancellation_fee: plainNumber(tier.flatFee),
+    // Paragraph 12 doesn't apply (paragraph 15 (3)): no cancellation fee.
+    cancellation_fee: "",
     buyer_comp_pct: buyerOffer.type === "percent" ? plainNumber(buyerOffer.pct) : "",
     buyer_comp_amount: buyerOffer.type === "amount" ? plainNumber(buyerOffer.amount) : "",
     financing_other_specify: otherFits ? otherText : "See Attachment",

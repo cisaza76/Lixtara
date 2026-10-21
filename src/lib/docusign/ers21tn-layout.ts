@@ -66,6 +66,8 @@ const onBlank = (x0: number, x1: number, u: number) => ({ x: x0 + 2, y: u - 14, 
 /** Checkbox tab over the printed box whose top-left corner is (bx, by). */
 const overBox = (bx: number, by: number) => ({ x: bx - 4, y: by - 4 });
 
+const ADDITIONAL_TERMS_UNDERLINES = [350.5, 370.5, 390.5, 410.5, 430.5, 451, 471, 491, 511.5, 531.5, 551.5, 571.5, 591.5, 611.5, 631.5];
+
 export const ERS21TN_FIELDS: LayoutField[] = [
   // ── Page 1 ──
   text({ label: "seller_name", line: 2, page: 1, ...onBlank(51, 529, 96), locked: true, required: true }),
@@ -124,7 +126,8 @@ export const ERS21TN_FIELDS: LayoutField[] = [
   box({ label: "lockbox_authorized", line: 71, page: 2, ...overBox(191, 295), locked: true }),
   // ── Page 3 ──
   text({ label: "commission_pct", line: 110, page: 3, ...onBlank(87, 142, 81), locked: true, required: true }),
-  text({ label: "flat_fee", line: 110, page: 3, ...onBlank(299, 410, 81), anchor: "purchase price plus $", locked: true, required: true }),
+  // 8(a): only the %; the "plus $" stays empty (the flat fee is charged at checkout, paragraph 15).
+  text({ label: "flat_fee", line: 110, page: 3, ...onBlank(299, 410, 81), anchor: "purchase price plus $", locked: true, required: false }),
   // Paragraph 8(d)(3) and 8(e): PROTECTION_PERIOD_DAYS and RETAINED_DEPOSITS_PCT (src/config/listing-agreement.ts).
   text({ label: "protection_period_days", line: 123, page: 3, ...onBlank(297.5, 330.5, 229), locked: true, required: true }),
   text({ label: "retained_deposits_pct", line: 128, page: 3, ...onBlank(485.5, 518.5, 288), locked: true, required: true }),
@@ -151,13 +154,13 @@ export const ERS21TN_FIELDS: LayoutField[] = [
   // The form prints "171" a second time, after line 181.
   text({ label: "transaction_broker", line: 171, page: 4, ...onBlank(158.5, 576, 417.5), anchor: "As a transaction broker,", locked: true, required: true }),
   // ── Page 5 ──
-  // Paragraph 12: the cancellation fee is the plan's flat fee (pricing-tiers.ts).
-  text({ label: "cancellation_fee", line: 207, page: 5, ...onBlank(406, 517, 69.5), anchor: "cancellation fee of $", locked: true, required: true }),
-  // Paragraph 15, Additional Terms: one tab per printed line (20 pt apart), filled in order.
-  text({ label: "additional_terms_1", line: 230, page: 5, ...onBlank(157.5, 569, 350.5), anchor: "Additional Terms:", locked: true, required: false }),
-  text({ label: "additional_terms_2", line: 231, page: 5, ...onBlank(50.5, 567.5, 370.5), locked: true, required: false }),
-  text({ label: "additional_terms_3", line: 232, page: 5, ...onBlank(50.5, 567.5, 390.5), locked: true, required: false }),
-  text({ label: "additional_terms_4", line: 233, page: 5, ...onBlank(50.5, 567.5, 410.5), locked: true, required: false }),
+  // Paragraph 12: empty and read-only; paragraph 15 says it doesn't apply.
+  text({ label: "cancellation_fee", line: 207, page: 5, ...onBlank(406, 517, 69.5), anchor: "cancellation fee of $", locked: true, required: false }),
+  // Paragraph 15, Additional Terms: one tab per printed line (L230–244, ~20 pt apart; underlines
+  // measured on the template image, L236's interpolated), filled in order.
+  ...ADDITIONAL_TERMS_UNDERLINES.map((u, i) =>
+    text({ label: `additional_terms_${i + 1}`, line: 230 + i, page: 5, ...onBlank(i === 0 ? 157.5 : 50.5, i === 0 ? 569 : 567.5, u), ...(i === 0 ? { anchor: "Additional Terms:" } : {}), locked: true, required: false }),
+  ),
   // ── Page 6 ── the broker signs and dates line 254 herself.
   text({ label: "brokerage_firm_name", line: 255, page: 6, ...onBlank(154.5, 404.5, 253.5), anchor: "Brokerage Firm Name:", locked: true, required: true }),
   text({ label: "brokerage_phone", line: 255, page: 6, ...onBlank(460.5, 571.5, 253.5), locked: true, required: true }),
