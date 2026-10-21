@@ -48,7 +48,7 @@ import {
   improveListingDescription,
   improveShowingInstructions,
 } from "@/lib/ai";
-import { lookupMiamiDadeProperty, unitFromStoredStreet } from "@/lib/miami-dade";
+import { baseStreetForLookup, lookupMiamiDadeProperty, unitFromStoredStreet } from "@/lib/miami-dade";
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
@@ -154,13 +154,6 @@ function stepCompleted(
   );
 }
 
-// Strip a trailing unit/apt token so county + comps lookups match the building
-// (the stored address keeps the unit for contracts/forms).
-function baseStreetForLookup(street: string): string {
-  return street
-    .replace(/[,\s]*\b(?:unit|apt|apartment|suite|ste|#)\b.*$/i, "")
-    .trim();
-}
 
 type OccupancyStatus = "vacant" | "owner_occupied" | "tenant_occupied";
 

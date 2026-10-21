@@ -68,55 +68,11 @@ try {
 
 import { getAccessToken, LIXTARA_BROKER_ROLE } from "../src/lib/docusign";
 import { BROKER_SIGNER_EMAIL } from "../src/config/brokerage";
+import { ERS21TN_FIELDS } from "../src/lib/docusign/ers21tn-layout";
 
-// The labels POST /api/agreement/create currently sends. Order matches the
-// route handler so the diff at the bottom is easy to scan.
-const SENT_LABELS = [
-  // identity
-  "street_address",
-  "city",
-  "state",
-  "zip",
-  "folio",
-  "legal_description",
-  "property_type",
-  // characteristics
-  "bedrooms",
-  "bathrooms",
-  "sqft",
-  "lot_size",
-  "year_built",
-  "parking_spaces",
-  "pool",
-  "flood_zone",
-  "property_description",
-  // financial
-  "list_price",
-  "hoa_fee",
-  "tax_annual",
-  "cash_only",
-  // occupancy / tenancy
-  "occupancy_status",
-  "monthly_rent",
-  "lease_end_date",
-  "tenant_cooperation",
-  // personal property (appliances)
-  "personal_property",
-  // checkbox tabs (template must bind on the Seller role):
-  //   lockbox_authorized → line 71-E · buyer_commission_ack → line 145-A
-  "lockbox_authorized",
-  "buyer_commission_ack",
-  // parties
-  "seller_name",
-  "broker_name",
-  // economics
-  "flat_fee",
-  "commission_pct",
-  "buyer_agent_commission",
-  // term
-  "start_date",
-  "termination_date",
-];
+// The labels POST /api/agreement/create sends: every field of the ERS-21tn layout
+// (src/lib/docusign/ers21tn-layout.ts), radio groups by group name.
+const SENT_LABELS = ERS21TN_FIELDS.map((f) => (f.kind === "radio" ? f.groupName : f.label));
 
 interface Tab {
   tabLabel?: string;

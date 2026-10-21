@@ -316,6 +316,32 @@ async function fetchByFolio(folio: string, unit?: string | null): Promise<MiamiD
   };
 }
 
+// Strip a trailing unit/apt token so county + comps lookups match the building
+// (the stored address keeps the unit for contracts/forms).
+export function baseStreetForLookup(street: string): string {
+  return street
+    .replace(/[,\s]*\b(?:unit|apt|apartment|suite|ste|#)\b.*$/i, "")
+    .trim();
+}
+
+/**
+ * Legal description for the listing agreement, VERIFIED against the county at signing time:
+ * the stored address is looked up again (same parcel rule as the step-3 autofill, #202) and
+ * must resolve to the folio saved on the listing. Anything else (no folio, outside
+ * Miami-Dade, county down, another parcel) → null, and the contract says "See Attachment".
+ */
+export async function verifiedLegalDescription(p: {
+  address_street: string | null;
+  address_zip: string | null;
+  folio: string | null;
+}): Promise<string | null> {
+  const folio = (p.folio ?? "").replace(/-/g, "").trim();
+  if (!folio || !p.address_street || !/^33\d{3}$/.test(p.address_zip ?? "")) return null;
+  const r = await lookupMiamiDadeProperty(baseStreetForLookup(p.address_street), p.address_zip!, unitFromStoredStreet(p.address_street));
+  if (!r.found || r.folio !== folio) return null;
+  return r.details?.legal_description?.trim() || null;
+}
+
 export async function lookupMiamiDadeProperty(
   street: string,
   zip: string,

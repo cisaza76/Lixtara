@@ -171,10 +171,11 @@ describe("acuerdo de compensación (CASSB-1)", () => {
     expect(buyerCommissionAck({ type: "none" })).toBe(false);
     expect(buyerCommissionAck({ type: "percent", pct: 3 })).toBe(true);
     expect(buyerCommissionAck({ type: "amount", amount: 1 })).toBe(true);
-    const route = read("src/app/api/agreement/create/route.ts");
-    expect(route).toContain("buyer_commission_ack: buyerCommissionAck(buyerOffer)");
-    expect(route).not.toMatch(/buyer_commission_ack:\s*true/);
-    expect(route).toContain('error: "buyer_comp_not_set"');
+    // Los valores del contrato salen de listingAgreementTabs (src/lib/docusign/).
+    const tabs = read("src/lib/docusign/listing-agreement-tabs.ts");
+    expect(tabs).toContain("buyer_commission_ack: buyerCommissionAck(buyerOffer)");
+    expect(tabs).not.toMatch(/buyer_commission_ack:\s*true/);
+    expect(read("src/app/api/agreement/create/route.ts")).toContain('error: "buyer_comp_not_set"');
   });
 });
 

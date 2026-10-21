@@ -17,16 +17,17 @@ import {
   LIXTARA_BROKER_ROLE,
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
-import { buyerCommissionAck, formatOffer, offerFromRow, offerWithinLimit } from "@/lib/buyer-comp";
+import { offerFromRow, offerWithinLimit } from "@/lib/buyer-comp";
 import { fetchBuyerComp } from "@/lib/buyer-comp.server";
 import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
 import { brokerSigner } from "@/config/brokerage";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
-import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import { t } from "@/lib/i18n";
 import { CONSENTS } from "@/lib/legal/consents";
 import { recordAcceptance } from "@/lib/legal/consents.server";
 import { loadFirstIncompleteStep } from "@/lib/listing-completeness.server";
+import { verifiedLegalDescription } from "@/lib/miami-dade";
+import { attachmentHtml, listingAgreementTabs } from "@/lib/docusign/listing-agreement-tabs";
 
 interface Body {
   property_id?: string;
@@ -199,125 +200,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "broker_signer_not_configured" }, { status: 503 });
       }
 
-      // Labels MUST match the tabLabel values defined on the DocuSign
-      // template (Seller role). Verified via scripts/check-docusign-template.ts
-      // against the Lixtara Listing Agreement template
-      // (f9f29faf-d151-4975-a3ce-14a4ac1b5117). DocuSign silently ignores
-      // any tabLabel that the template doesn't bind.
+      // Every value, its line on the form and the rules (legal description only verified
+      // with the county, "See Attachment", occupancy as one choice…): listingAgreementTabs and
+      // docs/docusign/field-map-ers21tn.md. DocuSign silently ignores a tabLabel the template
+      // doesn't bind: scripts/check-docusign-template.ts compares both.
       const tierId = (property.pricing_tier ?? "pro") as PricingTierId;
       const tier = PRICING_TIERS[tierId] ?? PRICING_TIERS.pro;
-
-      const today = new Date();
-      const startDate = today.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
+      // Re-checked with the county now; if it can't be verified the contract says "See Attachment".
+      const verifiedLegal = await verifiedLegalDescription(property).catch(() => null);
+      const contract = listingAgreementTabs({
+        listing: property,
+        tier,
+        sellerName: signerName,
+        brokerName: BROKERAGE_LICENSED_ENTITY,
+        buyerOffer,
+        verifiedLegal,
+        applianceLabels: t("en").listingForm.step3.appliances as Record<string, string>,
+        today: new Date(),
       });
-      const terminationDate = new Date(today);
-      terminationDate.setMonth(
-        terminationDate.getMonth() + (tier.termMonths ?? 24),
-      );
-      const terminationDateStr = terminationDate.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-
-      const fullAddress = `${property.address_street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`;
-
-      // Formatters so every value lands human-readable on the contract.
-      const yn = (v: unknown) => (v === true ? "Yes" : v === false ? "No" : "");
-      const money = (v: unknown) =>
-        v != null && Number.isFinite(Number(v)) && Number(v) > 0
-          ? `$${Number(v).toLocaleString()}`
-          : "";
-      const num = (v: unknown) =>
-        v != null && Number.isFinite(Number(v)) ? Number(v).toLocaleString() : "";
-      const PROPERTY_TYPE_LABEL: Record<string, string> = {
-        single_family: "Single Family",
-        condo: "Condominium",
-        townhouse: "Townhouse",
-        multi_family: "Multi-Family",
-      };
-      // Personal property: appliances the seller includes with the sale,
-      // rendered as a human-readable list in the contract's Personal Property
-      // clause. Labels are the canonical English names (the contract is EN).
-      const applianceLabels = t("en").listingForm.step3.appliances as Record<
-        string,
-        string
-      >;
-      const includedAppliances = sanitizeAppliances(
-        (property.appliances ?? []) as string[],
-      );
-      const personalProperty = APPLIANCE_KEYS.filter((k) =>
-        includedAppliances.includes(k),
-      )
-        .map((k) => applianceLabels[k])
-        .join(", ");
-
-      // Lockbox is part of the engagement on Concierge (always) and Pro (when
-      // the home is vacant). Essentials buys it as a $60 add-on — not included.
-      const lockboxIncluded =
-        tierId === "concierge" ||
-        (tierId === "pro" && property.occupancy_status === "vacant");
-
-      // EVERY seller-entered + Miami-Dade-sourced field is sent so the contract
-      // reaches the seller fully pre-populated — only awaiting signature.
-      // DocuSign silently ignores any tabLabel the template doesn't bind, so
-      // the template must define a text field per label below to display it.
-      // Keep this list in sync with scripts/check-docusign-template.ts.
-      const tabs: Record<string, string> = {
-        // ── Property: identity ──
-        street_address: fullAddress,
-        city: property.address_city ?? "",
-        state: property.address_state ?? "",
-        zip: property.address_zip ?? "",
-        folio: property.folio ?? "",
-        legal_description: property.legal_description ?? "",
-        property_type:
-          PROPERTY_TYPE_LABEL[property.property_type ?? ""] ??
-          property.property_type ??
-          "",
-        // ── Property: characteristics ──
-        bedrooms: property.bedrooms != null ? String(property.bedrooms) : "",
-        bathrooms: property.bathrooms != null ? String(property.bathrooms) : "",
-        sqft: num(property.sqft),
-        lot_size: num(property.lot_size),
-        year_built:
-          property.year_built != null ? String(property.year_built) : "",
-        parking_spaces:
-          property.parking_spaces != null
-            ? String(property.parking_spaces)
-            : "",
-        pool: yn(property.has_pool),
-        flood_zone: property.flood_zone ?? "",
-        property_description: property.description ?? "",
-        // ── Financial ──
-        list_price: `$${property.list_price.toLocaleString()}`,
-        hoa_fee: money(property.hoa_fee),
-        tax_annual: money(property.tax_annual_amount),
-        // cash_only is sent as a CHECKBOX tab (see checkboxTabs below). as_is_sale
-        // is intentionally NOT sent — the contract has no field for it.
-        // ── Occupancy / tenancy ──
-        // occupancy_status is a CHECKBOX on the contract ("not currently
-        // occupied by tenant") — sent via checkboxTabs below.
-        monthly_rent: money(property.monthly_rent),
-        lease_end_date: property.lease_end_date ?? "",
-        tenant_cooperation: property.tenant_cooperation ?? "",
-        // ── Personal property ──
-        personal_property: personalProperty,
-        // ── Parties ──
-        seller_name: signerName,
-        broker_name: BROKERAGE_LICENSED_ENTITY,
-        // ── Economics (Lixtara plan) ──
-        flat_fee: `$${tier.flatFee}`,
-        commission_pct: `${tier.commissionPct}%`,
-        // "2.5%", "$12,000" o "0%" (sin oferta).
-        buyer_agent_commission: formatOffer(buyerOffer),
-        // ── Term ──
-        start_date: startDate,
-        termination_date: terminationDateStr,
-      };
+      const propertyLine = `${property.address_street}, ${contract.text.city_state_zip}`;
 
       const created = await createEnvelopeFromTemplate({
         templateId,
@@ -330,27 +231,17 @@ export async function POST(req: Request) {
         clientUserId: propertyId,
         // La broker contrafirma después del vendedor (routingOrder 2) (#137 f).
         brokerSigner: { roleName: LIXTARA_BROKER_ROLE.listingAgreement, ...broker },
-        textTabs: tabs,
-        // System-set economics — the signer must not edit these (they reflect
-        // the selected plan exactly). Rendered read-only on the contract.
-        lockedTextTabs: ["commission_pct", "flat_fee", "buyer_agent_commission"],
-        // Checkbox tabs (template must bind these labels on the Seller role):
-        //  • lockbox_authorized → contract line 71, item E — checked only when
-        //    the plan includes a lockbox.
-        //  • buyer_commission_ack → contract line 145, item A — checked only when the
-        //    seller offers compensation (> 0). With 0% it stays unchecked and no CASSB-1
-        //    applies (src/lib/buyer-comp.ts#compensationAgreementsFor).
-        checkboxTabs: {
-          cash_only: property.cash_only === true,
-          // Contract clause: "not currently occupied by tenant" — checked when
-          // the seller marked the home vacant or owner-occupied (i.e. NOT
-          // tenant-occupied). Left unchecked if tenant-occupied or unset.
-          occupancy_status:
-            property.occupancy_status === "vacant" ||
-            property.occupancy_status === "owner_occupied",
-          lockbox_authorized: lockboxIncluded,
-          buyer_commission_ack: buyerCommissionAck(buyerOffer),
-        },
+        textTabs: contract.text,
+        // Lo que puso el sitio (precio, dirección, nombres, fechas, plan, comisión) no se edita
+        // en DocuSign.
+        lockedTextTabs: contract.lockedText,
+        checkboxTabs: contract.checkbox,
+        lockedCheckboxTabs: contract.lockedCheckbox,
+        radioGroupTabs: contract.radio,
+        attachments:
+          contract.attachment.length > 0
+            ? [{ name: "Attachment to Listing Agreement", html: attachmentHtml(contract.attachment, propertyLine) }]
+            : undefined,
         emailSubject: "Please sign your Lixtara listing agreement",
       });
       envelopeId = created.envelopeId;
