@@ -35,13 +35,14 @@ export const LEGAL_LAST_UPDATED = "2026-09-02";
 /** Versión publicada v2 (2026-10-18): Términos, Privacidad, Cookies, Avisos legales, Avisos de corretaje y Accesibilidad. */
 export const LEGAL_V2_PUBLISHED = "2026-10-18";
 
-/** Versión v3 (2026-10-21): solo los Términos (§6, tarifa de cancelación después de publicar en el MLS; §16, párrafo 12 del acuerdo de listado). */
+/** Versión v3 (2026-10-21): solo los Términos (§6 y §16, párrafo 15 del acuerdo de listado). */
 export const LEGAL_V3_PUBLISHED = "2026-10-21";
 
 /**
- * Terms of Service v3: §6 con la tarifa de cancelación después de publicar en el MLS (igual a la
- * tarifa fija ya pagada y cubierta por ella); §16 remite al párrafo 12 (Conditional Termination)
- * del acuerdo de listado. v2: §14/§15 sin límite para fraude y deberes no limitables.
+ * Terms of Service v3: §6 con el modelo final (tarifa fija no reembolsable una vez publicada,
+ * terminación sin costo, comisión solo al cierre); §16 remite al párrafo 15 (Additional Terms)
+ * del acuerdo de listado y explica el período de protección. v2: §14/§15 sin límite para fraude
+ * y deberes no limitables.
  */
 export const TERMS_LAST_UPDATED = LEGAL_V3_PUBLISHED;
 

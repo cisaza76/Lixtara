@@ -28,12 +28,12 @@ describe("casilla del paso 8 (terms_refund)", () => {
   it.each(TIER_ORDER)("%s: texto exacto con el precio y la comisión del plan", (tier) => {
     const fee = formatPrice(PRICING_TIERS[tier].flatFee);
     const pct = `${PRICING_TIERS[tier].commissionPct}%`;
-    // v3 (2026-10-21): después de publicar, la tarifa de cancelación es la tarifa fija ya pagada (nada adicional).
+    // v3 (2026-10-21): terminación sin costo y comisión al cierre (modelo final del owner).
     expect(consentCheckbox("terms_refund", "en", tier).before).toBe(
-      `I understand that the ${fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. If I cancel after publication, the cancellation fee in my listing agreement equals the ${fee} flat fee I already paid and is deemed paid by it; I pay nothing additional. The ${pct} commission is due only if a sale closes.`,
+      `I understand that the ${fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. I can end my listing agreement at any time, at no charge. The ${pct} commission is due only if a sale closes, and it's paid at closing.`,
     );
     expect(consentCheckbox("terms_refund", "es", tier).before).toBe(
-      `Entiendo que la tarifa fija de ${fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. Si cancelo después de la publicación, la tarifa de cancelación de mi acuerdo de listado es igual a la tarifa fija de ${fee} que ya pagué y se considera pagada con ella; no pago nada adicional. La comisión del ${pct} solo se paga si la venta se cierra.`,
+      `Entiendo que la tarifa fija de ${fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. Puedo terminar mi acuerdo de listado en cualquier momento, sin costo. La comisión del ${pct} solo se paga si la venta se cierra, al momento del cierre.`,
     );
     expect(pct).not.toMatch(/,/); // decimal con punto
   });
@@ -60,9 +60,9 @@ describe("casilla del paso 8 (terms_refund)", () => {
       expect(r).toMatch(lang === "en" ? /non-refundable once your property is published on the MLS/ : /no se reembolsa una vez tu propiedad está publicada en el MLS/);
       expect(r).toMatch(lang === "en" ? /full refund/ : /Te devolvemos el total/);
       expect(r).toMatch(lang === "en" ? /cancel before it's published/ : /cancelas antes de la publicación/);
-      // v3: después de publicar, la tarifa de cancelación es la tarifa fija ya pagada; nada adicional.
-      expect(r).toMatch(lang === "en" ? /equals the flat fee you already paid .* and is deemed paid by it: you pay nothing additional/ : /es igual a la tarifa fija que ya pagaste .* y se considera pagada con ella: no pagas nada adicional/);
-      for (const t of TIER_ORDER) expect(r, `${lang} ${t}`).toContain(formatPrice(PRICING_TIERS[t].flatFee));
+      // v3: terminación sin costo y comisión solo al cierre; sin tarifa de cancelación.
+      expect(r).toMatch(lang === "en" ? /end your listing agreement at any time, at no charge/ : /terminar tu acuerdo de listado en cualquier momento, sin costo/);
+      expect(r).not.toMatch(/cancellation fee|tarifa de cancelación/);
       // Los Términos dicen lo mismo; en español, con usted (refundPolicyTerms).
       expect(termsDoc[lang].sections.find((s) => s.heading.startsWith("6."))?.body).toContain(refundPolicyTerms[lang]);
       expect(termsFaq(lang).refund.a).toBe(r);

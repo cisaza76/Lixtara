@@ -93,17 +93,17 @@ const TERMS_REFUND_CHECKBOX_V1: Record<ConsentLang, ConsentParts> = {
   },
 };
 
-// v3 (2026-10-21): menciona la tarifa de cancelación después de publicar en el MLS: igual a la
-// tarifa fija ya pagada y cubierta por ella, sin monto adicional (ERS-21tn línea 207 y
-// párrafo 15). Pendiente de revisión del abogado.
+// v3 (2026-10-21, modelo final del owner; párrafo 15 del ERS-21tn): el vendedor puede terminar
+// el acuerdo en cualquier momento, sin costo; la comisión solo si la venta se cierra, al cierre.
+// Pendiente de revisión del abogado.
 const TERMS_REFUND_CHECKBOX: Record<ConsentLang, ConsentParts> = {
   en: {
     before:
-      "I understand that the {fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. If I cancel after publication, the cancellation fee in my listing agreement equals the {fee} flat fee I already paid and is deemed paid by it; I pay nothing additional. The {pct} commission is due only if a sale closes.",
+      "I understand that the {fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. I can end my listing agreement at any time, at no charge. The {pct} commission is due only if a sale closes, and it's paid at closing.",
   },
   es: {
     before:
-      "Entiendo que la tarifa fija de {fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. Si cancelo después de la publicación, la tarifa de cancelación de mi acuerdo de listado es igual a la tarifa fija de {fee} que ya pagué y se considera pagada con ella; no pago nada adicional. La comisión del {pct} solo se paga si la venta se cierra.",
+      "Entiendo que la tarifa fija de {fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. Puedo terminar mi acuerdo de listado en cualquier momento, sin costo. La comisión del {pct} solo se paga si la venta se cierra, al momento del cierre.",
   },
 };
 
@@ -144,7 +144,7 @@ export const CONSENTS: Record<ConsentDocument, ConsentDefinition> = {
   // Paso 8, antes de "Pagar con Stripe". Dice lo mismo que legal-terms.ts#refundPolicy, los
   // Términos §6 y la FAQ (site-claims.test.ts lo comprueba). La versión es la de los Términos:
   // el texto no cambió en la v2, pero se acepta junto con los Términos vigentes; en la v3
-  // agrega la tarifa de cancelación después de publicar.
+  // agrega la terminación sin costo y la comisión al cierre.
   terms_refund: {
     version: LEGAL_DOCS.terms.version,
     perPlan: true,
@@ -292,21 +292,21 @@ export const PUBLISHED_CONSENT_HASHES: Record<string, Record<ConsentLang, string
     es: "e94a13b74ea25e0be1c5f12cc80342e99487ec6d0e9fbd9d98132a7437dc13f8",
   },
   // v3 (2026-10-21): la casilla de los Términos no cambia (mismo hash que la v2); la del paso 8
-  // agrega la tarifa de cancelación después de publicar.
+  // agrega la terminación sin costo y la comisión al cierre.
   "terms@terms-2026-10-21-v3+privacy-2026-10-18-v2": {
     en: "4c3ae511d2e3245df3fbf105c4c1c587c2e6dcb701747fea13cde78c2addecb6",
     es: "971219881754a9fde2d0243a491213ae7bdcadf90005650b52d8b1afe07c90c1",
   },
   "terms_refund@2026-10-21-v3:essentials": {
-    en: "1f87af34b6e15e3f57bb2ab21353db6d620266e116e2c6e5165d00e5a2365641",
-    es: "a91d62229c5c9e02fac445ccd3bce3f410022452b4740725cd40ad6df607d8aa",
+    en: "d6f8d1cf5e138ae96a0c3dee5b1fdaf209e898dc4d714066e0b436b9b9ea60fb",
+    es: "6594e297e24b9458f39b5d9db56699a959af7d604f3ef68e7e92f1ab2bb436bb",
   },
   "terms_refund@2026-10-21-v3:pro": {
-    en: "f490118af49b0faa6dd1c3ddc2680f7fb9640661fddf7245931c4dcfed45266b",
-    es: "e0f272f66ff788c1d7a24214307b77824726adb40ccba0b8cc7d1e50d1628972",
+    en: "a67a6704999dc8128d402bdbf68aca728103c99e3a5b516609a34921aa270c0c",
+    es: "41693d3e168e38bf478319ff487a44958924a4f6db6badad5ae9814aa22208da",
   },
   "terms_refund@2026-10-21-v3:concierge": {
-    en: "ee330958d4a9f63969ec953cf008129ae4613dd03440deaed868cd9296fa80bd",
-    es: "77101d12ba07f5950abece9c7e88c5a48983117e56edd669ca095665260b6a5f",
+    en: "a5d42f6868b52514b56a8dfa90847a680f21d6d435fdfec266525c40a7f9341d",
+    es: "13305510529284ef8a6146fc61388a2e7d26c4fd563d5cc739e526b0f9bec269",
   },
 };

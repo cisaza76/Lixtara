@@ -5,7 +5,7 @@ import { dictionaryTexts, legalTermTexts, sentences, type Lang, type SiteText } 
 import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
 import { dictionaries } from "@/lib/i18n";
 import { BROKERAGE, CONTACT_EMAIL, DBPR_BROKER_LICENSE_URL, DBPR_BROKERAGE_LICENSE_URL, fillBrokerageCopy } from "@/config/brokerage";
-import { buyerAgentComp, refundPolicy, refundPolicyTerms, termsFaq } from "@/config/legal-terms";
+import { buyerAgentComp, listingTermination, refundPolicy, refundPolicyTerms, termsFaq } from "@/config/legal-terms";
 import { BUYER_COMP_MAX_PCT } from "@/lib/buyer-comp";
 import { PRICING_TIERS, TIER_ORDER, fillTierCopy, formatPrice } from "@/lib/pricing-tiers";
 import { fillFromPricing, minCommissionPct, minFlatFee } from "@/lib/pricing-from";
@@ -100,10 +100,11 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
     );
   });
 
-  it("FAQ 'si no se vende': vencimiento definido y salida por el acuerdo de listado", () => {
+  it("FAQ 'si no se vende': vencimiento definido y terminación sin costo con el período de protección", () => {
     const item = dictionaries[lang].faq.items.find((i) => /doesn't sell|no se vende/.test(i.q));
     expect(item?.a).toMatch(lang === "en" ? /defined expiration date of up to 24 months/ : /fecha de vencimiento definida, de hasta 24 meses/);
-    expect(item?.a).toMatch(lang === "en" ? /terms of your listing agreement/ : /condiciones de tu acuerdo de listado/);
+    // v3 (2026-10-21): termina cuando quiera, sin costo, con el período de protección del acuerdo.
+    expect(item?.a).toContain(listingTermination.text[lang]);
   });
 
   it("Términos §6: el reembolso es la política publicada, sin 'all fees are non-refundable'", () => {

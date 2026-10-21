@@ -116,7 +116,7 @@ describe("nada de borradores en lo que se publica", () => {
 describe("los cinco cambios de la v2", () => {
   const section = (lang: Lang, n: number) => termsDoc[lang].sections.find((s) => s.id === `section-${n}`)!;
 
-  // La v2 remitía al "Early Termination Addendum"; la v3 remite al párrafo 12 del acuerdo de
+  // La v2 remitía al "Early Termination Addendum"; la v3 remite al párrafo 15 del acuerdo de
   // listado (published-v3.test.ts). Lo que sigue de la v2: sin "24-month listing term".
   it("1. Términos §16: sin '24-month listing term' ni 'any commission obligations'", () => {
     const en = section("en", 16).body.join(" ");
