@@ -121,12 +121,19 @@ describe("Listing Agreement: valores por línea", () => {
     expect(unknown.lockedText).toContain("lease_end_date");
   });
 
-  it("«Other (specify)» nunca lo llena el sitio; «Cash» va como casilla", () => {
-    const r = run();
-    expect(r.text).not.toHaveProperty("financing_other_specify");
-    expect(Object.values(r.text)).not.toContain("Cash");
-    expect(r.checkbox.financing_cash).toBe(true);
-    expect(run({}, { cash_only: false }).checkbox.financing_cash).toBe(false);
+  it("financiamiento (L23) desde el paso 3, de solo lectura; «Other (specify)» solo con Other", () => {
+    const a = run({}, { financing_terms: ["cash", "conventional"], financing_other: null });
+    expect(a.checkbox).toMatchObject({ financing_cash: true, financing_conventional: true, financing_va: false, financing_fha: false, financing_other: false });
+    expect(a.text.financing_other_specify).toBe("");
+    const b = run({}, { financing_terms: ["other"], financing_other: "Seller financing, 20% down" });
+    expect(b.checkbox).toMatchObject({ financing_cash: false, financing_other: true });
+    expect(b.text.financing_other_specify).toBe("Seller financing, 20% down");
+    // Texto guardado sin Other: no se escribe (nunca «Cash» ni nada en Other).
+    expect(run({}, { financing_terms: ["cash"], financing_other: "Cash" }).text.financing_other_specify).toBe("");
+    // Listing anterior a la migración: desde cash_only.
+    expect(run({}, { financing_terms: null, cash_only: true }).checkbox.financing_cash).toBe(true);
+    expect(a.lockedCheckbox).toEqual(expect.arrayContaining(["financing_cash", "financing_conventional", "financing_va", "financing_fha", "financing_other"]));
+    expect(b.lockedText).toContain("financing_other_specify");
   });
 
   it("lo que pone el sitio queda bloqueado para el vendedor", () => {

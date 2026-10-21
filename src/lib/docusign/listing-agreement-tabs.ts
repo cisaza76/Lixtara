@@ -9,12 +9,13 @@
 //     checked and the attachment carries it;
 //   - personal property: one line; if the list doesn't fit, "See Attachment" + the attachment;
 //   - occupancy: one choice (is / is not) from step 3; lease expiry only with "is", MM/DD/YYYY;
-//   - "Other (specify)" is never filled by the site (the template shows it only with "Other").
+//   - financing (line 23): the boxes and "Other (specify)" come from step 3, read-only.
 
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import type { BuyerCompOffer } from "@/lib/buyer-comp";
 import { buyerCommissionAck } from "@/lib/buyer-comp";
 import type { PricingTier } from "@/lib/pricing-tiers";
+import { savedFinancing } from "@/lib/financing-terms";
 import { fitsOnLine, textWidthPt, textField } from "./ers21tn-layout";
 
 export interface AgreementListing {
@@ -25,6 +26,9 @@ export interface AgreementListing {
   folio: string | null;
   list_price: number;
   cash_only: boolean | null;
+  /** Step 3, migration 20261021120000. Null on listings saved before it (then: cash_only). */
+  financing_terms?: string[] | null;
+  financing_other?: string | null;
   occupancy_status: "vacant" | "owner_occupied" | "tenant_occupied" | string | null;
   lease_end_date: string | null;
   appliances: string[] | null;
@@ -131,6 +135,10 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
   const occupancy =
     p.occupancy_status === "tenant_occupied" ? "is" : p.occupancy_status === "vacant" || p.occupancy_status === "owner_occupied" ? "is_not" : null;
 
+  // Line 23: financing from step 3.
+  const financing = new Set(savedFinancing(p));
+  const otherText = financing.has("other") ? (p.financing_other ?? "").trim() : "";
+
   // Lockbox: Concierge always; Pro when the home is vacant. Essentials buys it as an add-on.
   const lockbox = tier.id === "concierge" || (tier.id === "pro" && p.occupancy_status === "vacant");
 
@@ -150,6 +158,7 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     flat_fee: plainNumber(tier.flatFee),
     buyer_comp_pct: buyerOffer.type === "percent" ? plainNumber(buyerOffer.pct) : "",
     buyer_comp_amount: buyerOffer.type === "amount" ? plainNumber(buyerOffer.amount) : "",
+    financing_other_specify: otherText,
   };
 
   return {
@@ -159,11 +168,25 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     checkbox: {
       legal_see_attachment: !legalLines,
       personal_property_see_attachment: !personalFits,
-      financing_cash: p.cash_only === true,
+      financing_cash: financing.has("cash"),
+      financing_conventional: financing.has("conventional"),
+      financing_va: financing.has("va"),
+      financing_fha: financing.has("fha"),
+      financing_other: financing.has("other"),
       lockbox_authorized: lockbox,
       buyer_commission_ack: buyerCommissionAck(buyerOffer),
     },
-    lockedCheckbox: ["legal_see_attachment", "personal_property_see_attachment", "lockbox_authorized", "buyer_commission_ack"],
+    lockedCheckbox: [
+      "legal_see_attachment",
+      "personal_property_see_attachment",
+      "financing_cash",
+      "financing_conventional",
+      "financing_va",
+      "financing_fha",
+      "financing_other",
+      "lockbox_authorized",
+      "buyer_commission_ack",
+    ],
     radio: { occupancy: { value: occupancy, locked: occupancy !== null } },
     attachment,
     legalStatus: input.verifiedLegal?.trim() ? "verified" : "pending",

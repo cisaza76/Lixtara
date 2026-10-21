@@ -4,17 +4,19 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { legalPendingMessage, pendingLegalFrom } from "./agreement-legal";
 
-const ag = (property_id: string, envelope_id: string | null, created_at: string) => ({ property_id, envelope_id, created_at });
-const log = (property_id: string, envelope_id: string, legal: string) => ({ property_id, metadata: { envelope_id, legal_description: legal } });
+const ag = (property_id: string, legal_description_status: string | null, created_at: string) => ({ property_id, legal_description_status, created_at });
 
 describe("descripción legal pendiente", () => {
-  it("bloquea solo si el ÚLTIMO acuerdo salió con la descripción legal pendiente", () => {
-    const pending = pendingLegalFrom(
-      [ag("p1", "e1", "2026-10-01"), ag("p2", "e2", "2026-10-01"), ag("p2", "e3", "2026-10-05"), ag("p3", "e4", "2026-10-01"), ag("p4", null, "2026-10-01")],
-      [log("p1", "e1", "pending"), log("p2", "e2", "pending"), log("p2", "e3", "verified"), log("p4", "x", "pending")],
-    );
-    // p1 pendiente; p2 ya tiene un acuerdo nuevo verificado; p3 es anterior al registro; p4 sin sobre.
-    expect([...pending]).toEqual(["p1"]);
+  it("bloquea si el ÚLTIMO acuerdo no está «verified» (null = anterior a la columna = pendiente)", () => {
+    const pending = pendingLegalFrom([
+      ag("p1", "pending", "2026-10-01"),
+      ag("p2", "pending", "2026-10-01"),
+      ag("p2", "verified", "2026-10-05"),
+      ag("p3", null, "2026-10-01"),
+      ag("p4", "verified", "2026-10-01"),
+    ]);
+    // p1 pendiente; p2 ya tiene un acuerdo nuevo verificado; p3 es anterior a la columna; p4 verificado.
+    expect([...pending].sort()).toEqual(["p1", "p3"]);
   });
 
   it("el mensaje es el del owner", () => {
@@ -34,10 +36,15 @@ describe("descripción legal pendiente", () => {
     expect(home.indexOf("error=legal_pending")).toBeLessThan(home.indexOf("checkBrokerCountersigned(id)"));
   });
 
-  it("el sobre registra si la descripción legal salió verificada o pendiente", () => {
+  it("el acuerdo se guarda con su estado (columna) y la auditoría queda en activity_log", () => {
     const route = readFileSync("src/app/api/agreement/create/route.ts", "utf8");
+    expect(route).toContain("legal_description_status: contract.legalStatus,");
+    expect(route).toMatch(/await createService\(\)\s*\.from\("agreements"\)\s*\.insert\(/);
     expect(route).toContain("await recordAgreementSent({ propertyId, userId: user.id, envelopeId, legal: contract.legalStatus });");
-    // Si falla la lectura, el admin queda bloqueado (fail closed).
-    expect(readFileSync("src/lib/agreement-legal.server.ts", "utf8")).toContain("return new Set(propertyIds);");
+    const gate = readFileSync("src/lib/agreement-legal.server.ts", "utf8");
+    // El bloqueo lee la columna, no activity_log; si falla la lectura, el admin queda bloqueado.
+    expect(gate).toContain('.select("property_id,legal_description_status,created_at")');
+    expect(gate.slice(gate.indexOf("export async function pendingLegalByProperty"))).not.toContain("activity_log");
+    expect(gate).toContain("return new Set(propertyIds);");
   });
 });

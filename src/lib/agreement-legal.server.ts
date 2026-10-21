@@ -1,7 +1,7 @@
 import { createService } from "@/lib/supabase/service";
-import { AGREEMENT_SENT_ACTION, pendingLegalFrom, type AgreementLegalStatus, type AgreementRow, type AgreementSentLog } from "./agreement-legal";
+import { AGREEMENT_SENT_ACTION, pendingLegalFrom, type AgreementLegalStatus, type AgreementRow } from "./agreement-legal";
 
-/** Logs the envelope and whether its legal description was verified. Never throws. */
+/** Audit entry (activity_log) for the envelope and its legal status. Never throws. */
 export async function recordAgreementSent(input: {
   propertyId: string;
   userId: string;
@@ -23,20 +23,23 @@ export async function recordAgreementSent(input: {
 }
 
 /**
- * Listings among `propertyIds` whose latest agreement has the legal description pending.
- * Service key: call only after checking the admin/broker role. On a read error it returns
- * every id (fail closed: better a blocked approval than a contract without the legal description).
+ * Listings among `propertyIds` whose latest agreement has the legal description pending
+ * (agreements.legal_description_status). Service key: call only after checking the
+ * admin/broker role. On a read error it returns every id (fail closed: better a blocked
+ * approval than a contract without the legal description).
  */
 export async function pendingLegalByProperty(propertyIds: string[]): Promise<Set<string>> {
   if (propertyIds.length === 0) return new Set();
-  const db = createService();
-  const [ag, logs] = await Promise.all([
-    db.from("agreements").select("property_id,envelope_id,created_at").in("property_id", propertyIds),
-    db.from("activity_log").select("property_id,metadata").eq("action_type", AGREEMENT_SENT_ACTION).in("property_id", propertyIds),
-  ]);
-  if (ag.error || logs.error) {
-    console.error("legal-pending read failed", ag.error?.message ?? logs.error?.message);
+  try {
+    const { data, error } = await createService()
+      .from("agreements")
+      .select("property_id,legal_description_status,created_at")
+      .in("property_id", propertyIds);
+    if (error) throw new Error(error.message);
+    // Without any agreement there's nothing to approve yet: the countersignature gate blocks it.
+    return pendingLegalFrom((data ?? []) as AgreementRow[]);
+  } catch (e) {
+    console.error("legal-pending read failed", e instanceof Error ? e.message : e);
     return new Set(propertyIds);
   }
-  return pendingLegalFrom((ag.data ?? []) as AgreementRow[], (logs.data ?? []) as AgreementSentLog[]);
 }

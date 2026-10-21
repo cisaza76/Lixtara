@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createService } from "@/lib/supabase/service";
 import {
   createEnvelopeFromTemplate,
   getRecipientView,
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
+      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, financing_terms, financing_other, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
     )
     .eq("id", propertyId)
     .eq("owner_id", user.id)
@@ -247,7 +248,10 @@ export async function POST(req: Request) {
       });
       envelopeId = created.envelopeId;
 
-      const { data: inserted, error: insErr } = await supabase
+      // Con la clave de servicio: el vendedor solo puede insertar 'pending' (política RLS de
+      // 20261021120000); 'verified' lo pone el servidor tras verificar con el condado. Ya se
+      // comprobó arriba que el listing es suyo y está en borrador.
+      const { data: inserted, error: insErr } = await createService()
         .from("agreements")
         .insert({
           property_id: propertyId,
@@ -258,6 +262,8 @@ export async function POST(req: Request) {
           status: "sent",
           signer_email: signerEmail,
           signer_name: signerName,
+          // Sin descripción legal verificada, el admin no puede aprobar el listing (#217).
+          legal_description_status: contract.legalStatus,
         })
         .select("id")
         .single();
@@ -265,7 +271,7 @@ export async function POST(req: Request) {
         console.error("agreements insert failed:", JSON.stringify(insErr));
       }
       agreementRowId = inserted?.id ?? null;
-      // Con la descripción legal pendiente, el admin no puede aprobar el listing (#217).
+      // Auditoría (el bloqueo lee agreements.legal_description_status).
       await recordAgreementSent({ propertyId, userId: user.id, envelopeId, legal: contract.legalStatus });
     }
 

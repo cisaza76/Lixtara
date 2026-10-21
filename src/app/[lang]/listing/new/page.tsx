@@ -107,6 +107,8 @@ import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { duplicateDraftId } from "@/lib/listing-step1-dedupe.server";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { isoToUsDate, parseLeaseEnd } from "@/lib/lease-end";
+import { parseFinancing, savedFinancing } from "@/lib/financing-terms";
+import { FinancingSection } from "@/components/financing-section";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
@@ -187,6 +189,8 @@ interface Draft {
   tax_annual_amount: number | null;
   has_pool: boolean | null;
   cash_only: boolean | null;
+  financing_terms: string[] | null;
+  financing_other: string | null;
   as_is_sale: boolean | null;
   flood_zone: string | null;
   occupancy_status: OccupancyStatus | null;
@@ -310,7 +314,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,appliances",
+        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,financing_terms,financing_other,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,appliances",
       )
       .eq("id", draftId)
       .maybeSingle();
@@ -839,7 +843,9 @@ export default async function ListingNewPage({
     const taxRaw = String(formData.get("tax_annual_amount") ?? "").trim();
     const taxAnnual = taxRaw === "" ? null : Number.parseInt(taxRaw, 10);
     const hasPool = formData.get("has_pool") === "1";
-    const cashOnly = formData.get("cash_only") === "1";
+    // Financiamiento aceptado (L23 del acuerdo): al menos una opción; Other con texto.
+    const financing = parseFinancing(formData.getAll("financing_terms"), formData.get("financing_other"));
+    if (!financing.ok) redirect(`/${lang}/listing/new?step=3&id=${id}&error=${financing.error}`);
     const asIsSale = formData.get("as_is_sale") === "1";
     const floodZoneRaw = String(formData.get("flood_zone") ?? "")
       .trim()
@@ -946,7 +952,9 @@ export default async function ListingNewPage({
         hoa_fee: hoaFee,
         tax_annual_amount: taxAnnual,
         has_pool: hasPool,
-        cash_only: cashOnly,
+        cash_only: financing.cashOnly,
+        financing_terms: financing.terms,
+        financing_other: financing.other,
         as_is_sale: asIsSale,
         flood_zone: floodZone,
         occupancy_status: occupancyStatus,
@@ -1732,7 +1740,13 @@ export default async function ListingNewPage({
                                                 ? copy.stepErrors.leaseEndInvalid
                                                 : sp.error === "lease_end_past"
                                                   ? copy.stepErrors.leaseEndPast
-                                                  : buyerCompError(sp.error);
+                                                  : sp.error === "financing_required"
+                                                    ? copy.stepErrors.financingRequired
+                                                    : sp.error === "financing_other_required"
+                                                      ? copy.stepErrors.financingOtherRequired
+                                                      : sp.error === "financing_other_too_long"
+                                                        ? copy.stepErrors.financingOtherTooLong
+                                                        : buyerCompError(sp.error);
   function buyerCompError(code: string | undefined): string | null {
     const c = copy.step6.buyerComp;
     const fill = (s: string) =>
@@ -2367,6 +2381,18 @@ export default async function ListingNewPage({
                 </p>
               </div>
 
+              <FinancingSection
+                initialTerms={draft ? savedFinancing(draft) : []}
+                initialOther={draft?.financing_other ?? ""}
+                labels={{
+                  title: copy.step3.financingTitle,
+                  help: copy.step3.financingHelp,
+                  options: copy.step3.financingOptions,
+                  otherLabel: copy.step3.financingOtherLabel,
+                  otherPlaceholder: copy.step3.financingOtherPlaceholder,
+                }}
+              />
+
               <OccupancySection
                 initialOccupancy={draft?.occupancy_status ?? ""}
                 initialRent={
@@ -2416,16 +2442,6 @@ export default async function ListingNewPage({
                     className="accent-gold w-4 h-4"
                   />
                   <span>{copy.step3.poolLabel}</span>
-                </label>
-                <label className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="cash_only"
-                    value="1"
-                    defaultChecked={draft?.cash_only ?? false}
-                    className="accent-gold w-4 h-4"
-                  />
-                  <span>{copy.step3.cashOnlyLabel}</span>
                 </label>
                 <label className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer">
                   <input

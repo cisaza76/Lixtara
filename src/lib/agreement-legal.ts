@@ -1,7 +1,8 @@
 // Listing agreement sent with the legal description PENDING (not verified with the county, so
 // the contract says "See Attachment" and the attachment asks the broker to provide it). The
 // admin can't approve/publish that listing until a new agreement goes out with it verified.
-// Recorded in activity_log when the envelope is created (metadata, no migration); read here.
+// Source of truth: agreements.legal_description_status (migration 20261021120000), written by
+// /api/agreement/create; activity_log keeps an audit entry (AGREEMENT_SENT_ACTION).
 
 export const AGREEMENT_SENT_ACTION = "agreement_sent";
 
@@ -9,30 +10,22 @@ export type AgreementLegalStatus = "verified" | "pending";
 
 export interface AgreementRow {
   property_id: string;
-  envelope_id: string | null;
+  legal_description_status: string | null;
   created_at: string;
 }
 
-export interface AgreementSentLog {
-  property_id: string | null;
-  metadata: { envelope_id?: unknown; legal_description?: unknown } | null;
-}
-
 /**
- * Properties whose LATEST agreement went out with the legal description pending. Older
- * agreements, or one sent before this record existed, never block.
+ * Properties whose LATEST agreement isn't "verified". An agreement from before the column
+ * (null) counts as pending: it was never checked against the county.
  */
-export function pendingLegalFrom(agreements: AgreementRow[], logs: AgreementSentLog[]): Set<string> {
+export function pendingLegalFrom(agreements: AgreementRow[]): Set<string> {
   const latest = new Map<string, AgreementRow>();
   for (const a of agreements) {
     const cur = latest.get(a.property_id);
     if (!cur || a.created_at > cur.created_at) latest.set(a.property_id, a);
   }
-  const pendingEnvelopes = new Set(
-    logs.filter((l) => l.metadata?.legal_description === "pending").map((l) => String(l.metadata?.envelope_id ?? "")),
-  );
   const out = new Set<string>();
-  for (const [propertyId, a] of latest) if (a.envelope_id && pendingEnvelopes.has(a.envelope_id)) out.add(propertyId);
+  for (const [propertyId, a] of latest) if (a.legal_description_status !== "verified") out.add(propertyId);
   return out;
 }
 

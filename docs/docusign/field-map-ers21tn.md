@@ -19,7 +19,7 @@ PDF: imagen escaneada, sin texto (no se pueden usar anclas: posiciones por coord
 | 15 | `legal_description` | Legal Description: | text | Seller | Condado, verificado al firmar (`verifiedLegalDescription`: misma dirección → mismo folio) | sí | sí | p1 x164 y264 · 480×21 · 9 pt | sí | **el sitio la mandó vacía (el condado no la devolvió) y, por ser obligatoria y editable, quien firmó escribió «three-bedroom townhouses»; la del condado tiene varias líneas y desbordaba hasta L18**; alto 21 pt: más de una línea; se sale del margen derecho; auto-grow activo; dato del sitio editable por el vendedor |
 | 17 | `personal_property` | (b) Personal Property, including appliances: | text | Seller | Paso 3, electrodomésticos incluidos (`properties.appliances`) | sí | sí | p1 x280 y305 · 330×19 · 9 pt | sí | **dos campos: L17 y un cuadro que crece sobre L18–L20**; campo duplicado (misma etiqueta dos veces); alto 19 pt: más de una línea; se sale del margen derecho; auto-grow activo; dato del sitio editable por el vendedor |
 | 18 | `personal_property` | … O See Attachment | text | Seller | Paso 3, electrodomésticos incluidos (`properties.appliances`) | sí | sí | p1 x84 y319 · 328×23 · 9 pt | sí | **dos campos: L17 y un cuadro que crece sobre L18–L20**; campo duplicado (misma etiqueta dos veces); alto 23 pt: más de una línea; auto-grow activo; dato del sitio editable por el vendedor |
-| 19–20 | `lease_end_date` | (c) Occupancy: | text | Seller | Paso 3, `lease_end_date` (MM/DD/YYYY, solo con inquilino) | sí | sí | p1 x482 y348 · 122×22 · 9 pt | sí | **obligatorio aunque no haya inquilino: quien firmó escribió «31/12/2026» (DD/MM)**; alto 22 pt: más de una línea; tapa las líneas 19, 20; se sale del margen derecho; auto-grow activo; dato del sitio editable por el vendedor |
+| 19–20 | `lease_end_date` | (c) Occupancy: | text | Seller | Paso 3, `lease_end_date` (MM/DD/YYYY, solo con inquilino; vacía con «No la sé») | sí | sí | p1 x482 y348 · 122×22 · 9 pt | sí | **obligatorio aunque no haya inquilino: quien firmó escribió «31/12/2026» (DD/MM)**; alto 22 pt: más de una línea; tapa las líneas 19, 20; se sale del margen derecho; auto-grow activo; dato del sitio editable por el vendedor |
 | 20 | `occupancy_status` | Property C] is | checkbox | Seller | Paso 3, `occupancy_status` (se quita: pasa a `occupancy`) | no | sí | p1 x150 y356 · 0×0 · 9 pt | — | **las dos casillas (is / is not) tienen la misma etiqueta: el sitio mandó las dos sin marcar y, al marcar una, DocuSign marcó las dos**; misma etiqueta en varias casillas: marcar una marca todas |
 | 20 | `occupancy_status` | Property | checkbox | Seller | Paso 3, `occupancy_status` (se quita: pasa a `occupancy`) | no | sí | p1 x124 y357 · 0×0 · 9 pt | — | **las dos casillas (is / is not) tienen la misma etiqueta: el sitio mandó las dos sin marcar y, al marcar una, DocuSign marcó las dos**; misma etiqueta en varias casillas: marcar una marca todas |
 | 21–22 | `list_price` | 3. Price and Terms: | text | Seller | Paso 3, `list_price` (sin «$») | sí | sí | p1 x121 y379 · 123×19 · 9 pt | sí | **«$» repetido: el formulario imprime «$» y el sitio mandaba «$650,000»**; alto 19 pt: más de una línea; tapa las líneas 21, 22; auto-grow activo; dato del sitio editable por el vendedor |
@@ -65,14 +65,14 @@ Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-lay
 | 17 | `personal_property` | text | Paso 3, electrodomésticos incluidos (`properties.appliances`) | no | no | p1 x286 y314 · 288×11 · 9 pt | no | — |
 | 18 | `personal_property_see_attachment` | checkbox | Marcada si la lista no cabe en L17 | no | no | p1 x380 y327 | — | — |
 | 20 | `occupancy` | radio | Paso 3, `occupancy_status` (inquilino → is; vacía u ocupada por el dueño → is not) | sí | sí | is: p1 x128 y357 · is_not: p1 x152 y357 | — | — |
-| 20 | `lease_end_date` | text | Paso 3, `lease_end_date` (MM/DD/YYYY, solo con inquilino) | no | no | p1 x491 y359 · 79×11 · 9 pt | no | solo si `occupancy` = is |
+| 20 | `lease_end_date` | text | Paso 3, `lease_end_date` (MM/DD/YYYY, solo con inquilino; vacía con «No la sé») | no | no | p1 x491 y359 · 79×11 · 9 pt | no | solo si `occupancy` = is |
 | 22 | `list_price` | text | Paso 3, `list_price` (sin «$») | sí | no | p1 x125 y388 · 107×11 · 9 pt | no | — |
-| 23 | `financing_cash` | checkbox | Paso 3, `cash_only` | no | no | p1 x172 y397 | — | — |
-| 23 | `financing_conventional` | checkbox | Lo llena quien firma | no | no | p1 x213 y397 | — | — |
-| 23 | `financing_va` | checkbox | Lo llena quien firma | no | no | p1 x289 y397 | — | — |
-| 23 | `financing_fha` | checkbox | Lo llena quien firma | no | no | p1 x319 y397 | — | — |
-| 23 | `financing_other` | checkbox | Lo llena quien firma | no | no | p1 x357 y397 | — | — |
-| 23 | `financing_other_specify` | text | Lo llena quien firma | no | no | p1 x444 y400 · 129×11 · 9 pt | no | solo si `financing_other` = on |
+| 23 | `financing_cash` | checkbox | Paso 3, `financing_terms` incluye cash | no | no | p1 x172 y397 | — | — |
+| 23 | `financing_conventional` | checkbox | Paso 3, `financing_terms` incluye conventional | no | no | p1 x213 y397 | — | — |
+| 23 | `financing_va` | checkbox | Paso 3, `financing_terms` incluye va | no | no | p1 x289 y397 | — | — |
+| 23 | `financing_fha` | checkbox | Paso 3, `financing_terms` incluye fha | no | no | p1 x319 y397 | — | — |
+| 23 | `financing_other` | checkbox | Paso 3, `financing_terms` incluye other | no | no | p1 x357 y397 | — | — |
+| 23 | `financing_other_specify` | text | Paso 3, `financing_other` (solo con Other) | no | no | p1 x444 y400 · 129×11 · 9 pt | no | solo si `financing_other` = on |
 | 71 | `lockbox_authorized` | checkbox | Plan: Concierge siempre; Pro si la casa está vacía | no | no | p2 x187 y291 | — | — |
 | 110 | `commission_pct` | text | Plan, `commissionPct` (sin «%») | sí | no | p3 x89 y71 · 51×11 · 9 pt | no | — |
 | 110 | `flat_fee` | text | Plan, `flatFee` (sin «$») | sí | no | p3 x301 y71 · 107×11 · 9 pt | no | — |
