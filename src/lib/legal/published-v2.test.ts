@@ -255,6 +255,6 @@ describe("pie de página", () => {
     expect(layout).toContain("footerCopy.licensedBrokerage");
     expect(layout).toContain("{BROKERAGE.legalName}");
     expect(layout).toContain("LEGAL_DOCS.notices.path}#fair-housing");
-    expect(read("src/app/sitemap.ts")).toMatch(/"\/notices",\s*"\/accessibility"/);
+    expect(read("src/lib/sitemap-routes.ts")).toMatch(/"\/notices",\s*"\/accessibility"/);
   });
 });

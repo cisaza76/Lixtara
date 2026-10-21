@@ -370,7 +370,7 @@ describe("landing de propietarios (/owners)", () => {
   it("noindex, fuera del menú y del sitemap, sin personalizar con datos del propietario", () => {
     expect(src).toContain("robots: { index: false, follow: true }");
     expect(src).not.toMatch(/searchParams/);
-    for (const f of ["src/app/[lang]/layout.tsx", "src/components/mobile-menu.tsx", "src/app/sitemap.ts"]) {
+    for (const f of ["src/app/[lang]/layout.tsx", "src/components/mobile-menu.tsx", "src/app/sitemap.ts", "src/lib/sitemap-routes.ts"]) {
       expect(read(f), f).not.toMatch(/\/owners/);
     }
   });
