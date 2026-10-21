@@ -3,19 +3,25 @@
 -- A. Financiación aceptada por el vendedor (paso 3) → línea 23 del contrato: Cash,
 --    Conventional, VA, FHA y Other (con texto, obligatorio si Other).
 --
--- 1. properties.financing_terms text[]: uno o más de cash, conventional, va, fha, other.
+-- 1. properties.financing_terms text[]: uno o más de cash, conventional, va, fha, other, sin
+--    repetidos (array_positions por valor: sin función ni subconsulta).
 -- 2. properties.financing_other text: el texto de "Other (specify)"; obligatorio con other,
 --    prohibido sin other; hasta 120 caracteres (cabe en la línea 23).
 -- 3. Relleno: cash_only = true → {cash}. El resto queda null: el paso 3 lo pide de nuevo.
 --    cash_only se mantiene (la app lo escribe = financing_terms es exactamente {cash}).
 -- 4. properties_seller_writable_columns(): las dos columnas (las escribe el paso 3).
--- 5. SELECT por columna para anon y authenticated (regla desde 20261017150000).
+-- 5. SELECT por columna solo para authenticated (regla desde 20261017150000). Ninguna página
+--    pública las lee: el paso 3, el admin y la creación del acuerdo leen con sesión (también
+--    la anónima del embudo, que es authenticated). anon no las necesita.
 --
 -- B. agreements.legal_description_status ('verified' | 'pending'): si la descripción legal del
 --    contrato salió verificada con el condado. "Aprobar → Active" del admin lee esta columna
 --    (activity_log queda solo como auditoría).
--- 6. Columna + CHECK. Obligatoria para los acuerdos NUEVOS (trigger BEFORE INSERT); los
---    anteriores quedan null y la app los trata como 'pending' (bloqueados).
+-- 6. Columna + CHECK + DEFAULT 'pending'. La base es compartida y el código de main no manda la
+--    columna: con el default, un acuerdo creado entre el db push y el merge queda 'pending'
+--    (bloqueado para aprobar, como debe) en vez de fallar. El trigger BEFORE INSERT sigue
+--    rechazando un null explícito. Los acuerdos anteriores quedan null y la app los trata como
+--    'pending'.
 -- 7. El dueño solo puede insertar 'pending' (política "own agreements insert"): así nadie
 --    marca su propio acuerdo como verificado. La app inserta con service_role después de
 --    verificar con el condado. Nadie más que service_role actualiza agreements (no hay política
@@ -38,7 +44,12 @@ alter table public.properties add constraint properties_financing_terms_check
   check (
     financing_terms is null
     or (cardinality(financing_terms) between 1 and 5
-        and financing_terms <@ array['cash', 'conventional', 'va', 'fha', 'other']::text[])
+        and financing_terms <@ array['cash', 'conventional', 'va', 'fha', 'other']::text[]
+        and cardinality(array_positions(financing_terms, 'cash')) <= 1
+        and cardinality(array_positions(financing_terms, 'conventional')) <= 1
+        and cardinality(array_positions(financing_terms, 'va')) <= 1
+        and cardinality(array_positions(financing_terms, 'fha')) <= 1
+        and cardinality(array_positions(financing_terms, 'other')) <= 1)
   );
 
 alter table public.properties drop constraint if exists properties_financing_other_check;
@@ -71,10 +82,11 @@ as $$
   ]::text[]
 $$;
 
-grant select (financing_terms, financing_other) on public.properties to anon, authenticated;
+grant select (financing_terms, financing_other) on public.properties to authenticated;
 
 -- ── B. Estado de la descripción legal del acuerdo ────────────────────────────────────
 alter table public.agreements add column if not exists legal_description_status text;
+alter table public.agreements alter column legal_description_status set default 'pending';
 
 alter table public.agreements drop constraint if exists agreements_legal_description_status_check;
 alter table public.agreements add constraint agreements_legal_description_status_check

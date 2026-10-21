@@ -25,7 +25,10 @@ create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 grant usage on schema auth to anon, authenticated, service_role;
 create table public.properties (id uuid primary key default gen_random_uuid(), owner_id uuid not null, cash_only boolean default false);
-grant select, insert, update on public.properties to anon, authenticated, service_role;
+grant select, insert, update on public.properties to service_role;
+-- Como producción desde 20261017150000: SELECT por columna para anon y authenticated.
+grant insert, update on public.properties to anon, authenticated;
+grant select (id, owner_id, cash_only) on public.properties to anon, authenticated;
 create table public.agreements (
   id uuid primary key default gen_random_uuid(),
   property_id uuid not null references public.properties(id) on delete cascade,
@@ -79,14 +82,26 @@ chk("texto de 121 caracteres → rechazo", "ERR:23514", await as("authenticated"
 chk("texto de 120 caracteres", "OK:1", await as("authenticated", SELLER, fin("array['other']", `'${"x".repeat(120)}'`)));
 chk("valor desconocido (crypto) → rechazo", "ERR:23514", await as("authenticated", SELLER, fin("array['cash','crypto']", "null")));
 chk("lista vacía → rechazo", "ERR:23514", await as("authenticated", SELLER, fin("array[]::text[]", "null")));
+chk("valor repetido {cash,cash} → rechazo", "ERR:23514", await as("authenticated", SELLER, fin("array['cash','cash']", "null")));
+chk("valor repetido {other,va,other} con texto → rechazo", "ERR:23514", await as("authenticated", SELLER, fin("array['other','va','other']", "'x'")));
+chk("los cinco valores, sin repetir", "OK:1", await as("authenticated", SELLER, fin("array['cash','conventional','va','fha','other']", "'x'")));
 chk("las dos columnas están en la lista del vendedor", "true",
   String((await one("select public.properties_seller_writable_columns() @> array['financing_terms','financing_other'] as ok")).ok));
-chk("anon puede leer las columnas nuevas", "OK:2", await as("anon", null, "select financing_terms, financing_other from public.properties"));
+chk("authenticated puede leer las columnas nuevas", "OK:2", await as("authenticated", SELLER, "select financing_terms, financing_other from public.properties"));
+chk("anon NO puede leer financing_terms", "ERR:42501", await as("anon", null, "select financing_terms from public.properties"));
+chk("anon NO puede leer financing_other", "ERR:42501", await as("anon", null, "select financing_other from public.properties"));
 
 // ── B. Estado de la descripción legal ──
 chk("el acuerdo anterior queda con null", "null", String((await one(`select legal_description_status as s from public.agreements where envelope_id = 'env-old'`)).s));
-chk("acuerdo nuevo sin estado → rechazo (aun service_role)", "ERR:23502", await as("service_role", null, agr("null", "env-1")));
+chk("acuerdo nuevo con null explícito → rechazo (aun service_role)", "ERR:23502", await as("service_role", null, agr("null", "env-1")));
 chk("estado desconocido → rechazo", "ERR:23514", await as("service_role", null, agr("'maybe'", "env-2")));
+chk("insert sin la columna (código de main) → queda 'pending'", "pending", await (async () => {
+  const r = await as("service_role", null, `insert into public.agreements (property_id, owner_id, envelope_id) values ('${PROP}', '${SELLER}', 'env-main')`);
+  if (r !== "OK:1") return r;
+  return (await one(`select legal_description_status as s from public.agreements where envelope_id = 'env-main'`)).s;
+})());
+chk("el vendedor inserta sin la columna (código de main) → 'pending'", "OK:1", await as("authenticated", SELLER,
+  `insert into public.agreements (property_id, owner_id, envelope_id) values ('${PROP}', '${SELLER}', 'env-main-2')`));
 chk("service_role inserta 'verified'", "OK:1", await as("service_role", null, agr("'verified'", "env-3")));
 chk("service_role inserta 'pending'", "OK:1", await as("service_role", null, agr("'pending'", "env-4")));
 chk("el vendedor NO puede insertar su acuerdo como 'verified'", "ERR:42501", await as("authenticated", SELLER, agr("'verified'", "env-5")));

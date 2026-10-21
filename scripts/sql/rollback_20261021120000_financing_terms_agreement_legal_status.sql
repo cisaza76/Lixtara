@@ -19,10 +19,18 @@ create policy "own agreements insert" on public.agreements
 drop trigger if exists agreements_require_legal_status on public.agreements;
 drop function if exists public.agreements_require_legal_status();
 alter table public.agreements drop constraint if exists agreements_legal_description_status_check;
+-- Explícito, aunque drop column ya quita el default.
+do $$ begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'agreements' and column_name = 'legal_description_status') then
+    alter table public.agreements alter column legal_description_status drop default;
+  end if;
+end $$;
 alter table public.agreements drop column if exists legal_description_status;
 
 -- ── A ──
 
+-- anon por si se otorgó en una versión anterior de la migración; con authenticated basta hoy.
 revoke select (financing_terms, financing_other) on public.properties from anon, authenticated;
 
 create or replace function public.properties_seller_writable_columns()
