@@ -2,6 +2,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { PRICING_TIERS } from "@/lib/pricing-tiers";
+import { BROKERAGE } from "@/config/brokerage";
+import { CONTACT } from "@/config/contact";
 import { t } from "@/lib/i18n";
 import { ERS21TN_FIELDS, fitsOnLine } from "./ers21tn-layout";
 import { attachmentHtml, listingAgreementTabs, splitOverLines, usDate, type AgreementInput } from "./listing-agreement-tabs";
@@ -43,12 +45,11 @@ describe("Listing Agreement: valores por línea", () => {
     }
   });
 
-  it("sin «$» ni «%» repetidos: el formulario ya los imprime (L22, L110, L145–146)", () => {
+  it("sin «$» ni «%» repetidos: el formulario ya los imprime (L22, L110, L150)", () => {
     const r = run();
     expect(r.text).toMatchObject({ list_price: "650,000", commission_pct: "1", flat_fee: "495", buyer_comp_pct: "2.5", buyer_comp_amount: "" });
     expect(run({ buyerOffer: { type: "amount", amount: 12000 } }).text).toMatchObject({ buyer_comp_pct: "", buyer_comp_amount: "12,000" });
     expect(run({ buyerOffer: { type: "none" } }).text).toMatchObject({ buyer_comp_pct: "", buyer_comp_amount: "" });
-    expect(run({ buyerOffer: { type: "none" } }).checkbox.buyer_commission_ack).toBe(false);
     for (const v of Object.values(r.text)) expect(v).not.toMatch(/^\$|%$/);
   });
 
@@ -146,7 +147,38 @@ describe("Listing Agreement: valores por línea", () => {
     for (const k of ["seller_name", "broker_name", "start_date", "termination_date", "street_address", "city_state_zip", "list_price", "commission_pct", "flat_fee", "buyer_comp_pct", "buyer_comp_amount", "legal_description", "personal_property"]) {
       expect(r.lockedText, k).toContain(k);
     }
-    expect(r.lockedCheckbox).toEqual(expect.arrayContaining(["lockbox_authorized", "buyer_commission_ack"]));
+    expect(r.lockedCheckbox).toContain("lockbox_authorized");
+  });
+
+  it("párrafo 10: la paga el vendedor aparte de la comisión de Lixtara → 10(b); 0% → 10(c); nunca 10(a); bloqueado", () => {
+    const pct = run();
+    expect(pct.radio.buyer_comp_option).toEqual({ value: "b", locked: true, options: ["a", "b", "c"] });
+    expect(pct.text).toMatchObject({ buyer_comp_pct: "2.5", buyer_comp_amount: "" });
+    const amount = run({ buyerOffer: { type: "amount", amount: 12000 } });
+    expect(amount.radio.buyer_comp_option.value).toBe("b");
+    expect(amount.text).toMatchObject({ buyer_comp_pct: "", buyer_comp_amount: "12,000" });
+    const none = run({ buyerOffer: { type: "none" } });
+    expect(none.radio.buyer_comp_option).toEqual({ value: "c", locked: true, options: ["a", "b", "c"] });
+    expect(none.text).toMatchObject({ buyer_comp_pct: "", buyer_comp_amount: "" });
+    expect(Object.keys(pct.checkbox)).not.toContain("buyer_commission_ack");
+    // El % y el monto van en la línea 150, la de 10(b).
+    for (const l of ["buyer_comp_pct", "buyer_comp_amount"]) expect(ERS21TN_FIELDS.find((f) => f.kind === "text" && f.label === l)!.line).toBe(150);
+  });
+
+  it("la brokerage en L159, L171 (la segunda) y L255–256, de solo lectura; firma y fecha de L254 quedan para la broker", () => {
+    const r = run();
+    expect(r.text).toMatchObject({
+      single_agent_broker: BROKERAGE.legalName,
+      transaction_broker: BROKERAGE.legalName,
+      brokerage_firm_name: BROKERAGE.legalName,
+      brokerage_phone: CONTACT.phoneDisplay,
+      brokerage_address: BROKERAGE.address,
+    });
+    for (const k of ["single_agent_broker", "transaction_broker", "brokerage_firm_name", "brokerage_phone", "brokerage_address"]) {
+      expect(r.lockedText, k).toContain(k);
+      expect(fitsOnLine(k, r.text[k]), k).toBe(true);
+    }
+    expect(Object.keys(r.text).some((k) => /signature|sign_date|broker_date/.test(k))).toBe(false);
   });
 
   it("fechas del plazo: hoy y hoy + 24 meses", () => {

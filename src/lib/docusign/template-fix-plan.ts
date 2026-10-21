@@ -11,11 +11,15 @@
 //   - one personal property field (there were two), "See Attachment" boxes on lines 16 and 18;
 //   - city/state/ZIP in one field on line 14; the Smarty address-verification country list
 //     (required, over lines 13–14) removed;
-//   - buyer's broker compensation split into "%" (line 145) and "$" (line 146).
+//   - buyer's broker compensation: one locked choice for paragraph 10 (a / b / c; the site
+//     sends b, or c with 0%), "%" and "$" on line 150 (10(b)); the old 10(a) box is removed;
+//   - brokerage name on lines 159 and 171 (the second), name, phone and address on 255–256;
+//   - initials (seller and broker) in their blank of each page's footer.
 
 import {
   ERS21TN_FIELDS,
   ERS21TN_FONT_SIZE_PT,
+  ERS21TN_INITIALS,
   ERS21TN_TEXT_HEIGHT,
   type CheckboxField,
   type LayoutField,
@@ -37,9 +41,10 @@ export interface LiveSellerTabs {
   listTabs?: LiveTab[];
   radioGroupTabs?: Array<LiveTab & { groupName?: string; radios?: LiveTab[] }>;
   tabGroups?: LiveTab[];
+  initialHereTabs?: LiveTab[];
 }
 
-export type TabKind = "textTabs" | "checkboxTabs" | "listTabs" | "radioGroupTabs" | "tabGroups";
+export type TabKind = "textTabs" | "checkboxTabs" | "listTabs" | "radioGroupTabs" | "tabGroups" | "initialHereTabs";
 
 export interface PlanStep {
   action: "update" | "create" | "delete";
@@ -66,6 +71,7 @@ const LEGACY_DELETE: Record<string, string> = {
   state: "city, state and ZIP now go together on line 14 (city_state_zip)",
   zip: "city, state and ZIP now go together on line 14 (city_state_zip)",
   occupancy_status: 'replaced by the radio group "occupancy" (is / is not); with one label for both boxes, checking one checked both',
+  buyer_commission_ack: 'replaced by the radio group "buyer_comp_option" (10(a) / (b) / (c)): the site checked 10(a), paid out of Broker\'s compensation',
 };
 
 function desiredText(f: TextField, anchors: boolean): Record<string, string> {
@@ -213,12 +219,34 @@ function planRadio(f: RadioGroupField, live: LiveSellerTabs): PlanStep[] {
       locked: String(f.locked),
     })),
   };
-  if (!existing) return [{ action: "create", kind: "radioGroupTabs", label: f.groupName, reason: "one choice: is / is not (line 20)", tab: want }];
+  if (!existing) return [{ action: "create", kind: "radioGroupTabs", label: f.groupName, reason: `one choice: ${f.radios.map((r) => r.value).join(" / ")} (line ${f.line})`, tab: want }];
   const before = JSON.stringify((existing.radios ?? []).map((r) => [r.value, r.xPosition, r.yPosition, r.required, r.locked]));
   const after = JSON.stringify(want.radios.map((r) => [r.value, r.xPosition, r.yPosition, r.required, r.locked]));
   return before === after
     ? []
     : [{ action: "update", kind: "radioGroupTabs", tabId: existing.tabId, label: f.groupName, reason: "over the printed boxes", changes: { radios: [before, after] }, tab: want }];
+}
+
+/**
+ * Initials of one role (Seller or Broker): one per page, moved into that party's blank of the
+ * page footer (ERS21TN_INITIALS). Matched by page; a page without one gets it created.
+ */
+export function planInitialFixes(live: LiveSellerTabs, role: "Seller" | "Broker"): PlanStep[] {
+  const steps: PlanStep[] = [];
+  const tabs = live.initialHereTabs ?? [];
+  for (const f of ERS21TN_INITIALS.filter((i) => i.role === role)) {
+    const want = { pageNumber: String(f.page), xPosition: String(Math.round(f.x)), yPosition: String(Math.round(f.y)), scaleValue: String(f.scale) };
+    const found = tabs.find((t) => num(t.pageNumber) === f.page);
+    const label = `${role} initials p${f.page}`;
+    if (!found) {
+      steps.push({ action: "create", kind: "initialHereTabs", label, reason: "footer blank", tab: { ...want, documentId: "1", tabType: "initialHere", optional: "false" } });
+      continue;
+    }
+    const changes: Record<string, [string, string]> = {};
+    for (const [k, v] of Object.entries(want)) if (Number(fmt(found[k]) || NaN) !== Number(v)) changes[k] = [fmt(found[k]), v];
+    if (Object.keys(changes).length > 0) steps.push({ action: "update", kind: "initialHereTabs", tabId: found.tabId, label, reason: `into the "${role === "Seller" ? "Seller" : "Broker/Authorized Associate"} (____)" blank of the footer`, changes });
+  }
+  return steps;
 }
 
 /** The plan as a readable diff (what --dry-run prints and what the owner approves). */

@@ -13,14 +13,16 @@
 // that was just sent downloads as the blank form (seen on 2026-10-21). To review values, sign
 // each one as the TEST seller (--sign-urls), then --download.
 //
-// (a) tenant + lease end date, financing Cash + Conventional
-// (b) no tenant, financing Other with text
-// (c) legal description not verified → "See Attachment" + attachment
+// (a) tenant + lease end date, financing Cash + Conventional; buyer's broker 2.5% → 10(b)
+// (b) vacant (Pro → lock box), financing Other with text; buyer's broker $12,000 → 10(b)
+// (c) owner-occupied, VA + FHA, legal description not verified → "See Attachment" +
+//     attachment; buyer's broker 0% → 10(c)
 import "./env";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createEnvelopeFromTemplate, getAccessToken, getRecipientView, LIXTARA_BROKER_ROLE } from "../../src/lib/docusign";
 import { attachmentHtml, listingAgreementTabs, type AgreementListing } from "../../src/lib/docusign/listing-agreement-tabs";
+import type { BuyerCompOffer } from "../../src/lib/buyer-comp";
 import { PRICING_TIERS } from "../../src/lib/pricing-tiers";
 import { t } from "../../src/lib/i18n";
 import { apiBase, dsGet } from "./dump-templates";
@@ -48,21 +50,24 @@ const base: AgreementListing = {
 };
 const VERIFIED = "TEST SUBDIVISION PB 00-00\nLOT 4 BLK 1 (TEST DATA)";
 
-const CASES: Array<{ key: string; listing: AgreementListing; verifiedLegal: string | null }> = [
+const CASES: Array<{ key: string; listing: AgreementListing; verifiedLegal: string | null; buyerOffer: BuyerCompOffer }> = [
   {
     key: "a-tenant-cash-conventional",
     listing: { ...base, occupancy_status: "tenant_occupied", lease_end_date: "2027-03-31", financing_terms: ["cash", "conventional"] },
     verifiedLegal: VERIFIED,
+    buyerOffer: { type: "percent", pct: 2.5 },
   },
   {
     key: "b-no-tenant-other",
     listing: { ...base, occupancy_status: "vacant", financing_terms: ["other"], financing_other: "TEST: seller financing with 20% down" },
     verifiedLegal: VERIFIED,
+    buyerOffer: { type: "amount", amount: 12000 },
   },
   {
     key: "c-legal-pending",
     listing: { ...base, occupancy_status: "owner_occupied", financing_terms: ["va", "fha"] },
     verifiedLegal: null,
+    buyerOffer: { type: "none" },
   },
 ];
 
@@ -102,7 +107,7 @@ async function main() {
       tier: PRICING_TIERS.pro,
       sellerName: "TEST Seller (made-up data)",
       brokerName: "Lixtara LLC",
-      buyerOffer: { type: "percent", pct: 2.5 },
+      buyerOffer: c.buyerOffer,
       verifiedLegal: c.verifiedLegal,
       applianceLabels,
       today: new Date(),

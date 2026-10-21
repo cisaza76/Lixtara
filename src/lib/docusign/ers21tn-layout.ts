@@ -125,10 +125,48 @@ export const ERS21TN_FIELDS: LayoutField[] = [
   // ── Page 3 ──
   text({ label: "commission_pct", line: 110, page: 3, ...onBlank(87, 142, 81), locked: true, required: true }),
   text({ label: "flat_fee", line: 110, page: 3, ...onBlank(299, 410, 81), anchor: "purchase price plus $", locked: true, required: true }),
-  box({ label: "buyer_commission_ack", line: 145, page: 3, ...overBox(122.5, 498), locked: true }),
-  text({ label: "buyer_comp_pct", line: 145, page: 3, ...onBlank(507, 540, 507.5), anchor: "in the amount of:", locked: true, required: false }),
-  text({ label: "buyer_comp_amount", line: 146, page: 3, ...onBlank(209, 292, 519), anchor: "purchase price or $", locked: true, required: false }),
+  {
+    // Paragraph 10, one option: Lixtara's model is that the seller pays the buyer's broker apart
+    // from Lixtara's commission → 10(b), with the amount on line 150; 0% → 10(c). Never 10(a)
+    // (paid out of Broker's compensation). Owner, 2026-10-21.
+    kind: "radio",
+    groupName: "buyer_comp_option",
+    line: 145,
+    page: 3,
+    locked: true,
+    required: true,
+    radios: [
+      { value: "a", ...overBox(122.5, 498) },
+      { value: "b", ...overBox(122.5, 550) },
+      { value: "c", ...overBox(122.5, 590) },
+    ],
+  },
+  text({ label: "buyer_comp_pct", line: 150, page: 3, ...onBlank(122.5, 156, 571.5), locked: true, required: false }),
+  text({ label: "buyer_comp_amount", line: 150, page: 3, ...onBlank(281, 364.5, 571.5), locked: true, required: false }),
+  // ── Page 4 ──
+  text({ label: "single_agent_broker", line: 159, page: 4, ...onBlank(132.5, 575.5, 98.5), anchor: "As a single agent,", locked: true, required: true }),
+  // The form prints "171" a second time, after line 181.
+  text({ label: "transaction_broker", line: 171, page: 4, ...onBlank(158.5, 576, 417.5), anchor: "As a transaction broker,", locked: true, required: true }),
+  // ── Page 6 ── the broker signs and dates line 254 herself.
+  text({ label: "brokerage_firm_name", line: 255, page: 6, ...onBlank(154.5, 404.5, 253.5), anchor: "Brokerage Firm Name:", locked: true, required: true }),
+  text({ label: "brokerage_phone", line: 255, page: 6, ...onBlank(460.5, 571.5, 253.5), locked: true, required: true }),
+  text({ label: "brokerage_address", line: 256, page: 6, ...onBlank(92.5, 571, 276.5), locked: true, required: true }),
 ];
+
+/**
+ * Initials on each page's footer: "Seller (____) (____) and Broker/Authorized Associate (____)
+ * (____)". The first blank of each party, 24 pt wide, underline at y 726 on every page; the
+ * text above ends at y 712 (page 2). The template had them ~40 pt higher, over lines 47–48,
+ * 105–106 and 204, and on page 6 over the form's footer. Checked on signed envelopes
+ * (2026-10-21): at y 708 the stamp sits between the parentheses and DocuSign's frame label
+ * clears the text above; the frame's bottom edge touches the next line. `scale` = DocuSign's
+ * scaleValue (0.5 is its minimum): the full-size stamp (~32×29 pt) doesn't fit in the blank.
+ */
+export type InitialField = { role: "Seller" | "Broker"; page: number; x: number; y: number; scale: number };
+const FOOTER_BLANK = { Seller: 77.5, Broker: 267 } as const;
+export const ERS21TN_INITIALS: InitialField[] = ([1, 2, 3, 4, 5, 6] as const).flatMap((page) =>
+  (["Seller", "Broker"] as const).map((role) => ({ role, page, x: FOOTER_BLANK[role] + 3, y: 708, scale: 0.5 })),
+);
 
 /** Height of every text tab: one line, no auto-grow. */
 export const ERS21TN_TEXT_HEIGHT = TEXT_HEIGHT;

@@ -9,11 +9,17 @@
 //     checked and the attachment carries it;
 //   - personal property: one line; if the list doesn't fit, "See Attachment" + the attachment;
 //   - occupancy: one choice (is / is not) from step 3; lease expiry only with "is", MM/DD/YYYY;
-//   - financing (line 23): the boxes and "Other (specify)" come from step 3, read-only.
+//   - financing (line 23): the boxes and "Other (specify)" come from step 3, read-only;
+//   - buyer's broker (paragraph 10): the seller pays it apart from Lixtara's commission → 10(b)
+//     with the % or amount on line 150; 0% → 10(c); never 10(a). One choice, read-only;
+//   - the brokerage on lines 159, 171 (the second one) and 254–256: name, address, phone. The
+//     broker signs and dates line 254 herself.
 
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import type { BuyerCompOffer } from "@/lib/buyer-comp";
-import { buyerCommissionAck } from "@/lib/buyer-comp";
+import { buyerCompOption } from "@/lib/buyer-comp";
+import { BROKERAGE } from "@/config/brokerage";
+import { CONTACT } from "@/config/contact";
 import type { PricingTier } from "@/lib/pricing-tiers";
 import { savedFinancing } from "@/lib/financing-terms";
 import { fitsOnLine, textWidthPt, textField } from "./ers21tn-layout";
@@ -163,6 +169,11 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     buyer_comp_pct: buyerOffer.type === "percent" ? plainNumber(buyerOffer.pct) : "",
     buyer_comp_amount: buyerOffer.type === "amount" ? plainNumber(buyerOffer.amount) : "",
     financing_other_specify: otherFits ? otherText : "See Attachment",
+    single_agent_broker: BROKERAGE.legalName,
+    transaction_broker: BROKERAGE.legalName,
+    brokerage_firm_name: BROKERAGE.legalName,
+    brokerage_phone: CONTACT.phoneDisplay,
+    brokerage_address: BROKERAGE.address,
   };
 
   return {
@@ -178,7 +189,6 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
       financing_fha: financing.has("fha"),
       financing_other: financing.has("other"),
       lockbox_authorized: lockbox,
-      buyer_commission_ack: buyerCommissionAck(buyerOffer),
     },
     lockedCheckbox: [
       "legal_see_attachment",
@@ -189,9 +199,11 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
       "financing_fha",
       "financing_other",
       "lockbox_authorized",
-      "buyer_commission_ack",
     ],
-    radio: { occupancy: { value: occupancy, locked: occupancy !== null, options: ["is", "is_not"] } },
+    radio: {
+      occupancy: { value: occupancy, locked: occupancy !== null, options: ["is", "is_not"] },
+      buyer_comp_option: { value: buyerCompOption(buyerOffer), locked: true, options: ["a", "b", "c"] },
+    },
     attachment,
     legalStatus: input.verifiedLegal?.trim() ? "verified" : "pending",
   };

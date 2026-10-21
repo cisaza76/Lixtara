@@ -35,7 +35,7 @@ PDF: imagen escaneada, sin texto (no se pueden usar anclas: posiciones por coord
 | 109–110 | `commission_pct` | terms | text | Seller | Plan, `commissionPct` (sin «%») | sí | no | p3 x83 y62 · 61×19 · 9 pt | sí | **«%» repetido: el sitio mandaba «1%» antes del «%» impreso**; alto 19 pt: más de una línea; tapa las líneas 109, 110; auto-grow activo |
 | 109–110 | `flat_fee` | Seller. Seller will pay Broker as | text | Seller | Plan, `flatFee` (sin «$») | sí | no | p3 x298 y62 · 124×19 · 9 pt | sí | **«$» repetido: «$495» después del «$» impreso**; alto 19 pt: más de una línea; tapa las líneas 109, 110; auto-grow activo |
 | 144–145 | `buyer_agent_commission` | buyer's broker in the amount of: | text | Seller | Paso 6 (pasa a `buyer_comp_pct` / `buyer_comp_amount`) | sí | no | p3 x500 y490 · 39×21 · 9 pt | sí | **«%» repetido, y un monto fijo («$12,000») caía en la línea del porcentaje; el monto va en L146**; alto 21 pt: más de una línea; tapa las líneas 144, 145; auto-grow activo |
-| 145 | `buyer_commission_ack` | (a) LJ | checkbox | Seller | Paso 6: marcada si ofrece compensación (> 0) | no | sí | p3 x119 y494 · 0×0 · 9 pt | — | — |
+| 145 | `buyer_commission_ack` | (a) LJ | checkbox | Seller | Paso 6 (se quita: marcaba 10(a); pasa a `buyer_comp_option`) | no | sí | p3 x119 y494 · 0×0 · 9 pt | — | — |
 | — | `lixtara_footer_p*` | pie de página (una por página) | text | Seller | Fijo en la plantilla | no | no | p3 x200 y760 · 280×9 · 7 pt | no | — |
 | — | `lixtara_footer_p*` | pie de página (una por página) | text | Seller | Fijo en la plantilla | no | no | p4 x200 y760 · 280×9 · 7 pt | no | — |
 | — | `lixtara_footer_p*` | pie de página (una por página) | text | Seller | Fijo en la plantilla | no | no | p5 x200 y760 · 280×9 · 7 pt | no | — |
@@ -49,7 +49,7 @@ PDF: imagen escaneada, sin texto (no se pueden usar anclas: posiciones por coord
 
 ## Después del arreglo (`scripts/docusign/apply-template-fixes.ts`)
 
-Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Firmas, iniciales, fechas de firma y pie de página no cambian.
+Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5). Firmas, fechas de firma y pie de Lixtara no cambian.
 
 | Línea | Campo | Tipo | Origen del dato | Obligatorio | Editable | Posición y tamaño | Auto-grow | Condición |
 |---|---|---|---|---|---|---|---|---|
@@ -76,6 +76,11 @@ Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-lay
 | 71 | `lockbox_authorized` | checkbox | Plan: Concierge siempre; Pro si la casa está vacía | no | no | p2 x187 y291 | — | — |
 | 110 | `commission_pct` | text | Plan, `commissionPct` (sin «%») | sí | no | p3 x89 y67 · 51×11 · 9 pt | no | — |
 | 110 | `flat_fee` | text | Plan, `flatFee` (sin «$») | sí | no | p3 x301 y67 · 107×11 · 9 pt | no | — |
-| 145 | `buyer_commission_ack` | checkbox | Paso 6: marcada si ofrece compensación (> 0) | no | no | p3 x119 y494 | — | — |
-| 145 | `buyer_comp_pct` | text | Paso 6, oferta en % (sin «%») | no | no | p3 x509 y494 · 29×11 · 9 pt | no | — |
-| 146 | `buyer_comp_amount` | text | Paso 6, oferta en monto fijo (sin «$») | no | no | p3 x211 y505 · 79×11 · 9 pt | no | — |
+| 145 | `buyer_comp_option` | radio | Paso 6: 10(b) si ofrece compensación (> 0; la paga el vendedor, aparte de la comisión de Lixtara), 10(c) con 0%; nunca 10(a) | sí | no | a: p3 x119 y494 · b: p3 x119 y546 · c: p3 x119 y586 | — | — |
+| 150 | `buyer_comp_pct` | text | Paso 6, oferta en % (sin «%»), L150 = 10(b) | no | no | p3 x125 y558 · 30×11 · 9 pt | no | — |
+| 150 | `buyer_comp_amount` | text | Paso 6, oferta en monto fijo (sin «$»), L150 = 10(b) | no | no | p3 x283 y558 · 80×11 · 9 pt | no | — |
+| 159 | `single_agent_broker` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p4 x135 y85 · 439×11 · 9 pt | no | — |
+| 171 | `transaction_broker` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p4 x161 y404 · 414×11 · 9 pt | no | — |
+| 255 | `brokerage_firm_name` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p6 x157 y240 · 246×11 · 9 pt | no | — |
+| 255 | `brokerage_phone` | text | `CONTACT.phoneDisplay` (`src/config/contact.ts`) | sí | no | p6 x463 y240 · 107×11 · 9 pt | no | — |
+| 256 | `brokerage_address` | text | `BROKERAGE.address` (`src/config/brokerage.ts`) | sí | no | p6 x95 y263 · 475×11 · 9 pt | no | — |

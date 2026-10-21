@@ -5,8 +5,9 @@ import {
   BUYER_COMP_MAX_PCT,
   buyerCompMaxAmount,
   offerWithinLimit,
-  buyerCommissionAck,
+  buyerCompOption,
   CASSB1_ENABLED,
+  cassb1Fields,
   cassb1Tabs,
   compensationAgreementsFor,
   formatOffer,
@@ -133,18 +134,23 @@ describe("acuerdo de compensación (CASSB-1)", () => {
     expect(compensationAgreementsFor({ type: "amount", amount: 5_000 })).toBe(1);
   });
 
-  it.skipIf(!CASSB1_ENABLED)("campos de la plantilla: % en fee_pct_value, USD en fee_amount; nada con 0%", () => {
-    expect(cassb1Tabs({ type: "none" })).toBeNull();
-    expect(cassb1Tabs({ type: "percent", pct: 2.5 })).toEqual({ fee_pct_value: "2.5" });
-    expect(cassb1Tabs({ type: "amount", amount: 12_000 })).toEqual({ fee_amount: "12,000" });
+  it("campos del CASSB-1, coherentes con el 10(b) del listado: paga el vendedor, listada por Lixtara; % o USD; nada con 0%", () => {
+    expect(cassb1Fields({ type: "none" }, "Jane Doe", "Lixtara LLC")).toBeNull();
+    expect(cassb1Fields(null, "Jane Doe", "Lixtara LLC")).toBeNull();
+    const pct = cassb1Fields({ type: "percent", pct: 2.5 }, "Jane Doe", "Lixtara LLC")!;
+    expect(pct.text).toEqual({ seller_name: "Jane Doe", listing_broker_name: "Lixtara LLC", fee_pct_value: "2.5" });
+    expect(pct.checkbox).toEqual({ party_seller: true, party_sellers_broker: false, property_listed: true, property_not_listed: false });
+    const amount = cassb1Fields({ type: "amount", amount: 12_000 }, "Jane Doe", "Lixtara LLC")!;
+    expect(amount.text.fee_amount).toBe("12,000");
+    expect(amount.text).not.toHaveProperty("fee_pct_value");
   });
 
   // Apagado hasta nuevo aviso (2026-10-18): se confirma si corresponde el CASSB-1 o un acuerdo
   // de compensación del vendedor al broker del comprador.
   it("CASSB-1 apagado: no se generan campos ni se sugiere en el admin ni en la hoja de Matrix", () => {
     expect(CASSB1_ENABLED).toBe(false);
-    expect(cassb1Tabs({ type: "percent", pct: 2.5 })).toBeNull();
-    expect(cassb1Tabs({ type: "amount", amount: 12_000 })).toBeNull();
+    expect(cassb1Tabs({ type: "percent", pct: 2.5 }, "Jane Doe", "Lixtara LLC")).toBeNull();
+    expect(cassb1Tabs({ type: "amount", amount: 12_000 }, "Jane Doe", "Lixtara LLC")).toBeNull();
     const review = read("src/app/[lang]/admin/listings/[id]/review/page.tsx");
     expect(review).toMatch(/\{CASSB1_ENABLED &&\s*field\(\s*"CASSB-1"/);
     const sheet = read("src/lib/matrix-input-sheet.ts");
@@ -167,14 +173,14 @@ describe("acuerdo de compensación (CASSB-1)", () => {
     for (const label of ["fee_amount", "fee_pct_value"]) expect(tpl).toContain(`"tabLabel": "${label}"`);
   });
 
-  it("el acuerdo de listado marca buyer_commission_ack solo con oferta > 0", () => {
-    expect(buyerCommissionAck({ type: "none" })).toBe(false);
-    expect(buyerCommissionAck({ type: "percent", pct: 3 })).toBe(true);
-    expect(buyerCommissionAck({ type: "amount", amount: 1 })).toBe(true);
+  it("párrafo 10 del listado: 10(b) con oferta > 0 (paga el vendedor), 10(c) con 0%, nunca 10(a)", () => {
+    expect(buyerCompOption({ type: "none" })).toBe("c");
+    expect(buyerCompOption({ type: "percent", pct: 3 })).toBe("b");
+    expect(buyerCompOption({ type: "amount", amount: 1 })).toBe("b");
     // Los valores del contrato salen de listingAgreementTabs (src/lib/docusign/).
     const tabs = read("src/lib/docusign/listing-agreement-tabs.ts");
-    expect(tabs).toContain("buyer_commission_ack: buyerCommissionAck(buyerOffer)");
-    expect(tabs).not.toMatch(/buyer_commission_ack:\s*true/);
+    expect(tabs).toContain("value: buyerCompOption(buyerOffer)");
+    expect(tabs).not.toContain("buyer_commission_ack");
     expect(read("src/app/api/agreement/create/route.ts")).toContain('error: "buyer_comp_not_set"');
   });
 });

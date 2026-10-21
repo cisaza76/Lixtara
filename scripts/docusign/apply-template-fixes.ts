@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getAccessToken } from "../../src/lib/docusign";
 import { ERS21TN_FIELDS } from "../../src/lib/docusign/ers21tn-layout";
-import { formatPlan, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "../../src/lib/docusign/template-fix-plan";
+import { formatPlan, planInitialFixes, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "../../src/lib/docusign/template-fix-plan";
 import { apiBase, dsGet } from "./dump-templates";
 
 const arg = (name: string) => {
@@ -34,6 +34,7 @@ const APPLY = process.argv.includes("--apply");
 const ANCHORS = process.argv.includes("--anchors");
 const COPY_AS = arg("--copy-as");
 const SELLER_ROLE = "Seller";
+const BROKER_ROLE = "Broker";
 
 async function ds(method: "POST" | "PUT" | "DELETE", path: string, body: unknown): Promise<unknown> {
   const token = await getAccessToken();
@@ -49,11 +50,19 @@ async function ds(method: "POST" | "PUT" | "DELETE", path: string, body: unknown
 
 type Recipient = { recipientId: string; roleName?: string; routingOrder?: string; tabs?: LiveSellerTabs & Record<string, unknown[]> };
 
-async function sellerOf(templateId: string): Promise<Recipient> {
+async function recipientOf(templateId: string, role: string): Promise<Recipient> {
   const r = (await (await dsGet(`/templates/${templateId}/recipients?include_tabs=true&include_extended=true`)).json()) as { signers?: Recipient[] };
-  const seller = (r.signers ?? []).find((s) => s.roleName === SELLER_ROLE);
-  if (!seller) throw new Error(`template ${templateId} has no "${SELLER_ROLE}" role`);
-  return seller;
+  const signer = (r.signers ?? []).find((s) => s.roleName === role);
+  if (!signer) throw new Error(`template ${templateId} has no "${role}" role`);
+  return signer;
+}
+
+/** Seller: every field the site fills plus the seller's initials; Broker: the broker's initials. */
+async function planFor(templateId: string, role: string): Promise<{ recipientId: string; steps: PlanStep[] }> {
+  const r = await recipientOf(templateId, role);
+  const tabs = r.tabs ?? {};
+  const steps = role === SELLER_ROLE ? [...planTemplateFixes(tabs, { anchors: ANCHORS }), ...planInitialFixes(tabs, "Seller")] : planInitialFixes(tabs, "Broker");
+  return { recipientId: r.recipientId, steps };
 }
 
 /** Each anchor must appear in the PDF's text exactly once, or DocuSign would misplace the tab. */
@@ -124,25 +133,26 @@ async function main() {
     templateId = await copyTemplate(templateId, COPY_AS);
     console.log(`Copy created: ${templateId}\n`);
   }
-  const seller = await sellerOf(templateId);
-  const steps = planTemplateFixes(seller.tabs ?? {}, { anchors: ANCHORS });
-  console.log(formatPlan(steps));
-  if (!APPLY) {
-    console.log("\nNothing was written. To apply: --apply (--copy-as \"<name>\" to fix a copy).");
-    return;
-  }
-  if (steps.length === 0) return console.log("\nNothing to change.");
+  let pending = 0;
+  for (const role of [SELLER_ROLE, BROKER_ROLE]) {
+    const { recipientId, steps } = await planFor(templateId, role);
+    console.log(`── ${role} ──\n${formatPlan(steps)}\n`);
+    if (!APPLY || steps.length === 0) continue;
 
-  await apply(templateId, seller.recipientId, steps);
-  let left = planTemplateFixes((await sellerOf(templateId)).tabs ?? {}, { anchors: ANCHORS });
-  // A condition on a tab created or renamed in the same call (occupancy, financing_other) is
-  // dropped by DocuSign: a second pass sets it once the parent exists (seen on 2026-10-21).
-  if (left.length > 0 && left.every((s) => s.action === "update")) {
-    await apply(templateId, seller.recipientId, left);
-    left = planTemplateFixes((await sellerOf(templateId)).tabs ?? {}, { anchors: ANCHORS });
+    await apply(templateId, recipientId, steps);
+    let left = (await planFor(templateId, role)).steps;
+    // A condition on a tab created or renamed in the same call (occupancy, financing_other) is
+    // dropped by DocuSign: a second pass sets it once the parent exists (seen on 2026-10-21).
+    if (left.length > 0 && left.every((s) => s.action === "update")) {
+      await apply(templateId, recipientId, left);
+      left = (await planFor(templateId, role)).steps;
+    }
+    if (left.length > 0) console.log(`✗ ${role}: still different after applying:\n${formatPlan(left)}\n`);
+    pending += left.length;
   }
-  console.log(left.length === 0 ? `\n✓ Applied. The template now matches the layout (template ${templateId}).` : `\n✗ Still different after applying:\n${formatPlan(left)}`);
-  if (left.length > 0) process.exitCode = 1;
+  if (!APPLY) return console.log("Nothing was written. To apply: --apply (--copy-as \"<name>\" to fix a copy).");
+  console.log(pending === 0 ? `✓ Applied. The template now matches the layout (template ${templateId}).` : "✗ Some changes didn't apply (above).");
+  if (pending > 0) process.exitCode = 1;
 }
 
 main().catch((e) => {

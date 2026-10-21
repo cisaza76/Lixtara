@@ -1,8 +1,8 @@
 // Plan de arreglos de la plantilla del Listing Agreement (ERS-21tn): con los errores que tenía
 // la plantilla Demo (2026-10-21), y que aplicarlo una vez deja la plantilla igual al layout. Sin red.
 import { describe, it, expect } from "vitest";
-import { ERS21TN_FIELDS } from "./ers21tn-layout";
-import { formatPlan, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "./template-fix-plan";
+import { ERS21TN_FIELDS, ERS21TN_INITIALS } from "./ers21tn-layout";
+import { formatPlan, planInitialFixes, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "./template-fix-plan";
 
 let n = 0;
 const tab = (tabLabel: string, page: number, x: number, y: number, extra: Record<string, unknown> = {}) => ({
@@ -46,7 +46,10 @@ function demoTemplate(): LiveSellerTabs {
       tab("Checkbox 1cd98371", 1, 287, 396),
       tab("Checkbox 6f2d0843", 1, 317, 397),
       tab("Checkbox 4ac2b140", 1, 355, 397),
+      tab("buyer_commission_ack", 3, 119, 494),
     ],
+    // Seller initials as they were: ~40 pt above the footer (p6 on the form's own footer).
+    initialHereTabs: [1, 2, 3, 4, 5].map((p) => tab(`Initial s${p}`, p, 73, 685)).concat(tab("Initial s6", 6, 88, 729)),
     listTabs: [tab("com.docusign.extensibilityplatform.action.verify.postaladdress@1.0.0.VerifyPostalAddressInput[0].countryOrRegion", 1, 166, 247)],
     tabGroups: [{ tabId: "g1", groupLabel: "G1" }, { tabId: "g2", groupLabel: "G2" }, { tabId: "g3", groupLabel: "G3" }],
   };
@@ -116,9 +119,31 @@ describe("arreglos de la plantilla ERS-21tn", () => {
     expect(steps.some((s) => s.label.startsWith("lixtara_footer"))).toBe(false);
   });
 
-  it("compensación al agente del comprador: «%» en la línea 145 y «$» en la 146", () => {
-    expect(find(steps, "buyer_comp_pct")[0].changes?.tabLabel).toEqual(["buyer_agent_commission", "buyer_comp_pct"]);
+  it("compensación al broker del comprador: una opción bloqueada del párrafo 10; «%» y «$» en la línea 150 (10(b))", () => {
+    const pct = find(steps, "buyer_comp_pct")[0].changes!;
+    expect(pct.tabLabel).toEqual(["buyer_agent_commission", "buyer_comp_pct"]);
+    expect(Number(pct.yPosition[1])).toBeGreaterThan(550);
     expect(find(steps, "buyer_comp_amount", "create")).toHaveLength(1);
+    // La casilla vieja marcaba 10(a) (sale de la comisión del Broker): se borra.
+    expect(find(steps, "buyer_commission_ack", "delete")).toHaveLength(1);
+    const radio = find(steps, "buyer_comp_option", "create")[0].tab as { radios: Array<{ value: string; locked: string; pageNumber: string }> };
+    expect(radio.radios.map((r) => r.value)).toEqual(["a", "b", "c"]);
+    expect(radio.radios.every((r) => r.locked === "true" && r.pageNumber === "3")).toBe(true);
+  });
+
+  it("iniciales: las del vendedor y las de la broker van al espacio del pie de cada página, más chicas", () => {
+    const seller = planInitialFixes(demoTemplate(), "Seller");
+    expect(seller).toHaveLength(6);
+    for (const s of seller) expect(s.changes).toMatchObject({ yPosition: [expect.any(String), "708"], scaleValue: ["", "0.5"] });
+    expect(seller.find((s) => s.label === "Seller initials p1")!.changes!.xPosition).toEqual(["73", "81"]);
+    // Sin iniciales de la broker en el ejemplo: se crean, una por página.
+    const broker = planInitialFixes({}, "Broker");
+    expect(broker.map((s) => s.action)).toEqual(Array(6).fill("create"));
+    expect(broker.map((s) => (s.tab as { xPosition: string }).xPosition)).toEqual(Array(6).fill("270"));
+    // Dentro del espacio de 24 pt de cada parte, y por debajo del texto de la página (y 712).
+    for (const i of ERS21TN_INITIALS) expect(i.x).toBeGreaterThanOrEqual(i.role === "Seller" ? 77 : 266);
+    const after = applyLocally(demoTemplate(), seller);
+    expect(planInitialFixes(after, "Seller")).toEqual([]);
   });
 
   it("aplicado una vez, el siguiente plan está vacío (idempotente)", () => {
