@@ -97,8 +97,7 @@ describe("paso 1: mismo dueño + misma dirección + menos de 2 minutos → el mi
     expect(page).toContain("const existingId = id || (await duplicateDraftId(supabase, user.id, { street, zip }));");
     expect(page).toContain("<PendingSubmitButton>{copy.nextLabel} →</PendingSubmitButton>");
     expect(readFileSync("src/components/pending-submit-button.tsx", "utf8")).toContain("disabled={pending}");
-    expect(readFileSync("src/components/address-autocomplete.tsx", "utf8")).toContain(
-      'if (e.key === "Enter" && suggestionsOpen()) e.preventDefault();',
-    );
+    // Enter en una sugerencia: address-suggestion-guard.test.ts.
+    expect(readFileSync("src/components/address-autocomplete.tsx", "utf8")).toContain("createSuggestionGuard(");
   });
 });
