@@ -123,7 +123,7 @@ Los textos del banner y de la variante con analítica de la política de cookies
 - **Supabase:** `funnel_events` (con `is_test`) → `listing_funnel_v`, una fila por listing real. `is_test` = entorno distinto de Production, propiedad `is_test` o Stripe `livemode=false`.
 - **`broker_countersigned`** (solo servidor, `funnel_events`, con `is_test`): la broker contrafirmó en DocuSign. Se registra una vez, en la transición del acuerdo a `completed`, y solo si la firma de la broker está verificada. Aún no es columna de `listing_funnel_v` (requiere otra migración).
 - **GA4 `purchase`** desde el webhook de Stripe (Measurement Protocol): solo con consentimiento `granted` guardado en el Checkout, `livemode`, Production y propiedad no `is_test`. `transaction_id` = id de la sesión de Stripe.
-- **Validar el webhook con una compra real reembolsada:** marcar ese listing `is_test` desde el admin **antes** de pagar; así no cuenta en el tablero ni como ingreso en GA4, y se verifica directo en `funnel_events`.
+- **Validar el webhook con una compra real reembolsada:** marcar ese listing `is_test` **antes** de pagar (ver "Marcar un listing de prueba en producción"); así no cuenta en el tablero ni como ingreso en GA4, y se verifica directo en `funnel_events`. En Preview no hace falta: lo que se crea fuera de Production ya queda `is_test` y Stripe está en modo de prueba.
 
 
 ## Portada y landing de propietarios (2026-10-18)
@@ -183,3 +183,24 @@ Nombres y valores que GTM y GA4 esperan tal cual; cambiar uno parte los datos en
   **Sin UTM en estos enlaces** (decisión del CMO, 2026-10-20): le quitarían el crédito a la campaña que trajo al vendedor. El marcador propio `?resumed=` cumple el papel del `?from=` que propuso el CMO; el navegador lo quita de la URL y, desde GTM v10, `page_location` solo conserva `utm_*` y los IDs de clic.
   En `funnel_events` (servidor) se guarda el marcador original (`email_link`, `broker_link`, `account`); `direct` solo existe en el navegador.
 - **`calculator_used`:** una vez por visita (por pestaña; la calculadora está en la portada y en `/owners`), cuando la persona deja de mover los controles 1,5 s. `home_price_range`: `under_300k`, `300k_500k`, `500k_1m`, `1m_2m`, `2m_plus`. `commission_mode`: `none`, `percent` o `amount` (nunca el monto). **Sin `plan`** (decisión del CMO, 2026-10-20): la calculadora compara los tres planes; el plan se ve en `listing_cta_click` (`tier`) y en `plan_tier`. `commission_mode` está conectado en GTM v12 y en GA4.
+
+## Marcar un listing de prueba en producción
+El admin **no** tiene un botón para esto (el vendedor no puede escribir `is_test`: lo impide `guard_properties_seller_columns`). Lo hace el owner en el **SQL Editor de Supabase**, proyecto `fizhoufepowilbhbtfkg`, **antes** de pagar. Usado el 2026-10-20 en la prueba del CMO con Tag Assistant.
+
+1. **Encontrar el listing.** Buscar por correo puede no encontrarlo: hasta el paso 7 la cuenta puede ser anónima o tener otro correo. Lo seguro es ver los últimos creados:
+   ```sql
+   select id, owner_id, pricing_tier, mls_status, is_test, created_at
+     from public.properties
+    order by created_at desc
+    limit 5;
+   ```
+2. **Marcarlo con sus eventos y su lead** (cambiar el id; un id de ejemplo como `ID-DEL-LISTING` falla con `invalid input syntax for type uuid`):
+   ```sql
+   with l as (select id from public.properties where id = '00000000-0000-0000-0000-000000000000'),
+   a as (update public.properties    set is_test = true where id in (select id from l) returning 1),
+   b as (update public.funnel_events set is_test = true where property_id in (select id from l) returning 1),
+   c as (update public.seller_leads  set is_test = true where property_id in (select id from l) returning 1)
+   select (select count(*) from a) as listings, (select count(*) from b) as eventos, (select count(*) from c) as leads;
+   ```
+   `listings` debe ser 1. Los eventos y el lead ya escritos quedaron como reales: por eso se marcan también.
+3. **Después de pagar:** reembolsar desde Stripe si fue con tarjeta real; el listing queda en `pending_approval` (no aprobarlo). `pnpm cleanup:test-data` lo encuentra después, porque ya es `is_test`.
