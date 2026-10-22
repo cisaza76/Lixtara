@@ -4,6 +4,8 @@
 // server-action form: the inputs carry `name`s so the action reads them from
 // FormData. Lease fields appear only when occupancy = tenant_occupied; the
 // "difficult tenant" explanation appears only when that option is chosen.
+// With a tenant, the lease end date is required as MM/DD/YYYY (the listing agreement's
+// format, line 20) unless the seller checks "I don't know" (src/lib/lease-end.ts).
 
 import { useState } from "react";
 
@@ -18,6 +20,9 @@ export interface OccupancyLabels {
   leaseInfoTitle: string;
   monthlyRentLabel: string;
   leaseEndLabel: string;
+  leaseEndPlaceholder: string;
+  leaseEndHelp: string;
+  leaseEndUnknown: string;
   tenantCoopLabel: string;
   coopCooperative: string;
   coopAdvanceNotice: string;
@@ -31,7 +36,9 @@ export interface OccupancyLabels {
 interface Props {
   initialOccupancy: Occupancy;
   initialRent: string;
-  initialLeaseEnd: string; // yyyy-mm-dd
+  initialLeaseEnd: string; // MM/DD/YYYY
+  /** Tenant-occupied with no date saved: "I don't know" was chosen. */
+  initialLeaseUnknown: boolean;
   initialCooperation: Cooperation;
   initialNotes: string;
   labels: OccupancyLabels;
@@ -46,6 +53,7 @@ export function OccupancySection({
   initialOccupancy,
   initialRent,
   initialLeaseEnd,
+  initialLeaseUnknown,
   initialCooperation,
   initialNotes,
   labels: L,
@@ -54,6 +62,7 @@ export function OccupancySection({
   const [cooperation, setCooperation] =
     useState<Cooperation>(initialCooperation);
   const isTenant = occupancy === "tenant_occupied";
+  const [leaseUnknown, setLeaseUnknown] = useState(initialLeaseUnknown);
 
   const coopOptions: { value: Cooperation; label: string }[] = [
     { value: "cooperative", label: L.coopCooperative },
@@ -94,15 +103,38 @@ export function OccupancySection({
             />
           </label>
 
-          <label className="flex flex-col gap-2">
-            <span className={labelClass}>{L.leaseEndLabel}</span>
-            <input
-              type="date"
-              name="lease_end_date"
-              defaultValue={initialLeaseEnd}
-              className={fieldClass}
-            />
-          </label>
+          <div className="flex flex-col gap-2">
+            <label className="flex flex-col gap-2">
+              <span className={labelClass}>{L.leaseEndLabel}</span>
+              <input
+                type="text"
+                name="lease_end_date"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder={L.leaseEndPlaceholder}
+                pattern="\d{1,2}/\d{1,2}/\d{4}"
+                defaultValue={initialLeaseEnd}
+                disabled={leaseUnknown}
+                required={!leaseUnknown}
+                aria-describedby="lease-end-help"
+                className={`${fieldClass} disabled:opacity-50`}
+              />
+            </label>
+            <span id="lease-end-help" className="text-xs text-ink/50">
+              {L.leaseEndHelp}
+            </span>
+            <label className="flex items-center gap-3 text-sm text-ink/80 cursor-pointer">
+              <input
+                type="checkbox"
+                name="lease_end_unknown"
+                value="1"
+                checked={leaseUnknown}
+                onChange={(e) => setLeaseUnknown(e.target.checked)}
+                className="accent-gold w-4 h-4 shrink-0"
+              />
+              <span>{L.leaseEndUnknown}</span>
+            </label>
+          </div>
 
           <div className="flex flex-col gap-2">
             <span className={labelClass}>{L.tenantCoopLabel}</span>

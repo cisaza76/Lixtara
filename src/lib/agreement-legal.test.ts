@@ -1,0 +1,50 @@
+// Admin: sin descripción legal verificada en el último acuerdo, no se aprueba ni se publica
+// el listing (#217). Sin red.
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { legalPendingMessage, pendingLegalFrom } from "./agreement-legal";
+
+const ag = (property_id: string, legal_description_status: string | null, created_at: string) => ({ property_id, legal_description_status, created_at });
+
+describe("descripción legal pendiente", () => {
+  it("bloquea si el ÚLTIMO acuerdo no está «verified» (null = anterior a la columna = pendiente)", () => {
+    const pending = pendingLegalFrom([
+      ag("p1", "pending", "2026-10-01"),
+      ag("p2", "pending", "2026-10-01"),
+      ag("p2", "verified", "2026-10-05"),
+      ag("p3", null, "2026-10-01"),
+      ag("p4", "verified", "2026-10-01"),
+    ]);
+    // p1 pendiente; p2 ya tiene un acuerdo nuevo verificado; p3 es anterior a la columna; p4 verificado.
+    expect([...pending].sort()).toEqual(["p1", "p3"]);
+  });
+
+  it("el mensaje es el del owner", () => {
+    expect(legalPendingMessage("es")).toBe("Falta descripción legal verificada");
+    expect(legalPendingMessage("en")).toBe("Verified legal description missing");
+  });
+
+  it("las dos acciones de aprobar lo comprueban en el servidor y deshabilitan el botón", () => {
+    const home = readFileSync("src/app/[lang]/admin/page.tsx", "utf8");
+    expect(home).toContain("if ((await pendingLegalByProperty([id])).has(id)) redirect(`/${lang}/admin?error=legal_pending`);");
+    expect(home).toContain("disabled={legalPending.has(p.id)}");
+    const review = readFileSync("src/app/[lang]/admin/listings/[id]/review/page.tsx", "utf8");
+    expect(review).toContain("redirect(`/${lang}/admin/listings/${id}/review?error=legal_pending`);");
+    expect(review).toContain("disabled={legalPending}");
+    // El bloqueo va antes de la consulta a DocuSign y de cualquier escritura.
+    expect(review.indexOf("error=legal_pending")).toBeLessThan(review.indexOf("checkBrokerCountersigned(id)"));
+    expect(home.indexOf("error=legal_pending")).toBeLessThan(home.indexOf("checkBrokerCountersigned(id)"));
+  });
+
+  it("el acuerdo se guarda con su estado (columna) y la auditoría queda en activity_log", () => {
+    const route = readFileSync("src/app/api/agreement/create/route.ts", "utf8");
+    expect(route).toContain("legal_description_status: contract.legalStatus,");
+    expect(route).toMatch(/await createService\(\)\s*\.from\("agreements"\)\s*\.insert\(/);
+    expect(route).toContain("await recordAgreementSent({ propertyId, userId: user.id, envelopeId, legal: contract.legalStatus });");
+    const gate = readFileSync("src/lib/agreement-legal.server.ts", "utf8");
+    // El bloqueo lee la columna, no activity_log; si falla la lectura, el admin queda bloqueado.
+    expect(gate).toContain('.select("property_id,legal_description_status,created_at")');
+    expect(gate.slice(gate.indexOf("export async function pendingLegalByProperty"))).not.toContain("activity_log");
+    expect(gate).toContain("return new Set(propertyIds);");
+  });
+});

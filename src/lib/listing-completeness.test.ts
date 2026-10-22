@@ -26,6 +26,7 @@ const fresh: ListingCompletenessFacts = {
   sqft: 0,
   year_built: null,
   list_price: 0,
+  financing_terms: null,
   description: null,
   photos_rights_confirmed: false,
   photoCount: 0,
@@ -41,6 +42,7 @@ const complete: ListingCompletenessFacts = {
   sqft: 1500,
   year_built: 1995,
   list_price: 450000,
+  financing_terms: ["cash", "conventional"],
   description: "Bright corner home near the park.",
   photos_rights_confirmed: true,
   photoCount: MIN_OWN_PHOTOS,
@@ -65,6 +67,9 @@ describe("firstIncompleteStep", () => {
     expect(firstIncompleteStep({ ...complete, sqft: 0 }, NOW)).toBe(3);
     expect(firstIncompleteStep({ ...complete, list_price: 0 }, NOW)).toBe(3);
     expect(firstIncompleteStep({ ...complete, year_built: null }, NOW)).toBe(3);
+    // Sin financiamiento elegido (L23 del acuerdo), el paso 3 no está completo.
+    expect(firstIncompleteStep({ ...complete, financing_terms: null }, NOW)).toBe(3);
+    expect(firstIncompleteStep({ ...complete, financing_terms: [] }, NOW)).toBe(3);
     expect(firstIncompleteStep({ ...complete, description: "short" }, NOW)).toBe(4);
     expect(firstIncompleteStep({ ...complete, photoCount: MIN_OWN_PHOTOS - 1 }, NOW)).toBe(5);
     expect(firstIncompleteStep({ ...complete, photos_rights_confirmed: false }, NOW)).toBe(5);

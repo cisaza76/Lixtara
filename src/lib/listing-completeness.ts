@@ -4,6 +4,7 @@
 import { isPricingTierId } from "@/lib/pricing-tiers";
 import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
 import { offerFromRow, type BuyerCompRow } from "@/lib/buyer-comp";
+import { isFinancingTerm } from "@/lib/financing-terms";
 
 export const PROPERTY_TYPES = ["single_family", "condo", "townhouse", "multi_family"] as const;
 
@@ -18,6 +19,8 @@ export interface ListingCompletenessFacts {
   sqft: number | null;
   year_built: number | null;
   list_price: number | null;
+  /** Financing accepted (line 23 of the agreement): at least one, since migration 20261021120000. */
+  financing_terms: string[] | null;
   description: string | null;
   photos_rights_confirmed: boolean | null;
   photoCount: number;
@@ -43,7 +46,8 @@ export function stepComplete(step: number, f: ListingCompletenessFacts, now = ne
         inRange(f.bathrooms, 0, 30, true) &&
         inRange(f.sqft, 0, 100000, true) &&
         inRange(f.year_built, 1800, now.getFullYear() + 2) &&
-        inRange(f.list_price, 0, 1000000000, true)
+        inRange(f.list_price, 0, 1000000000, true) &&
+        (f.financing_terms ?? []).some(isFinancingTerm)
       );
     case 4:
       return (f.description ?? "").trim().length >= 10;

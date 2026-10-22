@@ -33,6 +33,8 @@ import {
 import { correctListingMlsPublished, markListingMlsPublished } from "@/lib/mls-published.server";
 import { MarkPublishedForm } from "@/components/admin/mark-published-form";
 import { CASSB1_ENABLED } from "@/lib/buyer-comp";
+import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
+import { legalPendingHint, legalPendingMessage } from "@/lib/agreement-legal";
 import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
 
 interface Property {
@@ -136,6 +138,10 @@ async function transition(
   // El vendedor paga al firmar, pero el listing no se publica sin la contrafirma de la
   // broker en DocuSign (se consulta en vivo; si DocuSign no responde, no se publica).
   if (newStatus === "active") {
+    // Acuerdo enviado sin descripción legal verificada: no se publica (#217).
+    if ((await pendingLegalByProperty([id])).has(id)) {
+      redirect(`/${lang}/admin/listings/${id}/review?error=legal_pending`);
+    }
     const gate = await checkBrokerCountersigned(id);
     if (!gate.ok) redirect(`/${lang}/admin/listings/${id}/review?error=${gate.reason}`);
   }
@@ -285,6 +291,7 @@ export default async function ListingReviewPage({
     not_pending: "That request was already handled.",
     apply_failed: "Could not apply the request to the listing. Try again.",
     not_countersigned: "The broker hasn't countersigned the listing agreement in DocuSign yet.",
+    legal_pending: legalPendingMessage(lang),
     docusign_unavailable: "Could not confirm the broker's countersignature with DocuSign. Try again.",
     listing_not_active: "Approve the listing (active) before marking it as published on the MLS.",
     already_published: "This listing already has an MLS publication date. Only an admin can correct it.",
@@ -419,6 +426,7 @@ export default async function ListingReviewPage({
   const agreementSigned =
     agreement?.status === "signed" || agreement?.status === "completed";
   const awaitingCountersign = agreement?.status === "signed";
+  const legalPending = (await pendingLegalByProperty([id])).has(id);
   const planPaid = isPlanPaymentSucceeded(
     (paymentRows ?? []) as { payment_type: string | null; tier: string | null; status: string | null }[],
   );
@@ -821,6 +829,11 @@ export default async function ListingReviewPage({
             blocked until the seller signs and the broker countersigns.
           </p>
         )}
+        {legalPending && (
+          <p data-legal-pending className="text-xs text-red-700">
+            ⚠️ {legalPendingMessage(lang)}. {legalPendingHint(lang)}
+          </p>
+        )}
         {awaitingCountersign && (
           <p className="text-xs text-amber-700">
             ⚠️ Seller signed; waiting for the broker&apos;s countersignature in
@@ -847,7 +860,9 @@ export default async function ListingReviewPage({
           </label>
           <button
             type="submit"
-            className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
+            disabled={legalPending}
+            title={legalPending ? legalPendingMessage(lang) : undefined}
+            className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Approve → Active
           </button>

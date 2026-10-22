@@ -98,7 +98,7 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   key: since migration `20261017150000`, `anon`/`authenticated` have **column-level** SELECT on
   `properties` without those four. Owner, admin and broker read it via
   `get_property_buyer_comp()` (`fetchBuyerComp`, `src/lib/buyer-comp.server.ts`). A **new
-  `properties` column** needs `grant select (<col>) on public.properties to anon, authenticated`
+  `properties` column** needs `grant select (<col>) on public.properties to authenticated` (plus `anon` only if a public page reads it)
   in its migration, or the API can't read it (`properties-column-grants.test.ts` fails).
   Verified with `pnpm db-check:buyer-comp`.
 - The seller pays as soon as they sign the listing agreement (`agreements.status = signed`);

@@ -171,11 +171,15 @@ export function compareWithOffer(tierId: PricingTierId, salePrice: number, offer
 }
 
 /**
- * CASSB-1 apagado hasta nuevo aviso (decisión del owner, 2026-10-18): se está confirmando si
- * corresponde el CASSB-1 o un acuerdo de compensación del vendedor al broker del comprador.
- * Con false, el código no genera ni sugiere el CASSB-1: cassb1Tabs() devuelve null, el admin
- * no lo menciona y la hoja de Matrix tampoco. La casilla `buyer_commission_ack` del acuerdo de
- * listado no cambia (refleja la oferta del vendedor, no el CASSB-1).
+ * CASSB-1 apagado hasta nuevo aviso (decisión del owner, 2026-10-18). Con false, el código no
+ * genera ni sugiere el CASSB-1: cassb1Tabs() devuelve null, el admin no lo menciona y la hoja
+ * de Matrix tampoco.
+ *
+ * Coherencia con el acuerdo de listado (2026-10-21): el ERS-21tn marca 10(b), así que el
+ * acuerdo aparte es entre el VENDEDOR y el broker del comprador. El CASSB-1 ("Seller or
+ * Seller's Broker to Buyer's Broker") lo cubre marcando "Seller" en el párrafo 1 y "Property is
+ * listed by Seller's Broker, Lixtara LLC" en el párrafo 2: eso arma cassb1Tabs. Antes de
+ * encenderlo, la plantilla tiene que nombrar las casillas de la compensación (hoy sin nombre).
  */
 export const CASSB1_ENABLED = false;
 
@@ -189,20 +193,39 @@ export function compensationAgreementsFor(offer: BuyerCompOffer | null): 0 | 1 {
   return !offer || offer.type === "none" ? 0 : 1;
 }
 
-/** Casilla `buyer_commission_ack` del acuerdo de listado: marcada solo si hay oferta (> 0). */
-export function buyerCommissionAck(offer: BuyerCompOffer | null): boolean {
-  return compensationAgreementsFor(offer) === 1;
+/**
+ * Opción del párrafo 10 del acuerdo de listado (ERS-21tn), excluyentes. El modelo de Lixtara:
+ * el vendedor paga al broker del comprador, aparte de la comisión de Lixtara → 10(b), con el %
+ * o el monto en la línea 150. Con 0% → 10(c). Nunca 10(a), que la saca de la comisión del
+ * Broker (decisión del owner, 2026-10-21).
+ */
+export function buyerCompOption(offer: BuyerCompOffer): "b" | "c" {
+  return compensationAgreementsFor(offer) === 1 ? "b" : "c";
+}
+
+export interface Cassb1Tabs {
+  text: Record<string, string>;
+  checkbox: Record<string, boolean>;
 }
 
 /**
- * Campos del CASSB-1 (plantilla "Lixtara - Compensation Agreement … (CASSB-1)", exportada en
- * docs/docusign/lixtara-templates-2026-09-27): `fee_amount` = monto fijo en USD,
- * `fee_pct_value` = % del precio de compra. null cuando no corresponde ningún CASSB-1.
+ * Campos del CASSB-1 para una oferta > 0, coherentes con el 10(b) del acuerdo de listado:
+ * paga el vendedor (párrafo 1), la propiedad está listada por Lixtara (párrafo 2), y
+ * `fee_amount` = monto fijo en USD o `fee_pct_value` = % del precio de compra. Sin "$" ni "%"
+ * (los imprime el formulario). null con 0%.
  */
-export function cassb1Tabs(offer: BuyerCompOffer | null): Record<string, string> | null {
-  if (!CASSB1_ENABLED) return null;
+export function cassb1Fields(offer: BuyerCompOffer | null, sellerName: string, listingBroker: string): Cassb1Tabs | null {
   if (!offer || compensationAgreementsFor(offer) === 0) return null;
-  if (offer.type === "amount") return { fee_amount: offer.amount.toLocaleString("en-US") };
-  if (offer.type === "percent") return { fee_pct_value: String(offer.pct) };
-  return null;
+  const fee: Record<string, string> =
+    offer.type === "amount" ? { fee_amount: offer.amount.toLocaleString("en-US") } : offer.type === "percent" ? { fee_pct_value: String(offer.pct) } : {};
+  return {
+    text: { seller_name: sellerName, listing_broker_name: listingBroker, ...fee },
+    checkbox: { party_seller: true, party_sellers_broker: false, property_listed: true, property_not_listed: false },
+  };
+}
+
+/** cassb1Fields, solo con el CASSB-1 encendido (CASSB1_ENABLED). */
+export function cassb1Tabs(offer: BuyerCompOffer | null, sellerName: string, listingBroker: string): Cassb1Tabs | null {
+  if (!CASSB1_ENABLED) return null;
+  return cassb1Fields(offer, sellerName, listingBroker);
 }
