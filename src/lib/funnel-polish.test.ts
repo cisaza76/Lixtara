@@ -49,12 +49,10 @@ describe("panel", () => {
 });
 
 describe("revisión del listado (paso 6)", () => {
-  it("fotos propias opcionales (Pro/Concierge o fotografía pagada): 'Optional' / 'Opcional'", () => {
-    expect(dictionaries.en.listingForm.step6.photosOptional).toBe("Optional");
-    expect(dictionaries.es.listingForm.step6.photosOptional).toBe("Opcional");
-    expect(read("src/app/[lang]/listing/new/page.tsx")).toMatch(
-      /ownPhotosRequired\(draft\.pricing_tier, photographyPaid\)\s*\?\s*copy\.step6\.emptySection\s*:\s*copy\.step6\.photosOptional/,
-    );
+  it("sin fotos, la sección queda incompleta en todos los planes (al menos la foto del frente)", () => {
+    expect(dictionaries.en.listingForm.step6).not.toHaveProperty("photosOptional");
+    expect(dictionaries.es.listingForm.step6).not.toHaveProperty("photosOptional");
+    expect(read("src/app/[lang]/listing/new/page.tsx")).not.toContain("copy.step6.photosOptional");
   });
 });
 

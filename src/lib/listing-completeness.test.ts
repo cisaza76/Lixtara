@@ -79,11 +79,19 @@ describe("firstIncompleteStep", () => {
     expect(stepComplete(6, { ...complete, buyerComp: { buyer_agent_comp_type: "none", buyer_agent_commission: 0, buyer_agent_comp_amount: null } }, NOW)).toBe(true);
   });
 
-  it("Pro/Concierge o fotografía pagada: sin fotos propias el paso 5 está completo", () => {
-    expect(stepComplete(5, { ...complete, pricing_tier: "pro", photoCount: 0, photos_rights_confirmed: false }, NOW)).toBe(true);
-    expect(stepComplete(5, { ...complete, photographyPaid: true, photoCount: 0, photos_rights_confirmed: false }, NOW)).toBe(true);
-    // con fotos subidas, igual hay que confirmar los derechos
-    expect(stepComplete(5, { ...complete, pricing_tier: "concierge", photoCount: 2, photos_rights_confirmed: false }, NOW)).toBe(false);
+  it("Pro, Concierge y fotografía pagada: el paso 5 necesita la foto del frente y los derechos", () => {
+    for (const f of [{ pricing_tier: "pro" }, { pricing_tier: "concierge" }, { pricing_tier: "essentials", photographyPaid: true }]) {
+      const label = JSON.stringify(f);
+      expect(stepComplete(5, { ...complete, ...f, photoCount: 0, photos_rights_confirmed: true }, NOW), label).toBe(false);
+      expect(stepComplete(5, { ...complete, ...f, photoCount: 1, photos_rights_confirmed: false }, NOW), label).toBe(false);
+      expect(stepComplete(5, { ...complete, ...f, photoCount: 1, photos_rights_confirmed: true }, NOW), label).toBe(true);
+      expect(firstIncompleteStep({ ...complete, ...f, photoCount: 0 }, NOW), label).toBe(5);
+    }
+  });
+
+  it("Essentials sin fotografía sigue con MIN_OWN_PHOTOS", () => {
+    expect(stepComplete(5, { ...complete, pricing_tier: "essentials", photoCount: 1, photos_rights_confirmed: true }, NOW)).toBe(false);
+    expect(stepComplete(5, { ...complete, pricing_tier: "essentials", photoCount: MIN_OWN_PHOTOS, photos_rights_confirmed: true }, NOW)).toBe(true);
   });
 });
 
