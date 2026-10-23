@@ -2,7 +2,7 @@
 // server actions de cada paso. La página redirige ahí si la URL pide un paso posterior
 // (?step=7 con los pasos 2–6 vacíos) y /api/agreement/create rechaza un listing incompleto.
 import { isPricingTierId } from "@/lib/pricing-tiers";
-import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
+import { minPhotos } from "@/lib/listing-photos";
 import { offerFromRow, type BuyerCompRow } from "@/lib/buyer-comp";
 
 export const PROPERTY_TYPES = ["single_family", "condo", "townhouse", "multi_family"] as const;
@@ -48,11 +48,9 @@ export function stepComplete(step: number, f: ListingCompletenessFacts, now = ne
     case 4:
       return (f.description ?? "").trim().length >= 10;
     case 5: {
-      const needsOwn = ownPhotosRequired(f.pricing_tier, f.photographyPaid);
-      if (needsOwn) return f.photoCount >= MIN_OWN_PHOTOS && f.photos_rights_confirmed === true;
-      // Plan con fotografía profesional: sin fotos propias está completo; con fotos, el
-      // vendedor confirmó los derechos al continuar.
-      return f.photoCount === 0 || f.photos_rights_confirmed === true;
+      // Todos los planes: al menos minPhotos (10 propias, o la del frente con fotografía
+      // profesional) y los derechos confirmados al continuar.
+      return f.photoCount >= minPhotos(f.pricing_tier, f.photographyPaid) && f.photos_rights_confirmed === true;
     }
     case 6:
       // 0% ("none") es una elección válida; sin elección, no.

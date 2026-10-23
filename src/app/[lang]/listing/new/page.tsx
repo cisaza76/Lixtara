@@ -106,7 +106,7 @@ import {
 import { markPropertyIfOutsideProduction } from "@/lib/test-data.server";
 import { duplicateDraftId } from "@/lib/listing-step1-dedupe.server";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
-import { MIN_OWN_PHOTOS, ownPhotosRequired } from "@/lib/listing-photos";
+import { MIN_OWN_PHOTOS, minPhotos, ownPhotosRequired } from "@/lib/listing-photos";
 import { hasPaidPhotography } from "@/lib/listing-photos.server";
 import { isCheckoutSessionId } from "@/lib/checkout-guard";
 import { CONSENTS, consentCheckbox, consentNotice } from "@/lib/legal/consents";
@@ -1371,7 +1371,7 @@ export default async function ListingNewPage({
       .select("pricing_tier")
       .eq("id", id)
       .maybeSingle();
-    const needsOwnPhotos = ownPhotosRequired(
+    const requiredPhotos = minPhotos(
       prop?.pricing_tier as string | null,
       await hasPaidPhotography(supabase, id),
     );
@@ -1382,17 +1382,13 @@ export default async function ListingNewPage({
       .eq("property_id", id);
     const photoCount = count ?? 0;
 
-    // Pro/Concierge include professional photography (and Essentials with the paid
-    // add-on), so a seller who uploads none may skip the minimum and the rights box.
-    // DIY (Essentials without it), and anyone
-    // who DID upload, still confirm rights; Essentials still needs MIN_OWN_PHOTOS.
-    if (
-      (needsOwnPhotos || photoCount > 0) &&
-      formData.get("photos_rights_confirmed") !== "1"
-    ) {
+    // Every plan: at least minPhotos (MIN_OWN_PHOTOS on Essentials without photography; the
+    // front photo with professional photography, which the MLS needs within 2 business days,
+    // SEFMLS §15.1.1/§15.1.12), and the rights box.
+    if (formData.get("photos_rights_confirmed") !== "1") {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=rights_required`);
     }
-    if (needsOwnPhotos && photoCount < MIN_OWN_PHOTOS) {
+    if (photoCount < requiredPhotos) {
       redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough`);
     }
 
@@ -1677,7 +1673,10 @@ export default async function ListingNewPage({
     draftId && (step === 5 || step === 6)
       ? await hasPaidPhotography(await createClient(), draftId)
       : false;
+  // Essentials without photography uploads its own set; with professional photography, the
+  // front photo only. Both block step 5 below the minimum.
   const photosRequired = ownPhotosRequired(draft?.pricing_tier ?? null, photographyPaid);
+  const requiredPhotos = minPhotos(draft?.pricing_tier ?? null, photographyPaid);
 
   const errorMessage =
     sp.error === "captcha"
@@ -1713,7 +1712,9 @@ export default async function ListingNewPage({
                           : sp.error === "upload_failed"
                             ? copy.step5.uploadFailed
                             : sp.error === "not_enough"
-                              ? copy.step5.notEnoughPhotos.replace("{min}", String(MIN_OWN_PHOTOS))
+                              ? (photosRequired
+                                  ? copy.step5.notEnoughPhotos.replace("{min}", String(MIN_OWN_PHOTOS))
+                                  : copy.step5.notEnoughFrontPhoto)
                               : sp.error === "no_files"
                                 ? copy.step5.invalidFormat
                                 : sp.error === "save_failed"
@@ -2571,19 +2572,17 @@ export default async function ListingNewPage({
               </h2>
               <span
                 className={`text-[10px] uppercase tracking-[0.22em] ${
-                  photosRequired && photos.length < MIN_OWN_PHOTOS
+                  photos.length < requiredPhotos
                     ? "text-ink/55"
                     : "text-gold font-semibold"
                 }`}
               >
-                {(!photosRequired
-                  ? copy.step5.photoCountOptionalLabel
-                  : photos.length >= MIN_OWN_PHOTOS
-                    ? copy.step5.photoCountReachedLabel
-                    : copy.step5.photoCountLabel
+                {(photos.length >= requiredPhotos
+                  ? copy.step5.photoCountReachedLabel
+                  : copy.step5.photoCountLabel
                 )
                   .replace("{count}", String(photos.length))
-                  .replace("{min}", String(MIN_OWN_PHOTOS))}
+                  .replace("{min}", String(requiredPhotos))}
               </span>
             </div>
             <p className="text-base leading-relaxed text-ink/70">
@@ -2593,6 +2592,7 @@ export default async function ListingNewPage({
                   ? copy.step5.bodyPhotographyPaid
                   : copy.step5.bodyPro}
             </p>
+            <p className="text-sm leading-relaxed text-ink/70">{copy.step5.noMarksNote}</p>
           </div>
 
           {errorMessage && <ErrorBanner message={errorMessage} />}
@@ -2783,7 +2783,7 @@ export default async function ListingNewPage({
                 type="checkbox"
                 name="photos_rights_confirmed"
                 value="1"
-                required={photos.length > 0 || photosRequired}
+                required
                 className="mt-1 accent-gold w-4 h-4 shrink-0"
               />
               <span>{copy.step5.ownershipCheckLabel}</span>
@@ -2828,7 +2828,7 @@ export default async function ListingNewPage({
               draft.sqft === 0 ||
               draft.list_price === 0 ||
               !draft.description ||
-              (ownPhotosRequired(draft.pricing_tier, photographyPaid) && photos.length < MIN_OWN_PHOTOS);
+              photos.length < requiredPhotos;
 
             const SectionHeader = ({
               title,
@@ -3118,11 +3118,8 @@ export default async function ListingNewPage({
                     </>
                   ) : (
                     <p className="text-sm text-ink/55 italic">
-                      {/* Pro y Concierge (y el extra de fotografía pagado): las fotos propias son
-                          opcionales, no un paso sin completar. */}
-                      {ownPhotosRequired(draft.pricing_tier, photographyPaid)
-                        ? copy.step6.emptySection
-                        : copy.step6.photosOptional}
+                      {/* Todos los planes necesitan al menos la foto del frente. */}
+                      {copy.step6.emptySection}
                     </p>
                   )}
                 </div>
