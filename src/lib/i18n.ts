@@ -1,5 +1,5 @@
 import { conciergeLegalBullet, legalReferralBullet } from "@/config/legalPartner";
-import { publicationTimeline, termsFaq } from "@/config/legal-terms";
+import { listingTermination, publicationTimeline, termsFaq } from "@/config/legal-terms";
 
 export const locales = ["en", "es"] as const;
 export type Locale = (typeof locales)[number];
@@ -1833,7 +1833,7 @@ export const dictionaries = {
         termsFaq("en").refund,
         {
           q: "What if my home doesn't sell?",
-          a: "Your listing has a defined expiration date of up to 24 months. The Lixtara commission only applies if your property sells. If you want to end it early, contact us and we'll explain the terms of your listing agreement.",
+          a: `Your listing has a defined expiration date of up to 24 months. The Lixtara commission only applies if your property sells. ${listingTermination.text.en}`,
         },
         termsFaq("en").legal,
         termsFaq("en").earlyAccess,
@@ -3866,7 +3866,7 @@ export const dictionaries = {
         termsFaq("es").refund,
         {
           q: "¿Qué pasa si mi casa no se vende?",
-          a: "Tu listado tiene una fecha de vencimiento definida, de hasta 24 meses. La comisión de Lixtara solo aplica si la propiedad se vende. Si quieres terminarlo antes, contáctanos y te explicamos las condiciones de tu acuerdo de listado.",
+          a: `Tu listado tiene una fecha de vencimiento definida, de hasta 24 meses. La comisión de Lixtara solo aplica si la propiedad se vende. ${listingTermination.text.es}`,
         },
         termsFaq("es").legal,
         termsFaq("es").earlyAccess,

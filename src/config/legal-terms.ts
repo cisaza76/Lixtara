@@ -11,6 +11,7 @@
 import { legalFaqAnswer, legalServicesDisclosure } from "@/config/legalPartner";
 import { BUYER_COMP_MAX_PCT } from "@/lib/buyer-comp";
 import { PRICING_TIERS, TIER_ORDER } from "@/lib/pricing-tiers";
+import { PROTECTION_NOTICE_DAYS, PROTECTION_PERIOD_DAYS } from "@/config/listing-agreement";
 
 type Lang = "en" | "es";
 
@@ -146,25 +147,46 @@ export const publicationTimeline: TermDefinition<PublicationTexts> = {
 };
 
 // ── 4. Política de reembolso ────────────────────────────────────────────────────────
+// v3 (2026-10-21, modelo final del owner; párrafo 15 del ERS-21tn): la tarifa fija se cobra en
+// el checkout, antes de publicar, y no se reembolsa una vez publicada en el MLS; reembolso total
+// si la broker no aprueba el listado o no se publica (y en los demás casos de abajo). El
+// vendedor puede terminar el acuerdo en cualquier momento, sin costo; la comisión solo si la
+// venta se cierra, al cierre. No hay tarifa de cancelación. Pendiente de revisión del abogado
+// (docs/legal/2026-10-21-textos-v3-memo.md).
 // v2 (2026-10-18): empieza con "se cobra se venda o no", como la casilla del paso 8
 // (src/lib/legal/consents.ts, terms_refund). Los Términos §6, la FAQ y Loui leen de aquí.
 export const refundPolicy: TermDefinition<string> = {
-  version: "2",
-  date: "2026-10-18",
+  version: "3",
+  date: "2026-10-21",
   text: {
-    en: "The flat fee is charged whether or not your home sells. The flat fee is non-refundable once your property is published on the MLS. You get a full refund if the broker doesn't approve your listing or it can't be published, if you were charged twice or because of a technical error, or if you cancel before it's published.",
-    es: "La tarifa fija se cobra se venda o no tu propiedad. La tarifa fija no se reembolsa una vez tu propiedad está publicada en el MLS. Te devolvemos el total si la broker no aprueba tu listado o no se puede publicar, si te cobramos dos veces o por un error técnico, o si cancelas antes de la publicación.",
+    en: "The flat fee is charged whether or not your home sells. The flat fee is non-refundable once your property is published on the MLS. You get a full refund if the broker doesn't approve your listing or it can't be published, if you were charged twice or because of a technical error, or if you cancel before it's published. You can end your listing agreement at any time, at no charge. The Lixtara commission is due only if a sale closes, and it's paid at closing.",
+    es: "La tarifa fija se cobra se venda o no tu propiedad. La tarifa fija no se reembolsa una vez tu propiedad está publicada en el MLS. Te devolvemos el total si la broker no aprueba tu listado o no se puede publicar, si te cobramos dos veces o por un error técnico, o si cancelas antes de la publicación. Puedes terminar tu acuerdo de listado en cualquier momento, sin costo. La comisión de Lixtara solo se paga si la venta se cierra, al momento del cierre.",
   },
 };
 
 /**
- * La misma política de reembolso v2, en el registro de los Términos §6 (en español, con usted).
+ * La misma política de reembolso v3, en el registro de los Términos §6 (en español, con usted).
  * El contenido es el de `refundPolicy` (site-claims.test.ts compara las dos); si cambia uno,
  * cambian los dos.
  */
 export const refundPolicyTerms: Record<Lang, string> = {
   en: refundPolicy.text.en,
-  es: "La tarifa fija se cobra se venda o no su propiedad. La tarifa fija no se reembolsa una vez que su propiedad está publicada en el MLS. Le devolvemos el total si la broker no aprueba su listado o no se puede publicar, si le cobramos dos veces o por un error técnico, o si usted cancela antes de la publicación.",
+  es: "La tarifa fija se cobra se venda o no su propiedad. La tarifa fija no se reembolsa una vez que su propiedad está publicada en el MLS. Le devolvemos el total si la broker no aprueba su listado o no se puede publicar, si le cobramos dos veces o por un error técnico, o si usted cancela antes de la publicación. Usted puede terminar su acuerdo de listado en cualquier momento, sin costo. La comisión de Lixtara solo se adeuda si la venta se cierra, y se paga al cierre.",
+};
+
+// ── 4b. Terminación del acuerdo y período de protección ─────────────────────────────
+// v1 (2026-10-21, párrafo 15 del ERS-21tn): el vendedor termina cuando quiera, sin costo;
+// después, la comisión solo se debe por una venta, dentro de PROTECTION_PERIOD_DAYS, a un
+// comprador que visitó o hizo oferta escrita durante el acuerdo y que Lixtara nombró por escrito
+// dentro de PROTECTION_NOTICE_DAYS. FAQ, solicitud de retiro y Loui leen de aquí (con tú); los
+// Términos §16 lo dicen con usted.
+export const listingTermination: TermDefinition<string> = {
+  version: "1",
+  date: "2026-10-21",
+  text: {
+    en: `You can end your listing agreement at any time, at no charge, by writing to us. After it ends, the commission is due only if, within ${PROTECTION_PERIOD_DAYS} days, you sell to a buyer who toured your home or made a written offer during the agreement and whom we named to you in writing within ${PROTECTION_NOTICE_DAYS} days after it ended, and only if that sale closes.`,
+    es: `Puedes terminar tu acuerdo de listado en cualquier momento, sin costo, escribiéndonos. Después de que termine, la comisión solo se paga si, dentro de ${PROTECTION_PERIOD_DAYS} días, le vendes a un comprador que visitó tu propiedad o hizo una oferta por escrito durante el acuerdo y cuyo nombre te dimos por escrito dentro de los ${PROTECTION_NOTICE_DAYS} días siguientes a la terminación, y solo si esa venta se cierra.`,
+  },
 };
 
 // ── 5. Servicios legales (texto en legalPartner.ts) ─────────────────────────────────
@@ -200,6 +222,7 @@ export const LEGAL_TERMS = {
   buyerAgentComp,
   publicationTimeline,
   refundPolicy,
+  listingTermination,
   legalServices,
   propertyAccess,
   servicesNotProvided,
