@@ -56,6 +56,28 @@ const TERMS_V1: ConsentVersion = {
   },
 };
 
+// Casilla de Términos y Privacidad desde la v2 (2026-10-18), con el arbitraje de la §17.
+const TERMS_CHECKBOX: Record<ConsentLang, ConsentParts> = {
+  en: {
+    before: "I agree to the ",
+    link: "Terms of Service",
+    middle: ", including the ",
+    link2: "arbitration agreement in Section 17",
+    middle2: ", and the ",
+    link3: "Privacy Policy",
+    after: ".",
+  },
+  es: {
+    before: "Acepto los ",
+    link: "Términos de servicio",
+    middle: ", incluido el ",
+    link2: "acuerdo de arbitraje de la Sección 17",
+    middle2: ", y la ",
+    link3: "Política de privacidad",
+    after: ".",
+  },
+};
+
 const TERMS_REFUND_CHECKBOX: Record<ConsentLang, ConsentParts> = {
   en: {
     before:
@@ -95,30 +117,12 @@ export const CONSENTS: Record<ConsentDocument, ConsentDefinition> = {
   // Aceptación expresa de los Términos (con su arbitraje, §17) y la Privacidad al crear la
   // cuenta: /sign-up y el registro del paso 7. Sin la casilla no se crea la cuenta. La versión
   // nombra los dos documentos.
+  // Privacidad v4 (2026-10-24): misma casilla, versión nueva; la v2 queda como anterior.
   terms: {
     version: `terms-${LEGAL_DOCS.terms.version}+privacy-${LEGAL_DOCS.privacy.version}`,
-    checkbox: {
-      en: {
-        before: "I agree to the ",
-        link: "Terms of Service",
-        middle: ", including the ",
-        link2: "arbitration agreement in Section 17",
-        middle2: ", and the ",
-        link3: "Privacy Policy",
-        after: ".",
-      },
-      es: {
-        before: "Acepto los ",
-        link: "Términos de servicio",
-        middle: ", incluido el ",
-        link2: "acuerdo de arbitraje de la Sección 17",
-        middle2: ", y la ",
-        link3: "Política de privacidad",
-        after: ".",
-      },
-    },
+    checkbox: TERMS_CHECKBOX,
     links: [LEGAL_DOCS.terms.path, `${LEGAL_DOCS.terms.path}#section-17`, LEGAL_DOCS.privacy.path],
-    previous: [TERMS_V1],
+    previous: [TERMS_V1, { version: "terms-2026-10-18-v2+privacy-2026-10-18-v2", checkbox: TERMS_CHECKBOX }],
   },
   // Paso 8, antes de "Pagar con Stripe". Dice lo mismo que legal-terms.ts#refundPolicy, los
   // Términos §6 y la FAQ (site-claims.test.ts lo comprueba). La versión es la de los Términos:
@@ -261,6 +265,11 @@ export const PUBLISHED_CONSENT_HASHES: Record<string, Record<ConsentLang, string
   "terms_refund@2026-10-18-v2:concierge": {
     en: "bcc38ee48bcf1c6f5d97953493e5e8ca8c2b7491c7d7ea9c4004055937da1066",
     es: "48baa37e3b29c0f7d06e0402656d08aab641e5f1d2273bd7bfd2b03d45bd7348",
+  },
+  // Misma casilla que la v2 (mismo hash): cambió la versión de la Privacidad que se acepta.
+  "terms@terms-2026-10-18-v2+privacy-2026-10-24-v4": {
+    en: "4c3ae511d2e3245df3fbf105c4c1c587c2e6dcb701747fea13cde78c2addecb6",
+    es: "971219881754a9fde2d0243a491213ae7bdcadf90005650b52d8b1afe07c90c1",
   },
   "esign@2026-10-18-v2": {
     en: "4f9fbdf243093dc6946a823fbe5e146cade52ce8b6a7afee0cb71b93996c1df1",

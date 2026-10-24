@@ -56,6 +56,9 @@ const KNOWN_MARKERS: Record<string, string> = {
   'from "twilio"': "twilio",
   "api.replicate.com": "replicate",
   "connect.facebook.net": "meta",
+  "graph.facebook.com": "meta",
+  "_fbp": "meta",
+  "_gcl_aw": "google-ads",
   "static.hotjar.com": "hotjar",
   "cdn.segment.com": "segment",
 };

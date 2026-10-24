@@ -76,7 +76,7 @@ describe("aceptación de Términos y Privacidad al crear la cuenta (terms)", () 
       "Acepto los Términos de servicio, incluido el acuerdo de arbitraje de la Sección 17, y la Política de privacidad.",
     );
     expect(CONSENTS.terms.version).toBe(`terms-${LEGAL_DOCS.terms.version}+privacy-${LEGAL_DOCS.privacy.version}`);
-    expect(CONSENTS.terms.version).toBe("terms-2026-10-18-v2+privacy-2026-10-18-v2");
+    expect(CONSENTS.terms.version).toBe("terms-2026-10-18-v2+privacy-2026-10-24-v4");
     expect(CONSENTS.terms.version.length).toBeLessThanOrEqual(64); // check de la columna
     const parts = consentCheckbox("terms", "en");
     expect([parts.link, parts.link2, parts.link3]).toEqual(["Terms of Service", "arbitration agreement in Section 17", "Privacy Policy"]);

@@ -68,10 +68,15 @@ describe("páginas legales: todas, en los dos idiomas, desde una sola configurac
     }
   });
 
-  it("versión 2026-10-18-v2 en Términos, Privacidad, Cookies, Avisos legales, Avisos de corretaje y Accesibilidad", () => {
-    for (const id of ["terms", "privacy", "cookies", "disclaimers", "notices", "accessibility"] as const) {
+  it("versión 2026-10-18-v2 en Términos, Avisos legales, Avisos de corretaje y Accesibilidad; v4 en Privacidad y Cookies", () => {
+    for (const id of ["terms", "disclaimers", "notices", "accessibility"] as const) {
       expect(LEGAL_DOCS[id].version, id).toBe("2026-10-18-v2");
       expect(LEGAL_DOCS[id].updated, id).toBe("2026-10-18");
+    }
+    // 2026-10-24: categoría Publicidad (Meta y Google Ads); los Términos no cambian.
+    for (const id of ["privacy", "cookies"] as const) {
+      expect(LEGAL_DOCS[id].version, id).toBe("2026-10-24-v4");
+      expect(LEGAL_DOCS[id].updated, id).toBe("2026-10-24");
     }
   });
 
@@ -218,18 +223,59 @@ describe("Términos: precios y plazos de pricing-tiers, nombre y correos de brok
   });
 });
 
-describe("cookies: sin publicidad, en el aviso y en la política (mientras Clarity esté pausado)", () => {
-  it("todas las variantes dicen que no usamos cookies de publicidad", () => {
+describe("cookies: publicidad solo con consentimiento, en el aviso y en la política (v4, 2026-10-24)", () => {
+  it("con GTM: categoría Publicidad con Meta y Google Ads; sin GTM: no hay publicidad", () => {
     for (const lang of LANGS) {
       for (const t of TOOL_VARIANTS) {
-        expect(JSON.stringify(cookiesDocFor(lang, t))).toMatch(
-          lang === "en" ? /We do not use advertising or targeting cookies/ : /No utilizamos cookies de publicidad/,
-        );
+        const doc = JSON.stringify(cookiesDocFor(lang, t));
+        const noAds = lang === "en" ? /We do not use advertising or targeting cookies/ : /No utilizamos cookies de publicidad/;
+        if (t.gtm) {
+          expect(doc, `${lang} ${JSON.stringify(t)}`).not.toMatch(noAds);
+          expect(doc).toMatch(lang === "en" ? /Advertising Cookies \(only with your consent\)/ : /Cookies de Publicidad \(solo con su consentimiento\)/);
+          for (const c of ["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]) expect(doc, c).toContain(c);
+        } else {
+          expect(doc, `${lang} ${JSON.stringify(t)}`).toMatch(noAds);
+        }
       }
     }
     expect(cookiesDocFor("en", TOOL_VARIANTS[0])).toBe(cookiesDoc.en);
-    expect(dictionaries.en.cookieNotice.consentMessage).toContain("No advertising cookies.");
-    expect(dictionaries.es.cookieNotice.consentMessage).toContain("No usamos cookies de publicidad.");
+    // El aviso ya no dice que no hay publicidad: nombra la categoría.
+    expect(dictionaries.en.cookieNotice.consentMessage).not.toContain("No advertising cookies.");
+    expect(dictionaries.es.cookieNotice.consentMessage).not.toContain("No usamos cookies de publicidad.");
+    expect(dictionaries.en.cookieNotice.consentMessage).toContain("advertising cookies (Meta and Google Ads)");
+    expect(dictionaries.es.cookieNotice.consentMessage).toContain("cookies de publicidad (Meta y Google Ads)");
+    expect(dictionaries.es.cookieNotice.consentMessage).toContain("{tools}");
+  });
+
+  it("duraciones de fuentes oficiales: Google 90 días; Meta, aproximadamente 90 días", () => {
+    for (const lang of LANGS) {
+      const ads = cookiesDocFor(lang, { gtm: true, posthog: false }).sections.find((s) => s.id === "advertising")!;
+      expect(ads.table!.rows.map((r) => r[0])).toEqual(["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]);
+      const d = Object.fromEntries(ads.table!.rows.map((r) => [r[0], r[3]]));
+      for (const c of ["_fbp", "_fbc"]) expect(d[c], c).toBe(lang === "en" ? "About 90 days (set by Meta)" : "Aproximadamente 90 días (la fija Meta)");
+      for (const c of ["_gcl_au", "_gcl_aw"]) expect(d[c], c).toBe(lang === "en" ? "90 days (set by Google)" : "90 días (la fija Google)");
+    }
+    // Solo fuentes oficiales en el código.
+    expect(read("src/lib/legal/cookies.ts")).not.toMatch(/toolongdidntread/);
+  });
+
+  it("privacidad: compartición para publicidad solo con consentimiento, GPC y retiro; sin API de Conversiones", () => {
+    for (const lang of LANGS) {
+      const doc = fillLegalDoc(privacyDoc[lang]);
+      const s = JSON.stringify(doc);
+      // La API de Conversiones no existe todavía: se describe en el PR que la construya.
+      expect(s).not.toMatch(/SHA-256|Conversions API|API de Conversiones|hash/i);
+      for (const c of [true, false]) {
+        expect(JSON.stringify(cookiesDocFor(lang, { gtm: true, posthog: c }))).not.toMatch(/Conversions API|API de Conversiones|SHA-256/);
+      }
+      const s91 = JSON.stringify(doc.sections.find((x) => x.heading.startsWith("9."))!.sub!.find((x) => x.heading.startsWith("9.1")));
+      expect(s91).toContain("Global Privacy Control (GPC)");
+      expect(s91).toMatch(lang === "en" ? /Advertising category stays rejected/ : /categoría Publicidad queda rechazada/);
+      expect(s).toContain("Meta Platforms, Inc.");
+      expect(s).toContain("Google LLC (Google Ads)");
+      // Ya no afirma que no comparte para publicidad dirigida.
+      expect(s).not.toMatch(/do not currently share|actualmente no compart/i);
+    }
   });
 
   it("la tabla de cookies necesarias nombra las cookies reales del sitio", () => {

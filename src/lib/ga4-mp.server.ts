@@ -52,6 +52,7 @@ export async function sendGa4Purchase(session: Stripe.Checkout.Session): Promise
       body: JSON.stringify(
         purchasePayload({
           clientId: md.ga_client_id,
+          adsConsent: md.ads_consent,
           sessionId: md.ga_session_id,
           transactionId: session.id,
           value: (session.amount_total ?? 0) / 100,

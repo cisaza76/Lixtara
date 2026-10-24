@@ -4,16 +4,23 @@ import { STEP1_FORM_COOKIE, STEP1_FORM_MAX_AGE_S } from "@/lib/listing-step1-for
 import { SIGNUP_EMAIL_COOKIE } from "@/lib/auth/signup-code";
 import { FIRST_TOUCH_COOKIE, FIRST_TOUCH_MAX_AGE_S } from "@/lib/funnel-events";
 
-// Política de Cookies v2 (2026-10-18), publicada por decisión del owner sin revisión del
-// abogado todavía: docs/legal/2026-10-18-textos-v2-memo.md.
+// Política de Cookies v4 (2026-10-24): categoría Publicidad (Meta y Google Ads, solo con
+// consentimiento). Pendiente de revisión del abogado: docs/legal/2026-10-24-textos-v4-memo.md.
+// La v2 (2026-10-18) se publicó por decisión del owner: docs/legal/2026-10-18-textos-v2-memo.md.
 //
 // Tiene que ser cierta en cada estado del sitio, así que se ARMA según lo configurado:
 //   - sin NEXT_PUBLIC_GTM_ID ni NEXT_PUBLIC_POSTHOG_KEY: solo cookies necesarias;
-//   - con GTM (contenedor del CMO): Google Analytics 4 y Microsoft Clarity, solo con
-//     consentimiento (opt-in en todas las regiones);
+//   - con GTM (contenedor del CMO): Google Analytics 4 y Microsoft Clarity (Analítica) y el
+//     píxel de Meta y Google Ads (Publicidad, decisión del owner 2026-10-24), cada categoría
+//     solo con su consentimiento (opt-in en todas las regiones);
 //   - con PostHog: su analítica de producto, solo con consentimiento.
-// Google Ads y Meta NO están aprobados: la sección de publicidad dice que no se usan, en todas
-// las variantes. Nombres y duraciones de NUESTRAS cookies salen de las constantes del código.
+// Sin GTM no hay publicidad (Meta y Google Ads solo se cargan desde el contenedor): esa
+// variante dice que no se usan. Nombres y duraciones de NUESTRAS cookies salen de las
+// constantes del código. Duraciones de publicidad, solo fuentes oficiales (2026-10-24): Google,
+// "How Google uses cookies in advertising" (business.safety.google/adscookies): _gcl_au y
+// _gcl_aw, 90 días. Meta no da el plazo de _fbp en una página oficial comprobable, y para _fbc
+// solo recomienda 90 días a quien la pone desde su servidor (guía de fbp/fbc de la API de
+// Conversiones): las dos van como "aproximadamente 90 días".
 // Clarity: lista de "Clarity Cookies" (Microsoft Learn, actualizada 2025-12-05); Microsoft ya
 // no publica duraciones: las de la tabla son aproximadas (versión anterior de esa página).
 // Las duraciones que fija un tercero se atribuyen a ese tercero, sin prometer un valor exacto.
@@ -64,8 +71,8 @@ function necessaryRows(lang: Lang): string[][] {
       CONSENT_COOKIE,
       "Lixtara",
       es
-        ? "Guarda su elección en el aviso de cookies (aceptar o rechazar la analítica)."
-        : "Stores your choice in the cookie banner (accept or reject analytics).",
+        ? "Guarda su elección en el aviso de cookies (aceptar o rechazar la analítica y la publicidad, por separado)."
+        : "Stores your choice in the cookie banner (accept or reject analytics and advertising, separately).",
       duration(lang, "days", days(CONSENT_MAX_AGE_S)),
     ],
     [
@@ -187,6 +194,51 @@ function analyticsRows(lang: Lang, t: CookieTools): string[][] {
   return rows;
 }
 
+/** Cookies de publicidad: solo con GTM y con la categoría Publicidad aceptada. */
+function adsRows(lang: Lang): string[][] {
+  const es = lang === "es";
+  const meta = "Meta Platforms, Inc.";
+  const google = "Google LLC (Google Ads)";
+  const ninety = (who: string) => (es ? `90 días (la fija ${who})` : `90 days (set by ${who})`);
+  // Meta no publica el plazo exacto en una página oficial que se pueda comprobar (2026-10-24).
+  const aboutNinety = (who: string) =>
+    es ? `Aproximadamente 90 días (la fija ${who})` : `About 90 days (set by ${who})`;
+  return [
+    [
+      "_fbp",
+      meta,
+      es
+        ? "Identifica su navegador para medir nuestras campañas en Meta y mostrarle anuncios de Lixtara."
+        : "Identifies your browser to measure our Meta campaigns and show you Lixtara ads.",
+      aboutNinety("Meta"),
+    ],
+    [
+      "_fbc",
+      meta,
+      es
+        ? "Guarda el identificador del clic cuando llega desde un anuncio de Meta (parámetro fbclid), para atribuir el registro o el pago a ese anuncio."
+        : "Stores the click identifier when you arrive from a Meta ad (fbclid parameter), to attribute a sign-up or payment to that ad.",
+      aboutNinety("Meta"),
+    ],
+    [
+      "_gcl_au",
+      google,
+      es
+        ? "Mide las conversiones (registros y pagos) de nuestras campañas de Google Ads."
+        : "Measures conversions (sign-ups and payments) from our Google Ads campaigns.",
+      ninety("Google"),
+    ],
+    [
+      "_gcl_aw",
+      google,
+      es
+        ? "Guarda el identificador del clic cuando llega desde un anuncio de Google (parámetro gclid), para atribuir el registro o el pago a ese anuncio."
+        : "Stores the click identifier when you arrive from a Google ad (gclid parameter), to attribute a sign-up or payment to that ad.",
+      ninety("Google"),
+    ],
+  ];
+}
+
 /** Textos de la variante sin analítica; cada variante con analítica los reemplaza (lo comprueba la prueba). */
 const NO_ANALYTICS = {
   en: {
@@ -234,8 +286,8 @@ function build(lang: Lang, t: CookieTools): LegalDoc {
     body: any
       ? [
           es
-            ? `Solo si usted acepta en el aviso de cookies, usamos ${toolList(lang, t)}. Si rechaza, estas herramientas no se cargan. Los eventos que enviamos nosotros llevan direcciones de página sin parámetros y nunca el texto que usted escribe.`
-            : `Only if you accept in the cookie banner, we use ${toolList(lang, t)}. If you reject, these tools are not loaded. The events we send ourselves include page addresses without query parameters and never the text you type.`,
+            ? `Solo si usted acepta la categoría Analítica en el aviso de cookies, usamos ${toolList(lang, t)}. Si rechaza, estas herramientas no se activan. Los eventos que enviamos nosotros llevan direcciones de página sin parámetros y nunca el texto que usted escribe.`
+            : `Only if you accept the Analytics category in the cookie banner, we use ${toolList(lang, t)}. If you reject, these tools are not activated. The events we send ourselves include page addresses without query parameters and never the text you type.`,
           ...(t.gtm
             ? [
                 es
@@ -273,13 +325,19 @@ function build(lang: Lang, t: CookieTools): LegalDoc {
       },
       {
         heading: es ? "2. Cómo las Usamos" : "2. How We Use Them",
-        body: any
+        body: t.gtm
           ? [
               es
-                ? "Usamos cookies necesarias para que el sitio funcione y, solo si usted lo acepta, cookies de analítica para entender cómo se usa el sitio y mejorarlo (Sección 4). No usamos cookies de publicidad (Sección 6)."
-                : "We use necessary cookies so the site works and, only if you accept them, analytics cookies to understand how the site is used and improve it (Section 4). We do not use advertising cookies (Section 6).",
+                ? "Usamos cookies necesarias para que el sitio funcione y, solo si usted acepta cada categoría por separado, cookies de analítica para entender cómo se usa el sitio y mejorarlo (Sección 4) y cookies de publicidad para medir nuestras campañas y mostrarle anuncios de Lixtara (Sección 6)."
+                : "We use necessary cookies so the site works and, only if you accept each category separately, analytics cookies to understand how the site is used and improve it (Section 4) and advertising cookies to measure our campaigns and show you Lixtara ads (Section 6).",
             ]
-          : [na.how],
+          : any
+            ? [
+                es
+                  ? "Usamos cookies necesarias para que el sitio funcione y, solo si usted lo acepta, cookies de analítica para entender cómo se usa el sitio y mejorarlo (Sección 4). No usamos cookies de publicidad (Sección 6)."
+                  : "We use necessary cookies so the site works and, only if you accept them, analytics cookies to understand how the site is used and improve it (Section 4). We do not use advertising cookies (Section 6).",
+              ]
+            : [na.how],
       },
       {
         id: "necessary",
@@ -306,22 +364,38 @@ function build(lang: Lang, t: CookieTools): LegalDoc {
               "Upstash: rate limits against abuse, applied on our servers. It does not set cookies in your browser.",
             ],
       },
-      {
-        id: "advertising",
-        heading: es ? "6. Publicidad" : "6. Advertising",
-        body: [
-          es
-            ? "No utilizamos cookies de publicidad ni de segmentación. Lixtara no muestra publicidad de terceros y no usa cookies para crear perfiles publicitarios ni para seguirle en otros sitios."
-            : "We do not use advertising or targeting cookies. Lixtara does not show third-party advertising and does not use cookies to build advertising profiles or follow you across other websites.",
-          ...(t.gtm
-            ? [
-                es
-                  ? "Si usted acepta la analítica, Microsoft puede poner cookies en sus propios dominios (Sección 4). Microsoft las usa según su propia declaración de privacidad; Lixtara no las usa para publicidad."
-                  : "If you accept analytics, Microsoft may set cookies on its own domains (Section 4). Microsoft uses them under its own privacy statement; Lixtara does not use them for advertising.",
-              ]
-            : []),
-        ],
-      },
+      t.gtm
+        ? {
+            id: "advertising",
+            heading: es ? "6. Cookies de Publicidad (solo con su consentimiento)" : "6. Advertising Cookies (only with your consent)",
+            body: [
+              es
+                ? "Solo si usted acepta la categoría Publicidad en el aviso de cookies, activamos, mediante Google Tag Manager, el píxel de Meta (Meta Platforms, Inc.) y la medición de conversiones de Google Ads (Google LLC). Los usamos para medir nuestras campañas (por ejemplo, saber si un registro o un pago llegó desde un anuncio) y para mostrarle anuncios de Lixtara en Facebook, Instagram, Google y otros sitios. Si rechaza esta categoría, no se activan y no ponen estas cookies. Lixtara no muestra publicidad de terceros en su sitio."
+                : "Only if you accept the Advertising category in the cookie banner, we activate, through Google Tag Manager, the Meta pixel (Meta Platforms, Inc.) and Google Ads conversion measurement (Google LLC). We use them to measure our campaigns (for example, whether a sign-up or a payment came from an ad) and to show you Lixtara ads on Facebook, Instagram, Google and other websites. If you reject this category, they are not activated and do not set these cookies. Lixtara does not show third-party advertising on its site.",
+              es
+                ? "Aunque usted la haya aceptado, la publicidad no se activa en el proceso de publicación de su vivienda, en su cuenta, en el inicio de sesión y el registro, ni en su panel."
+                : "Even if you have accepted it, advertising is not activated in the listing flow for your home, in your account, in sign-in and sign-up, or in your dashboard.",
+              es
+                ? "Si su navegador envía la señal Global Privacy Control, la publicidad queda rechazada en ese navegador, aunque la acepte en el aviso (Política de Privacidad, Sección 9.1)."
+                : "If your browser sends the Global Privacy Control signal, advertising stays rejected in that browser, even if you accept it in the banner (Privacy Policy, Section 9.1).",
+              es
+                ? "Meta y Google pueden además poner cookies en sus propios dominios y las usan según sus propias políticas de privacidad. Las duraciones de la tabla las fijan Meta y Google."
+                : "Meta and Google may also set cookies on their own domains and use them under their own privacy policies. The durations in the table are set by Meta and Google.",
+              es
+                ? "Si usted acepta la analítica, Microsoft puede poner cookies en sus propios dominios (Sección 4). Microsoft las usa según su propia declaración de privacidad; Lixtara no las usa para publicidad."
+                : "If you accept analytics, Microsoft may set cookies on its own domains (Section 4). Microsoft uses them under its own privacy statement; Lixtara does not use them for advertising.",
+            ],
+            table: { columns: [...COLUMNS[lang]], rows: adsRows(lang) },
+          }
+        : {
+            id: "advertising",
+            heading: es ? "6. Publicidad" : "6. Advertising",
+            body: [
+              es
+                ? "No utilizamos cookies de publicidad ni de segmentación. Lixtara no muestra publicidad de terceros y no usa cookies para crear perfiles publicitarios ni para seguirle en otros sitios."
+                : "We do not use advertising or targeting cookies. Lixtara does not show third-party advertising and does not use cookies to build advertising profiles or follow you across other websites.",
+            ],
+          },
       {
         id: "third-party",
         heading: es ? "7. Servicios de Terceros que Usted Abre" : "7. Third-Party Services You Open",
@@ -351,16 +425,25 @@ function build(lang: Lang, t: CookieTools): LegalDoc {
       {
         id: "choices",
         heading: es ? "8. Cómo Elegir o Retirar su Consentimiento" : "8. How to Choose or Withdraw Consent",
-        body: any
+        body: t.gtm
           ? [
               es
-                ? "Cuando visita Lixtara por primera vez, el aviso de cookies le permite aceptar o rechazar las cookies de analítica, con las dos opciones igual de visibles. Nada de analítica se carga antes de que usted acepte."
-                : "When you first visit Lixtara, the cookie banner lets you accept or reject analytics cookies, with both options equally visible. No analytics loads before you accept.",
+                ? "Cuando visita Lixtara por primera vez, el aviso de cookies le permite aceptar o rechazar por separado las cookies de analítica y las de publicidad, con \"Aceptar\" y \"Rechazar\" igual de visibles en cada categoría, y también \"Rechazar todo\" y \"Aceptar todo\". Las dos categorías están rechazadas hasta que usted acepte: nada de analítica ni de publicidad se activa antes."
+                : "When you first visit Lixtara, the cookie banner lets you accept or reject analytics cookies and advertising cookies separately, with \"Accept\" and \"Reject\" equally visible for each category, as well as \"Reject all\" and \"Accept all\". Both categories stay rejected until you accept: no analytics or advertising is activated before that.",
               es
-                ? "Puede cambiar su elección en cualquier momento en \"Configurar cookies\", en el pie del sitio. Si retira su consentimiento, estas herramientas dejan de cargarse y las cookies que pusieron en nuestro dominio se borran de su navegador. Las cookies que Microsoft pone en sus propios dominios solo se pueden borrar desde el navegador."
-                : "You can change your choice at any time through \"Cookie settings\" in the site footer. If you withdraw consent, these tools stop loading and the cookies they set on our domain are deleted from your browser. Cookies Microsoft sets on its own domains can only be deleted from your browser.",
+                ? "Puede cambiar su elección o retirar su consentimiento en cualquier momento en \"Configurar cookies\", en el pie del sitio. Al hacerlo, las dos categorías vuelven a quedar rechazadas hasta que elija de nuevo; las herramientas de la categoría que rechace dejan de activarse y las cookies que pusieron en nuestro dominio se borran de su navegador. Las cookies que Microsoft, Meta o Google ponen en sus propios dominios solo se pueden borrar desde el navegador."
+                : "You can change your choice or withdraw your consent at any time through \"Cookie settings\" in the site footer. When you do, both categories return to rejected until you choose again; the tools in a category you reject stop being activated and the cookies they set on our domain are deleted from your browser. Cookies that Microsoft, Meta or Google set on their own domains can only be deleted from your browser.",
             ]
-          : [na.consent],
+          : any
+            ? [
+                es
+                  ? "Cuando visita Lixtara por primera vez, el aviso de cookies le permite aceptar o rechazar las cookies de analítica, con las dos opciones igual de visibles. Nada de analítica se carga antes de que usted acepte."
+                  : "When you first visit Lixtara, the cookie banner lets you accept or reject analytics cookies, with both options equally visible. No analytics loads before you accept.",
+                es
+                  ? "Puede cambiar su elección en cualquier momento en \"Configurar cookies\", en el pie del sitio. Si retira su consentimiento, estas herramientas dejan de cargarse y las cookies que pusieron en nuestro dominio se borran de su navegador."
+                  : "You can change your choice at any time through \"Cookie settings\" in the site footer. If you withdraw consent, these tools stop loading and the cookies they set on our domain are deleted from your browser.",
+              ]
+            : [na.consent],
         bullets: es
           ? [
               "También puede ver, bloquear o borrar cookies desde la configuración de su navegador.",
