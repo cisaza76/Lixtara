@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // El módulo lee la configuración al cargar: estas pruebas usan un build CONFIGURADO (las dos
 // variables), salvo la que verifica justamente lo contrario.
@@ -11,8 +13,9 @@ import {
   homePriceRange, markPageview, resultsBucket, resumeSourceFromMarker, track, trackThen,
 } from "@/lib/analytics";
 import {
-  ANALYTICS_COOKIE_RE, GRANTED_CONSENT, analyticsConfig, consentTools, isAnalyticsExcludedPath, isRecordingExcludedPath, needsFullLoad,
-  readConsent,
+  ADS_COOKIE_RE, ANALYTICS_COOKIE_RE, analyticsConfig, consentCookieValue, consentModeUpdate, consentTools,
+  isAdsExcludedPath, isAnalyticsExcludedPath, isRecordingExcludedPath, needsFullLoad, readAdsConsent, readConsent,
+  readConsentState,
   sanitizePosthogProperties, sanitizeUrl,
 } from "@/lib/analytics-config";
 import { recordServerEvent } from "@/lib/analytics.server";
@@ -165,11 +168,28 @@ describe("configuración", () => {
     expect(c).toEqual({ gtmId: null, posthogKey: null, posthogHost: "https://us.i.posthog.com", enabled: false });
   });
 
-  it("lee la elección de la cookie", () => {
-    expect(readConsent("a=1; lx_consent=granted; b=2")).toBe("granted");
-    expect(readConsent("lx_consent=denied")).toBe("denied");
+  it("lee la elección de la cookie, por categoría", () => {
+    expect(readConsentState("a=1; lx_consent=analytics-granted.ads-denied; b=2")).toEqual({ analytics: "granted", ads: "denied" });
+    expect(readConsentState("lx_consent=analytics-denied.ads-granted")).toEqual({ analytics: "denied", ads: "granted" });
+    expect(readConsent("lx_consent=analytics-granted.ads-granted")).toBe("granted");
+    expect(readAdsConsent("lx_consent=analytics-granted.ads-granted")).toBe("granted");
     expect(readConsent("lx_consent=maybe")).toBeNull();
+    expect(readConsentState("lx_consent=analytics-granted")).toBeNull();
     expect(readConsent("")).toBeNull();
+    expect(readAdsConsent("")).toBeNull();
+    for (const s of [
+      { analytics: "granted", ads: "granted" },
+      { analytics: "granted", ads: "denied" },
+      { analytics: "denied", ads: "granted" },
+      { analytics: "denied", ads: "denied" },
+    ] as const) {
+      expect(readConsentState(`lx_consent=${consentCookieValue(s)}`)).toEqual(s);
+    }
+  });
+
+  it("valores de antes del 2026-10-24 (solo analítica): publicidad denegada, sin volver a preguntar", () => {
+    expect(readConsentState("lx_consent=granted")).toEqual({ analytics: "granted", ads: "denied" });
+    expect(readConsentState("lx_consent=denied")).toEqual({ analytics: "denied", ads: "denied" });
   });
 
   it("URLs sin parámetros ni fragmento", () => {
@@ -262,29 +282,91 @@ describe("Clarity: graba el embudo, nunca /account (se entra y se sale con carga
     }
   });
   it("entrar a /account siempre recarga; salir hacia el embudo recarga solo con consentimiento", () => {
-    expect(needsFullLoad("/en/listing/new", "/en/account", false)).toBe(true);
-    expect(needsFullLoad("/es/listing/new", "/es/account", true)).toBe(true);
-    expect(needsFullLoad("/en/sign-in", "/en/account", false)).toBe(true);
-    expect(needsFullLoad("/en/account", "/en/listing/new", true)).toBe(true);
-    expect(needsFullLoad("/en/account", "/en/listing/new", false)).toBe(false);
-    expect(needsFullLoad("/en/listing/new", "/en/dashboard", true)).toBe(false);
-    expect(needsFullLoad("/en/account", "/en/account", true)).toBe(false);
+    const none = { analytics: false, ads: false };
+    const analytics = { analytics: true, ads: false };
+    expect(needsFullLoad("/en/listing/new", "/en/account", none)).toBe(true);
+    expect(needsFullLoad("/es/listing/new", "/es/account", analytics)).toBe(true);
+    expect(needsFullLoad("/en/sign-in", "/en/account", none)).toBe(true);
+    expect(needsFullLoad("/en/account", "/en/listing/new", analytics)).toBe(true);
+    expect(needsFullLoad("/en/account", "/en/listing/new", none)).toBe(false);
+    expect(needsFullLoad("/en/listing/new", "/en/dashboard", analytics)).toBe(false);
+    expect(needsFullLoad("/en/account", "/en/account", analytics)).toBe(false);
   });
 });
 
-describe("consentimiento: lo que concede 'Aceptar' y lo que se borra al rechazar", () => {
-  it("aceptar concede SOLO analítica: Google Ads y Meta no están aprobados (2026-10-15)", () => {
-    expect(GRANTED_CONSENT).toEqual({
+describe("publicidad: rutas sin publicidad y recarga al cruzarlas (2026-10-24)", () => {
+  it("/listing, /account, /auth, /sign-in, /sign-up, /dashboard y /admin no llevan publicidad", () => {
+    for (const p of ["/en/listing", "/es/listing/new", "/en/account", "/es/auth/verify", "/en/sign-in", "/es/sign-up",
+      "/en/dashboard", "/es/dashboard/x", "/en/admin", "/es/admin/seller-leads"]) {
+      expect(isAdsExcludedPath(p), p).toBe(true);
+    }
+    for (const p of ["/en", "/es", "/en/properties", "/es/owners", "/en/services", "/en/cookies", "/en/listings",
+      "/en/accounting", "/en/sign-up-now"]) {
+      expect(isAdsExcludedPath(p), p).toBe(false);
+    }
+  });
+
+  it("con publicidad aceptada, entrar o salir de una ruta sin publicidad recarga; sin ella, no", () => {
+    const ads = { analytics: false, ads: true };
+    const none = { analytics: false, ads: false };
+    expect(needsFullLoad("/en", "/en/listing/new", ads)).toBe(true);
+    expect(needsFullLoad("/en/listing/new", "/en", ads)).toBe(true);
+    expect(needsFullLoad("/es/sign-up", "/es/owners", ads)).toBe(true);
+    expect(needsFullLoad("/en", "/en/properties", ads)).toBe(false);
+    expect(needsFullLoad("/en/listing/new", "/en/dashboard", ads)).toBe(false);
+    expect(needsFullLoad("/en", "/en/listing/new", none)).toBe(false);
+    expect(needsFullLoad("/en/listing/new", "/en", none)).toBe(false);
+  });
+});
+
+describe("consentimiento: lo que concede cada categoría y lo que se borra al rechazar", () => {
+  it("aceptar Publicidad concede las 3 señales de publicidad; rechazarla las deja denegadas", () => {
+    expect(consentModeUpdate({ analytics: "denied", ads: "granted" }, "/en")).toEqual({
+      ad_storage: "granted", ad_user_data: "granted", ad_personalization: "granted", analytics_storage: "denied",
+    });
+    expect(consentModeUpdate({ analytics: "granted", ads: "denied" }, "/en")).toEqual({
       ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "granted",
+    });
+    expect(consentModeUpdate({ analytics: "granted", ads: "granted" }, "/es/properties")).toEqual({
+      ad_storage: "granted", ad_user_data: "granted", ad_personalization: "granted", analytics_storage: "granted",
     });
   });
 
-  it("al rechazar se borran las cookies de GA4, Google Ads, Meta, Clarity y PostHog, y no las propias del sitio", () => {
-    for (const c of ["_ga", "_ga_ABC123", "_gid", "_gcl_au", "_fbp", "_fbc", "_clck", "_clsk", "ph_phc_x_posthog", "lx_ft"]) {
+  it("en una ruta sin publicidad, las 3 señales quedan denegadas aunque se haya aceptado", () => {
+    for (const p of ["/en/listing/new", "/es/account", "/en/sign-in", "/es/sign-up", "/en/auth/verify", "/en/dashboard"]) {
+      expect(consentModeUpdate({ analytics: "granted", ads: "granted" }, p), p).toEqual({
+        ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "granted",
+      });
+    }
+  });
+
+  it("el banner aplica la elección guardada antes de gtm.js, con lx_ads_consent para GTM", () => {
+    const src = readFileSync(join(process.cwd(), "src/components/analytics-consent.tsx"), "utf8");
+    const i = (s: string) => src.indexOf(s);
+    expect(i('gtag("consent", "default"')).toBeGreaterThan(-1);
+    expect(i('gtag("consent", "default"')).toBeLessThan(i('gtag("consent", "update", update)'));
+    expect(i('gtag("consent", "update", update)')).toBeLessThan(i("lx_ads_consent: update.ad_storage"));
+    expect(i("lx_ads_consent: update.ad_storage")).toBeLessThan(i('event: "gtm.js"'));
+    expect(src).toContain("consentModeUpdate(choice, window.location.pathname)");
+    // "Rechazar todo" con el mismo estilo que "Aceptar todo".
+    expect(src).toMatch(/setConsent\(all\("denied"\)\)\} className=\{button\}/);
+    expect(src).toMatch(/setConsent\(all\("granted"\)\)\} className=\{button\}/);
+    // Por defecto, todo rechazado.
+    expect(src).toContain('useState<ConsentState>({ analytics: "denied", ads: "denied" })');
+  });
+
+  it("al rechazar Analítica se borran GA4, Clarity, PostHog y lx_ft; al rechazar Publicidad, Google Ads y Meta", () => {
+    for (const c of ["_ga", "_ga_ABC123", "_gid", "_clck", "_clsk", "ph_phc_x_posthog", "lx_ft"]) {
       expect(ANALYTICS_COOKIE_RE.test(c), c).toBe(true);
+      expect(ADS_COOKIE_RE.test(c), c).toBe(false);
+    }
+    for (const c of ["_gcl_au", "_gcl_aw", "_fbp", "_fbc"]) {
+      expect(ADS_COOKIE_RE.test(c), c).toBe(true);
+      expect(ANALYTICS_COOKIE_RE.test(c), c).toBe(false);
     }
     for (const c of ["lx_consent", "sb-access-token", "NEXT_LOCALE", "gallery_view"]) {
       expect(ANALYTICS_COOKIE_RE.test(c), c).toBe(false);
+      expect(ADS_COOKIE_RE.test(c), c).toBe(false);
     }
   });
 
@@ -300,15 +382,23 @@ describe("consentimiento: lo que concede 'Aceptar' y lo que se borra al rechazar
     expect(consentTools({ gtmId: null, posthogKey: key }, "en")).toBe("PostHog");
   });
 
-  it("el aviso con GTM dice exactamente el texto aprobado (2026-10-16), en EN y ES", () => {
+  it("el aviso con GTM dice exactamente el texto de la v4 (2026-10-24), en EN y ES", () => {
     const c = { gtmId: "GTM-5KGLHNL4", posthogKey: null };
     const msg = (lang: "en" | "es") => t(lang).cookieNotice.consentMessage.replace("{tools}", consentTools(c, lang));
     expect(msg("en")).toBe(
-      "We use essential cookies to run the site. With your permission, we also use analytics cookies (Google Analytics and Microsoft Clarity, which records how pages are used with personal information hidden) to improve the site. No advertising cookies.",
+      "We use essential cookies to run the site. With your permission, we also use analytics cookies (Google Analytics and Microsoft Clarity, which records how pages are used with personal information hidden) to improve the site, and advertising cookies (Meta and Google Ads) to measure our campaigns and show you our ads. You can accept or reject each category.",
     );
     expect(msg("es")).toBe(
-      "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica (Google Analytics y Microsoft Clarity, que graba cómo se usan las páginas con tu información personal oculta) para mejorar el sitio. No usamos cookies de publicidad.",
+      "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica (Google Analytics y Microsoft Clarity, que graba cómo se usan las páginas con tu información personal oculta) para mejorar el sitio, y cookies de publicidad (Meta y Google Ads) para medir nuestras campañas y mostrarte nuestros anuncios. Puedes aceptar o rechazar cada categoría.",
     );
+    // Sin GTM (solo PostHog) no hay publicidad: ni en el texto ni como categoría.
+    for (const lang of ["en", "es"] as const) {
+      expect(t(lang).cookieNotice.consentMessageAnalyticsOnly).not.toMatch(/Meta|Google Ads/);
+    }
+    const layout = readFileSync(join(process.cwd(), "src/app/[lang]/layout.tsx"), "utf8");
+    expect(layout).toContain("ads: analytics.gtmId ? cookieCopy.categoryAds : null,");
+    expect(t("es").cookieNotice.consentRejectAll).toBe("Rechazar todo");
+    expect(t("en").cookieNotice.consentRejectAll).toBe("Reject all");
     expect(t("en").cookieNotice.learnMore).toBe("Cookie Policy");
     expect(t("es").cookieNotice.learnMore).toBe("Política de cookies");
     for (const lang of ["en", "es"] as const) expect(msg(lang)).not.toMatch(/!|\p{Extended_Pictographic}/u);
@@ -476,7 +566,7 @@ describe("política de cookies según el estado real", () => {
     }
   });
 
-  it("nombra exactamente lo que el sitio carga: GA4 y Clarity con GTM, PostHog con su variable, nunca publicidad", async () => {
+  it("nombra exactamente lo que el sitio carga: GA4, Clarity, Meta y Google Ads con GTM; PostHog con su variable", async () => {
     const { cookiesDoc, cookiesDocFor } = await import("@/lib/legal/cookies");
     const noAds = { en: /We do not use advertising or targeting cookies/, es: /No utilizamos cookies de publicidad/ };
     for (const lang of ["en", "es"] as const) {
@@ -492,11 +582,19 @@ describe("política de cookies según el estado real", () => {
       expect(soloPosthog).toMatch(/PostHog/);
       for (const ausente of [/Google Analytics/, /Clarity/]) expect(soloPosthog).not.toMatch(ausente);
 
-      // Google Ads y Meta no aparecen en ninguna variante, y 3.5 siempre dice que no hay publicidad.
-      for (const doc of [ambos, soloGtm, soloPosthog, JSON.stringify(cookiesDoc[lang])]) {
-        expect(doc).not.toMatch(/Google Ads|Meta Pixel|Meta \(|_gcl_au|_fbp/);
+      // Con GTM: categoría Publicidad con sus cuatro cookies. Sin GTM: sin publicidad.
+      for (const doc of [ambos, soloGtm]) {
+        for (const c of ["_fbp", "_fbc", "_gcl_au", "_gcl_aw", "Meta Platforms, Inc.", "Google LLC (Google Ads)"]) {
+          expect(doc, c).toContain(c);
+        }
+        expect(doc).not.toMatch(noAds[lang]);
+      }
+      for (const doc of [soloPosthog, JSON.stringify(cookiesDoc[lang])]) {
+        expect(doc).not.toMatch(/Google Ads|Meta Platforms|_gcl_au|_fbp/);
         expect(doc).toMatch(noAds[lang]);
-        // Sentry declarado como herramienta técnica, en todas las variantes.
+      }
+      // Sentry declarado como herramienta técnica, en todas las variantes.
+      for (const doc of [ambos, soloGtm, soloPosthog, JSON.stringify(cookiesDoc[lang])]) {
         expect(doc).toMatch(/Sentry \(Functional Software, Inc\.\)/);
       }
     }

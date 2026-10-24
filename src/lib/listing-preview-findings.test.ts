@@ -73,8 +73,8 @@ describe("hallazgos de preview (paso 1, validación, cookies, seller_leads)", ()
     expect(page).toMatch(/data-step-notice\s+href=\{step1SignInHref/);
   });
 
-  it("la política de cookies lleva su propia fecha (v2, 2026-10-18); la DMCA no cambia", () => {
-    expect(COOKIES_LAST_UPDATED).toBe("2026-10-18");
+  it("la política de cookies lleva su propia fecha (v4, 2026-10-24); la DMCA no cambia", () => {
+    expect(COOKIES_LAST_UPDATED).toBe("2026-10-24");
     expect(LEGAL_LAST_UPDATED).toBe("2026-09-02");
     expect(read("src/app/[lang]/cookies/page.tsx")).toContain('docId="cookies"');
   });

@@ -2,7 +2,7 @@
 
 **Estado:** código listo y apagado.
 - **Cada herramienta por su lado (desde 2026-10-13):** `NEXT_PUBLIC_GTM_ID` activa GTM y `NEXT_PUBLIC_POSTHOG_KEY` activa PostHog, independientes. Una variable con forma inválida se ignora sola. Sin ninguna válida no se carga nada, `track()` no hace nada y queda el aviso de cookies de siempre.
-- **Opt-in en todas las regiones (decisión del owner, 2026-10-13):** el contenedor del CMO (`GTM-5KGLHNL4`) trae GA4 y Microsoft Clarity. Nada de eso se carga antes de "Aceptar"; al aceptar se concede **solo analítica**. **Google Ads y Meta no están aprobados (2026-10-15):** las señales `ad_*` de Consent Mode quedan denegadas, no aparecen en el banner ni en la política, y sus etiquetas deben quedar pausadas o eliminadas en el contenedor. Se descartó el modelo opt-out por región que propuso el CMO (GTM cargado para todos, concedido por defecto fuera de UE/UK/CH) y el `<noscript>` (se saltaría el consentimiento).
+- **Opt-in en todas las regiones (decisión del owner, 2026-10-13):** el contenedor del CMO (`GTM-5KGLHNL4`) trae GA4 y Microsoft Clarity. Nada de eso se carga antes de "Aceptar". **Publicidad (decisión del owner, 2026-10-24; reemplaza la del 2026-10-15):** el píxel de Meta y Google Ads se habilitan **solo** con el consentimiento opt-in de la categoría **Publicidad**, separada de **Analítica** en el banner (ver "Publicidad con consentimiento" abajo). Sigue sin haber pauta hasta Stripe live + DocuSign producción. Se descartó el modelo opt-out por región que propuso el CMO (GTM cargado para todos, concedido por defecto fuera de UE/UK/CH) y el `<noscript>` (se saltaría el consentimiento).
 - Activar = crear las cuentas + poner las variables en Vercel (Production) + redeploy, **con autorización del owner**.
 
 **Decisión del owner (2026-10-11):**
@@ -13,10 +13,10 @@
 | Regla | Dónde |
 |---|---|
 | Nada se carga sin consentimiento. "Aceptar" y "Rechazar" tienen el mismo estilo y tamaño. El banner aparece igual en pestañas en segundo plano | `src/components/analytics-consent.tsx` |
-| Consent Mode v2: todo denegado por defecto antes de `gtm.js` y, como solo se carga tras "Aceptar", todo concedido en la misma carga (`GRANTED_CONSENT`: analítica y publicidad) | `loadGtm()` |
+| Consent Mode v2: todo denegado por defecto antes de `gtm.js` y, en la misma carga, la elección guardada por categoría (`consentModeUpdate`): `analytics_storage` según Analítica; `ad_storage`, `ad_user_data` y `ad_personalization` juntas según Publicidad, y siempre denegadas en las rutas sin publicidad. Antes de `gtm.js` se empuja además `{ event: "lx_consent", lx_analytics_consent, lx_ads_consent }` | `loadGtm()` |
 | Sin consentimiento, `track()` no hace nada ni encola eventos. Con consentimiento, retiene lo de PostHog mientras su SDK carga | `src/lib/analytics.ts` |
 | La analítica **no corre en `/admin`** (sus URLs llevan ids de leads) | `isAnalyticsExcludedPath()` |
-| Al rechazar o retirar el consentimiento ("Configurar cookies" en el pie) se borran las cookies de nuestro dominio de GA4 (`_ga*`, `_gid`), Google Ads (`_gcl_*`), Meta (`_fbp`, `_fbc`), Clarity (`_clck`, `_clsk`) y PostHog (`ph_*`), y el almacenamiento de PostHog | `clearAnalyticsStorage()` / `ANALYTICS_COOKIE_RE` |
+| Al rechazar Analítica se borran las cookies de nuestro dominio de GA4 (`_ga*`, `_gid`), Clarity (`_clck`, `_clsk`), PostHog (`ph_*`, y su almacenamiento) y `lx_ft`; al rechazar Publicidad, las de Google Ads (`_gcl_*`) y Meta (`_fbp`, `_fbc`). "Configurar cookies" en el pie borra la elección y recarga: todo vuelve a denegado hasta elegir de nuevo | `clearStorage()` / `ANALYTICS_COOKIE_RE` / `ADS_COOKIE_RE` |
 | PostHog **sin autocapture** (no lee textos, imágenes ni URLs de fichas del MLS), **sin grabación de sesión**, sin heatmaps, rage/dead clicks, rendimiento, errores, encuestas ni experimentos; texto enmascarado; sin título de página; `person_profiles: identified_only` | `loadPosthog()` |
 | URLs **sin parámetros ni fragmento** en PostHog (`$current_url`, referrers) | `sanitizeUrl()` |
 | **Un pageview por ruta y por herramienta**, con la URL sin parámetros: `$pageview` en PostHog y el evento `lx_page_view` en el dataLayer para GA4. El Google tag **no** debe enviar su page_view automático (ver paso 1) | `pageview()` |
@@ -110,7 +110,17 @@ El sitio solo carga GTM cuando la persona ya aceptó, pero **lo que hace cada et
      - las fotos del inmueble en `/listing` (la cuadrícula del paso 5 y las miniaturas del paso 6).
      - DocuSign y Stripe ocurren fuera del sitio.
 3. **`/admin`** nunca carga GTM (lo impide el código).
-4. **Antes de publicar etiquetas de publicidad:** la política de privacidad dice que Lixtara "no comparte información personal para publicidad conductual de contexto cruzado" (sección de California). Con remarketing de Meta/Google eso deja de ser cierto: el abogado tiene que actualizar ese párrafo ese mismo día. La política de **cookies** ya cambia sola a la variante con publicidad cuando `NEXT_PUBLIC_GTM_ID` está configurado (borrador pendiente de revisión).
+4. **Publicidad:** ver "Publicidad con consentimiento (2026-10-24)". La Privacidad v4 (§4.6, §6.2, §6.3, §9.1) y la Cookies v4 ya describen Meta y Google Ads con consentimiento (pendientes de revisión del abogado: `docs/legal/2026-10-24-textos-v4-memo.md`).
+
+### Publicidad con consentimiento (2026-10-24)
+Desde la v4, **GTM se carga si la persona aceptó al menos una categoría**: alguien puede aceptar Publicidad y rechazar Analítica. Por eso el contenedor tiene que separar las categorías **antes** de que el código llegue a Production; si no, una persona que solo acepta Publicidad cargaría GA4 y Clarity:
+1. **GA4 y Clarity:** *Consent settings* → exigir `analytics_storage`; además, condición de disparo `lx_analytics_consent` = `granted` (variable de capa de datos). Clarity no lee Consent Mode de forma fiable: la condición del disparador es la barrera.
+2. **Meta Pixel (plantilla de la galería) y Google Ads (conversiones y remarketing):** *Consent settings* → exigir `ad_storage`, `ad_user_data` y `ad_personalization`; condición de disparo `lx_ads_consent` = `granted`. El píxel de Meta no lee Consent Mode: la condición del disparador es la barrera.
+3. **Rutas sin publicidad:** en `/listing`, `/account`, `/auth`, `/sign-in`, `/sign-up`, `/dashboard` y `/admin` el código deja las tres señales `ad_*` en `denied` y `lx_ads_consent` = `denied` aunque haya consentimiento (`isAdsExcludedPath`). Cruzar ese límite con Publicidad aceptada fuerza carga completa (`RecordingGuard` / `needsFullLoad`). La excepción por `Page Path` del punto 2 de arriba queda como respaldo.
+4. **Eventos propios:** `track()` y `lx_page_view` salen **solo con Analítica**. Con Publicidad sola, Meta y Ads usan los disparadores de GTM (p. ej. *All Pages* / *History Change*) y no reciben los `lx_*`. Si el CMO quiere conversiones de Meta con eventos `lx_*` sin Analítica, es una decisión aparte.
+5. **Stripe:** la metadata del Checkout lleva `ads_consent` y, **solo con Publicidad aceptada**, `fbp`, `fbc` y `gclid` (de `_gcl_aw`). El `purchase` de GA4 por Measurement Protocol manda `ad_user_data` / `ad_personalization` = `GRANTED` solo si `ads_consent` = `granted`.
+6. **API de Conversiones de Meta:** la Privacidad v4 (§6.2) la describe (correo con hash SHA-256, IP y user agent, solo con Publicidad aceptada). **No está implementada** en el código: el envío desde el servidor es trabajo aparte, y debe leer el consentimiento de Publicidad guardado (como la metadata de Stripe), nunca suponerlo.
+7. **Valores viejos de `lx_consent`:** `granted` / `denied` (antes de la v4, solo analítica) se leen con Publicidad **denegada** y el banner no vuelve a salir; quien quiera publicidad la acepta en "Configurar cookies".
 
 ## Apagar
 Borrar `NEXT_PUBLIC_GTM_ID` y `NEXT_PUBLIC_POSTHOG_KEY` en Vercel y hacer Redeploy. Vuelve el aviso informativo y la política sin analítica. Las cookies ya puestas expiran solas, o se borran si el visitante pulsa "Configurar cookies".
@@ -168,7 +178,7 @@ Cambio solo en el contenedor; el código no cambió.
 - **Campañas de Instantly:** prefijo `lx_` en `utm_campaign` (ver "Enlace de Instantly").
 
 ### Pendiente para cuando se active Google Ads
-- **Política de cookies y banner:** mencionar `gclid`, `gbraid` y `wbraid` (IDs de clic de Google Ads que la etiqueta `page_view` conserva en `page_location` y envía a GA4). Hoy Google Ads no está aprobado y la política dice que no se usa publicidad; el texto se cambia el mismo día en que se active, junto con el párrafo de privacidad del punto 4 de "Contenedor del CMO".
+- **Política de cookies y banner:** mencionar `gclid`, `gbraid` y `wbraid` (IDs de clic de Google Ads que la etiqueta `page_view` conserva en `page_location` y envía a GA4). La Cookies v4 ya nombra el `gclid` en `_gcl_aw`; `gbraid` / `wbraid` en `page_location` siguen pendientes (ver el memo v4).
 
 ## Spec de eventos del CMO (2026-10-19 y 10-20, GTM-5KGLHNL4 v12)
 Nombres y valores que GTM y GA4 esperan tal cual; cambiar uno parte los datos en dos, así que se avisa al CMO **antes**. Lo fija `src/lib/analytics-cmo-spec.test.ts`.

@@ -38,14 +38,17 @@ export const LEGAL_V2_PUBLISHED = "2026-10-18";
 /** Terms of Service v2: §14/§15 sin límite para fraude y deberes no limitables; §16 remite al Early Termination Addendum. */
 export const TERMS_LAST_UPDATED = LEGAL_V2_PUBLISHED;
 
-/** Cookie Policy v2: tablas con las cookies reales y la variante según la analítica configurada. */
-export const COOKIES_LAST_UPDATED = LEGAL_V2_PUBLISHED;
+/** v4 (2026-10-24): Privacidad y Cookies con la categoría Publicidad (Meta y Google Ads). */
+export const LEGAL_V4_PUBLISHED = "2026-10-24";
+
+/** Cookie Policy v4: categoría Publicidad (_fbp, _fbc, _gcl_au, _gcl_aw), por separado de Analítica. */
+export const COOKIES_LAST_UPDATED = LEGAL_V4_PUBLISHED;
 
 /** Disclaimers (Avisos Legales) v2: aviso IDX, valuaciones, registros públicos e IA. */
 export const DISCLAIMERS_LAST_UPDATED = LEGAL_V2_PUBLISHED;
 
-/** Privacy Policy v2: §2.3 registros públicos y proveedores de datos; §4.1 desde providers.ts. */
-export const PRIVACY_LAST_UPDATED = LEGAL_V2_PUBLISHED;
+/** Privacy Policy v4: §4.6 compartición para publicidad con consentimiento, §6.2 API de Conversiones de Meta, §6.3 retiro, §9.1. */
+export const PRIVACY_LAST_UPDATED = LEGAL_V4_PUBLISHED;
 
 /** Avisos de corretaje, vivienda justa y fraude (/notices), primera publicación. */
 export const NOTICES_LAST_UPDATED = LEGAL_V2_PUBLISHED;

@@ -68,10 +68,15 @@ describe("páginas legales: todas, en los dos idiomas, desde una sola configurac
     }
   });
 
-  it("versión 2026-10-18-v2 en Términos, Privacidad, Cookies, Avisos legales, Avisos de corretaje y Accesibilidad", () => {
-    for (const id of ["terms", "privacy", "cookies", "disclaimers", "notices", "accessibility"] as const) {
+  it("versión 2026-10-18-v2 en Términos, Avisos legales, Avisos de corretaje y Accesibilidad; v4 en Privacidad y Cookies", () => {
+    for (const id of ["terms", "disclaimers", "notices", "accessibility"] as const) {
       expect(LEGAL_DOCS[id].version, id).toBe("2026-10-18-v2");
       expect(LEGAL_DOCS[id].updated, id).toBe("2026-10-18");
+    }
+    // 2026-10-24: categoría Publicidad (Meta y Google Ads); los Términos no cambian.
+    for (const id of ["privacy", "cookies"] as const) {
+      expect(LEGAL_DOCS[id].version, id).toBe("2026-10-24-v4");
+      expect(LEGAL_DOCS[id].updated, id).toBe("2026-10-24");
     }
   });
 
@@ -218,18 +223,49 @@ describe("Términos: precios y plazos de pricing-tiers, nombre y correos de brok
   });
 });
 
-describe("cookies: sin publicidad, en el aviso y en la política (mientras Clarity esté pausado)", () => {
-  it("todas las variantes dicen que no usamos cookies de publicidad", () => {
+describe("cookies: publicidad solo con consentimiento, en el aviso y en la política (v4, 2026-10-24)", () => {
+  it("con GTM: categoría Publicidad con Meta y Google Ads; sin GTM: no hay publicidad", () => {
     for (const lang of LANGS) {
       for (const t of TOOL_VARIANTS) {
-        expect(JSON.stringify(cookiesDocFor(lang, t))).toMatch(
-          lang === "en" ? /We do not use advertising or targeting cookies/ : /No utilizamos cookies de publicidad/,
-        );
+        const doc = JSON.stringify(cookiesDocFor(lang, t));
+        const noAds = lang === "en" ? /We do not use advertising or targeting cookies/ : /No utilizamos cookies de publicidad/;
+        if (t.gtm) {
+          expect(doc, `${lang} ${JSON.stringify(t)}`).not.toMatch(noAds);
+          expect(doc).toMatch(lang === "en" ? /Advertising Cookies \(only with your consent\)/ : /Cookies de Publicidad \(solo con su consentimiento\)/);
+          for (const c of ["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]) expect(doc, c).toContain(c);
+        } else {
+          expect(doc, `${lang} ${JSON.stringify(t)}`).toMatch(noAds);
+        }
       }
     }
     expect(cookiesDocFor("en", TOOL_VARIANTS[0])).toBe(cookiesDoc.en);
-    expect(dictionaries.en.cookieNotice.consentMessage).toContain("No advertising cookies.");
-    expect(dictionaries.es.cookieNotice.consentMessage).toContain("No usamos cookies de publicidad.");
+    // El aviso ya no dice que no hay publicidad: nombra la categoría.
+    expect(dictionaries.en.cookieNotice.consentMessage).not.toContain("No advertising cookies.");
+    expect(dictionaries.es.cookieNotice.consentMessage).not.toContain("No usamos cookies de publicidad.");
+    expect(dictionaries.en.cookieNotice.consentMessage).toContain("advertising cookies (Meta and Google Ads)");
+    expect(dictionaries.es.cookieNotice.consentMessage).toContain("cookies de publicidad (Meta y Google Ads)");
+    expect(dictionaries.es.cookieNotice.consentMessage).toContain("{tools}");
+  });
+
+  it("las cuatro cookies de publicidad duran 90 días, según Meta y Google", () => {
+    for (const lang of LANGS) {
+      const ads = cookiesDocFor(lang, { gtm: true, posthog: false }).sections.find((s) => s.id === "advertising")!;
+      expect(ads.table!.rows.map((r) => r[0])).toEqual(["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]);
+      for (const r of ads.table!.rows) expect(r[3], r[0]).toMatch(lang === "en" ? /^90 days/ : /^90 días/);
+    }
+  });
+
+  it("privacidad: compartición para publicidad solo con consentimiento, API de Conversiones y retiro", () => {
+    for (const lang of LANGS) {
+      const s = JSON.stringify(fillLegalDoc(privacyDoc[lang]));
+      expect(s).toContain("SHA-256");
+      expect(s).toMatch(lang === "en" ? /Conversions API/ : /API de Conversiones/);
+      expect(s).toMatch(lang === "en" ? /IP address and your browser's user agent/ : /dirección IP y el agente de usuario/);
+      expect(s).toContain("Meta Platforms, Inc.");
+      expect(s).toContain("Google LLC (Google Ads)");
+      // Ya no afirma que no comparte para publicidad dirigida.
+      expect(s).not.toMatch(/do not currently share|actualmente no compart/i);
+    }
   });
 
   it("la tabla de cookies necesarias nombra las cookies reales del sitio", () => {
