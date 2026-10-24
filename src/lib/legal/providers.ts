@@ -76,9 +76,9 @@ export const PRIVACY_PROVIDERS: PrivacyProvider[] = [
   },
   {
     id: "meta",
-    name: "Meta Platforms, Inc. (Meta pixel and Conversions API)",
-    purpose_en: "measurement of our advertising campaigns and Lixtara ads on Facebook, Instagram and other apps, only if you accept advertising cookies; with that consent, our server may send Meta a hashed email address, IP address and browser user agent (see Section 6.2)",
-    purpose_es: "medición de nuestras campañas de publicidad y anuncios de Lixtara en Facebook, Instagram y otras aplicaciones, solo si usted acepta las cookies de publicidad; con ese consentimiento, nuestro servidor puede enviar a Meta el correo convertido en hash, la dirección IP y el agente de usuario del navegador (consulte la Sección 6.2)",
+    name: "Meta Platforms, Inc. (Meta pixel)",
+    purpose_en: "measurement of our advertising campaigns and Lixtara ads on Facebook, Instagram and other apps, only if you accept advertising cookies (see Section 6.2)",
+    purpose_es: "medición de nuestras campañas de publicidad y anuncios de Lixtara en Facebook, Instagram y otras aplicaciones, solo si usted acepta las cookies de publicidad (consulte la Sección 6.2)",
     policyUrl: "https://www.facebook.com/privacy/policy/",
     // Se carga solo por Google Tag Manager; el marcador es su cookie en el código.
     codeMarkers: ["_fbp"],

@@ -14,6 +14,7 @@ import {
 } from "@/lib/analytics";
 import {
   ADS_COOKIE_RE, ANALYTICS_COOKIE_RE, analyticsConfig, consentCookieValue, consentModeUpdate, consentTools,
+  effectiveConsent, gpcEnabled,
   isAdsExcludedPath, isAnalyticsExcludedPath, isRecordingExcludedPath, needsFullLoad, readAdsConsent, readConsent,
   readConsentState,
   sanitizePosthogProperties, sanitizeUrl,
@@ -340,6 +341,38 @@ describe("consentimiento: lo que concede cada categoría y lo que se borra al re
     }
   });
 
+  it("Global Privacy Control: Publicidad denegada (las 3 señales); Analítica no cambia", () => {
+    const all = { analytics: "granted", ads: "granted" } as const;
+    expect(consentModeUpdate(all, "/en", true)).toEqual({
+      ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "granted",
+    });
+    expect(consentModeUpdate({ analytics: "denied", ads: "granted" }, "/es/properties", true)).toEqual({
+      ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "denied",
+    });
+    expect(effectiveConsent(all, true)).toEqual({ analytics: "granted", ads: "denied" });
+    expect(effectiveConsent(all, false)).toEqual(all);
+    expect(gpcEnabled({ globalPrivacyControl: true })).toBe(true);
+    expect(gpcEnabled({ globalPrivacyControl: false })).toBe(false);
+    expect(gpcEnabled({})).toBe(false);
+    expect(gpcEnabled("1")).toBe(true);
+    expect(gpcEnabled("0")).toBe(false);
+    expect(gpcEnabled(null)).toBe(false);
+  });
+
+  it("el banner con GPC: Publicidad no se puede aceptar y lo dice en esa categoría", () => {
+    const src = readFileSync(join(process.cwd(), "src/components/analytics-consent.tsx"), "utf8");
+    expect(src).toContain("consentModeUpdate(choice, window.location.pathname, gpcEnabled(navigator))");
+    expect(src).toContain('const blocked = c.key === "ads" && gpc;');
+    expect(src).toContain("disabled={blocked}");
+    expect(src).toContain("{props.labels.gpcNote}");
+    expect(src).toContain("setConsent(effectiveConsent(draft, gpc))");
+    expect(src).toContain("const state = effectiveConsent(");
+    expect(t("es").cookieNotice.gpcNote).toBe("Tu navegador pidió no compartir datos para publicidad.");
+    expect(t("en").cookieNotice.gpcNote).toBe("Your browser asked not to share data for advertising.");
+    const guard = readFileSync(join(process.cwd(), "src/components/recording-guard.tsx"), "utf8");
+    expect(guard).toContain('ads: s?.ads === "granted" && !gpcEnabled(navigator)');
+  });
+
   it("el banner aplica la elección guardada antes de gtm.js, con lx_ads_consent para GTM", () => {
     const src = readFileSync(join(process.cwd(), "src/components/analytics-consent.tsx"), "utf8");
     const i = (s: string) => src.indexOf(s);
@@ -347,7 +380,6 @@ describe("consentimiento: lo que concede cada categoría y lo que se borra al re
     expect(i('gtag("consent", "default"')).toBeLessThan(i('gtag("consent", "update", update)'));
     expect(i('gtag("consent", "update", update)')).toBeLessThan(i("lx_ads_consent: update.ad_storage"));
     expect(i("lx_ads_consent: update.ad_storage")).toBeLessThan(i('event: "gtm.js"'));
-    expect(src).toContain("consentModeUpdate(choice, window.location.pathname)");
     // "Rechazar todo" con el mismo estilo que "Aceptar todo".
     expect(src).toMatch(/setConsent\(all\("denied"\)\)\} className=\{button\}/);
     expect(src).toMatch(/setConsent\(all\("granted"\)\)\} className=\{button\}/);

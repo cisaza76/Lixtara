@@ -17,7 +17,7 @@ Se habilitan el píxel de Meta y Google Ads **solo** con consentimiento opt-in d
 |---|---|---|
 | Aviso de cookies (banner) | — | Dos categorías (Analítica y Publicidad) con "Aceptar" y "Rechazar" del mismo peso visual en cada una; "Rechazar todo", "Guardar elección" y "Aceptar todo" con el mismo estilo. Todo rechazado por defecto. Se quita "No usamos cookies de publicidad". |
 | Política de Cookies | 2026-10-18-v2 → **2026-10-24-v4** | §2, §4 y §8 por categoría; §6 pasa a "Cookies de Publicidad (solo con su consentimiento)" con `_fbp`, `_fbc` (Meta) y `_gcl_au`, `_gcl_aw` (Google Ads); `lx_consent` guarda las dos elecciones. Sin GTM la política sigue diciendo que no hay publicidad. |
-| Política de Privacidad | 2026-10-18-v2 → **2026-10-24-v4** | §4.1 suma Meta y Google Ads; §4.6 reescrita (compartición para publicidad solo con consentimiento, cómo negarse); §6.2 nueva (publicidad y API de Conversiones de Meta: correo con hash SHA-256, IP y user agent); §6.3 nueva (retiro); §9.1 California. |
+| Política de Privacidad | 2026-10-18-v2 → **2026-10-24-v4** | §4.1 suma Meta (píxel) y Google Ads; §4.6 reescrita (compartición para publicidad solo con consentimiento, cómo negarse); §6.2 nueva (publicidad y medición de campañas); §6.3 nueva (retiro); §9.1 California, con Global Privacy Control. **Sin** la API de Conversiones de Meta: no existe, y su texto se agrega en el mismo PR que la construya. |
 | Términos | sin cambios (2026-10-18-v2) | No mencionan cookies ni publicidad. |
 | Casilla de registro | versión `terms-2026-10-18-v2+privacy-2026-10-24-v4` | Mismo texto (mismo hash); cambia la versión de la Privacidad que se acepta. La v2 queda registrada como anterior. |
 
@@ -27,23 +27,20 @@ Se habilitan el píxel de Meta y Google Ads **solo** con consentimiento opt-in d
 - **Aceptar Publicidad** → `ad_storage`, `ad_user_data` y `ad_personalization` = `granted`. La elección se guarda en `lx_consent` y se reaplica en cada carga antes de GTM.
 - **Rutas sin publicidad:** `/listing`, `/account`, `/auth`, `/sign-in`, `/sign-up`, `/dashboard` y `/admin` quedan con publicidad denegada aunque se haya aceptado, con carga completa al entrar y al salir.
 - **Retiro:** "Configurar cookies" (pie) borra la elección y recarga; todo vuelve a denegado hasta elegir de nuevo. Rechazar una categoría borra sus cookies en nuestro dominio.
-- **Stripe:** `_fbp`, `_fbc` y `gclid` van a la metadata del Checkout solo con Publicidad aceptada.
+- **Global Privacy Control:** si el navegador manda GPC, la Publicidad queda rechazada: no se puede aceptar y el aviso dice "Tu navegador pidió no compartir datos para publicidad". La Analítica no cambia.
+- **Stripe:** `_fbp`, `_fbc` y `gclid` van a la metadata del Checkout solo con Publicidad aceptada y sin GPC (header `Sec-GPC`).
 
 ## Preguntas para el abogado
 
 1. **¿"Venta" o solo "compartir"?** La v4 sigue diciendo "no vendemos su información personal por dinero" y llama "compartir" a lo que va a Meta y Google. Bajo la CCPA, los datos de un píxel a cambio de servicios de publicidad pueden considerarse "venta" (contraprestación no monetaria). ¿Basta la redacción actual, o hay que decir "vender o compartir" y ofrecer un enlace "Do Not Sell or Share"?
-2. **Global Privacy Control (GPC).** El sitio no lee la señal GPC. Para negocios cubiertos por la CCPA es una solicitud válida de exclusión. Recomendación técnica: tratar GPC como Publicidad rechazada. ¿Hace falta antes de la pauta? Ver también §12 (Do Not Track), que no cambia.
-3. **Florida Digital Bill of Rights.** ¿Aplica a Lixtara (umbrales)? Si aplica, la publicidad dirigida exige un opt-out; aquí ya es opt-in.
-4. **API de Conversiones de Meta (§6.2).** Describe lo que pidió el owner: el correo con hash SHA-256, la IP y el user agent, solo con Publicidad aceptada, para atribuir registros y compras. **Este envío no está implementado todavía**: la política lo anuncia como algo que "podemos" hacer. ¿Publicarla antes de implementarlo? Nota de redacción: el pedido decía "cifrado con SHA-256". SHA-256 es un hash, no un cifrado, y el correo con hash sigue siendo dato personal. El texto lo dice así.
-5. **Condiciones de Herramientas para Empresas de Meta** (https://www.facebook.com/legal/terms/businesstools) y políticas de Google Ads: exigen aviso y consentimiento. ¿Es suficiente lo de §6.2, §6.3 y la §6 de Cookies?
-6. **Duraciones.**
-   - **Fuentes oficiales consultadas el 2026-10-24:**
-     - `_gcl_au` y `_gcl_aw`: 90 días, en la página de Google sobre cookies publicitarias (https://business.safety.google/adscookies/).
-     - `_fbc`: 90 días, según la guía de fbp/fbc de la API de Conversiones de Meta.
-     - `_fbp`: 90 días, según la Política de Cookies de Meta. Esta solo se pudo leer en una copia de 2026 y en archivos anteriores; la página de facebook.com no carga sin JavaScript.
-   - **Tabla:** las cuatro aparecen como "90 días (la fija Meta/Google)".
-7. **IDs de clic en GA4:** el contenedor (v10) conserva `gclid`, `gbraid` y `wbraid` en el `page_location` que va a GA4, incluso solo con Analítica aceptada. ¿Hay que mencionarlo en la §4 de Cookies, o pedir al CMO que los quite cuando Publicidad esté rechazada?
-8. **Elecciones anteriores.** Quien aceptó la analítica antes de la v4 queda con Publicidad **rechazada** y no se le vuelve a preguntar (la puede aceptar en "Configurar cookies"). ¿Conforme, o hay que volver a mostrar el banner a todos?
+2. **Florida Digital Bill of Rights.** ¿Aplica a Lixtara (umbrales)? Si aplica, la publicidad dirigida exige un opt-out; aquí ya es opt-in.
+3. **Condiciones de Herramientas para Empresas de Meta** (https://www.facebook.com/legal/terms/businesstools) y políticas de Google Ads: exigen aviso y consentimiento. ¿Basta lo de la §6.2 y la §6.3 de Privacidad y la §6 de Cookies? El píxel va con "automatic advanced matching" desactivado (runbook de analítica).
+4. **Duraciones** (solo fuentes oficiales, 2026-10-24).
+   - **Google:** `_gcl_au` y `_gcl_aw` duran 90 días, según su página de cookies publicitarias (https://business.safety.google/adscookies/).
+   - **Meta:** no publica el plazo de `_fbp` en una página oficial que se pueda comprobar. Para `_fbc`, su guía de fbp/fbc de la API de Conversiones solo recomienda 90 días a quien la pone desde su servidor. La tabla dice "aproximadamente 90 días (la fija Meta)" para las dos.
+5. **IDs de clic en GA4:** el contenedor (v10) conserva `gclid`, `gbraid` y `wbraid` en el `page_location` que va a GA4, incluso solo con Analítica aceptada. ¿Hay que mencionarlo en la §4 de Cookies, o pedir al CMO que los quite cuando Publicidad esté rechazada?
+6. **Elecciones anteriores.** Quien aceptó la analítica antes de la v4 queda con Publicidad **rechazada** y no se le vuelve a preguntar (la puede aceptar en "Configurar cookies"). ¿Conforme, o hay que volver a mostrar el banner a todos?
+7. **Do Not Track (§12).** Sin cambios: el sitio no responde a DNT y sí a Global Privacy Control (§9.1). ¿Conforme?
 
 ## Textos (generados del código)
 
@@ -53,11 +50,15 @@ Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también u
 
 Categorías: **Analítica** y **Publicidad**, cada una con [Rechazar] [Aceptar]. Botones: [Rechazar todo] [Guardar elección] [Aceptar todo]. Enlace: Política de cookies. Pie: Configurar cookies.
 
+Con Global Privacy Control, en la categoría Publicidad: "Tu navegador pidió no compartir datos para publicidad." ([Aceptar] desactivado).
+
 ## Aviso de cookies (EN, con GTM)
 
 We use essential cookies to run the site. With your permission, we also use analytics cookies (Google Analytics and Microsoft Clarity, which records how pages are used with personal information hidden) to improve the site, and advertising cookies (Meta and Google Ads) to measure our campaigns and show you our ads. You can accept or reject each category.
 
 Categorías: **Analytics** y **Advertising**, cada una con [Reject] [Accept]. Botones: [Reject all] [Save choices] [Accept all]. Enlace: Cookie Policy. Pie: Cookie settings.
+
+Con Global Privacy Control, en la categoría Advertising: "Your browser asked not to share data for advertising." ([Accept] desactivado).
 
 ## Política de Cookies v4 (ES), secciones que cambian
 
@@ -104,7 +105,7 @@ Solo si usted acepta la categoría Publicidad en el aviso de cookies, activamos,
 
 Aunque usted la haya aceptado, la publicidad no se activa en el proceso de publicación de su vivienda, en su cuenta, en el inicio de sesión y el registro, ni en su panel.
 
-Si acepta la publicidad, cuando se registra o paga podemos enviar a Meta, desde nuestro servidor, algunos datos para atribuir ese registro o pago a un anuncio. La Política de Privacidad (Sección 6.2) explica cuáles.
+Si su navegador envía la señal Global Privacy Control, la publicidad queda rechazada en ese navegador, aunque la acepte en el aviso (Política de Privacidad, Sección 9.1).
 
 Meta y Google pueden además poner cookies en sus propios dominios y las usan según sus propias políticas de privacidad. Las duraciones de la tabla las fijan Meta y Google.
 
@@ -112,8 +113,8 @@ Si usted acepta la analítica, Microsoft puede poner cookies en sus propios domi
 
 | Nombre | Proveedor | Finalidad | Duración |
 |---|---|---|---|
-| _fbp | Meta Platforms, Inc. | Identifica su navegador para medir nuestras campañas en Meta y mostrarle anuncios de Lixtara. | 90 días (la fija Meta) |
-| _fbc | Meta Platforms, Inc. | Guarda el identificador del clic cuando llega desde un anuncio de Meta (parámetro fbclid), para atribuir el registro o el pago a ese anuncio. | 90 días (la fija Meta) |
+| _fbp | Meta Platforms, Inc. | Identifica su navegador para medir nuestras campañas en Meta y mostrarle anuncios de Lixtara. | Aproximadamente 90 días (la fija Meta) |
+| _fbc | Meta Platforms, Inc. | Guarda el identificador del clic cuando llega desde un anuncio de Meta (parámetro fbclid), para atribuir el registro o el pago a ese anuncio. | Aproximadamente 90 días (la fija Meta) |
 | _gcl_au | Google LLC (Google Ads) | Mide las conversiones (registros y pagos) de nuestras campañas de Google Ads. | 90 días (la fija Google) |
 | _gcl_aw | Google LLC (Google Ads) | Guarda el identificador del clic cuando llega desde un anuncio de Google (parámetro gclid), para atribuir el registro o el pago a ese anuncio. | 90 días (la fija Google) |
 
@@ -171,7 +172,7 @@ Only if you accept the Advertising category in the cookie banner, we activate, t
 
 Even if you have accepted it, advertising is not activated in the listing flow for your home, in your account, in sign-in and sign-up, or in your dashboard.
 
-If you accept advertising, when you sign up or pay we may send Meta some data from our server to attribute that sign-up or payment to an ad. The Privacy Policy (Section 6.2) explains which data.
+If your browser sends the Global Privacy Control signal, advertising stays rejected in that browser, even if you accept it in the banner (Privacy Policy, Section 9.1).
 
 Meta and Google may also set cookies on their own domains and use them under their own privacy policies. The durations in the table are set by Meta and Google.
 
@@ -179,8 +180,8 @@ If you accept analytics, Microsoft may set cookies on its own domains (Section 4
 
 | Name | Provider | Purpose | Duration |
 |---|---|---|---|
-| _fbp | Meta Platforms, Inc. | Identifies your browser to measure our Meta campaigns and show you Lixtara ads. | 90 days (set by Meta) |
-| _fbc | Meta Platforms, Inc. | Stores the click identifier when you arrive from a Meta ad (fbclid parameter), to attribute a sign-up or payment to that ad. | 90 days (set by Meta) |
+| _fbp | Meta Platforms, Inc. | Identifies your browser to measure our Meta campaigns and show you Lixtara ads. | About 90 days (set by Meta) |
+| _fbc | Meta Platforms, Inc. | Stores the click identifier when you arrive from a Meta ad (fbclid parameter), to attribute a sign-up or payment to that ad. | About 90 days (set by Meta) |
 | _gcl_au | Google LLC (Google Ads) | Measures conversions (sign-ups and payments) from our Google Ads campaigns. | 90 days (set by Google) |
 | _gcl_aw | Google LLC (Google Ads) | Stores the click identifier when you arrive from a Google ad (gclid parameter), to attribute a sign-up or payment to that ad. | 90 days (set by Google) |
 
@@ -199,7 +200,7 @@ You can change your choice or withdraw your consent at any time through "Cookie 
 
 Lixtara no vende su información personal por dinero.
 
-Solo si usted acepta la categoría Publicidad en el aviso de cookies, compartimos identificadores en línea (como las cookies de Meta y de Google Ads) e información sobre su uso de nuestro sitio con Meta Platforms, Inc. y Google LLC y, según se describe en la Sección 6.2, algunos datos desde nuestro servidor con Meta, para medir nuestras campañas y mostrarle anuncios de Lixtara en otros sitios y aplicaciones. Según algunas leyes estatales, esto puede considerarse "compartir" información para publicidad conductual de contexto cruzado o "publicidad dirigida". Si usted no acepta la publicidad, no compartimos su información para estos fines.
+Solo si usted acepta la categoría Publicidad en el aviso de cookies, compartimos identificadores en línea (como las cookies de Meta y de Google Ads) e información sobre su uso de nuestro sitio con Meta Platforms, Inc. y Google LLC para medir nuestras campañas y mostrarle anuncios de Lixtara en otros sitios y aplicaciones. Según algunas leyes estatales, esto puede considerarse "compartir" información para publicidad conductual de contexto cruzado o "publicidad dirigida". Si usted no acepta la publicidad, no compartimos su información para estos fines.
 
 Puede negarse a esta compartición o detenerla en cualquier momento: rechace la categoría Publicidad en el aviso de cookies o retire su consentimiento en "Configurar cookies", en el pie del sitio. También puede escribirnos a privacy@lixtara.com.
 
@@ -207,26 +208,22 @@ Puede negarse a esta compartición o detenerla en cualquier momento: rechace la 
 
 Usamos el píxel de Meta (Meta Platforms, Inc.) y Google Ads (Google LLC) para medir nuestras campañas de publicidad y mostrarle anuncios de Lixtara en otros sitios y aplicaciones. Solo funcionan si usted acepta la categoría Publicidad en el aviso de cookies; hasta entonces, y si la rechaza, no se activan. La publicidad nunca se activa en el proceso de publicación de su vivienda, en su cuenta, en el inicio de sesión y el registro, ni en su panel, aunque usted la haya aceptado.
 
-Si usted aceptó la publicidad, cuando crea una cuenta o hace un pago nuestro servidor puede enviar a Meta, mediante su API de Conversiones, lo siguiente para atribuir ese registro o pago a un anuncio:
-
-- su correo electrónico, convertido en nuestros servidores en un código irreversible (un hash SHA-256) antes de enviarse; Meta lo usa para emparejar el evento con sus propias cuentas, y sigue siendo información personal;
-- su dirección IP y el agente de usuario de su navegador (el tipo de navegador y de dispositivo);
-- los identificadores de las cookies de Meta (_fbp y _fbc), si existen, y el tipo de evento (registro o pago) con su fecha y, en un pago, su importe.
+Si su navegador envía la señal Global Privacy Control, la publicidad queda rechazada en ese navegador (Sección 9.1).
 
 ### 6.3 Cómo Retirar su Consentimiento a la Publicidad
 
-Puede retirar su consentimiento en cualquier momento en "Configurar cookies", en el pie del sitio. A partir de ese momento, el píxel de Meta y Google Ads dejan de activarse, las cookies que pusieron en nuestro dominio se borran de su navegador y nuestro servidor deja de enviar sus datos a Meta para nuevos eventos. La información ya enviada la tratan Meta y Google según sus propias políticas: https://www.facebook.com/privacy/policy/ y https://policies.google.com/privacy
+Puede retirar su consentimiento en cualquier momento en "Configurar cookies", en el pie del sitio. A partir de ese momento, el píxel de Meta y Google Ads dejan de activarse y las cookies que pusieron en nuestro dominio se borran de su navegador. La información ya enviada la tratan Meta y Google según sus propias políticas: https://www.facebook.com/privacy/policy/ y https://policies.google.com/privacy
 
 ### 9.1 Residentes de California
 
 Si usted es residente de California, la Ley de Privacidad del Consumidor de California (CCPA), en su versión modificada por la Ley de Derechos de Privacidad de California (CPRA), puede otorgarle ciertos derechos sobre su información personal, según si esa ley nos aplica. Estos pueden incluir el derecho a saber qué información personal recopilamos, usamos y divulgamos; el derecho a solicitar la eliminación de su información personal; el derecho a corregir información personal inexacta; el derecho a oponerse a la venta o la compartición de información personal; y el derecho a no ser discriminado por ejercer sus derechos.
 
-Como se indica en la Sección 4.6, Lixtara no vende su información personal por dinero, y solo la comparte para publicidad conductual de contexto cruzado si usted acepta la categoría Publicidad en el aviso de cookies. Para oponerse a esa compartición, rechace esa categoría o retire su consentimiento en "Configurar cookies", en el pie del sitio. Para ejercer sus demás derechos en California, comuníquese con nosotros en privacy@lixtara.com.
+Como se indica en la Sección 4.6, Lixtara no vende su información personal por dinero, y solo la comparte para publicidad conductual de contexto cruzado si usted acepta la categoría Publicidad en el aviso de cookies. Para oponerse a esa compartición, rechace esa categoría o retire su consentimiento en "Configurar cookies", en el pie del sitio. También tratamos la señal Global Privacy Control (GPC) como una solicitud de exclusión: si su navegador la envía, la categoría Publicidad queda rechazada en ese navegador, aunque la acepte en el aviso de cookies, y el aviso lo indica; la analítica no cambia. Para ejercer sus demás derechos en California, comuníquese con nosotros en privacy@lixtara.com.
 
 ### 4.1 (líneas nuevas)
 
 - Google LLC (Google Ads): medición de nuestras campañas de publicidad y anuncios de Lixtara en otros sitios, solo si usted acepta las cookies de publicidad (consulte la Sección 6.2). Política de privacidad: https://policies.google.com/privacy
-- Meta Platforms, Inc. (Meta pixel and Conversions API): medición de nuestras campañas de publicidad y anuncios de Lixtara en Facebook, Instagram y otras aplicaciones, solo si usted acepta las cookies de publicidad; con ese consentimiento, nuestro servidor puede enviar a Meta el correo convertido en hash, la dirección IP y el agente de usuario del navegador (consulte la Sección 6.2). Política de privacidad: https://www.facebook.com/privacy/policy/
+- Meta Platforms, Inc. (Meta pixel): medición de nuestras campañas de publicidad y anuncios de Lixtara en Facebook, Instagram y otras aplicaciones, solo si usted acepta las cookies de publicidad (consulte la Sección 6.2). Política de privacidad: https://www.facebook.com/privacy/policy/
 
 ## Política de Privacidad v4 (EN), secciones que cambian
 
@@ -234,7 +231,7 @@ Como se indica en la Sección 4.6, Lixtara no vende su información personal por
 
 Lixtara does not sell your personal information for money.
 
-Only if you accept the Advertising category in the cookie banner, we share online identifiers (such as the Meta and Google Ads cookies) and information about your use of our site with Meta Platforms, Inc. and Google LLC, and, as described in Section 6.2, some information from our server with Meta, to measure our campaigns and show you Lixtara ads on other websites and apps. Under some state laws this may be considered "sharing" for cross-context behavioral advertising or "targeted advertising". If you do not accept advertising, we do not share your information for these purposes.
+Only if you accept the Advertising category in the cookie banner, we share online identifiers (such as the Meta and Google Ads cookies) and information about your use of our site with Meta Platforms, Inc. and Google LLC to measure our campaigns and show you Lixtara ads on other websites and apps. Under some state laws this may be considered "sharing" for cross-context behavioral advertising or "targeted advertising". If you do not accept advertising, we do not share your information for these purposes.
 
 You can refuse or stop this sharing at any time: reject the Advertising category in the cookie banner, or withdraw your consent through "Cookie settings" in the site footer. You can also write to us at privacy@lixtara.com.
 
@@ -242,24 +239,20 @@ You can refuse or stop this sharing at any time: reject the Advertising category
 
 We use the Meta pixel (Meta Platforms, Inc.) and Google Ads (Google LLC) to measure our advertising campaigns and to show you Lixtara ads on other websites and apps. They run only if you accept the Advertising category in the cookie banner; until then, and if you reject it, they are not activated. Advertising is never activated in the listing flow for your home, in your account, in sign-in and sign-up, or in your dashboard, even if you have accepted it.
 
-If you have accepted advertising, when you create an account or make a payment our server may send Meta, through its Conversions API, the following to attribute that sign-up or payment to an ad:
-
-- your email address, converted on our servers into an irreversible code (a SHA-256 hash) before it is sent; Meta uses it to match the event with its own accounts, and it is still personal information;
-- your IP address and your browser's user agent (the browser and device type);
-- the Meta cookie identifiers (_fbp and _fbc), if they exist, and the type of event (sign-up or payment) with its date and, for a payment, its amount.
+If your browser sends the Global Privacy Control signal, advertising stays rejected in that browser (Section 9.1).
 
 ### 6.3 Withdrawing Your Advertising Consent
 
-You can withdraw your consent at any time through "Cookie settings" in the site footer. From then on, the Meta pixel and Google Ads are no longer activated, the cookies they set on our domain are deleted from your browser, and our server no longer sends your data to Meta for new events. Information already sent is processed by Meta and Google under their own policies: https://www.facebook.com/privacy/policy/ and https://policies.google.com/privacy
+You can withdraw your consent at any time through "Cookie settings" in the site footer. From then on, the Meta pixel and Google Ads are no longer activated and the cookies they set on our domain are deleted from your browser. Information already sent is processed by Meta and Google under their own policies: https://www.facebook.com/privacy/policy/ and https://policies.google.com/privacy
 
 ### 9.1 California Residents
 
 If you are a California resident, the California Consumer Privacy Act (CCPA), as amended by the California Privacy Rights Act (CPRA), may give you certain rights regarding your personal information, depending on whether that law applies to us. These may include the right to know what personal information we collect, use, and disclose; the right to request deletion of your personal information; the right to correct inaccurate personal information; the right to opt out of the sale or sharing of personal information; and the right not to be discriminated against for exercising your rights.
 
-As stated in Section 4.6, Lixtara does not sell your personal information for money, and shares it for cross-context behavioral advertising only if you accept the Advertising category in the cookie banner. To opt out of that sharing, reject that category or withdraw your consent through "Cookie settings" in the site footer. To exercise your other California rights, contact us at privacy@lixtara.com.
+As stated in Section 4.6, Lixtara does not sell your personal information for money, and shares it for cross-context behavioral advertising only if you accept the Advertising category in the cookie banner. To opt out of that sharing, reject that category or withdraw your consent through "Cookie settings" in the site footer. We also treat the Global Privacy Control (GPC) signal as a request to opt out: if your browser sends it, the Advertising category stays rejected in that browser, even if you accept it in the cookie banner, and the cookie banner says so; analytics is not affected. To exercise your other California rights, contact us at privacy@lixtara.com.
 
 ### 4.1 (líneas nuevas)
 
 - Google LLC (Google Ads): measurement of our advertising campaigns and Lixtara ads on other websites, only if you accept advertising cookies (see Section 6.2). Privacy policy: https://policies.google.com/privacy
-- Meta Platforms, Inc. (Meta pixel and Conversions API): measurement of our advertising campaigns and Lixtara ads on Facebook, Instagram and other apps, only if you accept advertising cookies; with that consent, our server may send Meta a hashed email address, IP address and browser user agent (see Section 6.2). Privacy policy: https://www.facebook.com/privacy/policy/
+- Meta Platforms, Inc. (Meta pixel): measurement of our advertising campaigns and Lixtara ads on Facebook, Instagram and other apps, only if you accept advertising cookies (see Section 6.2). Privacy policy: https://www.facebook.com/privacy/policy/
 

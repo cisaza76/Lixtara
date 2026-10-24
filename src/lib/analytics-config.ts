@@ -42,11 +42,27 @@ export function readConsentState(cookieHeader: string): ConsentState | null {
 }
 
 /**
- * Consent Mode v2 para la página actual: analítica según su categoría; las tres señales de
- * publicidad juntas, según Publicidad, y siempre denegadas en las rutas sin publicidad.
+ * Global Privacy Control (decisión del owner 2026-10-24): si el navegador manda la señal
+ * (`navigator.globalPrivacyControl === true`, o el header `Sec-GPC: 1` en el servidor), la
+ * Publicidad queda denegada aunque la cookie diga otra cosa. La Analítica no cambia.
  */
-export function consentModeUpdate(s: ConsentState, pathname: string) {
-  const ads = s.ads === "granted" && !isAdsExcludedPath(pathname) ? "granted" : "denied";
+export function effectiveConsent(s: ConsentState, gpc: boolean): ConsentState {
+  return gpc ? { analytics: s.analytics, ads: "denied" } : s;
+}
+
+/** ¿El navegador manda Global Privacy Control? (`navigator` o el header `Sec-GPC`). */
+export function gpcEnabled(signal: object | string | null | undefined): boolean {
+  if (typeof signal === "string" || signal == null) return signal?.trim() === "1";
+  return (signal as { globalPrivacyControl?: unknown }).globalPrivacyControl === true;
+}
+
+/**
+ * Consent Mode v2 para la página actual: analítica según su categoría; las tres señales de
+ * publicidad juntas, según Publicidad, y siempre denegadas en las rutas sin publicidad y con
+ * Global Privacy Control.
+ */
+export function consentModeUpdate(s: ConsentState, pathname: string, gpc = false) {
+  const ads = s.ads === "granted" && !gpc && !isAdsExcludedPath(pathname) ? "granted" : "denied";
   return {
     ad_storage: ads,
     ad_user_data: ads,

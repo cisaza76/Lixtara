@@ -471,6 +471,7 @@ export default async function RootLayout({
               save: cookieCopy.consentSave,
               analytics: cookieCopy.categoryAnalytics,
               ads: analytics.gtmId ? cookieCopy.categoryAds : null,
+              gpcNote: cookieCopy.gpcNote,
               regionLabel: cookieCopy.regionLabel,
             }}
           />

@@ -1591,6 +1591,8 @@ export const dictionaries = {
       consentSave: "Save choices",
       categoryAnalytics: "Analytics",
       categoryAds: "Advertising",
+      // Global Privacy Control: la Publicidad queda rechazada y no se puede aceptar.
+      gpcNote: "Your browser asked not to share data for advertising.",
       settings: "Cookie settings",
     },
     quiz: {
@@ -3757,6 +3759,8 @@ export const dictionaries = {
       consentSave: "Guardar elección",
       categoryAnalytics: "Analítica",
       categoryAds: "Publicidad",
+      // Global Privacy Control: la Publicidad queda rechazada y no se puede aceptar.
+      gpcNote: "Tu navegador pidió no compartir datos para publicidad.",
       settings: "Configurar cookies",
     },
     quiz: {
