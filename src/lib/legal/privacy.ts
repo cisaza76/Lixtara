@@ -3,7 +3,8 @@ import { BROKERAGE, PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
 import { PRIVACY_PROVIDERS, providerBullet } from "./providers";
 
 // Política de Privacidad v4 (2026-10-24): publicidad con consentimiento (Meta y Google Ads,
-// §4.6, §6.2, §9.1). Pendiente de revisión del abogado: docs/legal/2026-10-24-textos-v4-memo.md.
+// §4.6, §6.2, §6.3) y Global Privacy Control (§9.1). La API de Conversiones de Meta NO está
+// aquí: se agrega en el mismo PR que la construya. Pendiente de revisión del abogado: docs/legal/2026-10-24-textos-v4-memo.md.
 // La v2 (2026-10-18) se publicó por decisión del owner: docs/legal/2026-10-18-textos-v2-memo.md. La lista de proveedores (§4.1)
 // sale de providers.ts, que providers.test.ts compara con el código.
 
@@ -130,7 +131,7 @@ export const privacyDoc: LegalContent = {
             heading: "4.6 No Sale of Personal Information; Sharing and Targeted Advertising",
             body: [
               "Lixtara does not sell your personal information for money.",
-              "Only if you accept the Advertising category in the cookie banner, we share online identifiers (such as the Meta and Google Ads cookies) and information about your use of our site with Meta Platforms, Inc. and Google LLC, and, as described in Section 6.2, some information from our server with Meta, to measure our campaigns and show you Lixtara ads on other websites and apps. Under some state laws this may be considered \"sharing\" for cross-context behavioral advertising or \"targeted advertising\". If you do not accept advertising, we do not share your information for these purposes.",
+              "Only if you accept the Advertising category in the cookie banner, we share online identifiers (such as the Meta and Google Ads cookies) and information about your use of our site with Meta Platforms, Inc. and Google LLC to measure our campaigns and show you Lixtara ads on other websites and apps. Under some state laws this may be considered \"sharing\" for cross-context behavioral advertising or \"targeted advertising\". If you do not accept advertising, we do not share your information for these purposes.",
               "You can refuse or stop this sharing at any time: reject the Advertising category in the cookie banner, or withdraw your consent through \"Cookie settings\" in the site footer. You can also write to us at {privacyEmail}.",
             ],
           },
@@ -167,18 +168,13 @@ export const privacyDoc: LegalContent = {
             heading: "6.2 Advertising and Campaign Measurement",
             body: [
               "We use the Meta pixel (Meta Platforms, Inc.) and Google Ads (Google LLC) to measure our advertising campaigns and to show you Lixtara ads on other websites and apps. They run only if you accept the Advertising category in the cookie banner; until then, and if you reject it, they are not activated. Advertising is never activated in the listing flow for your home, in your account, in sign-in and sign-up, or in your dashboard, even if you have accepted it.",
-              "If you have accepted advertising, when you create an account or make a payment our server may send Meta, through its Conversions API, the following to attribute that sign-up or payment to an ad:",
-            ],
-            bullets: [
-              "your email address, converted on our servers into an irreversible code (a SHA-256 hash) before it is sent; Meta uses it to match the event with its own accounts, and it is still personal information;",
-              "your IP address and your browser's user agent (the browser and device type);",
-              "the Meta cookie identifiers (_fbp and _fbc), if they exist, and the type of event (sign-up or payment) with its date and, for a payment, its amount.",
+              "If your browser sends the Global Privacy Control signal, advertising stays rejected in that browser (Section 9.1).",
             ],
           },
           {
             heading: "6.3 Withdrawing Your Advertising Consent",
             body: [
-              "You can withdraw your consent at any time through \"Cookie settings\" in the site footer. From then on, the Meta pixel and Google Ads are no longer activated, the cookies they set on our domain are deleted from your browser, and our server no longer sends your data to Meta for new events. Information already sent is processed by Meta and Google under their own policies: https://www.facebook.com/privacy/policy/ and https://policies.google.com/privacy",
+              "You can withdraw your consent at any time through \"Cookie settings\" in the site footer. From then on, the Meta pixel and Google Ads are no longer activated and the cookies they set on our domain are deleted from your browser. Information already sent is processed by Meta and Google under their own policies: https://www.facebook.com/privacy/policy/ and https://policies.google.com/privacy",
             ],
           },
         ],
@@ -220,7 +216,7 @@ export const privacyDoc: LegalContent = {
             heading: "9.1 California Residents",
             body: [
               "If you are a California resident, the California Consumer Privacy Act (CCPA), as amended by the California Privacy Rights Act (CPRA), may give you certain rights regarding your personal information, depending on whether that law applies to us. These may include the right to know what personal information we collect, use, and disclose; the right to request deletion of your personal information; the right to correct inaccurate personal information; the right to opt out of the sale or sharing of personal information; and the right not to be discriminated against for exercising your rights.",
-              `As stated in Section 4.6, Lixtara does not sell your personal information for money, and shares it for cross-context behavioral advertising only if you accept the Advertising category in the cookie banner. To opt out of that sharing, reject that category or withdraw your consent through \"Cookie settings\" in the site footer. To exercise your other California rights, contact us at ${PRIVACY_EMAIL}.`,
+              `As stated in Section 4.6, Lixtara does not sell your personal information for money, and shares it for cross-context behavioral advertising only if you accept the Advertising category in the cookie banner. To opt out of that sharing, reject that category or withdraw your consent through \"Cookie settings\" in the site footer. We also treat the Global Privacy Control (GPC) signal as a request to opt out: if your browser sends it, the Advertising category stays rejected in that browser, even if you accept it in the cookie banner, and the cookie banner says so; analytics is not affected. To exercise your other California rights, contact us at ${PRIVACY_EMAIL}.`,
             ],
           },
           {
@@ -397,7 +393,7 @@ export const privacyDoc: LegalContent = {
             heading: "4.6 Ausencia de Venta de Información Personal; Compartición y Publicidad Dirigida",
             body: [
               "Lixtara no vende su información personal por dinero.",
-              "Solo si usted acepta la categoría Publicidad en el aviso de cookies, compartimos identificadores en línea (como las cookies de Meta y de Google Ads) e información sobre su uso de nuestro sitio con Meta Platforms, Inc. y Google LLC y, según se describe en la Sección 6.2, algunos datos desde nuestro servidor con Meta, para medir nuestras campañas y mostrarle anuncios de Lixtara en otros sitios y aplicaciones. Según algunas leyes estatales, esto puede considerarse \"compartir\" información para publicidad conductual de contexto cruzado o \"publicidad dirigida\". Si usted no acepta la publicidad, no compartimos su información para estos fines.",
+              "Solo si usted acepta la categoría Publicidad en el aviso de cookies, compartimos identificadores en línea (como las cookies de Meta y de Google Ads) e información sobre su uso de nuestro sitio con Meta Platforms, Inc. y Google LLC para medir nuestras campañas y mostrarle anuncios de Lixtara en otros sitios y aplicaciones. Según algunas leyes estatales, esto puede considerarse \"compartir\" información para publicidad conductual de contexto cruzado o \"publicidad dirigida\". Si usted no acepta la publicidad, no compartimos su información para estos fines.",
               "Puede negarse a esta compartición o detenerla en cualquier momento: rechace la categoría Publicidad en el aviso de cookies o retire su consentimiento en \"Configurar cookies\", en el pie del sitio. También puede escribirnos a {privacyEmail}.",
             ],
           },
@@ -434,18 +430,13 @@ export const privacyDoc: LegalContent = {
             heading: "6.2 Publicidad y Medición de Campañas",
             body: [
               "Usamos el píxel de Meta (Meta Platforms, Inc.) y Google Ads (Google LLC) para medir nuestras campañas de publicidad y mostrarle anuncios de Lixtara en otros sitios y aplicaciones. Solo funcionan si usted acepta la categoría Publicidad en el aviso de cookies; hasta entonces, y si la rechaza, no se activan. La publicidad nunca se activa en el proceso de publicación de su vivienda, en su cuenta, en el inicio de sesión y el registro, ni en su panel, aunque usted la haya aceptado.",
-              "Si usted aceptó la publicidad, cuando crea una cuenta o hace un pago nuestro servidor puede enviar a Meta, mediante su API de Conversiones, lo siguiente para atribuir ese registro o pago a un anuncio:",
-            ],
-            bullets: [
-              "su correo electrónico, convertido en nuestros servidores en un código irreversible (un hash SHA-256) antes de enviarse; Meta lo usa para emparejar el evento con sus propias cuentas, y sigue siendo información personal;",
-              "su dirección IP y el agente de usuario de su navegador (el tipo de navegador y de dispositivo);",
-              "los identificadores de las cookies de Meta (_fbp y _fbc), si existen, y el tipo de evento (registro o pago) con su fecha y, en un pago, su importe.",
+              "Si su navegador envía la señal Global Privacy Control, la publicidad queda rechazada en ese navegador (Sección 9.1).",
             ],
           },
           {
             heading: "6.3 Cómo Retirar su Consentimiento a la Publicidad",
             body: [
-              "Puede retirar su consentimiento en cualquier momento en \"Configurar cookies\", en el pie del sitio. A partir de ese momento, el píxel de Meta y Google Ads dejan de activarse, las cookies que pusieron en nuestro dominio se borran de su navegador y nuestro servidor deja de enviar sus datos a Meta para nuevos eventos. La información ya enviada la tratan Meta y Google según sus propias políticas: https://www.facebook.com/privacy/policy/ y https://policies.google.com/privacy",
+              "Puede retirar su consentimiento en cualquier momento en \"Configurar cookies\", en el pie del sitio. A partir de ese momento, el píxel de Meta y Google Ads dejan de activarse y las cookies que pusieron en nuestro dominio se borran de su navegador. La información ya enviada la tratan Meta y Google según sus propias políticas: https://www.facebook.com/privacy/policy/ y https://policies.google.com/privacy",
             ],
           },
         ],
@@ -486,7 +477,7 @@ export const privacyDoc: LegalContent = {
             heading: "9.1 Residentes de California",
             body: [
               "Si usted es residente de California, la Ley de Privacidad del Consumidor de California (CCPA), en su versión modificada por la Ley de Derechos de Privacidad de California (CPRA), puede otorgarle ciertos derechos sobre su información personal, según si esa ley nos aplica. Estos pueden incluir el derecho a saber qué información personal recopilamos, usamos y divulgamos; el derecho a solicitar la eliminación de su información personal; el derecho a corregir información personal inexacta; el derecho a oponerse a la venta o la compartición de información personal; y el derecho a no ser discriminado por ejercer sus derechos.",
-              `Como se indica en la Sección 4.6, Lixtara no vende su información personal por dinero, y solo la comparte para publicidad conductual de contexto cruzado si usted acepta la categoría Publicidad en el aviso de cookies. Para oponerse a esa compartición, rechace esa categoría o retire su consentimiento en \"Configurar cookies\", en el pie del sitio. Para ejercer sus demás derechos en California, comuníquese con nosotros en ${PRIVACY_EMAIL}.`,
+              `Como se indica en la Sección 4.6, Lixtara no vende su información personal por dinero, y solo la comparte para publicidad conductual de contexto cruzado si usted acepta la categoría Publicidad en el aviso de cookies. Para oponerse a esa compartición, rechace esa categoría o retire su consentimiento en \"Configurar cookies\", en el pie del sitio. También tratamos la señal Global Privacy Control (GPC) como una solicitud de exclusión: si su navegador la envía, la categoría Publicidad queda rechazada en ese navegador, aunque la acepte en el aviso de cookies, y el aviso lo indica; la analítica no cambia. Para ejercer sus demás derechos en California, comuníquese con nosotros en ${PRIVACY_EMAIL}.`,
             ],
           },
           {

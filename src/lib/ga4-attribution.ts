@@ -5,11 +5,12 @@
 // categoría de consentimiento y:
 //   - con Analítica aceptada: el client_id y el session_id de GA4 (cookies _ga y _ga_<id>);
 //   - con Publicidad aceptada (decisión del owner 2026-10-24): _fbp y _fbc (Meta) y el gclid
-//     (de la cookie _gcl_aw de Google Ads). Sin Publicidad, ninguno de los tres.
+//     (de la cookie _gcl_aw de Google Ads). Sin Publicidad, ninguno de los tres. Con Global
+//     Privacy Control (header Sec-GPC: 1), la Publicidad cuenta como denegada.
 // El webhook envía `purchase` solo si: analítica "granted" + Production + Stripe livemode +
 // propiedad no is_test.
 
-import { readConsentState } from "@/lib/analytics-config";
+import { effectiveConsent, readConsentState } from "@/lib/analytics-config";
 
 export type CheckoutAttribution = {
   lang: string;
@@ -63,9 +64,11 @@ export function checkoutAttribution(
   cookieHeader: string | null,
   measurementId: string | undefined,
   lang: string,
+  gpc = false,
 ): CheckoutAttribution {
   const header = cookieHeader ?? "";
-  const state = readConsentState(header);
+  const saved = readConsentState(header);
+  const state = saved ? effectiveConsent(saved, gpc) : null;
   const consent = state?.analytics ?? "unknown";
   const ads = state?.ads ?? "unknown";
   const out: CheckoutAttribution = { lang: lang === "es" ? "es" : "en", consent, ads_consent: ads };

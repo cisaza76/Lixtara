@@ -247,20 +247,30 @@ describe("cookies: publicidad solo con consentimiento, en el aviso y en la polí
     expect(dictionaries.es.cookieNotice.consentMessage).toContain("{tools}");
   });
 
-  it("las cuatro cookies de publicidad duran 90 días, según Meta y Google", () => {
+  it("duraciones de fuentes oficiales: Google 90 días; Meta, aproximadamente 90 días", () => {
     for (const lang of LANGS) {
       const ads = cookiesDocFor(lang, { gtm: true, posthog: false }).sections.find((s) => s.id === "advertising")!;
       expect(ads.table!.rows.map((r) => r[0])).toEqual(["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]);
-      for (const r of ads.table!.rows) expect(r[3], r[0]).toMatch(lang === "en" ? /^90 days/ : /^90 días/);
+      const d = Object.fromEntries(ads.table!.rows.map((r) => [r[0], r[3]]));
+      for (const c of ["_fbp", "_fbc"]) expect(d[c], c).toBe(lang === "en" ? "About 90 days (set by Meta)" : "Aproximadamente 90 días (la fija Meta)");
+      for (const c of ["_gcl_au", "_gcl_aw"]) expect(d[c], c).toBe(lang === "en" ? "90 days (set by Google)" : "90 días (la fija Google)");
     }
+    // Solo fuentes oficiales en el código.
+    expect(read("src/lib/legal/cookies.ts")).not.toMatch(/toolongdidntread/);
   });
 
-  it("privacidad: compartición para publicidad solo con consentimiento, API de Conversiones y retiro", () => {
+  it("privacidad: compartición para publicidad solo con consentimiento, GPC y retiro; sin API de Conversiones", () => {
     for (const lang of LANGS) {
-      const s = JSON.stringify(fillLegalDoc(privacyDoc[lang]));
-      expect(s).toContain("SHA-256");
-      expect(s).toMatch(lang === "en" ? /Conversions API/ : /API de Conversiones/);
-      expect(s).toMatch(lang === "en" ? /IP address and your browser's user agent/ : /dirección IP y el agente de usuario/);
+      const doc = fillLegalDoc(privacyDoc[lang]);
+      const s = JSON.stringify(doc);
+      // La API de Conversiones no existe todavía: se describe en el PR que la construya.
+      expect(s).not.toMatch(/SHA-256|Conversions API|API de Conversiones|hash/i);
+      for (const c of [true, false]) {
+        expect(JSON.stringify(cookiesDocFor(lang, { gtm: true, posthog: c }))).not.toMatch(/Conversions API|API de Conversiones|SHA-256/);
+      }
+      const s91 = JSON.stringify(doc.sections.find((x) => x.heading.startsWith("9."))!.sub!.find((x) => x.heading.startsWith("9.1")));
+      expect(s91).toContain("Global Privacy Control (GPC)");
+      expect(s91).toMatch(lang === "en" ? /Advertising category stays rejected/ : /categoría Publicidad queda rechazada/);
       expect(s).toContain("Meta Platforms, Inc.");
       expect(s).toContain("Google LLC (Google Ads)");
       // Ya no afirma que no comparte para publicidad dirigida.

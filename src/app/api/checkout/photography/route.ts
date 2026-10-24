@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createPhotographyCheckoutSession } from "@/lib/stripe";
 import { checkoutAttribution } from "@/lib/ga4-attribution";
+import { gpcEnabled } from "@/lib/analytics-config";
 import { PHOTOGRAPHY_ADDON_PRICE } from "@/lib/pricing-tiers";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 
@@ -69,7 +70,12 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
   try {
     const { sessionId, url } = await createPhotographyCheckoutSession({
-      attribution: checkoutAttribution(req.headers.get("cookie"), process.env.GA4_MEASUREMENT_ID, lang),
+      attribution: checkoutAttribution(
+        req.headers.get("cookie"),
+        process.env.GA4_MEASUREMENT_ID,
+        lang,
+        gpcEnabled(req.headers.get("sec-gpc")),
+      ),
       lang,
       propertyId,
       userId: user.id,

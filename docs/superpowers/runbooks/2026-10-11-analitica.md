@@ -113,14 +113,32 @@ El sitio solo carga GTM cuando la persona ya aceptó, pero **lo que hace cada et
 4. **Publicidad:** ver "Publicidad con consentimiento (2026-10-24)". La Privacidad v4 (§4.6, §6.2, §6.3, §9.1) y la Cookies v4 ya describen Meta y Google Ads con consentimiento (pendientes de revisión del abogado: `docs/legal/2026-10-24-textos-v4-memo.md`).
 
 ### Publicidad con consentimiento (2026-10-24)
-Desde la v4, **GTM se carga si la persona aceptó al menos una categoría**: alguien puede aceptar Publicidad y rechazar Analítica. Por eso el contenedor tiene que separar las categorías **antes** de que el código llegue a Production; si no, una persona que solo acepta Publicidad cargaría GA4 y Clarity:
+Desde la v4, **GTM se carga si la persona aceptó al menos una categoría**: alguien puede aceptar Publicidad y rechazar Analítica. Por eso el contenedor tiene que separar las categorías **antes** de que el código llegue a Production; si no, una persona que solo acepta Publicidad cargaría GA4 y Clarity.
+
+#### Para el CMO: cambios del contenedor `GTM-5KGLHNL4` que se publican ANTES del merge del PR #225
+Publicar una versión del contenedor con **todos** estos cambios y avisar el número de versión; el merge espera esa confirmación.
+
+| # | Etiquetas | Cambio exacto |
+|---|---|---|
+| 1 | GA4 (Google tag y eventos) y Microsoft Clarity | *Consent settings* → *Require additional consent for tag to fire* → `analytics_storage`. Disparadores: agregar la condición `lx_analytics_consent` *equals* `granted` (variable de capa de datos `lx_analytics_consent`, versión 2). |
+| 2 | Meta Pixel y Google Ads (conversiones y remarketing) | *Consent settings* → exigir `ad_storage`. Disparadores: agregar la condición `lx_ads_consent` *equals* `granted` (variable de capa de datos `lx_ads_consent`, versión 2). |
+| 3 | Meta Pixel | **Automatic advanced matching desactivado** (en la configuración del píxel en Events Manager y, si la plantilla lo ofrece, en la etiqueta). Sin advanced matching manual: no se envían correos, teléfonos ni nombres a Meta. |
+| 4 | Todas las de publicidad (Meta y Google Ads) | **Ninguna** dispara en `/listing`, `/account`, `/auth`, `/sign-in`, `/sign-up`, `/dashboard` ni `/admin` (en y es): excepción de disparador con `Page Path` que coincida con la expresión regular `^/(en\|es)/(listing\|account\|auth\|sign-in\|sign-up\|dashboard\|admin)(/\|$)`. Es una segunda barrera: el código ya deja ahí `lx_ads_consent` = `denied` y las tres señales `ad_*` denegadas. |
+
+Verificación en *Preview* de GTM, con el sitio del PR:
+- **Aceptar solo Publicidad:** GA4 y Clarity no disparan; Meta y Ads sí, solo fuera de las rutas del punto 4.
+- **Aceptar solo Analítica:** Meta y Ads no disparan.
+- **Navegador con GPC** (por ejemplo, Brave, o Firefox con GPC activado): Meta y Ads no disparan aunque se acepte todo.
+
+Detalle de cada regla:
 1. **GA4 y Clarity:** *Consent settings* → exigir `analytics_storage`; además, condición de disparo `lx_analytics_consent` = `granted` (variable de capa de datos). Clarity no lee Consent Mode de forma fiable: la condición del disparador es la barrera.
 2. **Meta Pixel (plantilla de la galería) y Google Ads (conversiones y remarketing):** *Consent settings* → exigir `ad_storage`, `ad_user_data` y `ad_personalization`; condición de disparo `lx_ads_consent` = `granted`. El píxel de Meta no lee Consent Mode: la condición del disparador es la barrera.
 3. **Rutas sin publicidad:** en `/listing`, `/account`, `/auth`, `/sign-in`, `/sign-up`, `/dashboard` y `/admin` el código deja las tres señales `ad_*` en `denied` y `lx_ads_consent` = `denied` aunque haya consentimiento (`isAdsExcludedPath`). Cruzar ese límite con Publicidad aceptada fuerza carga completa (`RecordingGuard` / `needsFullLoad`). La excepción por `Page Path` del punto 2 de arriba queda como respaldo.
 4. **Eventos propios:** `track()` y `lx_page_view` salen **solo con Analítica**. Con Publicidad sola, Meta y Ads usan los disparadores de GTM (p. ej. *All Pages* / *History Change*) y no reciben los `lx_*`. Si el CMO quiere conversiones de Meta con eventos `lx_*` sin Analítica, es una decisión aparte.
 5. **Stripe:** la metadata del Checkout lleva `ads_consent` y, **solo con Publicidad aceptada**, `fbp`, `fbc` y `gclid` (de `_gcl_aw`). El `purchase` de GA4 por Measurement Protocol manda `ad_user_data` / `ad_personalization` = `GRANTED` solo si `ads_consent` = `granted`.
-6. **API de Conversiones de Meta:** la Privacidad v4 (§6.2) la describe (correo con hash SHA-256, IP y user agent, solo con Publicidad aceptada). **No está implementada** en el código: el envío desde el servidor es trabajo aparte, y debe leer el consentimiento de Publicidad guardado (como la metadata de Stripe), nunca suponerlo.
+6. **API de Conversiones de Meta:** **no existe** en el código ni en las políticas. El PR que la construya agrega en el mismo cambio su texto de Privacidad. Ese envío debe leer el consentimiento de Publicidad guardado y Global Privacy Control (como la metadata de Stripe), nunca suponerlos.
 7. **Valores viejos de `lx_consent`:** `granted` / `denied` (antes de la v4, solo analítica) se leen con Publicidad **denegada** y el banner no vuelve a salir; quien quiera publicidad la acepta en "Configurar cookies".
+8. **Global Privacy Control:** con `navigator.globalPrivacyControl === true`, la Publicidad queda denegada (`effectiveConsent`): las tres señales `ad_*` y `lx_ads_consent` quedan en `denied`, el banner no deja aceptarla y lo dice en esa categoría, y la metadata de Stripe la trata como denegada si el request trae `Sec-GPC: 1`. La Analítica no cambia.
 
 ## Apagar
 Borrar `NEXT_PUBLIC_GTM_ID` y `NEXT_PUBLIC_POSTHOG_KEY` en Vercel y hacer Redeploy. Vuelve el aviso informativo y la política sin analítica. Las cookies ya puestas expiran solas, o se borran si el visitante pulsa "Configurar cookies".

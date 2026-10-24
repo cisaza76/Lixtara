@@ -47,7 +47,7 @@ export const COOKIES_LAST_UPDATED = LEGAL_V4_PUBLISHED;
 /** Disclaimers (Avisos Legales) v2: aviso IDX, valuaciones, registros públicos e IA. */
 export const DISCLAIMERS_LAST_UPDATED = LEGAL_V2_PUBLISHED;
 
-/** Privacy Policy v4: §4.6 compartición para publicidad con consentimiento, §6.2 API de Conversiones de Meta, §6.3 retiro, §9.1. */
+/** Privacy Policy v4: §4.6 compartición para publicidad con consentimiento, §6.2 publicidad (Meta y Google Ads), §6.3 retiro, §9.1 Global Privacy Control. */
 export const PRIVACY_LAST_UPDATED = LEGAL_V4_PUBLISHED;
 
 /** Avisos de corretaje, vivienda justa y fraude (/notices), primera publicación. */

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { needsFullLoad, readConsentState } from "@/lib/analytics-config";
+import { gpcEnabled, needsFullLoad, readConsentState } from "@/lib/analytics-config";
 
 // Clarity (desde GTM) graba la sesión y no tiene una función documentada para detenerse.
 // El contenedor la excluye de /account (y /admin) en la CARGA de página, pero una navegación
@@ -15,7 +15,8 @@ import { needsFullLoad, readConsentState } from "@/lib/analytics-config";
 
 function consentGranted(): { analytics: boolean; ads: boolean } {
   const s = readConsentState(document.cookie);
-  return { analytics: s?.analytics === "granted", ads: s?.ads === "granted" };
+  // Con Global Privacy Control la publicidad está denegada en todas partes: no hay que recargar por ella.
+  return { analytics: s?.analytics === "granted", ads: s?.ads === "granted" && !gpcEnabled(navigator) };
 }
 
 export function RecordingGuard() {

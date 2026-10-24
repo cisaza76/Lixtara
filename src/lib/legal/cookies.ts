@@ -16,10 +16,11 @@ import { FIRST_TOUCH_COOKIE, FIRST_TOUCH_MAX_AGE_S } from "@/lib/funnel-events";
 //   - con PostHog: su analítica de producto, solo con consentimiento.
 // Sin GTM no hay publicidad (Meta y Google Ads solo se cargan desde el contenedor): esa
 // variante dice que no se usan. Nombres y duraciones de NUESTRAS cookies salen de las
-// constantes del código. Meta y Google Ads: duraciones de su documentación (2026-10-24):
-// Google "How Google uses cookies in advertising" (business.safety.google/adscookies, _gcl_au
-// y _gcl_aw: 90 días); Meta, Cookies Policy (_fbp: 90 días) y la guía de fbp/fbc de la API de
-// Conversiones (_fbc: 90 días).
+// constantes del código. Duraciones de publicidad, solo fuentes oficiales (2026-10-24): Google,
+// "How Google uses cookies in advertising" (business.safety.google/adscookies): _gcl_au y
+// _gcl_aw, 90 días. Meta no da el plazo de _fbp en una página oficial comprobable, y para _fbc
+// solo recomienda 90 días a quien la pone desde su servidor (guía de fbp/fbc de la API de
+// Conversiones): las dos van como "aproximadamente 90 días".
 // Clarity: lista de "Clarity Cookies" (Microsoft Learn, actualizada 2025-12-05); Microsoft ya
 // no publica duraciones: las de la tabla son aproximadas (versión anterior de esa página).
 // Las duraciones que fija un tercero se atribuyen a ese tercero, sin prometer un valor exacto.
@@ -199,6 +200,9 @@ function adsRows(lang: Lang): string[][] {
   const meta = "Meta Platforms, Inc.";
   const google = "Google LLC (Google Ads)";
   const ninety = (who: string) => (es ? `90 días (la fija ${who})` : `90 days (set by ${who})`);
+  // Meta no publica el plazo exacto en una página oficial que se pueda comprobar (2026-10-24).
+  const aboutNinety = (who: string) =>
+    es ? `Aproximadamente 90 días (la fija ${who})` : `About 90 days (set by ${who})`;
   return [
     [
       "_fbp",
@@ -206,7 +210,7 @@ function adsRows(lang: Lang): string[][] {
       es
         ? "Identifica su navegador para medir nuestras campañas en Meta y mostrarle anuncios de Lixtara."
         : "Identifies your browser to measure our Meta campaigns and show you Lixtara ads.",
-      ninety("Meta"),
+      aboutNinety("Meta"),
     ],
     [
       "_fbc",
@@ -214,7 +218,7 @@ function adsRows(lang: Lang): string[][] {
       es
         ? "Guarda el identificador del clic cuando llega desde un anuncio de Meta (parámetro fbclid), para atribuir el registro o el pago a ese anuncio."
         : "Stores the click identifier when you arrive from a Meta ad (fbclid parameter), to attribute a sign-up or payment to that ad.",
-      ninety("Meta"),
+      aboutNinety("Meta"),
     ],
     [
       "_gcl_au",
@@ -372,8 +376,8 @@ function build(lang: Lang, t: CookieTools): LegalDoc {
                 ? "Aunque usted la haya aceptado, la publicidad no se activa en el proceso de publicación de su vivienda, en su cuenta, en el inicio de sesión y el registro, ni en su panel."
                 : "Even if you have accepted it, advertising is not activated in the listing flow for your home, in your account, in sign-in and sign-up, or in your dashboard.",
               es
-                ? "Si acepta la publicidad, cuando se registra o paga podemos enviar a Meta, desde nuestro servidor, algunos datos para atribuir ese registro o pago a un anuncio. La Política de Privacidad (Sección 6.2) explica cuáles."
-                : "If you accept advertising, when you sign up or pay we may send Meta some data from our server to attribute that sign-up or payment to an ad. The Privacy Policy (Section 6.2) explains which data.",
+                ? "Si su navegador envía la señal Global Privacy Control, la publicidad queda rechazada en ese navegador, aunque la acepte en el aviso (Política de Privacidad, Sección 9.1)."
+                : "If your browser sends the Global Privacy Control signal, advertising stays rejected in that browser, even if you accept it in the banner (Privacy Policy, Section 9.1).",
               es
                 ? "Meta y Google pueden además poner cookies en sus propios dominios y las usan según sus propias políticas de privacidad. Las duraciones de la tabla las fijan Meta y Google."
                 : "Meta and Google may also set cookies on their own domains and use them under their own privacy policies. The durations in the table are set by Meta and Google.",

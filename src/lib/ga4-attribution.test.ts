@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   checkoutAttribution,
   gaClientId,
@@ -48,6 +49,19 @@ describe("metadata del Checkout", () => {
       fbc: "fb.1.1760000000000.IwAR2abc_DEF-123",
       gclid: "Cj0KCQjw_abc-123",
     });
+  });
+  it("Global Privacy Control (Sec-GPC: 1): Publicidad denegada, sin _fbp, _fbc ni gclid; GA4 sigue", () => {
+    expect(checkoutAttribution(cookies("analytics-granted.ads-granted"), MID, "en", true)).toEqual({
+      lang: "en",
+      consent: "granted",
+      ads_consent: "denied",
+      ga_client_id: "1234567890.1760000000",
+      ga_session_id: "1760400000",
+    });
+    for (const f of ["tier", "photography", "consultation", "staging-overage"]) {
+      const src = readFileSync(`src/app/api/checkout/${f}/route.ts`, "utf8");
+      expect(src, f).toContain('gpcEnabled(req.headers.get("sec-gpc"))');
+    }
   });
   it("sin consentimiento: solo idioma y estado, sin ids", () => {
     expect(checkoutAttribution(cookies("denied"), MID, "en")).toEqual({ lang: "en", consent: "denied", ads_consent: "denied" });

@@ -15,6 +15,9 @@
 // - GTM se carga si hay al menos una categoría aceptada. PostHog y los eventos propios
 //   (track(), lx_page_view) solo con Analítica aceptada.
 // - Rechazar una categoría borra las cookies que esa categoría dejó en nuestro dominio.
+// - Global Privacy Control (2026-10-24): con `navigator.globalPrivacyControl === true`, la
+//   Publicidad queda denegada (no se puede aceptar y el aviso lo dice en esa categoría) y sus
+//   cookies se borran. La Analítica no cambia.
 // - PostHog en modo estricto: sin autocapture (no lee textos, imágenes ni URLs de fichas
 //   del MLS), sin grabación de sesión, pageviews manuales con la URL SIN parámetros.
 //
@@ -31,6 +34,8 @@ import {
   CONSENT_MAX_AGE_S,
   consentCookieValue,
   consentModeUpdate,
+  effectiveConsent,
+  gpcEnabled,
   isAnalyticsExcludedPath,
   readConsentState,
   sanitizePosthogProperties,
@@ -57,6 +62,8 @@ interface Props {
     analytics: string;
     /** null: sin GTM no hay publicidad que pedir (Meta y Google Ads solo vía GTM). */
     ads: string | null;
+    /** Nota de la categoría Publicidad cuando el navegador manda Global Privacy Control. */
+    gpcNote: string;
     regionLabel: string;
   };
 }
@@ -83,7 +90,7 @@ function loadGtm(gtmId: string, choice: ConsentState): void {
     ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "denied",
   });
   // La elección guardada, por categoría; en las rutas sin publicidad, publicidad denegada.
-  const update = consentModeUpdate(choice, window.location.pathname);
+  const update = consentModeUpdate(choice, window.location.pathname, gpcEnabled(navigator));
   gtag("consent", "update", update);
   // Para las etiquetas que no leen Consent Mode (el píxel de Meta): GTM las dispara solo con
   // lx_ads_consent = "granted"; GA4 y Clarity, solo con lx_analytics_consent = "granted".
@@ -193,6 +200,7 @@ function setConsent(choice: ConsentState): void {
 
 let gtmLoaded = false;
 let analyticsOn = false;
+const noSubscribe = () => () => {};
 
 export function AnalyticsConsent(props: Props) {
   const raw = useSyncExternalStore(consentStore.subscribe, consentStore.get, consentStore.server);
@@ -203,11 +211,13 @@ export function AnalyticsConsent(props: Props) {
   const excluded = isAnalyticsExcludedPath(pathname);
   // Lo que se marca en el banner antes de guardar. Por defecto, todo rechazado.
   const [draft, setDraft] = useState<ConsentState>({ analytics: "denied", ads: "denied" });
+  // Global Privacy Control: solo existe en el navegador, así que se lee después de montar.
+  const gpc = useSyncExternalStore(noSubscribe, () => gpcEnabled(navigator), () => false);
 
   // Efectos de la elección: cargar lo aceptado; apagar y limpiar lo rechazado.
   useEffect(() => {
     if (analytics === null || ads === null || excluded) return;
-    const state: ConsentState = { analytics, ads: props.gtmId ? ads : "denied" };
+    const state = effectiveConsent({ analytics, ads: props.gtmId ? ads : "denied" }, gpc);
     if (state.analytics === "granted" || state.ads === "granted") {
       void start(props, state).then(() => pageview());
     }
@@ -218,7 +228,7 @@ export function AnalyticsConsent(props: Props) {
     if (state.ads === "denied") clearStorage(ADS_COOKIE_RE, false);
     // La configuración no cambia durante la vida de la página.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analytics, ads, excluded]);
+  }, [analytics, ads, excluded, gpc]);
 
   // Un pageview por cambio de ruta, con la URL SIN parámetros, para GA4 (evento propio en
   // el dataLayer; el Google tag NO envía su page_view automático, ver runbook) y PostHog.
@@ -228,7 +238,8 @@ export function AnalyticsConsent(props: Props) {
 
   if (choice !== null || excluded) return null;
 
-  const all = (c: ConsentChoice): ConsentState => ({ analytics: c, ads: props.labels.ads ? c : "denied" });
+  // Con GPC, "Aceptar todo" y "Guardar" nunca guardan la publicidad aceptada.
+  const all = (c: ConsentChoice): ConsentState => effectiveConsent({ analytics: c, ads: props.labels.ads ? c : "denied" }, gpc);
   // Mismo peso visual para aceptar y rechazar, para cada categoría y para "todo": mismo
   // estilo, mismo tamaño. Sin patrones oscuros.
   const button =
@@ -256,8 +267,10 @@ export function AnalyticsConsent(props: Props) {
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-x-6 gap-y-2">
-            {categories.map((c) => (
-              <div key={c.key} role="group" aria-label={c.label} className="flex items-center gap-2">
+            {categories.map((c) => {
+              const blocked = c.key === "ads" && gpc;
+              return (
+              <div key={c.key} role="group" aria-label={c.label} className="flex flex-wrap items-center gap-2">
                 <span className="min-w-[5.5rem] text-[11px] font-semibold uppercase tracking-[0.14em] text-ivory">
                   {c.label}
                 </span>
@@ -272,19 +285,22 @@ export function AnalyticsConsent(props: Props) {
                 <button
                   type="button"
                   aria-pressed={draft[c.key] === "granted"}
+                  disabled={blocked}
                   onClick={() => setDraft({ ...draft, [c.key]: "granted" })}
-                  className={option(draft[c.key] === "granted")}
+                  className={`${option(draft[c.key] === "granted")} disabled:cursor-not-allowed disabled:opacity-40`}
                 >
                   {props.labels.accept}
                 </button>
+                {blocked && <span className="basis-full text-[11px] text-ivory/70">{props.labels.gpcNote}</span>}
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="flex flex-wrap gap-2 sm:flex-nowrap">
             <button type="button" onClick={() => setConsent(all("denied"))} className={button}>
               {props.labels.rejectAll}
             </button>
-            <button type="button" onClick={() => setConsent(draft)} className={button}>
+            <button type="button" onClick={() => setConsent(effectiveConsent(draft, gpc))} className={button}>
               {props.labels.save}
             </button>
             <button type="button" onClick={() => setConsent(all("granted"))} className={button}>
