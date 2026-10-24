@@ -17,7 +17,7 @@ export interface PrivacyProvider {
   policyUrl?: string;
   /** Texto que aparece en el código cuando se usa (SDK, host o nombre del módulo). */
   codeMarkers: string[];
-  /** Solo se carga si la persona acepta las cookies de analítica. */
+  /** Solo se carga si la persona acepta las cookies de analítica o de publicidad. */
   consentOnly?: boolean;
 }
 
@@ -61,6 +61,27 @@ export const PRIVACY_PROVIDERS: PrivacyProvider[] = [
     purpose_es: "analítica de uso a través de Google Tag Manager y, después de un pago, un evento de compra enviado desde el servidor con identificadores seudónimos, solo si usted acepta las cookies de analítica",
     policyUrl: "https://policies.google.com/privacy",
     codeMarkers: ["googletagmanager.com", "google-analytics.com/mp"],
+    consentOnly: true,
+  },
+  {
+    id: "google-ads",
+    name: "Google LLC (Google Ads)",
+    purpose_en: "measurement of our advertising campaigns and Lixtara ads on other websites, only if you accept advertising cookies (see Section 6.2)",
+    purpose_es: "medición de nuestras campañas de publicidad y anuncios de Lixtara en otros sitios, solo si usted acepta las cookies de publicidad (consulte la Sección 6.2)",
+    policyUrl: "https://policies.google.com/privacy",
+    // Se carga solo por Google Tag Manager; el marcador es su cookie de clic en el código
+    // (metadata del Checkout y borrado al rechazar).
+    codeMarkers: ["_gcl_aw"],
+    consentOnly: true,
+  },
+  {
+    id: "meta",
+    name: "Meta Platforms, Inc. (Meta pixel and Conversions API)",
+    purpose_en: "measurement of our advertising campaigns and Lixtara ads on Facebook, Instagram and other apps, only if you accept advertising cookies; with that consent, our server may send Meta a hashed email address, IP address and browser user agent (see Section 6.2)",
+    purpose_es: "medición de nuestras campañas de publicidad y anuncios de Lixtara en Facebook, Instagram y otras aplicaciones, solo si usted acepta las cookies de publicidad; con ese consentimiento, nuestro servidor puede enviar a Meta el correo convertido en hash, la dirección IP y el agente de usuario del navegador (consulte la Sección 6.2)",
+    policyUrl: "https://www.facebook.com/privacy/policy/",
+    // Se carga solo por Google Tag Manager; el marcador es su cookie en el código.
+    codeMarkers: ["_fbp"],
     consentOnly: true,
   },
   {

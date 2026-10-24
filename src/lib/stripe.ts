@@ -53,7 +53,7 @@ export interface CreateTierCheckoutInput {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
-  /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
+  /** Idioma, consentimiento por categoría e ids de GA4 / Meta / Google Ads (cada uno solo con su categoría aceptada): ver ga4-attribution.ts. */
   attribution?: CheckoutAttribution;
   /** Versión de los Términos cuya casilla de reembolso aceptó (prueba ante un contracargo). */
   refundTermsVersion?: string;
@@ -130,7 +130,7 @@ export interface ConsultationCheckoutInput {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
-  /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
+  /** Idioma, consentimiento por categoría e ids de GA4 / Meta / Google Ads (cada uno solo con su categoría aceptada): ver ga4-attribution.ts. */
   attribution?: CheckoutAttribution;
 }
 
@@ -178,7 +178,7 @@ export interface PhotographyCheckoutInput {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
-  /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
+  /** Idioma, consentimiento por categoría e ids de GA4 / Meta / Google Ads (cada uno solo con su categoría aceptada): ver ga4-attribution.ts. */
   attribution?: CheckoutAttribution;
 }
 
@@ -230,7 +230,7 @@ export interface StagingOverageCheckoutInput {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
-  /** Idioma, consentimiento e ids de GA4 (solo con consentimiento): ver ga4-attribution.ts. */
+  /** Idioma, consentimiento por categoría e ids de GA4 / Meta / Google Ads (cada uno solo con su categoría aceptada): ver ga4-attribution.ts. */
   attribution?: CheckoutAttribution;
 }
 

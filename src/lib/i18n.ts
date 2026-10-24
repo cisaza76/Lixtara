@@ -1578,10 +1578,19 @@ export const dictionaries = {
       accept: "Got it",
       regionLabel: "Cookie notice",
       // {tools}: las herramientas configuradas en este build (ver consentTools en analytics-config).
+      // Con GTM: analítica y publicidad (Meta y Google Ads, solo vía GTM, decisión 2026-10-24).
       consentMessage:
-        "We use essential cookies to run the site. With your permission, we also use analytics cookies ({tools}) to improve the site. No advertising cookies.",
-      consentAccept: "Accept analytics",
+        "We use essential cookies to run the site. With your permission, we also use analytics cookies ({tools}) to improve the site, and advertising cookies (Meta and Google Ads) to measure our campaigns and show you our ads. You can accept or reject each category.",
+      // Sin GTM (solo PostHog) no hay publicidad que pedir.
+      consentMessageAnalyticsOnly:
+        "We use essential cookies to run the site. With your permission, we also use analytics cookies ({tools}) to improve the site.",
+      consentAccept: "Accept",
       consentReject: "Reject",
+      consentAcceptAll: "Accept all",
+      consentRejectAll: "Reject all",
+      consentSave: "Save choices",
+      categoryAnalytics: "Analytics",
+      categoryAds: "Advertising",
       settings: "Cookie settings",
     },
     quiz: {
@@ -3735,10 +3744,19 @@ export const dictionaries = {
       accept: "Entendido",
       regionLabel: "Aviso de cookies",
       // {tools}: las herramientas configuradas en este build (ver consentTools en analytics-config).
+      // Con GTM: analítica y publicidad (Meta y Google Ads, solo vía GTM, decisión 2026-10-24).
       consentMessage:
-        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica ({tools}) para mejorar el sitio. No usamos cookies de publicidad.",
-      consentAccept: "Aceptar analítica",
+        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica ({tools}) para mejorar el sitio, y cookies de publicidad (Meta y Google Ads) para medir nuestras campañas y mostrarte nuestros anuncios. Puedes aceptar o rechazar cada categoría.",
+      // Sin GTM (solo PostHog) no hay publicidad que pedir.
+      consentMessageAnalyticsOnly:
+        "Usamos cookies esenciales para que el sitio funcione. Con tu permiso, también usamos cookies de analítica ({tools}) para mejorar el sitio.",
+      consentAccept: "Aceptar",
       consentReject: "Rechazar",
+      consentAcceptAll: "Aceptar todo",
+      consentRejectAll: "Rechazar todo",
+      consentSave: "Guardar elección",
+      categoryAnalytics: "Analítica",
+      categoryAds: "Publicidad",
       settings: "Configurar cookies",
     },
     quiz: {

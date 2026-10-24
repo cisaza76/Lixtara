@@ -3,9 +3,11 @@
 //   - 2026-10-13: GTM (contenedor del CMO) trae Microsoft Clarity. Modelo OPT-IN en todas las
 //     regiones: nada se carga antes de "Aceptar". GTM y PostHog son independientes: cada uno
 //     se activa con su propia variable.
-//   - 2026-10-15: Google Ads y Meta NO están aprobados. "Aceptar" concede solo analítica
-//     (analytics_storage); las señales de publicidad de Consent Mode quedan denegadas, así
-//     que una etiqueta de anuncios que quedara en el contenedor no recibe consentimiento.
+//   - 2026-10-15: Google Ads y Meta NO están aprobados (reemplazado el 2026-10-24).
+//   - 2026-10-24: Meta (píxel) y Google Ads SOLO con consentimiento opt-in de la categoría
+//     Publicidad, separada de Analítica. Todo denegado por defecto; cada categoría se acepta o
+//     rechaza por su lado. En el embudo, la cuenta y el staff (isAdsExcludedPath) las señales
+//     de publicidad quedan denegadas aunque haya consentimiento.
 // Sin variables no se carga nada: el sitio queda exactamente como antes.
 //
 // PURO: sin I/O. Lo lee el layout (servidor) y pasa el resultado al banner (cliente).
@@ -15,24 +17,56 @@ export type ConsentChoice = "granted" | "denied";
 /** Un año: después se vuelve a preguntar. */
 export const CONSENT_MAX_AGE_S = 365 * 24 * 60 * 60;
 
-/**
- * Lo que concede "Aceptar" en Consent Mode v2: SOLO analítica (GA4, Clarity). La publicidad
- * (Google Ads, Meta) no está aprobada: sus señales siguen denegadas aunque el visitante acepte.
- */
-export const GRANTED_CONSENT = {
-  ad_storage: "denied",
-  ad_user_data: "denied",
-  ad_personalization: "denied",
-  analytics_storage: "granted",
-} as const;
+/** La elección por categoría. */
+export interface ConsentState {
+  analytics: ConsentChoice;
+  ads: ConsentChoice;
+}
 
 /**
- * Cookies que las herramientas dejan en NUESTRO dominio y que se borran al rechazar o retirar
- * el consentimiento: GA4 `_ga*`/`_gid`, Clarity `_clck`/`_clsk`, PostHog `ph_*` y nuestra
- * `lx_ft` (UTM de primer contacto, solo con consentimiento). También `_gcl_*` y `_fbp`/`_fbc`
- * (Google Ads, Meta): no están aprobados, pero si una etiqueta del contenedor los dejara, se borran.
+ * Valor de `lx_consent`: `analytics-<granted|denied>.ads-<granted|denied>`. Los valores de
+ * antes del 2026-10-24 (`granted` / `denied`) solo hablaban de analítica: se leen con la
+ * publicidad denegada (nunca se pidió) y el banner no vuelve a salir.
  */
-export const ANALYTICS_COOKIE_RE = /^(_ga|_gid|_gcl_|_fbp|_fbc|_clck|_clsk|ph_|lx_ft$)/;
+export function consentCookieValue(s: ConsentState): string {
+  return `analytics-${s.analytics}.ads-${s.ads}`;
+}
+
+/** Lee la elección guardada de un `document.cookie` (o del header Cookie). null = aún no eligió. */
+export function readConsentState(cookieHeader: string): ConsentState | null {
+  const m = cookieHeader.match(new RegExp(`(?:^|;\\s*)${CONSENT_COOKIE}=([^;]*)`));
+  const v = m?.[1]?.trim() ?? "";
+  if (v === "granted" || v === "denied") return { analytics: v, ads: "denied" };
+  const n = v.match(/^analytics-(granted|denied)\.ads-(granted|denied)$/);
+  return n ? { analytics: n[1] as ConsentChoice, ads: n[2] as ConsentChoice } : null;
+}
+
+/**
+ * Consent Mode v2 para la página actual: analítica según su categoría; las tres señales de
+ * publicidad juntas, según Publicidad, y siempre denegadas en las rutas sin publicidad.
+ */
+export function consentModeUpdate(s: ConsentState, pathname: string) {
+  const ads = s.ads === "granted" && !isAdsExcludedPath(pathname) ? "granted" : "denied";
+  return {
+    ad_storage: ads,
+    ad_user_data: ads,
+    ad_personalization: ads,
+    analytics_storage: s.analytics,
+  } as const;
+}
+
+/**
+ * Cookies de analítica que las herramientas dejan en NUESTRO dominio y que se borran al
+ * rechazar o retirar la analítica: GA4 `_ga*`/`_gid`, Clarity `_clck`/`_clsk`, PostHog `ph_*`
+ * y nuestra `lx_ft` (UTM de primer contacto, solo con consentimiento).
+ */
+export const ANALYTICS_COOKIE_RE = /^(_ga|_gid|_clck|_clsk|ph_|lx_ft$)/;
+
+/**
+ * Cookies de publicidad en NUESTRO dominio (Google Ads `_gcl_*`, Meta `_fbp`/`_fbc`): se
+ * borran al rechazar o retirar la publicidad.
+ */
+export const ADS_COOKIE_RE = /^(_gcl_|_fbp$|_fbc$)/;
 
 export interface AnalyticsConfig {
   gtmId: string | null;
@@ -80,10 +114,14 @@ export function consentTools(c: Pick<AnalyticsConfig, "gtmId" | "posthogKey">, l
   return tools.length > 1 ? `${tools.slice(0, -1).join(", ")}${and}${tools.at(-1)}` : (tools[0] ?? "");
 }
 
-/** Lee la elección guardada de un `document.cookie`. null = aún no eligió. */
+/** La elección de ANALÍTICA guardada en un `document.cookie`. null = aún no eligió. */
 export function readConsent(cookieHeader: string): ConsentChoice | null {
-  const m = cookieHeader.match(new RegExp(`(?:^|;\\s*)${CONSENT_COOKIE}=(granted|denied)(?:;|$)`));
-  return m ? (m[1] as ConsentChoice) : null;
+  return readConsentState(cookieHeader)?.analytics ?? null;
+}
+
+/** La elección de PUBLICIDAD guardada en un `document.cookie`. null = aún no eligió. */
+export function readAdsConsent(cookieHeader: string): ConsentChoice | null {
+  return readConsentState(cookieHeader)?.ads ?? null;
 }
 
 /**
@@ -120,17 +158,34 @@ export function isRecordingExcludedPath(pathname: string): boolean {
 }
 
 /**
- * ¿Ir de `from` a `to` exige carga completa?
- *   - Entrar a una ruta excluida: SIEMPRE (Clarity podría estar grabando).
- *   - Salir de una ruta excluida: solo con consentimiento, para que el contenedor vuelva a
- *     cargar Clarity al regresar al embudo (sin recarga, el resto de la visita no se graba).
+ * Rutas sin publicidad (decisión del owner 2026-10-24): el proceso de publicación, la cuenta,
+ * el acceso y el registro, el panel del vendedor y el de staff. Ahí ad_storage, ad_user_data
+ * y ad_personalization quedan denegadas aunque la persona haya aceptado la publicidad, y el
+ * dataLayer lleva `lx_ads_consent: "denied"` para que GTM no dispare Meta ni Google Ads.
  */
-export function needsFullLoad(from: string, to: string, consentGranted: boolean): boolean {
+export function isAdsExcludedPath(pathname: string): boolean {
+  return /^\/(en|es)\/(listing|account|auth|sign-in|sign-up|dashboard|admin)(\/|$)/.test(pathname);
+}
+
+/**
+ * ¿Ir de `from` a `to` exige carga completa? El consentimiento se aplica al cargar GTM, así
+ * que cambiarlo en medio de una visita exige recargar.
+ *   - Entrar a una ruta sin grabación: SIEMPRE (Clarity podría estar grabando).
+ *   - Salir de una ruta sin grabación: solo con analítica aceptada, para que el contenedor
+ *     vuelva a cargar Clarity al regresar al embudo.
+ *   - Entrar a una ruta sin publicidad o salir de ella: solo con publicidad aceptada (sin
+ *     ella, las señales ya están denegadas en todas partes).
+ */
+export function needsFullLoad(
+  from: string,
+  to: string,
+  consent: { analytics: boolean; ads: boolean },
+): boolean {
   const a = isRecordingExcludedPath(from);
   const b = isRecordingExcludedPath(to);
   if (b && !a) return true;
-  if (a && !b) return consentGranted;
-  return false;
+  if (a && !b && consent.analytics) return true;
+  return consent.ads && isAdsExcludedPath(from) !== isAdsExcludedPath(to);
 }
 
 /**

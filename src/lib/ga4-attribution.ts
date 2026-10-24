@@ -1,18 +1,26 @@
 // Compras en GA4 por Measurement Protocol (aprobado por el owner 2026-10-14, punto 4 del plan
 // del CMO). Reglas puras; el envío vive en ga4-mp.server.ts.
 //
-// Al crear el Checkout de Stripe se guardan en su metadata SOLO: idioma, estado del
-// consentimiento y, si la persona aceptó, el client_id y el session_id de GA4 (de las cookies
-// _ga y _ga_<id>). Nada de _fbp, _fbc ni gclid. El webhook envía `purchase` solo si:
-// consentimiento "granted" + Production + Stripe livemode + propiedad no is_test.
+// Al crear el Checkout de Stripe se guardan en su metadata SOLO: idioma, estado de cada
+// categoría de consentimiento y:
+//   - con Analítica aceptada: el client_id y el session_id de GA4 (cookies _ga y _ga_<id>);
+//   - con Publicidad aceptada (decisión del owner 2026-10-24): _fbp y _fbc (Meta) y el gclid
+//     (de la cookie _gcl_aw de Google Ads). Sin Publicidad, ninguno de los tres.
+// El webhook envía `purchase` solo si: analítica "granted" + Production + Stripe livemode +
+// propiedad no is_test.
 
-import { readConsent } from "@/lib/analytics-config";
+import { readConsentState } from "@/lib/analytics-config";
 
 export type CheckoutAttribution = {
   lang: string;
+  /** Analítica (se llama `consent` desde antes de que existiera Publicidad). */
   consent: "granted" | "denied" | "unknown";
+  ads_consent: "granted" | "denied" | "unknown";
   ga_client_id?: string;
   ga_session_id?: string;
+  fbp?: string;
+  fbc?: string;
+  gclid?: string;
 };
 
 function cookie(header: string, name: string): string | null {
@@ -35,21 +43,47 @@ export function gaSessionId(value: string | null): string | null {
   return m ? m[1] : null;
 }
 
-/** Lo que va a la metadata del Checkout. Los ids de GA4 solo con consentimiento. */
+/** `_fbp` = fb.<subdominio>.<creación>.<aleatorio> (formato de Meta). */
+export function metaFbp(value: string | null): string | null {
+  return value?.match(/^fb\.\d\.\d{10,13}\.\d{1,20}$/) ? value : null;
+}
+
+/** `_fbc` = fb.<subdominio>.<creación>.<fbclid> (formato de Meta). */
+export function metaFbc(value: string | null): string | null {
+  return value?.match(/^fb\.\d\.\d{10,13}\.[A-Za-z0-9_-]{1,400}$/) ? value : null;
+}
+
+/** `_gcl_aw` = GCL.<ts>.<gclid> → gclid. */
+export function googleGclid(value: string | null): string | null {
+  return value?.match(/^GCL\.\d{1,13}\.([A-Za-z0-9_-]{1,400})$/)?.[1] ?? null;
+}
+
+/** Lo que va a la metadata del Checkout. Cada identificador solo con su categoría aceptada. */
 export function checkoutAttribution(
   cookieHeader: string | null,
   measurementId: string | undefined,
   lang: string,
 ): CheckoutAttribution {
   const header = cookieHeader ?? "";
-  const consent = readConsent(header) ?? "unknown";
-  const out: CheckoutAttribution = { lang: lang === "es" ? "es" : "en", consent };
-  if (consent !== "granted") return out;
-  const clientId = gaClientId(cookie(header, "_ga"));
-  if (clientId) out.ga_client_id = clientId;
-  const streamId = measurementId?.match(/^G-([A-Z0-9]{4,20})$/)?.[1];
-  const sessionId = streamId ? gaSessionId(cookie(header, `_ga_${streamId}`)) : null;
-  if (sessionId) out.ga_session_id = sessionId;
+  const state = readConsentState(header);
+  const consent = state?.analytics ?? "unknown";
+  const ads = state?.ads ?? "unknown";
+  const out: CheckoutAttribution = { lang: lang === "es" ? "es" : "en", consent, ads_consent: ads };
+  if (consent === "granted") {
+    const clientId = gaClientId(cookie(header, "_ga"));
+    if (clientId) out.ga_client_id = clientId;
+    const streamId = measurementId?.match(/^G-([A-Z0-9]{4,20})$/)?.[1];
+    const sessionId = streamId ? gaSessionId(cookie(header, `_ga_${streamId}`)) : null;
+    if (sessionId) out.ga_session_id = sessionId;
+  }
+  if (ads === "granted") {
+    const fbp = metaFbp(cookie(header, "_fbp"));
+    if (fbp) out.fbp = fbp;
+    const fbc = metaFbc(cookie(header, "_fbc"));
+    if (fbc) out.fbc = fbc;
+    const gclid = googleGclid(cookie(header, "_gcl_aw"));
+    if (gclid) out.gclid = gclid;
+  }
   return out;
 }
 
@@ -89,6 +123,8 @@ export function shouldSendPurchase(input: {
 
 export function purchasePayload(input: {
   clientId: string;
+  /** Publicidad aceptada al abrir el Checkout (metadata `ads_consent`). */
+  adsConsent: string | undefined;
   sessionId?: string;
   transactionId: string;
   value: number;
@@ -97,8 +133,11 @@ export function purchasePayload(input: {
 }) {
   return {
     client_id: input.clientId,
-    // La persona aceptó todo (analítica y publicidad, opt-in): se respeta igual del lado de GA4.
-    consent: { ad_user_data: "GRANTED", ad_personalization: "GRANTED" },
+    // Analítica aceptada (si no, no se llega aquí); las señales de publicidad, según Publicidad.
+    consent: {
+      ad_user_data: input.adsConsent === "granted" ? "GRANTED" : "DENIED",
+      ad_personalization: input.adsConsent === "granted" ? "GRANTED" : "DENIED",
+    },
     events: [
       {
         name: "purchase",
