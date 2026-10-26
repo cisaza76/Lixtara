@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { getActiveProperties, getActiveListingMlsRefs, isDemoListing } from "@/lib/properties";
@@ -20,6 +21,17 @@ import {
   propertySearchQuery,
   type RawSearchParams,
 } from "@/lib/property-search";
+
+// Título y descripción propios; canonical y hreflang los hereda del layout.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  const copy = t(isLocale(lang) ? lang : "en").properties;
+  return { title: `${copy.metaTitle} | Lixtara`, description: copy.metaDescription };
+}
 
 export default async function PropertiesPage({
   params,

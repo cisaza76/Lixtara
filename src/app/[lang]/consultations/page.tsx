@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import {
@@ -9,6 +10,17 @@ import { legalReferralBullet } from "@/config/legalPartner";
 import { FootnoteText } from "@/components/footnote-text";
 import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
 import { ConsultationCheckoutButton } from "@/components/consultation-checkout-button";
+
+// Título y descripción propios; canonical y hreflang los hereda del layout.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  const copy = t(isLocale(lang) ? lang : "en").consultations;
+  return { title: `${copy.metaTitle} | Lixtara`, description: copy.metaDescription };
+}
 
 export default async function ConsultationsPage({
   params,

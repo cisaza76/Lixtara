@@ -208,6 +208,8 @@ export const dictionaries = {
     },
     consultations: {
       eyebrow: "Expert consultations",
+      metaTitle: "Consultations with a Florida realtor",
+      metaDescription: "Buy prepaid hours with a licensed Florida realtor and book them when you need them: strategy, pricing, comparables and how the sale works.",
       title: "Talk to a licensed realtor.",
       body: "Buy prepaid hours and book when you need them: strategy, pricing, comparables and how the sale works.",
       ctaBuy: "Get started",
@@ -881,6 +883,8 @@ export const dictionaries = {
     },
     properties: {
       eyebrow: "Florida listings",
+      metaTitle: "Florida properties for sale",
+      metaDescription: "Search Florida properties for sale by county, ZIP code, price, bedrooms and bathrooms, presented by a licensed Florida real estate brokerage.",
       titleBefore: "Available ",
       titleAccent: "now",
       titleAfter: ".",
@@ -1271,6 +1275,8 @@ export const dictionaries = {
     },
     services: {
       eyebrow: "Services",
+      metaTitle: "Services for Florida home sellers",
+      metaDescription: "Add-ons for your flat-fee listing: professional photography, hourly consultations with a licensed Florida realtor and AI virtual staging.",
       titleBefore: "Everything you need, ",
       titleAccent: "à la carte",
       titleAfter: ".",
@@ -2243,6 +2249,8 @@ export const dictionaries = {
     },
     consultations: {
       eyebrow: "Consultas con expertos",
+      metaTitle: "Consultas con un Realtor en Florida",
+      metaDescription: "Compra horas prepagadas con un Realtor licenciado en Florida y agenda cuando las necesites: estrategia, precio, comparables y cómo funciona la venta.",
       title: "Habla con un Realtor licenciado.",
       body: "Compra horas prepagadas y agenda cuando las necesites: estrategia, precio, comparables y cómo funciona la venta.",
       ctaBuy: "Empezar",
@@ -2916,6 +2924,8 @@ export const dictionaries = {
     },
     properties: {
       eyebrow: "Propiedades en Florida",
+      metaTitle: "Propiedades en venta en Florida",
+      metaDescription: "Busca propiedades en venta en Florida por condado, código postal, precio, habitaciones y baños, presentadas por una inmobiliaria licenciada en Florida.",
       titleBefore: "Disponibles ",
       titleAccent: "ahora",
       titleAfter: ".",
@@ -3306,6 +3316,8 @@ export const dictionaries = {
     },
     services: {
       eyebrow: "Servicios",
+      metaTitle: "Servicios para vender tu casa en Florida",
+      metaDescription: "Complementos para tu listado con tarifa fija: fotografía profesional, consultas por hora con un Realtor licenciado en Florida y staging virtual con IA.",
       titleBefore: "Todo lo que necesitas, ",
       titleAccent: "a la carta",
       titleAfter: ".",

@@ -1,9 +1,21 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { isLocale, t } from "@/lib/i18n";
 import { fillPricingCopy } from "@/lib/pricing-tiers";
 import { FootnoteText } from "@/components/footnote-text";
 import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
+
+// Título y descripción propios; canonical y hreflang los hereda del layout.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  const copy = t(isLocale(lang) ? lang : "en").services;
+  return { title: `${copy.metaTitle} | Lixtara`, description: copy.metaDescription };
+}
 
 export default async function ServicesPage({
   params,
