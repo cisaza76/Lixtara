@@ -23,10 +23,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // Sin idioma (/, /about, …) → idioma por defecto. 308: el idioma por defecto es fijo, no
+  // depende del navegador. Si algún día se elige por Accept-Language, esto vuelve a 307.
   if (!isLocale(firstSegment)) {
     const url = request.nextUrl.clone();
     url.pathname = `/${defaultLocale}${pathname === "/" ? "" : pathname}`;
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(url, 308);
   }
 
   // Ficha pública de un listing: 410 Gone si fue retirado / vencido / cerrado; 404 si no
