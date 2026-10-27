@@ -6,13 +6,16 @@ import { BROKERAGE } from "@/config/brokerage";
 import { CONTACT } from "@/config/contact";
 import { t } from "@/lib/i18n";
 import { PROTECTION_NOTICE_DAYS, PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
-import { ERS21TN_FIELDS, fitsOnLine } from "./ers21tn-layout";
+import { ERS21TN_FIELDS, fitsOnLine, textField, textRoom, textWidthPt } from "./ers21tn-layout";
 import {
   ADDITIONAL_TERMS_LABELS,
+  addCalendarMonths,
   additionalTermsClauses,
   attachmentHtml,
   contractPhone,
   listingAgreementTabs,
+  longDate,
+  nyCalendarDate,
   splitOverLabels,
   splitOverLines,
   usDate,
@@ -275,8 +278,55 @@ describe("Listing Agreement: valores por línea", () => {
     expect(route).toContain("seller: { phone: profile?.phone ?? null, email: signerEmail }");
   });
 
+  it("párrafo 15 dentro del margen: cada línea deja el inset de DocuSign (5.5 pt) y termina ≥ 10 pt antes del fin de la raya", () => {
+    // v2 (2026-10-26): L231 y L235 llegaban al fin de la raya (567.7 pt) con 2 pt de holgura.
+    for (const tier of Object.values(PRICING_TIERS)) {
+      const r = run({ tier });
+      for (const label of ADDITIONAL_TERMS_LABELS) {
+        const f = ERS21TN_FIELDS.find((x) => x.kind === "text" && x.label === label) as { x: number; width: number };
+        const end = f.x + 5.5 + textWidthPt(r.text[label]);
+        expect(end, `${tier.id} ${label}`).toBeLessThanOrEqual(f.x + f.width - 8);
+      }
+    }
+    expect(textRoom("additional_terms_2")).toBe(textField("additional_terms_2").width - 6.5);
+  });
+
   it("fechas del plazo: hoy y hoy + 24 meses", () => {
     expect(run().text).toMatchObject({ start_date: "October 21, 2026", termination_date: "October 21, 2028" });
+  });
+
+  it("fechas en Nueva York, nunca UTC (bug de producción 2026-10-26: 22:05 EDT salía «October 27»)", () => {
+    const at = (iso: string) => run({ today: new Date(iso) }).text;
+    // El caso de producción: 02:05 UTC del 27 = 22:05 EDT del 26.
+    expect(at("2026-10-27T02:05:00Z")).toMatchObject({ start_date: "October 26, 2026", termination_date: "October 26, 2028" });
+    // Borde de medianoche con EDT (UTC−4): 03:30Z = 23:30 del 26; 04:30Z = 00:30 del 27.
+    expect(at("2026-10-27T03:30:00Z").start_date).toBe("October 26, 2026");
+    expect(at("2026-10-27T04:30:00Z").start_date).toBe("October 27, 2026");
+    // Con EST (UTC−5): 04:30Z del 1 de diciembre = 23:30 del 30 de noviembre.
+    expect(at("2026-12-01T04:30:00Z")).toMatchObject({ start_date: "November 30, 2026", termination_date: "November 30, 2028" });
+    expect(at("2026-12-01T05:30:00Z").start_date).toBe("December 1, 2026");
+    // Cambio de hora de marzo (8 de marzo de 2026, 02:00 EST → 03:00 EDT).
+    expect(at("2026-03-08T04:59:00Z").start_date).toBe("March 7, 2026"); // 23:59 EST del 7
+    expect(at("2026-03-08T05:00:00Z").start_date).toBe("March 8, 2026"); // 00:00 EST del 8
+    expect(at("2026-03-09T03:59:00Z").start_date).toBe("March 8, 2026"); // 23:59 EDT del 8
+    // Cambio de hora de noviembre (1 de noviembre de 2026, 02:00 EDT → 01:00 EST).
+    expect(at("2026-11-01T03:59:00Z").start_date).toBe("October 31, 2026"); // 23:59 EDT del 31
+    expect(at("2026-11-01T04:00:00Z").start_date).toBe("November 1, 2026"); // 00:00 EDT del 1
+    expect(at("2026-11-02T04:59:00Z").start_date).toBe("November 1, 2026"); // 23:59 EST del 1
+  });
+
+  it("el vencimiento sale de la fecha de inicio en Nueva York, con el último día del mes si no existe", () => {
+    const at = (iso: string, over: Partial<AgreementInput> = {}) => run({ today: new Date(iso), ...over }).text.termination_date;
+    // 31 de enero a las 22:00 EST (03:00Z del 1 de febrero): inicio 31 de enero → vence 31 de enero.
+    expect(at("2026-02-01T03:00:00Z")).toBe("January 31, 2028");
+    // 29 de febrero de 2028 + 24 meses → 28 de febrero de 2030 (no 1 de marzo).
+    expect(at("2028-02-29T15:00:00Z")).toBe("February 28, 2030");
+    expect(addCalendarMonths({ y: 2026, m: 8, d: 31 }, 1)).toEqual({ y: 2026, m: 9, d: 30 });
+    expect(addCalendarMonths({ y: 2026, m: 12, d: 15 }, 2)).toEqual({ y: 2027, m: 2, d: 15 });
+    // Otro plazo del plan: la misma regla.
+    expect(at("2026-10-27T02:05:00Z", { tier: { ...PRICING_TIERS.pro, termMonths: 12 } })).toBe("October 26, 2027");
+    expect(nyCalendarDate(new Date("2026-10-27T02:05:00Z"))).toEqual({ y: 2026, m: 10, d: 26 });
+    expect(longDate({ y: 2026, m: 10, d: 26 })).toBe("October 26, 2026");
   });
 
   it("utilidades: fecha MM/DD/YYYY, reparto en dos líneas, anexo sin HTML inyectado", () => {

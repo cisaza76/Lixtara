@@ -33,7 +33,7 @@ import { CONTACT } from "@/config/contact";
 import { PROTECTION_NOTICE_DAYS, PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
 import type { PricingTier } from "@/lib/pricing-tiers";
 import { savedFinancing } from "@/lib/financing-terms";
-import { fitsOnLine, textWidthPt, textField } from "./ers21tn-layout";
+import { PARAGRAPH_RIGHT_MARGIN_PT, fitsOnLine, textRoom, textWidthPt } from "./ers21tn-layout";
 
 export interface AgreementListing {
   address_street: string;
@@ -95,7 +95,32 @@ export interface AgreementTabs {
   legalStatus: "verified" | "pending";
 }
 
-const LONG_DATE: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
+/** A calendar date (no time, no zone). */
+export type CalendarDate = { y: number; m: number; d: number };
+
+/**
+ * The calendar date in Miami (America/New_York) at `instant`. The contract's dates are New York
+ * dates, never UTC: an envelope sent at 22:05 EDT on Oct 26 (02:05 UTC Oct 27) said "start
+ * October 27" while DocuSign dated the signatures Oct 26 (production, 2026-10-26).
+ */
+export function nyCalendarDate(instant: Date): CalendarDate {
+  const [y, m, d] = instant.toLocaleDateString("en-CA", { timeZone: "America/New_York" }).split("-").map(Number);
+  return { y, m, d };
+}
+
+/** `date` + `months`, clamped to the month's last day (Aug 31 + 1 month = Sep 30, not Oct 1). */
+export function addCalendarMonths(date: CalendarDate, months: number): CalendarDate {
+  const index = date.y * 12 + (date.m - 1) + months;
+  const y = Math.floor(index / 12);
+  const m = (index % 12) + 1;
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { y, m, d: Math.min(date.d, lastDay) };
+}
+
+/** { 2026, 10, 26 } → "October 26, 2026". */
+export function longDate({ y, m, d }: CalendarDate): string {
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+}
 
 /** "2026-12-31" → "12/31/2026" (the lease date the form expects). Anything else → "". */
 export function usDate(iso: string | null): string {
@@ -142,7 +167,8 @@ export function clausesOverLabels(clauses: string[], labels: string[]): string[]
   for (const clause of clauses) {
     const rest = labels.slice(out.length);
     let lines: string[] | null = null;
-    for (let k = 1; k <= rest.length && !lines; k++) lines = splitOverLabels(clause, rest.slice(0, k));
+    // Running text: it keeps the paragraph margin (L231 and L235 reached the rule's end, 2026-10-26).
+    for (let k = 1; k <= rest.length && !lines; k++) lines = splitOverLabels(clause, rest.slice(0, k), PARAGRAPH_RIGHT_MARGIN_PT);
     if (!lines) return null;
     out.push(...lines);
   }
@@ -151,15 +177,16 @@ export function clausesOverLabels(clauses: string[], labels: string[]): string[]
 export const ADDITIONAL_TERMS_LABELS = Array.from({ length: 15 }, (_, i) => `additional_terms_${i + 1}`);
 
 /**
- * Splits `text` over the lines `labels`, in order, word by word. null when it doesn't fit in
- * all of them: the caller then uses the attachment.
+ * Splits `text` over the lines `labels`, in order, word by word, leaving `rightMargin` pt more
+ * free at the end of each line. null when it doesn't fit in all of them: the caller then uses
+ * the attachment.
  */
-export function splitOverLabels(text: string, labels: string[]): string[] | null {
+export function splitOverLabels(text: string, labels: string[], rightMargin = 0): string[] | null {
   const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   const out: string[] = [];
   let i = 0;
   for (const label of labels) {
-    const room = textField(label).width - 2;
+    const room = textRoom(label) - rightMargin;
     let line = "";
     for (; i < words.length; i++) {
       const next = line ? `${line} ${words[i]}` : words[i];
@@ -185,8 +212,9 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
   const { listing: p, tier, buyerOffer } = input;
   const attachment: AttachmentSection[] = [];
 
-  const termination = new Date(input.today);
-  termination.setMonth(termination.getMonth() + (tier.termMonths ?? 24));
+  // Start = today in New York; the term (24 months…) runs from that date.
+  const start = nyCalendarDate(input.today);
+  const termination = addCalendarMonths(start, tier.termMonths ?? 24);
 
   // Line 15–16: legal description, only verified, only if it fits.
   const legalOneLine = (input.verifiedLegal ?? "").replace(/\s*\n\s*/g, "; ").trim();
@@ -250,8 +278,8 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
   const text: Record<string, string> = {
     seller_name: input.sellerName,
     broker_name: input.brokerName,
-    start_date: input.today.toLocaleDateString("en-US", LONG_DATE),
-    termination_date: termination.toLocaleDateString("en-US", LONG_DATE),
+    start_date: longDate(start),
+    termination_date: longDate(termination),
     street_address: p.address_street,
     city_state_zip: cityStateZip,
     legal_description: legalLines?.[0] ?? "",

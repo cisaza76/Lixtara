@@ -134,13 +134,16 @@ describe("arreglos de la plantilla ERS-21tn", () => {
   it("iniciales: las del vendedor y las de la broker van al espacio del pie de cada página, más chicas", () => {
     const seller = planInitialFixes(demoTemplate(), "Seller");
     expect(seller).toHaveLength(6);
-    for (const s of seller) expect(s.changes).toMatchObject({ yPosition: [expect.any(String), "708"], scaleValue: ["", "0.5"] });
+    for (const s of seller) expect(s.changes).toMatchObject({ yPosition: [expect.any(String), "710"], scaleValue: ["", "0.5"] });
+    // El marco de DocuSign (y + 5.5 … y + 20.6 a escala 0.5) no toca L106 (descendentes en 713.9,
+    // página 2), L204 (710.3) ni el pie de la página 1 (709.2): 2026-10-26, la v2 lo tocaba en y 708.
+    for (const i of ERS21TN_INITIALS) expect(i.y + 5.5).toBeGreaterThanOrEqual(713.9 + 1.5);
     expect(seller.find((s) => s.label === "Seller initials p1")!.changes!.xPosition).toEqual(["73", "81"]);
     // Sin iniciales de la broker en el ejemplo: se crean, una por página.
     const broker = planInitialFixes({}, "Broker");
     expect(broker.map((s) => s.action)).toEqual(Array(6).fill("create"));
     expect(broker.map((s) => (s.tab as { xPosition: string }).xPosition)).toEqual(Array(6).fill("270"));
-    // Dentro del espacio de 24 pt de cada parte, y por debajo del texto de la página (y 712).
+    // Dentro del espacio de 24 pt de cada parte.
     for (const i of ERS21TN_INITIALS) expect(i.x).toBeGreaterThanOrEqual(i.role === "Seller" ? 77 : 266);
     const after = applyLocally(demoTemplate(), seller);
     expect(planInitialFixes(after, "Seller")).toEqual([]);
