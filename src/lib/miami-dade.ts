@@ -135,9 +135,18 @@ export interface CountyCandidate {
   SiteUnit?: unknown;
 }
 
+// Direccionales escritas completas → la abreviatura que usa el condado. Google Places
+// devuelve "10279 Northwest 30th Terrace" y el condado "10279 NW 30 TER" (auditoría #04,
+// 2026-10-26: sin esto, "NORTHWEST" se tomaba como nombre de la calle y no había match).
+const DIRECTION_WORDS: Record<string, string> = {
+  NORTH: "N", SOUTH: "S", EAST: "E", WEST: "W",
+  NORTHEAST: "NE", NORTHWEST: "NW", SOUTHEAST: "SE", SOUTHWEST: "SW",
+};
+
 function normToken(t: string): string {
-  // "6th" → "6", "Ave." → "AVE"
-  return t.toUpperCase().replace(/[.,#]/g, "").replace(/^(\d+)(ST|ND|RD|TH)$/, "$1");
+  // "6th" → "6", "Ave." → "AVE", "Northwest" → "NW"
+  const u = t.toUpperCase().replace(/[.,#]/g, "").replace(/^(\d+)(ST|ND|RD|TH)$/, "$1");
+  return DIRECTION_WORDS[u] ?? u;
 }
 
 /** Número de casa + primera palabra del nombre de la calle (sin direccionales). */

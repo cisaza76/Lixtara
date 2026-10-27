@@ -52,7 +52,7 @@ import { baseStreetForLookup, lookupMiamiDadeProperty, unitFromStoredStreet } fr
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
-import { validateUsAddress } from "@/lib/geocode";
+import { countyForAddress, isMiamiDadeCounty, validateUsAddress } from "@/lib/geocode";
 import { TourCoaching } from "@/components/tour-coaching";
 import { PhotographyCheckoutButton } from "@/components/photography-checkout-button";
 import { PhotoUploader } from "@/components/photo-uploader";
@@ -289,6 +289,8 @@ export default async function ListingNewPage({
   }
 
   let draft: Draft | null = null;
+  let step3County: string | null = null;
+  let step3MiamiDade: boolean | null = null;
   let photos: Array<{
     id: string;
     url: string;
@@ -423,11 +425,24 @@ export default async function ListingNewPage({
     // still placeholders) + Rentcast comps (if not fetched yet). Runs server-
     // side on entry to Step 3 so the form pre-populates with real data + the
     // comps panel renders immediately.
+    // Step 3: county from Google geocoding (administrative_area_level_2), not the ZIP —
+    // 33xxx also covers Broward (333xx) and Palm Beach (334xx). null = unknown (no key,
+    // error, quota): no county lookup is offered and no "outside Miami-Dade" notice shown.
+    if (step === 3 && draft) {
+      step3County = await countyForAddress(
+        baseStreetForLookup(draft.address_street),
+        draft.address_city,
+        draft.address_state,
+        draft.address_zip,
+      );
+      step3MiamiDade = step3County === null ? null : isMiamiDadeCounty(step3County);
+    }
+
     if (step === 3 && draft) {
       const tasks: Promise<unknown>[] = [];
       const updates: Record<string, unknown> = {};
 
-      const isMiamiDade = /^33\d{3}$/.test(draft.address_zip);
+      const isMiamiDade = step3MiamiDade === true;
       const fieldsEmpty =
         draft.bedrooms === 0 &&
         draft.sqft === 0 &&
@@ -469,17 +484,18 @@ export default async function ListingNewPage({
             draft.address_state,
             draft.address_zip,
           ).then((rc) => {
-            if (rc) {
-              updates.price_comps = rc.comps;
-              updates.price_estimate_low = rc.priceLow;
-              updates.price_estimate_high = rc.priceHigh;
+            if (rc.status === "ok") {
+              updates.price_comps = rc.estimate.comps;
+              updates.price_estimate_low = rc.estimate.priceLow;
+              updates.price_estimate_high = rc.estimate.priceHigh;
               updates.price_comps_fetched_at = new Date().toISOString();
-            } else {
+            } else if (rc.status === "no_data") {
               // Mark as fetched to avoid retrying on every page load. Empty
               // comps means "no data for this area" — user fills price manually.
               updates.price_comps = [];
               updates.price_comps_fetched_at = new Date().toISOString();
             }
+            // "error": nothing is stored, so the next visit retries.
           }),
         );
       }
@@ -994,14 +1010,20 @@ export default async function ListingNewPage({
       row.address_state,
       row.address_zip,
     );
-    const update = rc
-      ? {
-          price_comps: rc.comps,
-          price_estimate_low: rc.priceLow,
-          price_estimate_high: rc.priceHigh,
-          price_comps_fetched_at: new Date().toISOString(),
-        }
-      : { price_comps: [], price_comps_fetched_at: new Date().toISOString() };
+    // A failed lookup keeps the comparables already stored instead of wiping them.
+    if (rc.status === "error") {
+      revalidatePath(`/${lang}/listing/new`);
+      return;
+    }
+    const update =
+      rc.status === "ok"
+        ? {
+            price_comps: rc.estimate.comps,
+            price_estimate_low: rc.estimate.priceLow,
+            price_estimate_high: rc.estimate.priceHigh,
+            price_comps_fetched_at: new Date().toISOString(),
+          }
+        : { price_comps: [], price_comps_fetched_at: new Date().toISOString() };
     await supabase
       .from("properties")
       .update(update)
@@ -2039,18 +2061,26 @@ export default async function ListingNewPage({
               </div>
             </div>
           )}
-          {draft && draft.bedrooms > 0 && /^33\d{3}$/.test(draft.address_zip) && (
+          {draft && draft.bedrooms > 0 && step3MiamiDade && (
             <SuccessBanner message={copy.step3.autoFilledNote} />
           )}
-          <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-3">
-            <form action={autofillStep3}>
-              <input type="hidden" name="id" value={draftId ?? ""} />
-              <SecondaryButton>{copy.step3.autofillButton}</SecondaryButton>
-            </form>
-            <p className="text-xs text-ink/55 leading-relaxed">
-              {copy.step3.autofillCaption}
+          {/* Only where Google places the address in Miami-Dade County. */}
+          {draft && step3MiamiDade === false && step3County && (
+            <p className="text-sm text-ink/70 border border-gold-soft bg-ivory-strong/40 p-5 leading-relaxed">
+              {copy.step3.autofillOutsideCounty}
             </p>
-          </div>
+          )}
+          {draft && step3MiamiDade && (
+            <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-3">
+              <form action={autofillStep3}>
+                <input type="hidden" name="id" value={draftId ?? ""} />
+                <SecondaryButton>{copy.step3.autofillButton}</SecondaryButton>
+              </form>
+              <p className="text-xs text-ink/55 leading-relaxed">
+                {copy.step3.autofillCaption}
+              </p>
+            </div>
+          )}
           {autofillMessage && (
             autofillResult === "notfound" ? (
               <ErrorBanner message={autofillMessage} />
@@ -2133,7 +2163,16 @@ export default async function ListingNewPage({
 
               {draft.price_comps.length === 0 ? (
                 <p className="text-sm text-ink/60 italic">
-                  {copy.step3.compsEmpty}
+                  {copy.step3.compsEmpty}{" "}
+                  {/* New tab: the step 3 form isn't saved yet. */}
+                  <a
+                    href={`/${lang}/consultations`}
+                    target="_blank"
+                    rel="noopener"
+                    className="not-italic font-medium text-ink underline underline-offset-2 hover:text-gold"
+                  >
+                    {copy.step3.compsEmptyCta}
+                  </a>
                 </p>
               ) : (
                 <>
