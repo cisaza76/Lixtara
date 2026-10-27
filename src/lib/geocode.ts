@@ -99,3 +99,47 @@ export async function validateUsAddress(
     ...(typeof lat === "number" && typeof lng === "number" ? { lat, lng } : {}),
   };
 }
+
+/**
+ * Condado de la dirección según Google (`administrative_area_level_2`, p. ej. "Miami-Dade
+ * County"). Decide si el paso 3 consulta el registro de Miami-Dade (decisión del owner
+ * 2026-10-26, auditoría #04: el ZIP 33xxx no sirve, Broward es 333xx y Palm Beach 334xx).
+ * null = no se pudo saber (sin clave, error, cuota): el paso 3 no ofrece la consulta.
+ */
+export async function countyForAddress(
+  street: string,
+  city: string,
+  state: string,
+  zip: string,
+): Promise<string | null> {
+  const key =
+    process.env.GOOGLE_GEOCODING_API_KEY ??
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!key) return null;
+  const address = `${street}, ${city}, ${state} ${zip}`;
+  const url =
+    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}` +
+    `&components=country:US&key=${key}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      status?: string;
+      results?: Array<{
+        address_components?: Array<{ long_name: string; types: string[] }>;
+      }>;
+    };
+    if (data.status !== "OK") return null;
+    const county = data.results?.[0]?.address_components?.find((c) =>
+      c.types.includes("administrative_area_level_2"),
+    )?.long_name;
+    return county?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** "Miami-Dade County" (y variantes de escritura) → true. */
+export function isMiamiDadeCounty(county: string | null | undefined): boolean {
+  return /^miami[\s-]*dade(\s+county)?$/i.test(String(county ?? "").trim());
+}
