@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { stepState } from "@/lib/step-progress";
 
 interface Props {
   stepNumber: number;
@@ -10,6 +11,8 @@ interface Props {
   titleAfter: string;
   stepLabel: string;
   ofLabel: string;
+  /** El paso actual ya terminó (p. ej. acuerdo firmado): la franja lo marca como hecho. */
+  currentStepDone?: boolean;
   children: ReactNode;
 }
 
@@ -23,6 +26,7 @@ export function StepShell({
   titleAfter,
   stepLabel,
   ofLabel,
+  currentStepDone = false,
   children,
 }: Props) {
   return (
@@ -47,10 +51,15 @@ export function StepShell({
           <ol className="mt-6 grid grid-cols-4 md:grid-cols-8 gap-2">
             {stepNames.map((name, i) => {
               const num = i + 1;
-              const done = num < stepNumber;
-              const active = num === stepNumber;
+              const state = stepState(num, stepNumber, currentStepDone);
+              const done = state === "done";
+              const active = state === "active";
               return (
-                <li key={name} className="flex flex-col gap-1.5">
+                <li
+                  key={name}
+                  className="flex flex-col gap-1.5"
+                  aria-current={num === stepNumber ? "step" : undefined}
+                >
                   <div
                     className={`h-px ${
                       done || active ? "bg-gold" : "bg-gold-soft"
@@ -66,6 +75,7 @@ export function StepShell({
                     }`}
                   >
                     {String(num).padStart(2, "0")} · {name}
+                    {done && num === stepNumber ? " ✓" : null}
                   </span>
                 </li>
               );
