@@ -1,7 +1,7 @@
 // Plan de arreglos de la plantilla del Listing Agreement (ERS-21tn): con los errores que tenía
 // la plantilla Demo (2026-10-21), y que aplicarlo una vez deja la plantilla igual al layout. Sin red.
 import { describe, it, expect } from "vitest";
-import { ERS21TN_FIELDS, ERS21TN_INITIALS, ERS21TN_SELLER_SIGNATURES } from "./ers21tn-layout";
+import { ERS21TN_BROKER_SIGNATURES, ERS21TN_FIELDS, ERS21TN_INITIALS, ERS21TN_SELLER_SIGNATURES } from "./ers21tn-layout";
 import { formatPlan, planInitialFixes, planSignatureFixes, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "./template-fix-plan";
 
 let n = 0;
@@ -170,6 +170,27 @@ describe("arreglos de la plantilla ERS-21tn", () => {
     // La firma de la página 6 no se toca, y aplicado una vez el plan queda vacío.
     expect(plan.some((s) => s.label === "Signature" || s.label === "Date Signed")).toBe(false);
     expect(planSignatureFixes(applyLocally(live, plan))).toEqual([]);
+  });
+
+  it("página 6: contacto del vendedor en L247–249 y «email» en L257, de solo lectura; la fecha de L257 es la firma de la broker", () => {
+    const plan = planTemplateFixes(demoTemplate());
+    for (const [label, line] of [["seller_phone", 247], ["seller_address", 248], ["seller_email", 249]] as const) {
+      const s = find(plan, label)[0];
+      expect(s.action, label).toBe("create");
+      expect(s.tab, label).toMatchObject({ pageNumber: "6", locked: "true", height: "11", disableAutoSize: "true" });
+      expect(ERS21TN_FIELDS.find((f) => f.kind === "text" && f.label === label)?.line).toBe(line);
+    }
+    // Encima de su raya (L247 y 69.7, L248 y 92.7, L249 y 116.1), sin pasar a la de abajo.
+    expect(find(plan, "seller_phone")[0].tab).toMatchObject({ xPosition: "135", yPosition: "56", width: "96" });
+    expect(find(plan, "seller_email")[0].tab).toMatchObject({ yPosition: "102" });
+    const box = find(plan, "copy_returned_by_email")[0];
+    expect(box.tab).toMatchObject({ pageNumber: "6", locked: "true", xPosition: "330", yPosition: "304" });
+    // La fecha la pone DocuSign: dateSigned de la broker (firma la última), no un texto del sitio.
+    const broker = planSignatureFixes({}, ERS21TN_BROKER_SIGNATURES, "broker");
+    expect(broker.map((s) => [s.action, s.kind, s.label])).toEqual([["create", "dateSignedTabs", "copy_returned_date"]]);
+    expect(broker[0].tab).toMatchObject({ pageNumber: "6", xPosition: "194", yPosition: "302" });
+    expect(broker[0].reason).toMatch(/^broker's date, line 257/);
+    expect(planSignatureFixes(applyLocally({}, broker), ERS21TN_BROKER_SIGNATURES, "broker")).toEqual([]);
   });
 
   it("aplicado una vez, el siguiente plan está vacío (idempotente)", () => {

@@ -22,7 +22,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getAccessToken } from "../../src/lib/docusign";
-import { ERS21TN_FIELDS } from "../../src/lib/docusign/ers21tn-layout";
+import { ERS21TN_BROKER_SIGNATURES, ERS21TN_FIELDS } from "../../src/lib/docusign/ers21tn-layout";
 import { formatPlan, planInitialFixes, planSignatureFixes, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "../../src/lib/docusign/template-fix-plan";
 import { apiBase, dsGet } from "./dump-templates";
 
@@ -57,11 +57,14 @@ async function recipientOf(templateId: string, role: string): Promise<Recipient>
   return signer;
 }
 
-/** Seller: every field the site fills, the seller's initials and page-4 signatures; Broker: the broker's initials. */
+/** Seller: every field the site fills, the seller's initials and page-4 signatures; Broker: the broker's initials and the L257 date. */
 async function planFor(templateId: string, role: string): Promise<{ recipientId: string; steps: PlanStep[] }> {
   const r = await recipientOf(templateId, role);
   const tabs = r.tabs ?? {};
-  const steps = role === SELLER_ROLE ? [...planTemplateFixes(tabs, { anchors: ANCHORS }), ...planInitialFixes(tabs, "Seller"), ...planSignatureFixes(tabs)] : planInitialFixes(tabs, "Broker");
+  const steps =
+    role === SELLER_ROLE
+      ? [...planTemplateFixes(tabs, { anchors: ANCHORS }), ...planInitialFixes(tabs, "Seller"), ...planSignatureFixes(tabs)]
+      : [...planInitialFixes(tabs, "Broker"), ...planSignatureFixes(tabs, ERS21TN_BROKER_SIGNATURES, "broker")];
   return { recipientId: r.recipientId, steps };
 }
 

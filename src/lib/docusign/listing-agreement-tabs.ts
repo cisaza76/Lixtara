@@ -14,6 +14,9 @@
 //     with the % or amount on line 150; 0% → 10(c); never 10(a). One choice, read-only;
 //   - the brokerage on lines 159, 171 (the second one) and 254–256: name, address, phone. The
 //     broker signs and dates line 254 herself.
+//   - lines 247–249 (owner, 2026-10-26): the seller's phone, address (mailing if stored, else
+//     the property's) and email, read-only; line 257: "email" checked, read-only; its date is the
+//     broker's dateSigned on the template (the day the envelope completes).
 //
 // Broker's decisions (Anamaria, 2026-10-21):
 //   - protection period (line 123) and retained deposits (line 128) from
@@ -49,10 +52,21 @@ export interface AgreementListing {
   pricing_tier: string | null;
 }
 
+/** The seller's contact on lines 247–249 (owner, 2026-10-26). */
+export interface SellerContact {
+  /** `users.phone` (sign-up), any format; null or empty → line 247 stays blank. */
+  phone: string | null;
+  /** The account email: the same address DocuSign sends the envelope to. */
+  email: string;
+  /** Mailing address, if the site ever stores one; none today → the property's address. */
+  mailingAddress?: string | null;
+}
+
 export interface AgreementInput {
   listing: AgreementListing;
   tier: PricingTier;
   sellerName: string;
+  seller: SellerContact;
   brokerName: string;
   buyerOffer: BuyerCompOffer;
   /** From verifiedLegalDescription(): null when it couldn't be verified. */
@@ -87,6 +101,17 @@ const LONG_DATE: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", 
 export function usDate(iso: string | null): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
   return m ? `${m[2]}/${m[3]}/${m[1]}` : "";
+}
+
+/**
+ * Line 247's phone. US numbers (10 digits, or 11 starting with 1) as "+1 (305) 555-0123", like
+ * the brokerage's on line 255; anything else as the seller typed it, trimmed; empty → "".
+ */
+export function contractPhone(raw: string | null): string {
+  const s = (raw ?? "").trim();
+  const d = s.replace(/\D/g, "");
+  const us = d.length === 10 ? d : d.length === 11 && d.startsWith("1") ? d.slice(1) : null;
+  return us && /^\+?[0-9 ().-]+$/.test(s) ? `+1 (${us.slice(0, 3)}) ${us.slice(3, 6)}-${us.slice(6)}` : s;
 }
 
 /** 650000 → "650,000"; 2.5 → "2.5" (the form prints the "$" or "%" itself). */
@@ -205,6 +230,19 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
   // Lockbox: Concierge always; Pro when the home is vacant. Essentials buys it as an add-on.
   const lockbox = tier.id === "concierge" || (tier.id === "pro" && p.occupancy_status === "vacant");
 
+  // Lines 247–249: the seller's contact. Address: the mailing address if there is one, else the
+  // property's. Longer than line 248 (or an email longer than 249) → "See Attachment".
+  const cityStateZip = [p.address_city, [p.address_state, p.address_zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const sellerAddress = input.seller.mailingAddress?.trim() || [p.address_street, cityStateZip].filter(Boolean).join(", ");
+  const addressFits = fitsOnLine("seller_address", sellerAddress);
+  if (!addressFits) attachment.push({ heading: "Seller's Address (line 248)", body: sellerAddress });
+  const sellerEmail = input.seller.email.trim();
+  const emailFits = fitsOnLine("seller_email", sellerEmail);
+  if (!emailFits) attachment.push({ heading: "Seller's Email Address (line 249)", body: sellerEmail });
+  const sellerPhone = contractPhone(input.seller.phone);
+  const phoneFits = fitsOnLine("seller_phone", sellerPhone);
+  if (!phoneFits) attachment.push({ heading: "Seller's Telephone (line 247)", body: sellerPhone });
+
   // Paragraph 15: a fixed text, checked to fit by the tests; never in the attachment.
   const additional = clausesOverLabels(additionalTermsClauses(tier), ADDITIONAL_TERMS_LABELS);
   if (!additional) throw new Error("paragraph 15 doesn't fit on lines 230–244");
@@ -215,7 +253,7 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     start_date: input.today.toLocaleDateString("en-US", LONG_DATE),
     termination_date: termination.toLocaleDateString("en-US", LONG_DATE),
     street_address: p.address_street,
-    city_state_zip: [p.address_city, [p.address_state, p.address_zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+    city_state_zip: cityStateZip,
     legal_description: legalLines?.[0] ?? "",
     legal_description_2: legalLines?.[1] ?? "",
     personal_property: personalFits ? personal : "",
@@ -236,6 +274,9 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
     brokerage_firm_name: BROKERAGE.legalName,
     brokerage_phone: CONTACT.phoneDisplay,
     brokerage_address: BROKERAGE.address,
+    seller_phone: phoneFits ? sellerPhone : "See Attachment",
+    seller_address: addressFits ? sellerAddress : "See Attachment",
+    seller_email: emailFits ? sellerEmail : "See Attachment",
     ...Object.fromEntries(ADDITIONAL_TERMS_LABELS.map((label, i) => [label, additional[i]])),
   };
 
@@ -252,6 +293,8 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
       financing_fha: financing.has("fha"),
       financing_other: financing.has("other"),
       lockbox_authorized: lockbox,
+      // Line 257: the copy goes back by email (DocuSign emails the completed envelope).
+      copy_returned_by_email: true,
     },
     lockedCheckbox: [
       "legal_see_attachment",
@@ -262,6 +305,7 @@ export function listingAgreementTabs(input: AgreementInput): AgreementTabs {
       "financing_fha",
       "financing_other",
       "lockbox_authorized",
+      "copy_returned_by_email",
     ],
     radio: {
       occupancy: { value: occupancy, locked: occupancy !== null, options: ["is", "is_not"] },

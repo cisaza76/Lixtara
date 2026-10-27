@@ -161,10 +161,22 @@ export const ERS21TN_FIELDS: LayoutField[] = [
   ...ADDITIONAL_TERMS_UNDERLINES.map((u, i) =>
     text({ label: `additional_terms_${i + 1}`, line: 230 + i, page: 5, ...onBlank(i === 0 ? 157.5 : 50.5, i === 0 ? 569 : 567.5, u), ...(i === 0 ? { anchor: "Additional Terms:" } : {}), locked: true, required: false }),
   ),
-  // ── Page 6 ── the broker signs and dates line 254 herself.
+  // ── Page 6 ──
+  // Lines 247–249, the seller's contact (owner, 2026-10-26): phone on "Home Telephone" (Work
+  // Telephone and Facsimile stay blank), the mailing address (the property's: the site has no
+  // other), the email. Lines 251–253 are a second seller's: blank. Underlines measured on the
+  // template image, 2026-10-26.
+  text({ label: "seller_phone", line: 247, page: 6, ...onBlank(132.8, 232.9, 69.7), anchor: "Home Telephone:", locked: true, required: false }),
+  text({ label: "seller_address", line: 248, page: 6, ...onBlank(92.9, 571.3, 92.7), locked: true, required: true }),
+  text({ label: "seller_email", line: 249, page: 6, ...onBlank(120.6, 571.3, 116.1), locked: true, required: true }),
+  // The broker signs and dates line 254 herself.
   text({ label: "brokerage_firm_name", line: 255, page: 6, ...onBlank(154.5, 404.5, 253.5), anchor: "Brokerage Firm Name:", locked: true, required: true }),
   text({ label: "brokerage_phone", line: 255, page: 6, ...onBlank(460.5, 571.5, 253.5), locked: true, required: true }),
   text({ label: "brokerage_address", line: 256, page: 6, ...onBlank(92.5, 571, 276.5), locked: true, required: true }),
+  // Line 257, "Copy returned to Seller on ____ by [x] email": DocuSign emails every signer the
+  // completed envelope, so "email" is checked and read-only. The date is the broker's
+  // dateSigned (ERS21TN_BROKER_SIGNATURES). Box measured on the template image, 2026-10-26.
+  box({ label: "copy_returned_by_email", line: 257, page: 6, ...overBox(333.7, 307.8), locked: true }),
 ];
 
 /**
@@ -205,6 +217,15 @@ export const ERS21TN_SELLER_SIGNATURES: SignatureField[] = [
   { kind: "dateSignedTabs", label: "single_agent_date", line: 171, page: 4, ...dateOnLine(436, 255) },
   { kind: "signHereTabs", label: "transition_consent_signature", line: 201, page: 4, ...signOnLine(50.5, 666) },
   { kind: "dateSignedTabs", label: "transition_consent_date", line: 201, page: 4, ...dateOnLine(436, 666) },
+];
+
+/**
+ * The broker's date on line 257 ("Copy returned to Seller on ____"): blank 191.5–308.5,
+ * underline at 315.5. The broker signs last (routing order 2), so her dateSigned is the day
+ * DocuSign completes the envelope and emails the copy. Owner, 2026-10-26: DocuSign sets it.
+ */
+export const ERS21TN_BROKER_SIGNATURES: SignatureField[] = [
+  { kind: "dateSignedTabs", label: "copy_returned_date", line: 257, page: 6, ...dateOnLine(191.5, 315.5) },
 ];
 
 /** Height of every text tab: one line, no auto-grow. */

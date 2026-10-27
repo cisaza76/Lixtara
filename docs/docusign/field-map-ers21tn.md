@@ -49,7 +49,7 @@ PDF: imagen escaneada, sin texto (no se pueden usar anclas: posiciones por coord
 
 ## Después del arreglo (`scripts/docusign/apply-template-fixes.ts`)
 
-Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5). El vendedor firma y fecha además el aviso de single agent (L171) y el consentimiento a transaction broker (L201) (`ERS21TN_SELLER_SIGNATURES`, escala 0.65); L173 y L203 (segundo vendedor) quedan en blanco: el sitio tiene un vendedor por acuerdo. La firma y la fecha de la página 6 y el pie de Lixtara no cambian.
+Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5). El vendedor firma y fecha además el aviso de single agent (L171) y el consentimiento a transaction broker (L201) (`ERS21TN_SELLER_SIGNATURES`, escala 0.65); L173 y L203 (segundo vendedor) quedan en blanco: el sitio tiene un vendedor por acuerdo. En la página 6, el sitio llena el teléfono, la dirección y el email del vendedor (L247–249; L251–253, segundo vendedor, en blanco) y marca «email» en L257; la fecha de L257 es la fecha de firma de la broker (`ERS21TN_BROKER_SIGNATURES`), que firma la última. La firma y la fecha de L246 y L254 y el pie de Lixtara no cambian.
 
 | Línea | Campo | Tipo | Origen del dato | Obligatorio | Editable | Posición y tamaño | Auto-grow | Condición |
 |---|---|---|---|---|---|---|---|---|
@@ -99,10 +99,15 @@ Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-lay
 | 242 | `additional_terms_13` | text | `additionalTermsClauses()` (`listing-agreement-tabs.ts`), línea 13 de 15: tarifa fija, comisión solo al cierre, terminación sin cargo, período de protección; cada cláusula empieza en una línea | no | no | p5 x53 y578 · 513×11 · 9 pt | no | — |
 | 243 | `additional_terms_14` | text | `additionalTermsClauses()` (`listing-agreement-tabs.ts`), línea 14 de 15: tarifa fija, comisión solo al cierre, terminación sin cargo, período de protección; cada cláusula empieza en una línea | no | no | p5 x53 y598 · 513×11 · 9 pt | no | — |
 | 244 | `additional_terms_15` | text | `additionalTermsClauses()` (`listing-agreement-tabs.ts`), línea 15 de 15: tarifa fija, comisión solo al cierre, terminación sin cargo, período de protección; cada cláusula empieza en una línea | no | no | p5 x53 y618 · 513×11 · 9 pt | no | — |
+| 247 | `seller_phone` | text | `users.phone` (registro), formato `+1 (305) 555-0123` si es de EE. UU.; vacío si no hay. Work Telephone y Facsimile quedan en blanco | no | no | p6 x135 y56 · 96×11 · 9 pt | no | — |
+| 248 | `seller_address` | text | Dirección postal del vendedor; el sitio no guarda otra: la de la propiedad (`address_street`, `city_state_zip`) | sí | no | p6 x95 y79 · 474×11 · 9 pt | no | — |
+| 249 | `seller_email` | text | Email de la cuenta (el mismo al que DocuSign manda el sobre) | sí | no | p6 x123 y102 · 447×11 · 9 pt | no | — |
 | 255 | `brokerage_firm_name` | text | `BROKERAGE.legalName` (`src/config/brokerage.ts`) | sí | no | p6 x157 y240 · 246×11 · 9 pt | no | — |
 | 255 | `brokerage_phone` | text | `CONTACT.phoneDisplay` (`src/config/contact.ts`) | sí | no | p6 x463 y240 · 107×11 · 9 pt | no | — |
 | 256 | `brokerage_address` | text | `BROKERAGE.address` (`src/config/brokerage.ts`) | sí | no | p6 x95 y263 · 475×11 · 9 pt | no | — |
+| 257 | `copy_returned_by_email` | checkbox | Siempre marcada: DocuSign manda por email el sobre completado | no | no | p6 x330 y304 | — | — |
 | 171 | `single_agent_signature` | signHere | Firma del vendedor en el aviso de single agent (L171); L173 (segundo vendedor) sin tab: el sitio tiene un vendedor por acuerdo | sí | — | p4 x53 y232 · escala 0.65 | — | — |
 | 171 | `single_agent_date` | dateSigned | Fecha de firma del vendedor (L171) | sí | — | p4 x438 y241 · 9 pt | — | — |
 | 201 | `transition_consent_signature` | signHere | Firma del vendedor en el consentimiento a transaction broker (L201); L203 sin tab | sí | — | p4 x53 y643 · escala 0.65 | — | — |
 | 201 | `transition_consent_date` | dateSigned | Fecha de firma del vendedor (L201) | sí | — | p4 x438 y652 · 9 pt | — | — |
+| 257 | `copy_returned_date` | dateSigned | Fecha de firma de la broker (rol Broker, firma la última): el día en que DocuSign completa el sobre | sí | — | p6 x194 y302 · 9 pt | — | — |

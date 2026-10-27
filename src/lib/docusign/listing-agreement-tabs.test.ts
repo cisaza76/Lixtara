@@ -11,6 +11,7 @@ import {
   ADDITIONAL_TERMS_LABELS,
   additionalTermsClauses,
   attachmentHtml,
+  contractPhone,
   listingAgreementTabs,
   splitOverLabels,
   splitOverLines,
@@ -34,6 +35,7 @@ const base: AgreementInput = {
   },
   tier: PRICING_TIERS.pro,
   sellerName: "Test Seller",
+  seller: { phone: "305-555-0100", email: "test-seller@example.com" },
   brokerName: "Lixtara LLC",
   buyerOffer: { type: "percent", pct: 2.5 },
   verifiedLegal: "SABAL PALM COURT PB 46-66\nLOT 4 BLK 1",
@@ -229,6 +231,48 @@ describe("Listing Agreement: valores por línea", () => {
     }
     expect(r.attachment.some((a) => /Additional/i.test(a.heading))).toBe(false);
     expect(ERS21TN_FIELDS.filter((f) => f.kind === "text" && ADDITIONAL_TERMS_LABELS.includes(f.label)).map((f) => f.line)).toEqual(Array.from({ length: 15 }, (_, i) => 230 + i));
+  });
+
+  it("contacto del vendedor (L247–249) y copia por email (L257), de solo lectura", () => {
+    const r = run();
+    expect(r.text).toMatchObject({
+      seller_phone: "+1 (305) 555-0100",
+      // Sin dirección postal guardada: la de la propiedad.
+      seller_address: "200 S Biscayne Blvd, Unit 4, Miami, FL 33131",
+      seller_email: "test-seller@example.com",
+    });
+    for (const k of ["seller_phone", "seller_address", "seller_email"]) expect(r.lockedText, k).toContain(k);
+    expect(r.checkbox.copy_returned_by_email).toBe(true);
+    expect(r.lockedCheckbox).toContain("copy_returned_by_email");
+    // La fecha de L257 no la manda el sitio: la pone DocuSign (fecha de firma de la broker).
+    expect(Object.keys(r.text).some((k) => /copy_returned/.test(k))).toBe(false);
+    expect(r.attachment).toEqual([]);
+  });
+
+  it("contacto: postal si existe; sin teléfono, L247 en blanco; lo que no cabe va al anexo", () => {
+    expect(run({ seller: { phone: null, email: "a@example.com", mailingAddress: "PO Box 1, Doral, FL 33172" } }).text).toMatchObject({
+      seller_phone: "",
+      seller_address: "PO Box 1, Doral, FL 33172",
+    });
+    expect(run({ seller: { phone: "  ", email: "a@example.com" } }).text.seller_phone).toBe("");
+    const long = run({ seller: { phone: "+44 20 7946 0000 ext. 12345678", email: "a@example.com", mailingAddress: "x ".repeat(200) } });
+    expect(long.text).toMatchObject({ seller_phone: "See Attachment", seller_address: "See Attachment" });
+    expect(long.attachment.map((a) => a.heading)).toEqual(["Seller's Address (line 248)", "Seller's Telephone (line 247)"]);
+  });
+
+  it("teléfono de EE. UU. con el formato de la brokerage; otro país, como lo escribió", () => {
+    expect(contractPhone("3055550100")).toBe("+1 (305) 555-0100");
+    expect(contractPhone("+1 (305) 555-0100")).toBe("+1 (305) 555-0100");
+    expect(contractPhone("1-305-555-0100")).toBe("+1 (305) 555-0100");
+    expect(contractPhone("+57 300 123 4567")).toBe("+57 300 123 4567");
+    expect(contractPhone(null)).toBe("");
+    expect(fitsOnLine("seller_phone", contractPhone("3055550100"))).toBe(true);
+  });
+
+  it("el endpoint manda el teléfono del perfil y el email de la cuenta", () => {
+    const route = readFileSync("src/app/api/agreement/create/route.ts", "utf8");
+    expect(route).toContain('.select("first_name, last_name, phone")');
+    expect(route).toContain("seller: { phone: profile?.phone ?? null, email: signerEmail }");
   });
 
   it("fechas del plazo: hoy y hoy + 24 meses", () => {

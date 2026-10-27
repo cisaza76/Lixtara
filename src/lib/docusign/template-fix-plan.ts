@@ -18,7 +18,9 @@
 //   - protection period (L123), retained deposits (L128), cancellation fee (L207) and the
 //     additional terms (L230–233), read-only;
 //   - the seller's signature and date on the single agent notice (L171) and on the consent to
-//     transition to transaction broker (L201).
+//     transition to transaction broker (L201);
+//   - the seller's phone, address and email (L247–249), read-only; on L257 "email" checked and
+//     read-only, and the broker's dateSigned as the "Copy returned to Seller on" date.
 
 import {
   ERS21TN_FIELDS,
@@ -29,6 +31,7 @@ import {
   type CheckboxField,
   type LayoutField,
   type RadioGroupField,
+  type SignatureField,
   type TextField,
 } from "./ers21tn-layout";
 
@@ -257,12 +260,18 @@ export function planInitialFixes(live: LiveSellerTabs, role: "Seller" | "Broker"
 }
 
 /**
- * The seller's signatures and dates on page 4 (ERS21TN_SELLER_SIGNATURES), matched by label: the
- * signature and date of page 6 have other labels and stay as they are.
+ * Signatures and dates of one role, matched by label: the seller's on page 4
+ * (ERS21TN_SELLER_SIGNATURES, the default) or the broker's date on line 257
+ * (ERS21TN_BROKER_SIGNATURES). The signatures and dates of lines 246 and 254 have other labels
+ * and stay as they are.
  */
-export function planSignatureFixes(live: LiveSellerTabs): PlanStep[] {
+export function planSignatureFixes(
+  live: LiveSellerTabs,
+  fields: SignatureField[] = ERS21TN_SELLER_SIGNATURES,
+  who: "seller" | "broker" = "seller",
+): PlanStep[] {
   const steps: PlanStep[] = [];
-  for (const f of ERS21TN_SELLER_SIGNATURES) {
+  for (const f of fields) {
     const want: Record<string, string> = {
       tabLabel: f.label,
       pageNumber: String(f.page),
@@ -277,7 +286,7 @@ export function planSignatureFixes(live: LiveSellerTabs): PlanStep[] {
         action: "create",
         kind: f.kind,
         label: f.label,
-        reason: `seller's ${what}, line ${f.line}`,
+        reason: `${who}'s ${what}, line ${f.line}`,
         tab: { ...want, documentId: "1", tabType: f.kind === "signHereTabs" ? "signHere" : "dateSigned", ...(f.kind === "signHereTabs" ? { optional: "false" } : { font: "arial" }) },
       });
       continue;
@@ -288,7 +297,7 @@ export function planSignatureFixes(live: LiveSellerTabs): PlanStep[] {
       const same = k === "scaleValue" || k === "xPosition" || k === "yPosition" || k === "pageNumber" ? Number(before || NaN) === Number(v) : before.toLowerCase() === v.toLowerCase();
       if (!same) changes[k] = [before, v];
     }
-    if (Object.keys(changes).length > 0) steps.push({ action: "update", kind: f.kind, tabId: found.tabId, label: f.label, reason: `seller's ${what}, line ${f.line}`, changes });
+    if (Object.keys(changes).length > 0) steps.push({ action: "update", kind: f.kind, tabId: found.tabId, label: f.label, reason: `${who}'s ${what}, line ${f.line}`, changes });
   }
   return steps;
 }
