@@ -18,6 +18,12 @@ import { ListingCtaLink } from "@/components/listing-cta-link";
 import { LegalServicesDisclosure } from "@/components/legal-services-disclosure";
 import { SavingsSlider } from "@/components/savings-slider";
 
+/** Contenedor de sección y ritmo vertical de la portada y de /owners (auditoría CMO #02/#03). */
+export const SECTION_X = "mx-auto w-full max-w-7xl px-6 lg:px-12";
+export const SECTION_INNER = `${SECTION_X} py-14 lg:py-20`;
+/** Espacio entre el título de una sección (o su encabezado) y el contenido. */
+export const SECTION_TITLE_GAP = "mb-10 lg:mb-12";
+
 /** Ancla de la calculadora de ahorro ("See what you'd pay" del hero). */
 export const CALCULATOR_ANCHOR = "calculator";
 
@@ -25,11 +31,11 @@ export function HowItWorksSection({ lang }: { lang: Locale }) {
   const hiwCopy = t(lang).howItWorks;
   return (
     <section id="how-it-works" className="border-t border-gold-soft scroll-mt-20">
-      <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+      <div className={SECTION_INNER}>
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
           {hiwCopy.eyebrow}
         </p>
-        <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-16 lg:mb-20">
+        <h2 className={`font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl ${SECTION_TITLE_GAP}`}>
           {hiwCopy.titleBefore}
           <em className="italic text-gold">{hiwCopy.titleAccent}</em>
           {hiwCopy.titleAfter}
@@ -76,7 +82,7 @@ export function SavingsSection({ lang }: { lang: Locale }) {
   const prCopy = t(lang).pricing;
   return (
     <section id={CALCULATOR_ANCHOR} className="border-t border-gold-soft bg-ivory-strong/30 scroll-mt-20">
-      <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+      <div className={SECTION_INNER}>
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
           {savingsCopy.eyebrow}
         </p>
@@ -85,7 +91,7 @@ export function SavingsSection({ lang }: { lang: Locale }) {
           <em className="italic text-gold">{savingsCopy.titleAccent}</em>
           {savingsCopy.titleAfter}
         </h2>
-        <p className="max-w-2xl text-base leading-relaxed text-ink/70 mb-12 lg:mb-16">
+        <p className={`max-w-2xl text-base leading-relaxed text-ink/70 ${SECTION_TITLE_GAP}`}>
           {fillCommissionCopy(savingsCopy.body)}
         </p>
         <SavingsSlider
@@ -112,11 +118,11 @@ export function PricingSection({ lang }: { lang: Locale }) {
   const prCopy = t(lang).pricing;
   return (
     <section id="pricing" className="border-t border-gold-soft scroll-mt-20">
-      <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+      <div className={SECTION_INNER}>
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
           {prCopy.eyebrow}
         </p>
-        <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-16 lg:mb-20">
+        <h2 className={`font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl ${SECTION_TITLE_GAP}`}>
           {prCopy.titleBefore}
           <em className="italic text-gold">{prCopy.titleAccent}</em>
           {prCopy.titleAfter}

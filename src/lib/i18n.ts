@@ -19,8 +19,8 @@ export const dictionaries = {
       // {minFee} y {minPct}: el plan más bajo de pricing-tiers.ts (src/lib/pricing-from.ts).
       subheadline:
         "List on the MLS with a licensed brokerage and a broker with {brokerYears}+ years of experience. Plans from {minFee}, plus {minPct} only if your home sells.",
-      ctaPrimary: "See what you'd pay",
-      ctaSecondary: "Start my listing",
+      ctaPrimary: "Start my listing",
+      ctaSecondary: "See what you'd pay",
       licenseLabel: "FL License #{brokerageLicense}",
       verifyDbpr: "Verify on DBPR",
       opensNewTab: "(opens in a new tab)",
@@ -2079,8 +2079,8 @@ export const dictionaries = {
       headlineAfter: "",
       subheadline:
         "Publica en el MLS con una inmobiliaria licenciada y una broker con más de {brokerYears} años de experiencia. Planes desde {minFee}, más {minPct} solo si tu casa se vende.",
-      ctaPrimary: "Calcula cuánto pagarías",
-      ctaSecondary: "Publicar mi casa",
+      ctaPrimary: "Publicar mi casa",
+      ctaSecondary: "Calcula cuánto pagarías",
       licenseLabel: "Licencia FL #{brokerageLicense}",
       verifyDbpr: "Verificar en DBPR",
       opensNewTab: "(se abre en una pestaña nueva)",

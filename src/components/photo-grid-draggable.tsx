@@ -294,119 +294,130 @@ export function PhotoGridDraggable({
               onDragStart={() => handleDragStart(photo.id)}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(photo.id)}
-              className={`relative aspect-square overflow-hidden bg-ivory-strong border border-gold-soft group cursor-move transition-opacity ${
+              className={`flex flex-col border border-gold-soft bg-ivory cursor-move transition-opacity ${
                 draggingId === photo.id ? "opacity-40" : ""
-              } ${isStaging ? "opacity-60" : ""}`}
+              }`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {/* Clarity: la foto del inmueble va enmascarada; los botones de la tarjeta no. */}
-              <img
-                src={photo.url}
-                alt=""
-                data-clarity-mask="true"
-                className="w-full h-full object-cover pointer-events-none"
-              />
+              <div
+                className={`relative aspect-square overflow-hidden bg-ivory-strong ${
+                  isStaging ? "opacity-60" : ""
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* Clarity: la foto del inmueble va enmascarada; los botones de la tarjeta no. */}
+                <img
+                  src={photo.url}
+                  alt=""
+                  data-clarity-mask="true"
+                  className="w-full h-full object-cover pointer-events-none"
+                />
 
-              {photo.is_primary && (
-                <div className="absolute top-2 left-2 bg-gold text-ink text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1 pointer-events-none">
-                  {labels.primaryBadge}
-                </div>
-              )}
+                {photo.is_primary && (
+                  <div className="absolute top-2 left-2 bg-gold text-ink text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1 pointer-events-none">
+                    {labels.primaryBadge}
+                  </div>
+                )}
 
-              {photo.is_staged && (
-                <div className="absolute top-2 right-2 flex items-center gap-1 bg-ink/85 text-ivory text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1 pointer-events-none">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
-                  </svg>
-                  {labels.stagedBadge}
-                </div>
-              )}
+                {photo.is_staged && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 bg-ink/85 text-ivory text-[9px] font-semibold tracking-[0.2em] uppercase px-2 py-1 pointer-events-none">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
+                    </svg>
+                    {labels.stagedBadge}
+                  </div>
+                )}
 
-              {isStaging && (
-                <div className="absolute inset-0 flex items-center justify-center bg-ivory/70 pointer-events-none">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink animate-pulse">
-                    {labels.stagingNow}
-                  </p>
-                </div>
-              )}
+                {isStaging && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-ivory/70 pointer-events-none">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink animate-pulse">
+                      {labels.stagingNow}
+                    </p>
+                  </div>
+                )}
 
-              {isLiving && (
-                <div className="absolute inset-0 flex items-center justify-center bg-ivory/80 pointer-events-none p-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink text-center animate-pulse">
-                    {labels.livingGenerating}
-                  </p>
-                </div>
-              )}
+                {isLiving && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-ivory/80 pointer-events-none p-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink text-center animate-pulse">
+                      {labels.livingGenerating}
+                    </p>
+                  </div>
+                )}
 
-              {livingUrl && (
-                <a
-                  href={livingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 bg-gold px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink"
-                >
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M5 3l14 9-14 9V3z" />
-                  </svg>
-                  {labels.livingView}
-                </a>
-              )}
-
-              {/* Style picker overlay — shown only when user clicked Stage */}
-              {showPicker && !isStaging && (
-                <div className="absolute inset-0 bg-ink/90 p-3 flex flex-col gap-2 justify-center">
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-gold text-center">
-                    {labels.pickStyle}
-                  </p>
-                  {STAGING_STYLES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => handleStage(photo.id, s)}
-                      className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ivory border border-gold-soft py-1.5 hover:bg-gold hover:text-ink transition-colors"
-                    >
-                      {styleLabel[s]}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setPickerFor(null)}
-                    className="text-[9px] uppercase tracking-[0.18em] text-ivory/60 hover:text-ivory mt-1"
+                {livingUrl && (
+                  <a
+                    href={livingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 bg-gold px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink"
                   >
-                    {labels.cancelStyle}
-                  </button>
-                </div>
-              )}
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M5 3l14 9-14 9V3z" />
+                    </svg>
+                    {labels.livingView}
+                  </a>
+                )}
 
-              {/* Hover action bar — Stage + Living video + Delete */}
-              {!showPicker && !isStaging && !isLiving && (
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/90 to-ink/0 p-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!photo.is_staged && (
+                {/* Style picker overlay — shown only when user clicked Stage */}
+                {showPicker && !isStaging && (
+                  <div className="absolute inset-0 bg-ink/90 p-3 flex flex-col gap-2 justify-center">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-gold text-center">
+                      {labels.pickStyle}
+                    </p>
+                    {STAGING_STYLES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => handleStage(photo.id, s)}
+                        className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ivory border border-gold-soft py-1.5 hover:bg-gold hover:text-ink transition-colors"
+                      >
+                        {styleLabel[s]}
+                      </button>
+                    ))}
                     <button
                       type="button"
-                      onClick={() => setPickerFor(photo.id)}
-                      className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-gold"
+                      onClick={() => setPickerFor(null)}
+                      className="text-[9px] uppercase tracking-[0.18em] text-ivory/60 hover:text-ivory mt-1"
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
-                      </svg>
-                      {labels.stageButton}
+                      {labels.cancelStyle}
                     </button>
-                  )}
-                  {!livingUrl && (
-                    <button
-                      type="button"
-                      onClick={() => handleLivingVideo(photo.id)}
-                      className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-gold"
-                    >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M5 3l14 9-14 9V3z" />
-                      </svg>
-                      {labels.livingButton}
-                    </button>
-                  )}
+                  </div>
+                )}
+
+              </div>
+
+              {/* Acciones siempre visibles debajo de la foto (también en móvil): texto de 12 px
+                  sobre fondo sólido; Eliminar aparte, como acción destructiva (auditoría CMO #06). */}
+              <div className="flex flex-col gap-1.5 border-t border-gold-soft p-2">
+                {!photo.is_staged && (
                   <button
                     type="button"
+                    onClick={() => setPickerFor(photo.id)}
+                    disabled={showPicker || isStaging || isLiving}
+                    className="inline-flex w-full items-center justify-center gap-1.5 bg-ink px-2 py-2 text-xs font-medium leading-tight text-ivory transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0">
+                      <path d="M12 2l1.9 5.6L19.5 9l-4.6 1.4L12 16l-2.9-5.6L4.5 9l5.6-1.4z" />
+                    </svg>
+                    {labels.stageButton}
+                  </button>
+                )}
+                {!livingUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleLivingVideo(photo.id)}
+                    disabled={showPicker || isStaging || isLiving}
+                    className="inline-flex w-full items-center justify-center gap-1.5 border border-ink px-2 py-2 text-xs font-medium leading-tight text-ink transition-colors hover:bg-ink hover:text-ivory disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+                      <path d="M5 3l14 9-14 9V3z" />
+                    </svg>
+                    {labels.livingButton}
+                  </button>
+                )}
+                <div className="mt-1 flex justify-end border-t border-gold-soft pt-1.5">
+                  <button
+                    type="button"
+                    disabled={isStaging || isLiving}
                     onClick={() => {
                       const fd = new FormData();
                       fd.append("id", propertyId);
@@ -422,12 +433,15 @@ export function PhotoGridDraggable({
                       // optimistic
                       setPhotos((curr) => curr.filter((p) => p.id !== photo.id));
                     }}
-                    className="ml-auto text-[9px] font-semibold uppercase tracking-[0.18em] text-ivory hover:text-red-300"
+                    className="inline-flex items-center gap-1.5 px-1 py-1 text-xs font-medium text-red-700 underline-offset-4 transition-colors hover:text-red-800 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
                   >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+                      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+                    </svg>
                     {labels.deleteButton}
                   </button>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
