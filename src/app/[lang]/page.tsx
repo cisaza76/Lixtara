@@ -18,6 +18,9 @@ import { fillFromPricing } from "@/lib/pricing-from";
 import {
   CALCULATOR_ANCHOR,
   FaqList,
+  SECTION_INNER,
+  SECTION_TITLE_GAP,
+  SECTION_X,
   HowItWorksSection,
   PricingSection,
   SavingsSection,
@@ -72,7 +75,7 @@ export default async function Home({
 
   return (
     <main className="bg-background text-foreground flex-1 flex flex-col">
-      <section className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-32 flex-1">
+      <section className={`${SECTION_X} pt-20 lg:pt-32 pb-10 lg:pb-12 flex-1`}>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-20 items-center">
           {/* LEFT — copy */}
           <div className="lg:col-span-7 flex flex-col gap-10">
@@ -90,27 +93,28 @@ export default async function Home({
               {fillFromPricing(fillBrokerageCopy(copy.subheadline))}
             </p>
 
+            {/* Botón sólido = inicio del listado; la calculadora queda como enlace (auditoría CMO #01). */}
             <div className="flex flex-col sm:flex-row gap-6 sm:items-center pt-2">
-              <a
-                href={`#${CALCULATOR_ANCHOR}`}
-                className="inline-flex items-center justify-center px-10 py-5 bg-ink text-ivory text-xs font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
-              >
-                {copy.ctaPrimary}
-              </a>
               <ListingCtaLink
                 href={`/${lang}/listing/new`}
                 location="home_hero"
                 lang={lang}
+                className="inline-flex items-center justify-center px-10 py-5 bg-ink text-ivory text-xs font-medium tracking-[0.2em] uppercase hover:bg-ink/85 transition-colors"
+              >
+                {copy.ctaPrimary}
+              </ListingCtaLink>
+              <a
+                href={`#${CALCULATOR_ANCHOR}`}
                 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors inline-flex items-center gap-2 group"
               >
                 {copy.ctaSecondary}
                 <span
                   aria-hidden
-                  className="transition-transform group-hover:translate-x-1"
+                  className="transition-transform group-hover:translate-y-0.5"
                 >
-                  →
+                  ↓
                 </span>
-              </ListingCtaLink>
+              </a>
             </div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-ink/55 leading-relaxed">
               {BROKERAGE_NAME}
@@ -186,12 +190,13 @@ export default async function Home({
         </div>
       </section>
 
+      {/* Hero → "Why Lixtara": ~88/96 px en total, no ~240 (auditoría CMO #02). */}
       <section className="border-t border-gold-soft">
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+        <div className={`${SECTION_X} pt-10 lg:pt-12 pb-14 lg:pb-20`}>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
             {vpCopy.eyebrow}
           </p>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-16 lg:mb-20">
+          <h2 className={`font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl ${SECTION_TITLE_GAP}`}>
             {vpCopy.titleBefore}
             <em className="italic text-gold">{vpCopy.titleAccent}</em>
             {vpCopy.titleAfter}
@@ -218,11 +223,11 @@ export default async function Home({
       <HowItWorksSection lang={lang} />
 
       <section className="border-t border-gold-soft">
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+        <div className={SECTION_INNER}>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
             {spCopy.eyebrow}
           </p>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-16 lg:mb-20">
+          <h2 className={`font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl ${SECTION_TITLE_GAP}`}>
             {spCopy.titleBefore}
             <em className="italic text-gold">{spCopy.titleAccent}</em>
             {spCopy.titleAfter}
@@ -259,7 +264,7 @@ export default async function Home({
       </section>
 
       <section className="border-t border-gold-soft">
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+        <div className={SECTION_INNER}>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
             {quizCopy.eyebrow}
           </p>
@@ -268,7 +273,7 @@ export default async function Home({
             <em className="italic text-gold">{quizCopy.titleAccent}</em>
             {quizCopy.titleAfter}
           </h2>
-          <p className="max-w-2xl text-base leading-relaxed text-ink/70 mb-12 lg:mb-16">
+          <p className={`max-w-2xl text-base leading-relaxed text-ink/70 ${SECTION_TITLE_GAP}`}>
             {quizCopy.body}
           </p>
           <PlanQuiz
@@ -314,7 +319,7 @@ export default async function Home({
         id="virtual-tours"
         className="border-t border-gold-soft bg-ivory-strong/30 scroll-mt-20"
       >
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+        <div className={SECTION_INNER}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
             <div className="lg:col-span-7 flex flex-col gap-6">
               <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
@@ -359,8 +364,8 @@ export default async function Home({
         id="buyers"
         className="border-t border-gold-soft scroll-mt-20"
       >
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
-          <div className="flex flex-col gap-6 max-w-3xl mb-12 lg:mb-16">
+        <div className={SECTION_INNER}>
+          <div className={`flex flex-col gap-6 max-w-3xl ${SECTION_TITLE_GAP}`}>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
               {buyerCopy.eyebrow}
             </p>
@@ -408,8 +413,8 @@ export default async function Home({
         id="investor-club"
         className="border-t border-gold-soft scroll-mt-20"
       >
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
-          <div className="flex flex-col gap-5 mb-12 lg:mb-16">
+        <div className={SECTION_INNER}>
+          <div className={`flex flex-col gap-5 ${SECTION_TITLE_GAP}`}>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
               {investorClubCopy.eyebrow}
             </p>
@@ -476,11 +481,11 @@ export default async function Home({
       )}
 
       <section id="faq" className="border-t border-gold-soft scroll-mt-20">
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+        <div className={SECTION_INNER}>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">
             {faqCopy.eyebrow}
           </p>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-12 lg:mb-16">
+          <h2 className={`font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl ${SECTION_TITLE_GAP}`}>
             {faqCopy.titleBefore}
             <em className="italic text-gold">{faqCopy.titleAccent}</em>
             {faqCopy.titleAfter}

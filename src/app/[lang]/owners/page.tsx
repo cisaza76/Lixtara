@@ -8,7 +8,14 @@ import { CONTACT_EMAIL, fillBrokerageCopy } from "@/config/brokerage";
 import { termsFaq } from "@/config/legal-terms";
 import { ListingCtaLink } from "@/components/listing-cta-link";
 import { BrokerageFacts } from "@/components/brokerage-facts";
-import { FaqList, HowItWorksSection, PricingSection, SavingsSection } from "@/components/home-sections";
+import {
+  FaqList,
+  HowItWorksSection,
+  PricingSection,
+  SavingsSection,
+  SECTION_INNER,
+  SECTION_TITLE_GAP,
+} from "@/components/home-sections";
 import { isHumanPageView } from "@/lib/funnel-events";
 import { recordPageViewEvent } from "@/lib/funnel-events.server";
 import { ownersContactHref } from "@/lib/owners-landing";
@@ -63,7 +70,7 @@ export default async function OwnersPage({ params }: { params: Promise<{ lang: s
       </section>
 
       <section className="border-t border-gold-soft">
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28 flex flex-col gap-8">
+        <div className={`${SECTION_INNER} flex flex-col gap-8`}>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">{copy.whoEyebrow}</p>
           <h2 className="font-display text-3xl md:text-4xl leading-[1.1] tracking-tight text-ink font-normal max-w-3xl">
             {fillBrokerageCopy(copy.whoTitle)}
@@ -78,9 +85,9 @@ export default async function OwnersPage({ params }: { params: Promise<{ lang: s
       <PricingSection lang={lang} />
 
       <section id="faq" className="border-t border-gold-soft scroll-mt-20">
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28">
+        <div className={SECTION_INNER}>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold mb-5">{copy.faqEyebrow}</p>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl mb-12 lg:mb-16">
+          <h2 className={`font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl ${SECTION_TITLE_GAP}`}>
             {copy.faqTitle}
           </h2>
           <FaqList items={faqItems} />
@@ -88,7 +95,7 @@ export default async function OwnersPage({ params }: { params: Promise<{ lang: s
       </section>
 
       <section className="border-t border-gold-soft bg-ivory-strong/30">
-        <div className="mx-auto w-full max-w-7xl px-6 lg:px-12 py-20 lg:py-28 flex flex-col gap-10">
+        <div className={`${SECTION_INNER} flex flex-col gap-10`}>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] tracking-tight text-ink font-normal max-w-2xl">
             {copy.finalTitle}
           </h2>

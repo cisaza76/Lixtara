@@ -279,16 +279,20 @@ describe("portada: hero nuevo (2026-10-18)", () => {
     if (lang === "en") {
       expect(title).toBe("Sell your Florida home. Keep more of what you've earned.");
       expect(sub).toBe(`List on the MLS with a licensed brokerage and a broker with 20+ years of experience. Plans from ${fee}, plus ${pct} only if your home sells.`);
-      expect([hero.ctaPrimary, hero.ctaSecondary]).toEqual(["See what you'd pay", "Start my listing"]);
+      expect([hero.ctaPrimary, hero.ctaSecondary]).toEqual(["Start my listing", "See what you'd pay"]);
     } else {
       expect(title).toBe("Vende tu casa en Florida. Quédate con más de lo que ganaste.");
       expect(sub).toBe(`Publica en el MLS con una inmobiliaria licenciada y una broker con más de 20 años de experiencia. Planes desde ${fee}, más ${pct} solo si tu casa se vende.`);
-      expect([hero.ctaPrimary, hero.ctaSecondary]).toEqual(["Calcula cuánto pagarías", "Publicar mi casa"]);
+      expect([hero.ctaPrimary, hero.ctaSecondary]).toEqual(["Publicar mi casa", "Calcula cuánto pagarías"]);
     }
   });
 
-  it("el CTA principal va a la calculadora y el secundario al registro (home_hero)", () => {
+  it("el CTA principal (botón sólido) va al registro (home_hero) y el secundario a la calculadora", () => {
+    // Auditoría CMO 2026-10-26 #01: el botón sólido inicia la conversión.
     const src = read("src/app/[lang]/page.tsx");
+    const hero = src.slice(src.indexOf("auditoría CMO #01"), src.indexOf("copy.verifyDbpr"));
+    expect(hero.indexOf('location="home_hero"')).toBeLessThan(hero.indexOf("href={`#${CALCULATOR_ANCHOR}`}"));
+    expect(hero).toMatch(/location="home_hero"[\s\S]*?bg-ink text-ivory[\s\S]*?copy\.ctaPrimary/);
     expect(src).toContain("href={`#${CALCULATOR_ANCHOR}`}");
     expect(src).toContain('location="home_hero"');
     expect(src).toContain("fillFromPricing(fillBrokerageCopy(copy.subheadline))");
