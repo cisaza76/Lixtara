@@ -33,6 +33,14 @@ export interface NextStep {
   text: string;
   ctaLabel: string;
   ctaHref: string;
+  /** En revisión de la broker: los pasos que siguen en vez de una acción; el CTA, secundario. */
+  whatsNext?: {
+    label: string;
+    steps: readonly string[];
+    /** Plazo de publicación, tal cual lo dice legal-terms.ts. */
+    deadline: string;
+    secondary: string | null;
+  };
 }
 
 export interface SellerListingCardProps {
@@ -275,6 +283,35 @@ export function SellerListingCard({
           </div>
 
           {/* Recommended next step */}
+          {nextStep.whatsNext ? (
+            <div className="flex flex-col gap-3 border border-gold/40 bg-gold/[0.06] p-4">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-gold">
+                {nextStep.whatsNext.label}
+              </span>
+              <ol className="flex flex-col gap-2">
+                {nextStep.whatsNext.steps.map((s, i) => (
+                  <li key={s} className="flex items-start gap-3 text-sm leading-snug text-ink/80">
+                    <span className="font-display text-base italic leading-none text-gold">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="text-sm font-medium leading-snug text-ink">{nextStep.whatsNext.deadline}</p>
+              {nextStep.whatsNext.secondary && (
+                <p className="border-t border-gold-soft pt-3 text-xs leading-relaxed text-ink/65">
+                  {nextStep.whatsNext.secondary}{" "}
+                  <Link
+                    href={nextStep.ctaHref}
+                    className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.2em] text-gold transition-colors hover:text-ink"
+                  >
+                    {nextStep.ctaLabel} →
+                  </Link>
+                </p>
+              )}
+            </div>
+          ) : (
           <div className="flex flex-col gap-3 border border-gold/40 bg-gold/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <svg
@@ -308,6 +345,7 @@ export function SellerListingCard({
               {nextStep.ctaLabel} →
             </Link>
           </div>
+          )}
 
           <Link
             href={primaryHref}

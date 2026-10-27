@@ -10,6 +10,7 @@ import { createService } from "@/lib/supabase/service";
 import { SITE_URL } from "@/lib/config";
 import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
+import { agreementSignedBySeller } from "@/lib/step-progress";
 import { ListingEmailCode } from "@/components/listing-email-code";
 import {
   cleanCodeInput,
@@ -1809,15 +1810,14 @@ export default async function ListingNewPage({
       titleAfter={copy.titleAfter}
       stepLabel={copy.stepLabel}
       ofLabel={copy.ofLabel}
+      currentStepDone={step === 7 && !needsAccount && agreementSignedBySeller(latestAgreement?.status)}
     >
       <ListingFunnelEvents
         step={step}
         lang={lang}
         planTier={draft?.pricing_tier ?? null}
         photosCount={step === 6 ? photos.length : undefined}
-        agreementSigned={
-          latestAgreement?.status === "signed" || latestAgreement?.status === "completed"
-        }
+        agreementSigned={agreementSignedBySeller(latestAgreement?.status)}
         errorField={listingErrorField(sp.error)}
         listingId={draft?.id ?? null}
         resumable={
@@ -3294,14 +3294,17 @@ export default async function ListingNewPage({
       {/* ─── Step 7: Agreement (DocuSign) ─── */}
       {step === 7 && draftId && (
         <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-3">
-            <h2 className="font-display text-2xl text-ink font-normal">
-              {copy.step7.title}
-            </h2>
-            <p className="text-base leading-relaxed text-ink/70">
-              {copy.step7.body}
-            </p>
-          </div>
+          {/* Ya firmado: solo la confirmación, sin la instrucción de firmar (auditoría #07). */}
+          {(needsAccount || !agreementSignedBySeller(latestAgreement?.status)) && (
+            <div className="flex flex-col gap-3">
+              <h2 className="font-display text-2xl text-ink font-normal">
+                {copy.step7.title}
+              </h2>
+              <p className="text-base leading-relaxed text-ink/70">
+                {copy.step7.body}
+              </p>
+            </div>
+          )}
 
           {needsAccount ? (
             <AccountGate
@@ -3360,14 +3363,14 @@ export default async function ListingNewPage({
           ) : (
             (() => {
             const agStatus = latestAgreement?.status ?? null;
-            const isSigned = agStatus === "signed" || agStatus === "completed";
+            const isSigned = agreementSignedBySeller(agStatus);
 
             if (isSigned) {
               return (
                 <div className="border border-gold bg-gold/5 p-6 flex flex-col gap-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">
+                  <h2 className="font-display text-2xl text-ink font-normal">
                     {copy.step7.signedTitle}
-                  </p>
+                  </h2>
                   <p className="text-base text-ink leading-relaxed">
                     {copy.step7.signedBody}
                   </p>
