@@ -36,6 +36,7 @@ import { CASSB1_ENABLED } from "@/lib/buyer-comp";
 import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
 import { legalPendingHint, legalPendingMessage } from "@/lib/agreement-legal";
 import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
+import { notifyListingApprovedOnce, writeListingStatus } from "@/lib/listing-approval.server";
 
 interface Property {
   id: string;
@@ -146,10 +147,7 @@ async function transition(
     if (!gate.ok) redirect(`/${lang}/admin/listings/${id}/review?error=${gate.reason}`);
   }
 
-  const { error: updateError } = await supabase
-    .from("properties")
-    .update(mlsNumber ? { mls_status: newStatus, mls_number: mlsNumber } : { mls_status: newStatus })
-    .eq("id", id);
+  const { error: updateError, becameActive } = await writeListingStatus(supabase, id, newStatus, mlsNumber);
   if (mlsNumber && updateError) {
     // Con número, la aprobación va en la MISMA escritura: si el número choca, no se
     // aprueba nada y se avisa.
@@ -179,6 +177,8 @@ async function transition(
   if (newStatus === "active") {
     recordServerEvent({ event: "listing_published", props: {} });
   }
+  // El mismo correo que la aprobación desde el inicio del admin, una sola vez por listing.
+  if (becameActive) await notifyListingApprovedOnce(id);
 
   redirect(`/${lang}/admin/listings/${id}/review?done=${actionType}`);
 }

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { nextStepKind, type NextStepInput } from "./dashboard-next-step";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { t } from "./i18n";
+import { PUBLICATION_BUSINESS_DAYS, publicationTimeline } from "@/config/legal-terms";
 
 const paidPending: NextStepInput = {
   mlsStatus: "pending_approval",
@@ -41,6 +44,13 @@ describe("textos de 'qué sigue'", () => {
       expect(text, lang).not.toMatch(/\d+\s*(h|hours?|horas?|days?|d[ií]as?)\b/i);
       expect(text, lang).not.toMatch(/email|correo/i);
     }
+  });
+
+  it("el plazo sale de legal-terms.ts (2 días hábiles), no de un texto propio", () => {
+    const src = readFileSync(resolve(__dirname, "../app/[lang]/dashboard/page.tsx"), "utf8");
+    expect(src).toContain("deadline: publicationTimeline.text[lang as Locale].sentence");
+    expect(publicationTimeline.text.en.sentence).toContain(`within ${PUBLICATION_BUSINESS_DAYS} business days`);
+    expect(publicationTimeline.text.es.sentence).toContain(`dentro de ${PUBLICATION_BUSINESS_DAYS} días hábiles`);
   });
 
   it("la confirmación de firma no promete publicar con el pago", () => {
