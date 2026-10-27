@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Field } from "@/components/auth-shell";
+import { createSuggestionGuard } from "@/lib/address-suggestion-guard";
 
 interface Props {
   streetLabel: string;
@@ -170,6 +171,41 @@ export function AddressAutocomplete({
     defaultLat !== null && defaultLng !== null,
   );
 
+  // Enter or a click on a Google suggestion only picks it: no submit, no validation, until
+  // place_changed has filled the fields (src/lib/address-suggestion-guard.ts).
+  const guardRef = useRef<ReturnType<typeof createSuggestionGuard> | null>(null);
+  useEffect(() => {
+    const input = streetInputRef.current;
+    const form = input?.form;
+    if (!input || !form) return;
+    const guard = createSuggestionGuard({
+      input,
+      menuOpen: suggestionsOpen,
+      isSubmitter: (t) => {
+        const el = t instanceof Element ? t.closest("button, input") : null;
+        return (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) && el.type === "submit" && el.form === form;
+      },
+      isSuggestion: (t) => t instanceof Element && t.closest(".pac-container") !== null,
+    });
+    guardRef.current = guard;
+    const onKeyDown = (e: KeyboardEvent) => guard.onKeyDown(e);
+    const onPointerDown = (e: Event) => guard.onPointerDown(e);
+    const onClick = (e: Event) => guard.onClick(e);
+    const onSubmit = (e: Event) => guard.onSubmit(e);
+    // Capture on window: runs before Google's keydown listener on the input.
+    window.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("mousedown", onPointerDown, true);
+    document.addEventListener("click", onClick, true);
+    form.addEventListener("submit", onSubmit, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("mousedown", onPointerDown, true);
+      document.removeEventListener("click", onClick, true);
+      form.removeEventListener("submit", onSubmit, true);
+      guardRef.current = null;
+    };
+  }, []);
+
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     // Missing-key error is already reflected in initial state above; "loading"
@@ -237,6 +273,7 @@ export function AddressAutocomplete({
             lngInputRef.current.value = c.lng?.toString() ?? "";
           }
           setVerified(true);
+          guardRef.current?.placeChanged();
         });
 
         setStatus("ready");
@@ -275,11 +312,6 @@ export function AddressAutocomplete({
           defaultValue={defaultStreet}
           autoComplete="section-property address-line1"
           placeholder={streetPlaceholder}
-          // Enter on a Google suggestion picks it; it must not also submit step 1 (that sent
-          // the form with the half-typed street, and "Next" then sent it again).
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && suggestionsOpen()) e.preventDefault();
-          }}
           className="bg-transparent border-b border-gold-soft focus:border-gold outline-none py-2 text-base text-ink"
         />
         <span
