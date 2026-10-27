@@ -19,7 +19,7 @@ Se habilitan el píxel de Meta y Google Ads **solo** con consentimiento opt-in d
 | Política de Cookies | 2026-10-18-v2 → **2026-10-24-v4** | §2, §4 y §8 por categoría; §6 pasa a "Cookies de Publicidad (solo con su consentimiento)" con `_fbp`, `_fbc` (Meta) y `_gcl_au`, `_gcl_aw` (Google Ads); `lx_consent` guarda las dos elecciones. Sin GTM la política sigue diciendo que no hay publicidad. |
 | Política de Privacidad | 2026-10-18-v2 → **2026-10-24-v4** | §4.1 suma Meta (píxel) y Google Ads; §4.6 reescrita (compartición para publicidad solo con consentimiento, cómo negarse); §6.2 nueva (publicidad y medición de campañas); §6.3 nueva (retiro); §9.1 California, con Global Privacy Control. **Sin** la API de Conversiones de Meta: no existe, y su texto se agrega en el mismo PR que la construya. |
 | Términos | sin cambios (2026-10-18-v2) | No mencionan cookies ni publicidad. |
-| Casilla de registro | versión `terms-2026-10-18-v2+privacy-2026-10-24-v4` | Mismo texto (mismo hash); cambia la versión de la Privacidad que se acepta. La v2 queda registrada como anterior. |
+| Casilla de registro | versión `terms-2026-10-21-v3+privacy-2026-10-24-v4` | Mismo texto (mismo hash); cambia la versión de la Privacidad que se acepta. Las versiones anteriores (v2 y Términos v3 con Privacidad v2) quedan registradas como anteriores. |
 
 ## Cómo funciona (lo que los textos describen)
 
