@@ -1,6 +1,7 @@
 // Textos de las solicitudes del vendedor (#134, #136), EN/ES. Módulo aparte de i18n.ts
 // para no cargar todos los diccionarios en el formulario (componente cliente).
 import type { ChangeableField } from "@/lib/listing-requests";
+import { listingTermination } from "@/config/legal-terms";
 
 export type RequestsLang = "en" | "es";
 
@@ -25,7 +26,7 @@ const en = {
   changeNotAllowed: "Changes can't be requested in this status. Contact your broker.",
   withdrawTitle: "Request withdrawal",
   withdrawHelp:
-    "Your broker withdraws the listing from the MLS and then from lixtara.com. Your 24-month agreement still applies; she will contact you if anything is needed.",
+    `Your broker withdraws the listing from the MLS and then from lixtara.com. ${listingTermination.text.en}`,
   withdrawConfirm: "I want to take my listing off the market.",
   submitWithdrawal: "Send withdrawal request",
   withdrawNotAllowed:
@@ -65,7 +66,7 @@ const es: typeof en = {
   changeNotAllowed: "En este estado no se pueden solicitar cambios. Contacta a tu broker.",
   withdrawTitle: "Solicitar el retiro",
   withdrawHelp:
-    "Tu broker retira el listing del MLS y luego de lixtara.com. Tu contrato de 24 meses sigue vigente; ella te contactará si hace falta algo.",
+    `Tu broker retira el listing del MLS y luego de lixtara.com. ${listingTermination.text.es}`,
   withdrawConfirm: "Quiero sacar mi propiedad del mercado.",
   submitWithdrawal: "Enviar solicitud de retiro",
   withdrawNotAllowed:

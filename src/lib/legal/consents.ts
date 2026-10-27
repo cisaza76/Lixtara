@@ -56,7 +56,33 @@ const TERMS_V1: ConsentVersion = {
   },
 };
 
-const TERMS_REFUND_CHECKBOX: Record<ConsentLang, ConsentParts> = {
+// Casilla de los Términos desde la v2 (con el arbitraje de la §17). Sin cambios en la v3.
+const TERMS_CHECKBOX: Record<ConsentLang, ConsentParts> = {
+  en: {
+    before: "I agree to the ",
+    link: "Terms of Service",
+    middle: ", including the ",
+    link2: "arbitration agreement in Section 17",
+    middle2: ", and the ",
+    link3: "Privacy Policy",
+    after: ".",
+  },
+  es: {
+    before: "Acepto los ",
+    link: "Términos de servicio",
+    middle: ", incluido el ",
+    link2: "acuerdo de arbitraje de la Sección 17",
+    middle2: ", y la ",
+    link3: "Política de privacidad",
+    after: ".",
+  },
+};
+
+// v2 (2026-10-18): misma casilla, aceptada con los Términos v2.
+const TERMS_V2: ConsentVersion = { version: "terms-2026-10-18-v2+privacy-2026-10-18-v2", checkbox: TERMS_CHECKBOX };
+
+// Casilla del paso 8 v1/v2 (2026-10-18): conservada para reconstruir las aceptaciones registradas.
+const TERMS_REFUND_CHECKBOX_V1: Record<ConsentLang, ConsentParts> = {
   en: {
     before:
       "I understand that the {fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. The {pct} commission is due only if a sale closes.",
@@ -64,6 +90,20 @@ const TERMS_REFUND_CHECKBOX: Record<ConsentLang, ConsentParts> = {
   es: {
     before:
       "Entiendo que la tarifa fija de {fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. La comisión del {pct} solo se paga si la venta se cierra.",
+  },
+};
+
+// v3 (2026-10-21, modelo final del owner; párrafo 15 del ERS-21tn): el vendedor puede terminar
+// el acuerdo en cualquier momento, sin costo; la comisión solo si la venta se cierra, al cierre.
+// Pendiente de revisión del abogado.
+const TERMS_REFUND_CHECKBOX: Record<ConsentLang, ConsentParts> = {
+  en: {
+    before:
+      "I understand that the {fee} flat fee is charged whether or not my home sells and is non-refundable once my home is published on the MLS. If my listing ends before publication, I receive a full refund. I can end my listing agreement at any time, at no charge. The {pct} commission is due only if a sale closes, and it's paid at closing.",
+  },
+  es: {
+    before:
+      "Entiendo que la tarifa fija de {fee} se cobra se venda o no mi propiedad y que no es reembolsable una vez publicada en el MLS. Si mi listado termina antes de la publicación, recibo el reembolso total. Puedo terminar mi acuerdo de listado en cualquier momento, sin costo. La comisión del {pct} solo se paga si la venta se cierra, al momento del cierre.",
   },
 };
 
@@ -97,37 +137,22 @@ export const CONSENTS: Record<ConsentDocument, ConsentDefinition> = {
   // nombra los dos documentos.
   terms: {
     version: `terms-${LEGAL_DOCS.terms.version}+privacy-${LEGAL_DOCS.privacy.version}`,
-    checkbox: {
-      en: {
-        before: "I agree to the ",
-        link: "Terms of Service",
-        middle: ", including the ",
-        link2: "arbitration agreement in Section 17",
-        middle2: ", and the ",
-        link3: "Privacy Policy",
-        after: ".",
-      },
-      es: {
-        before: "Acepto los ",
-        link: "Términos de servicio",
-        middle: ", incluido el ",
-        link2: "acuerdo de arbitraje de la Sección 17",
-        middle2: ", y la ",
-        link3: "Política de privacidad",
-        after: ".",
-      },
-    },
+    checkbox: TERMS_CHECKBOX,
     links: [LEGAL_DOCS.terms.path, `${LEGAL_DOCS.terms.path}#section-17`, LEGAL_DOCS.privacy.path],
-    previous: [TERMS_V1],
+    previous: [TERMS_V1, TERMS_V2],
   },
   // Paso 8, antes de "Pagar con Stripe". Dice lo mismo que legal-terms.ts#refundPolicy, los
   // Términos §6 y la FAQ (site-claims.test.ts lo comprueba). La versión es la de los Términos:
-  // el texto no cambió en la v2, pero se acepta junto con los Términos vigentes.
+  // el texto no cambió en la v2, pero se acepta junto con los Términos vigentes; en la v3
+  // agrega la terminación sin costo y la comisión al cierre.
   terms_refund: {
     version: LEGAL_DOCS.terms.version,
     perPlan: true,
     checkbox: TERMS_REFUND_CHECKBOX,
-    previous: [{ version: "2026-10-18-v1", checkbox: TERMS_REFUND_CHECKBOX }],
+    previous: [
+      { version: "2026-10-18-v1", checkbox: TERMS_REFUND_CHECKBOX_V1 },
+      { version: "2026-10-18-v2", checkbox: TERMS_REFUND_CHECKBOX_V1 },
+    ],
   },
   // Paso 7, antes de abrir DocuSign. v2: el consentimiento se puede retirar "en cualquier
   // momento" (antes: "antes de firmar"). En español con tú, como el resto del flujo.
@@ -265,5 +290,23 @@ export const PUBLISHED_CONSENT_HASHES: Record<string, Record<ConsentLang, string
   "esign@2026-10-18-v2": {
     en: "4f9fbdf243093dc6946a823fbe5e146cade52ce8b6a7afee0cb71b93996c1df1",
     es: "e94a13b74ea25e0be1c5f12cc80342e99487ec6d0e9fbd9d98132a7437dc13f8",
+  },
+  // v3 (2026-10-21): la casilla de los Términos no cambia (mismo hash que la v2); la del paso 8
+  // agrega la terminación sin costo y la comisión al cierre.
+  "terms@terms-2026-10-21-v3+privacy-2026-10-18-v2": {
+    en: "4c3ae511d2e3245df3fbf105c4c1c587c2e6dcb701747fea13cde78c2addecb6",
+    es: "971219881754a9fde2d0243a491213ae7bdcadf90005650b52d8b1afe07c90c1",
+  },
+  "terms_refund@2026-10-21-v3:essentials": {
+    en: "d6f8d1cf5e138ae96a0c3dee5b1fdaf209e898dc4d714066e0b436b9b9ea60fb",
+    es: "6594e297e24b9458f39b5d9db56699a959af7d604f3ef68e7e92f1ab2bb436bb",
+  },
+  "terms_refund@2026-10-21-v3:pro": {
+    en: "a67a6704999dc8128d402bdbf68aca728103c99e3a5b516609a34921aa270c0c",
+    es: "41693d3e168e38bf478319ff487a44958924a4f6db6badad5ae9814aa22208da",
+  },
+  "terms_refund@2026-10-21-v3:concierge": {
+    en: "a5d42f6868b52514b56a8dfa90847a680f21d6d435fdfec266525c40a7f9341d",
+    es: "13305510529284ef8a6146fc61388a2e7d26c4fd563d5cc739e526b0f9bec269",
   },
 };

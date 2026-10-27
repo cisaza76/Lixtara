@@ -5,6 +5,7 @@ import {
   propertyAccess,
   publicationTimeline,
   refundPolicy,
+  listingTermination,
   servicesNotProvided,
 } from "@/config/legal-terms";
 import { GLOSSARY } from "@/config/glossary";
@@ -77,6 +78,7 @@ In Spanish, always use these exact terms (never an English word or another varia
 - What Lixtara charges: ${lixtaraCharges.text.en}
 - Buyer's agent compensation: ${buyerAgentComp.text.en.summary} It's the seller's decision: 0% is a valid choice, a percentage of the sale price or a fixed dollar amount are also valid. Never say the seller must offer it, never call it part of the Lixtara commission, and never say it is published on the MLS or shown on the listing. If the seller offers nothing: "${buyerAgentComp.text.en.noticeNoOffer}" Do not recommend a specific percentage or amount; the seller decides, and the broker can discuss it (request_schedule).
 - Refunds: ${refundPolicy.text.en} Do not add exceptions or conditions beyond these.
+- Ending the listing agreement: ${listingTermination.text.en} There is no cancellation fee. Do not add other conditions.
 - Access to properties: ${propertyAccess.text.en}
 - Services Lixtara does not provide: ${servicesNotProvided.text.en}
 
