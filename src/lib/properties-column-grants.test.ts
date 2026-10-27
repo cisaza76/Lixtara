@@ -35,6 +35,8 @@ describe("lectura de la oferta: solo dueño, admin y broker", () => {
     expect(migration).toContain("revoke execute on function public.get_property_buyer_comp(uuid) from public, anon;");
   });
 
+  // Con sesión (authenticated) siempre; anon solo si una página pública la lee (20261021120000:
+  // financing_terms y financing_other, solo authenticated).
   it("toda columna nueva de properties en una migración posterior lleva su grant select", () => {
     const later = readdirSync(MIGRATIONS)
       .filter((f) => f.endsWith(".sql") && f.slice(0, 14) > COLUMN_GRANTS_VERSION)
@@ -47,7 +49,7 @@ describe("lectura de la oferta: solo dueño, admin y broker", () => {
           const col = m[1];
           if (OFFER_COLUMNS.includes(col)) continue;
           const granted = new RegExp(
-            `grant select \\([^)]*\\b${col}\\b[^)]*\\) on (?:table )?(?:public\\.)?properties to anon, authenticated`,
+            `grant select \\([^)]*\\b${col}\\b[^)]*\\) on (?:table )?(?:public\\.)?properties to (?:anon, )?authenticated`,
           ).test(sql);
           if (!granted) missing.push(`${f}: ${col}`);
         }

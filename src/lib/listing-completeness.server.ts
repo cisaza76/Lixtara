@@ -4,7 +4,7 @@ import { hasPaidPhotography } from "@/lib/listing-photos.server";
 import { firstIncompleteStep, type ListingCompletenessFacts } from "@/lib/listing-completeness";
 
 const FACT_COLUMNS =
-  "address_street,address_city,address_zip,pricing_tier,property_type,bedrooms,bathrooms,sqft,year_built,list_price,description,photos_rights_confirmed";
+  "address_street,address_city,address_zip,pricing_tier,property_type,bedrooms,bathrooms,sqft,year_built,list_price,financing_terms,description,photos_rights_confirmed";
 
 /**
  * Primer paso incompleto (1–6) del listing, o null si está completo. Lee con el cliente que

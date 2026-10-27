@@ -167,6 +167,18 @@ export interface CreateEnvelopeInput {
    * listing commission). Rendered read-only/locked on the envelope.
    */
   lockedTextTabs?: string[];
+  /** Checkbox labels the signer must NOT change. */
+  lockedCheckboxTabs?: string[];
+  /**
+   * Radio groups (one choice): groupName → selected value (null = signer picks). With
+   * `locked`, every option in `options` is locked too, so the signer can't switch to another.
+   */
+  radioGroupTabs?: Record<string, { value: string | null; locked: boolean; options?: string[] }>;
+  /**
+   * Extra documents added after the template's (e.g. the "See Attachment" annex), as HTML:
+   * DocuSign converts them to PDF. With any, the envelope is built with composite templates.
+   */
+  attachments?: Array<{ name: string; html: string }>;
   emailSubject?: string;
   /**
    * Broker de Lixtara: contrafirma DESPUÉS del vendedor (routingOrder 2) en todo acuerdo
@@ -240,13 +252,29 @@ export async function createEnvelopeFromTemplate(
       : { tabLabel: k, value: v },
   );
   // DocuSign checkbox tabs take selected as a stringified boolean.
-  const checkboxTabs = Object.entries(input.checkboxTabs ?? {}).map(
-    ([k, v]) => ({ tabLabel: k, selected: v ? "true" : "false" }),
-  );
+  const lockedBoxes = new Set(input.lockedCheckboxTabs ?? []);
+  const checkboxTabs = Object.entries(input.checkboxTabs ?? {}).map(([k, v]) => ({
+    tabLabel: k,
+    selected: v ? "true" : "false",
+    ...(lockedBoxes.has(k) ? { locked: "true" } : {}),
+  }));
+  // A radio group with no value is left out: the template's own (unselected, required) group
+  // makes the signer choose.
+  const radioGroupTabs = Object.entries(input.radioGroupTabs ?? {})
+    .filter(([, g]) => g.value !== null)
+    .map(([groupName, g]) => ({
+      groupName,
+      radios: [...new Set([g.value!, ...(g.locked ? (g.options ?? []) : [])])].map((value) => ({
+        value,
+        selected: value === g.value ? "true" : "false",
+        ...(g.locked ? { locked: "true" } : {}),
+      })),
+    }));
 
   const tabs: Record<string, unknown> = {};
   if (textTabs.length > 0) tabs.textTabs = textTabs;
   if (checkboxTabs.length > 0) tabs.checkboxTabs = checkboxTabs;
+  if (radioGroupTabs.length > 0) tabs.radioGroupTabs = radioGroupTabs;
 
   const body = {
     templateId: input.templateId,
@@ -265,10 +293,55 @@ export async function createEnvelopeFromTemplate(
 
   // Roles definitivos: vendedor (1) + broker de Lixtara (2). buildTemplateRoles lanza antes
   // de la llamada si falta la broker (#137 f).
+  const roles = buildTemplateRoles(input, tabs);
+  if (input.attachments?.length) {
+    return authedRequest<CreateEnvelopeResult>("/envelopes", {
+      method: "POST",
+      body: compositeEnvelopeBody(input, roles, body.emailSubject),
+    });
+  }
   return authedRequest<CreateEnvelopeResult>("/envelopes", {
     method: "POST",
-    body: { ...body, templateRoles: buildTemplateRoles(input, tabs) },
+    body: { ...body, templateRoles: roles },
   });
+}
+
+/**
+ * Envelope = the server template (with the signers' tabs) + one document per attachment,
+ * appended after it. Each composite template repeats the signers (DocuSign merges them by
+ * recipientId); the tabs go only with the server template.
+ */
+export function compositeEnvelopeBody(
+  input: CreateEnvelopeInput,
+  roles: ReturnType<typeof buildTemplateRoles>,
+  emailSubject: string,
+) {
+  const signers = (withTabs: boolean) =>
+    roles.map((r, i) => {
+      const { tabs, ...rest } = r as typeof r & { tabs?: unknown };
+      return { ...rest, recipientId: String(i + 1), ...(withTabs && tabs ? { tabs } : {}) };
+    });
+  return {
+    status: "sent",
+    emailSubject,
+    compositeTemplates: [
+      {
+        compositeTemplateId: "1",
+        serverTemplates: [{ sequence: "1", templateId: input.templateId }],
+        inlineTemplates: [{ sequence: "2", recipients: { signers: signers(true) } }],
+      },
+      ...(input.attachments ?? []).map((a, i) => ({
+        compositeTemplateId: String(i + 2),
+        inlineTemplates: [{ sequence: "1", recipients: { signers: signers(false) } }],
+        document: {
+          documentId: String(i + 2),
+          name: a.name,
+          fileExtension: "html",
+          documentBase64: Buffer.from(a.html, "utf8").toString("base64"),
+        },
+      })),
+    ],
+  };
 }
 
 export interface RecipientViewInput {
