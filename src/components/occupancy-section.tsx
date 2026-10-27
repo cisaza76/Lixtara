@@ -2,7 +2,8 @@
 
 // Occupancy selector + conditional lease details. Lives inside the step-3
 // server-action form: the inputs carry `name`s so the action reads them from
-// FormData. Lease fields appear only when occupancy = tenant_occupied; the
+// FormData. Occupancy is required (line 20 of the listing agreement); the empty
+// option is only a placeholder. Lease fields appear only when occupancy = tenant_occupied; the
 // "difficult tenant" explanation appears only when that option is chosen.
 // With a tenant, the lease end date is required as MM/DD/YYYY (the listing agreement's
 // format, line 20) unless the seller checks "I don't know" (src/lib/lease-end.ts).
@@ -29,8 +30,8 @@ export interface OccupancyLabels {
   coopDifficult: string;
   tenantNotesLabel: string;
   tenantNotesPlaceholder: string;
-  /** Empty option of the occupancy select (no selection yet). */
-  notSpecifiedOption: string;
+  /** Placeholder of the occupancy select; not a valid answer (occupancy is required). */
+  occupancyPlaceholder: string;
 }
 
 interface Props {
@@ -78,9 +79,12 @@ export function OccupancySection({
           name="occupancy_status"
           value={occupancy}
           onChange={(e) => setOccupancy(e.target.value as Occupancy)}
+          required
           className={fieldClass}
         >
-          <option value="">{L.notSpecifiedOption}</option>
+          <option value="" disabled>
+            {L.occupancyPlaceholder}
+          </option>
           <option value="vacant">{L.occupancyVacant}</option>
           <option value="owner_occupied">{L.occupancyOwner}</option>
           <option value="tenant_occupied">{L.occupancyTenant}</option>

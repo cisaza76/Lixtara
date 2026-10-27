@@ -116,7 +116,7 @@ import { CONSENTS, consentCheckbox, consentNotice } from "@/lib/legal/consents";
 import { recordAcceptance, termsAcceptedIn } from "@/lib/legal/consents.server";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
-import { PROPERTY_TYPES, allowedStep } from "@/lib/listing-completeness";
+import { PROPERTY_TYPES, allowedStep, isOccupancyStatus, type OccupancyStatus } from "@/lib/listing-completeness";
 import { loadFirstIncompleteStep } from "@/lib/listing-completeness.server";
 
 const TOTAL_STEPS = 8;
@@ -158,7 +158,6 @@ function stepCompleted(
 }
 
 
-type OccupancyStatus = "vacant" | "owner_occupied" | "tenant_occupied";
 
 interface Draft {
   id: string;
@@ -851,12 +850,10 @@ export default async function ListingNewPage({
       .trim()
       .toUpperCase();
     const floodZone = floodZoneRaw === "" ? null : floodZoneRaw.slice(0, 10);
+    // Ocupación (L20 del acuerdo): obligatoria; sin elegir, el contrato saldría con L20 en blanco.
     const occupancyRaw = String(formData.get("occupancy_status") ?? "");
-    const occupancyStatus = (
-      ["vacant", "owner_occupied", "tenant_occupied"] as const
-    ).includes(occupancyRaw as OccupancyStatus)
-      ? (occupancyRaw as OccupancyStatus)
-      : null;
+    if (!isOccupancyStatus(occupancyRaw)) redirect(`/${lang}/listing/new?step=3&id=${id}&error=occupancy_required`);
+    const occupancyStatus: OccupancyStatus = occupancyRaw;
     const showPhone = formData.get("show_phone_on_portals") === "1";
     // Appliances included with the sale (multi-select; validated against the
     // canonical list so only known keys are stored).
@@ -1741,7 +1738,9 @@ export default async function ListingNewPage({
                                                 ? copy.stepErrors.leaseEndInvalid
                                                 : sp.error === "lease_end_past"
                                                   ? copy.stepErrors.leaseEndPast
-                                                  : sp.error === "financing_required"
+                                                  : sp.error === "occupancy_required"
+                                                    ? copy.stepErrors.occupancyRequired
+                                                    : sp.error === "financing_required"
                                                     ? copy.stepErrors.financingRequired
                                                     : sp.error === "financing_other_required"
                                                       ? copy.stepErrors.financingOtherRequired
@@ -2426,7 +2425,7 @@ export default async function ListingNewPage({
                   coopDifficult: copy.step3.coopDifficult,
                   tenantNotesLabel: copy.step3.tenantNotesLabel,
                   tenantNotesPlaceholder: copy.step3.tenantNotesPlaceholder,
-                  notSpecifiedOption: copy.step3.notSpecifiedOption,
+                  occupancyPlaceholder: copy.step3.occupancyPlaceholder,
                 }}
               />
 

@@ -178,6 +178,7 @@ const STEP_ERROR_FIELDS: Record<string, string> = {
   lease_end_required: "lease_end_date",
   lease_end_invalid: "lease_end_date",
   lease_end_past: "lease_end_date",
+  occupancy_required: "occupancy_status",
   financing_required: "financing_terms",
   financing_other_required: "financing_other",
   financing_other_too_long: "financing_other",
