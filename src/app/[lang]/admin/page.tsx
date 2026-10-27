@@ -3,7 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { SuccessBanner, ErrorBanner } from "@/components/auth-shell";
-import { notifyListingApprovedOnce } from "@/lib/listing-approval.server";
+import {
+  TEST_LISTING_ERROR,
+  isTestListing,
+  notifyListingApprovedOnce,
+  testListingMessage,
+} from "@/lib/listing-approval.server";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
 import { checkBrokerCountersigned } from "@/lib/agreement-refresh";
 import { assertStaffWithUser } from "@/lib/admin-auth";
@@ -32,6 +37,8 @@ interface PendingListing {
   owner_id: string;
   updated_at: string | null;
   created_at: string;
+  /** Listing de prueba: se ve en la cola, pero no se puede aprobar. */
+  is_test: boolean;
 }
 
 interface PaymentRowJoined {
@@ -70,7 +77,7 @@ export default async function AdminPage({
   const { data: pendingRows } = await supabase
     .from("properties")
     .select(
-      "id,address_street,address_city,address_state,address_zip,bedrooms,bathrooms,sqft,list_price,pricing_tier,owner_id,updated_at,created_at",
+      "id,address_street,address_city,address_state,address_zip,bedrooms,bathrooms,sqft,list_price,pricing_tier,owner_id,updated_at,created_at,is_test",
     )
     .eq("mls_status", "pending_approval")
     .order("updated_at", { ascending: true });
@@ -167,6 +174,9 @@ export default async function AdminPage({
       redirect(`/${lang}/admin?error=mls_number_invalid`);
     }
 
+    // Un listing de prueba no se aprueba: publicarlo mandaría el correo de aprobación.
+    if (await isTestListing(supabase, id)) redirect(`/${lang}/admin?error=${TEST_LISTING_ERROR}`);
+
     // Acuerdo enviado sin descripción legal verificada: no se publica (#217).
     if ((await pendingLegalByProperty([id])).has(id)) redirect(`/${lang}/admin?error=legal_pending`);
 
@@ -179,6 +189,7 @@ export default async function AdminPage({
       .update(mls.ok ? { mls_status: "active", mls_number: mls.value } : { mls_status: "active" })
       .eq("id", id)
       .eq("mls_status", "pending_approval")
+      .eq("is_test", false)
       .select(
         "id,address_street,address_city,address_state,address_zip,owner_id",
       )
@@ -240,6 +251,11 @@ export default async function AdminPage({
         {sp.error === "mls_number_taken" && (
           <div className="mb-8">
             <ErrorBanner message={copy.mlsNumberTaken} />
+          </div>
+        )}
+        {sp.error === TEST_LISTING_ERROR && (
+          <div className="mb-8">
+            <ErrorBanner message={testListingMessage(lang)} />
           </div>
         )}
         {sp.error === "legal_pending" && (
@@ -482,11 +498,16 @@ export default async function AdminPage({
                         </label>
                         <button
                           type="submit"
-                          disabled={legalPending.has(p.id)}
+                          disabled={legalPending.has(p.id) || p.is_test}
                           className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {copy.approveButton}
                         </button>
+                        {p.is_test && (
+                          <span data-test-listing className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
+                            {testListingMessage(lang)}
+                          </span>
+                        )}
                         {legalPending.has(p.id) && (
                           <span data-legal-pending className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
                             {legalPendingMessage(lang)}

@@ -16,8 +16,8 @@ const read = (p: string) => readFileSync(join(root, p), "utf8");
  * de mls_status. Soporta las dos escrituras de aprobación: la del inicio del admin
  * (`.eq("mls_status", "pending_approval")`) y la de la revisión (`.neq("mls_status", "active")`).
  */
-function fakeDb(initial: string) {
-  const row = { id: "p1", mls_status: initial, mls_number: null as string | null };
+function fakeDb(initial: string, isTest = false) {
+  const row = { id: "p1", mls_status: initial, mls_number: null as string | null, is_test: isTest };
   const history: string[] = [];
   const client = {
     from(table: string) {
@@ -35,7 +35,7 @@ function fakeDb(initial: string) {
           values = v;
           return q;
         },
-        eq(col: keyof typeof row, val: string) {
+        eq(col: keyof typeof row, val: string | boolean) {
           filters.push((r) => r[col] === val);
           return q;
         },
@@ -56,7 +56,7 @@ function fakeDb(initial: string) {
   } as unknown as SupabaseClient;
   const deps = (send: ApprovedEmailDeps["send"]): ApprovedEmailDeps => ({
     countActivations: async () => history.filter((s) => s === "active").length,
-    loadListing: async () => ({ ownerId: "u1", address: "1 Main St, Doral, FL 33172" }),
+    loadListing: async () => ({ ownerId: "u1", address: "1 Main St, Doral, FL 33172", isTest: row.is_test }),
     sellerEmail: async () => "seller@example.com",
     sellerLang: async () => "es",
     send,
@@ -71,6 +71,7 @@ async function approveFromHome(db: ReturnType<typeof fakeDb>, send: ApprovedEmai
     .update({ mls_status: "active" })
     .eq("id", "p1")
     .eq("mls_status", "pending_approval")
+    .eq("is_test", false)
     .select("id");
   if ((data ?? []).length > 0) await notifyListingApprovedOnce("p1", db.deps(send));
 }
@@ -80,6 +81,48 @@ async function approveFromReview(db: ReturnType<typeof fakeDb>, send: ApprovedEm
   const { becameActive } = await writeListingStatus(db.client, "p1", "active", mls);
   if (becameActive) await notifyListingApprovedOnce("p1", db.deps(send));
 }
+
+describe("listing de prueba (is_test): no se aprueba ni manda el correo", () => {
+  it("ninguno de los dos caminos lo pasa a active ni manda el correo", async () => {
+    for (const approve of [approveFromHome, approveFromReview]) {
+      const db = fakeDb("pending_approval", true);
+      const send = vi.fn(async () => ({}));
+      await approve(db, send as never);
+      expect(db.row.mls_status).toBe("pending_approval");
+      expect(db.history).toEqual([]);
+      expect(send).not.toHaveBeenCalled();
+    }
+  });
+
+  it("la revisión tampoco lo activa con número de MLS (segunda escritura)", async () => {
+    const db = fakeDb("pending_approval", true);
+    await approveFromReview(db, vi.fn() as never, "A1234567");
+    expect(db.row).toMatchObject({ mls_status: "pending_approval", mls_number: null });
+  });
+
+  it("el correo se niega aunque lo llamen con un listing de prueba", async () => {
+    const send = vi.fn(async () => ({}));
+    const deps: ApprovedEmailDeps = {
+      countActivations: async () => 1,
+      loadListing: async () => ({ ownerId: "u1", address: "x", isTest: true }),
+      sellerEmail: async () => "seller@example.com",
+      sellerLang: async () => "es",
+      send: send as never,
+    };
+    expect(await notifyListingApprovedOnce("p1", deps)).toBe("test_listing");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("las dos pantallas lo comprueban antes de aprobar y deshabilitan el botón", () => {
+    const home = read("src/app/[lang]/admin/page.tsx");
+    expect(home).toContain("if (await isTestListing(supabase, id)) redirect(`/${lang}/admin?error=${TEST_LISTING_ERROR}`);");
+    expect(home).toMatch(/\.eq\("mls_status", "pending_approval"\)\s*\.eq\("is_test", false\)/);
+    expect(home).toContain("disabled={legalPending.has(p.id) || p.is_test}");
+    const review = read("src/app/[lang]/admin/listings/[id]/review/page.tsx");
+    expect(review).toContain("if (await isTestListing(supabase, id)) {");
+    expect(review).toContain("disabled={legalPending || prop.is_test}");
+  });
+});
 
 describe("correo de aprobación: una sola vez por listing", () => {
   it("aprobar desde la revisión lo manda (mismo correo que el inicio)", async () => {
@@ -128,7 +171,7 @@ describe("correo de aprobación: una sola vez por listing", () => {
     const send = vi.fn(async () => ({}));
     const deps: ApprovedEmailDeps = {
       countActivations: async () => 2,
-      loadListing: async () => ({ ownerId: "u1", address: "x" }),
+      loadListing: async () => ({ ownerId: "u1", address: "x", isTest: false }),
       sellerEmail: async () => "seller@example.com",
       sellerLang: async () => null,
       send: send as never,
@@ -140,7 +183,7 @@ describe("correo de aprobación: una sola vez por listing", () => {
   it("nunca lanza: un fallo del correo no deshace la aprobación", async () => {
     const deps: ApprovedEmailDeps = {
       countActivations: async () => 1,
-      loadListing: async () => ({ ownerId: "u1", address: "x" }),
+      loadListing: async () => ({ ownerId: "u1", address: "x", isTest: false }),
       sellerEmail: async () => "seller@example.com",
       sellerLang: async () => null,
       send: (async () => {
