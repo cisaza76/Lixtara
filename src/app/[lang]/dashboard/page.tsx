@@ -9,9 +9,11 @@ import { createClient } from "@/lib/supabase/server";
 import { formatPrice, PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import {
   SellerListingCard,
+  type NextStep,
   type Tone,
   type Workstream,
 } from "@/components/seller-listing-card";
+import { nextStepKind } from "@/lib/dashboard-next-step";
 import { MediaStrategyPanel } from "@/components/media-strategy-panel";
 import type { StrategyPayload } from "@/lib/media-intelligence/types";
 import { ListingVideoPanel } from "@/components/listing-video-panel";
@@ -550,34 +552,54 @@ export default async function DashboardPage({
               ];
 
               // Recommended next step — first unmet, highest-impact action.
-              let nextStep: { text: string; ctaLabel: string; ctaHref: string };
-              if (isDraft)
+              const kind = nextStepKind({
+                mlsStatus: l.mls_status,
+                paymentDone,
+                agreementDone,
+                stagedCount,
+                videoStatus,
+                offersCount,
+              });
+              let nextStep: NextStep;
+              if (kind === "complete")
                 nextStep = {
                   text: cc.nsComplete,
                   ctaLabel: cc.nsCompleteCta,
                   ctaHref: `${flowHref}&step=6&resumed=account`,
                 };
-              else if (!paymentDone)
+              else if (kind === "pay")
                 nextStep = { text: cc.nsPay, ctaLabel: cc.nsPayCta, ctaHref: flowHref };
-              else if (!agreementDone)
+              else if (kind === "agreement")
                 nextStep = {
                   text: cc.nsAgreement,
                   ctaLabel: cc.nsAgreementCta,
                   ctaHref: flowHref,
                 };
-              else if (stagedCount === 0)
+              // Pagado y firmado, en revisión de la broker: qué sigue; el staging, secundario (#09).
+              else if (kind === "awaiting_broker")
+                nextStep = {
+                  text: "",
+                  ctaLabel: cc.nsStagingCta,
+                  ctaHref: photosHref,
+                  whatsNext: {
+                    label: cc.whatsNextLabel,
+                    steps: cc.whatsNextSteps,
+                    secondary: stagedCount === 0 ? cc.whatsNextSecondary : null,
+                  },
+                };
+              else if (kind === "staging")
                 nextStep = {
                   text: cc.nsStaging,
                   ctaLabel: cc.nsStagingCta,
                   ctaHref: photosHref,
                 };
-              else if (videoStatus === "none" || videoStatus === "failed")
+              else if (kind === "video")
                 nextStep = {
                   text: cc.nsVideo,
                   ctaLabel: cc.nsVideoCta,
                   ctaHref: photosHref,
                 };
-              else if (offersCount > 0)
+              else if (kind === "offers")
                 nextStep = {
                   text: cc.nsOffers,
                   ctaLabel: cc.nsOffersCta,
