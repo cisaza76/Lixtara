@@ -3,8 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { SuccessBanner, ErrorBanner } from "@/components/auth-shell";
-import { sendListingApproved } from "@/lib/email";
-import { lookupRecipientLang } from "@/lib/email-recipient-lang";
+import { notifyListingApprovedOnce } from "@/lib/listing-approval.server";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
 import { checkBrokerCountersigned } from "@/lib/agreement-refresh";
 import { assertStaffWithUser } from "@/lib/admin-auth";
@@ -199,28 +198,9 @@ export default async function AdminPage({
       );
     }
 
-    // Notify seller (best-effort).
-    try {
-      const { data: sellerAuth } = await supabase.auth.admin.getUserById(
-        prop.owner_id,
-      );
-      const sellerEmail = sellerAuth.user?.email;
-      if (sellerEmail) {
-        const origin =
-          process.env.NEXT_PUBLIC_SITE_URL ?? "https://lixtara.vercel.app";
-        // El email va en el idioma del vendedor (seller_leads.locale), no en el del
-        // admin que aprueba; si no lo conocemos, inglés.
-        const sellerLang = (await lookupRecipientLang(prop.owner_id)) ?? "en";
-        await sendListingApproved({
-          to: sellerEmail,
-          lang: sellerLang,
-          propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
-          listingUrl: `${origin}/${sellerLang}/property/${prop.id}`,
-        });
-      }
-    } catch (e) {
-      console.error("admin approve email failed:", e);
-    }
+    // Avisa al vendedor (best-effort). La escritura de arriba es condicional a
+    // pending_approval: solo la primera aprobación llega aquí; la revisión usa la misma función.
+    await notifyListingApprovedOnce(prop.id);
 
     redirect(`/${lang}/admin?approved=${id}`);
   }

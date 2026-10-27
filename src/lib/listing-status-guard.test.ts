@@ -143,7 +143,7 @@ describe("mls_status solo lo escribe quien debe", () => {
   const PERMITIDOS = [
     "lib/tier-fulfillment.server.ts",                 // service_role: draft → pending_approval (webhook de Stripe y regreso del paso 8)
     "app/[lang]/admin/page.tsx",                      // broker/admin: aprobación rápida
-    "app/[lang]/admin/listings/[id]/review/page.tsx", // broker/admin: aprobar/rechazar/cambios
+    "lib/listing-approval.server.ts",                // broker/admin: la revisión del listing (aprobar/rechazar/cambios) escribe por aquí
   ];
 
   const escritores = walk(SRC)

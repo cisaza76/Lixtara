@@ -34,7 +34,13 @@ export interface NextStep {
   ctaLabel: string;
   ctaHref: string;
   /** En revisión de la broker: los pasos que siguen en vez de una acción; el CTA, secundario. */
-  whatsNext?: { label: string; steps: readonly string[]; secondary: string | null };
+  whatsNext?: {
+    label: string;
+    steps: readonly string[];
+    /** Plazo de publicación, tal cual lo dice legal-terms.ts. */
+    deadline: string;
+    secondary: string | null;
+  };
 }
 
 export interface SellerListingCardProps {
@@ -292,6 +298,7 @@ export function SellerListingCard({
                   </li>
                 ))}
               </ol>
+              <p className="text-sm font-medium leading-snug text-ink">{nextStep.whatsNext.deadline}</p>
               {nextStep.whatsNext.secondary && (
                 <p className="border-t border-gold-soft pt-3 text-xs leading-relaxed text-ink/65">
                   {nextStep.whatsNext.secondary}{" "}

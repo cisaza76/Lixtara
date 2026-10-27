@@ -14,6 +14,7 @@ import {
   type Workstream,
 } from "@/components/seller-listing-card";
 import { nextStepKind } from "@/lib/dashboard-next-step";
+import { publicationTimeline } from "@/config/legal-terms";
 import { MediaStrategyPanel } from "@/components/media-strategy-panel";
 import type { StrategyPayload } from "@/lib/media-intelligence/types";
 import { ListingVideoPanel } from "@/components/listing-video-panel";
@@ -584,6 +585,8 @@ export default async function DashboardPage({
                   whatsNext: {
                     label: cc.whatsNextLabel,
                     steps: cc.whatsNextSteps,
+                    // Plazo aprobado (2 días hábiles), el mismo texto de legal-terms.ts.
+                    deadline: publicationTimeline.text[lang as Locale].sentence,
                     secondary: stagedCount === 0 ? cc.whatsNextSecondary : null,
                   },
                 };
