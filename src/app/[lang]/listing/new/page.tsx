@@ -469,17 +469,18 @@ export default async function ListingNewPage({
             draft.address_state,
             draft.address_zip,
           ).then((rc) => {
-            if (rc) {
-              updates.price_comps = rc.comps;
-              updates.price_estimate_low = rc.priceLow;
-              updates.price_estimate_high = rc.priceHigh;
+            if (rc.status === "ok") {
+              updates.price_comps = rc.estimate.comps;
+              updates.price_estimate_low = rc.estimate.priceLow;
+              updates.price_estimate_high = rc.estimate.priceHigh;
               updates.price_comps_fetched_at = new Date().toISOString();
-            } else {
+            } else if (rc.status === "no_data") {
               // Mark as fetched to avoid retrying on every page load. Empty
               // comps means "no data for this area" — user fills price manually.
               updates.price_comps = [];
               updates.price_comps_fetched_at = new Date().toISOString();
             }
+            // "error": nothing is stored, so the next visit retries.
           }),
         );
       }
@@ -994,14 +995,20 @@ export default async function ListingNewPage({
       row.address_state,
       row.address_zip,
     );
-    const update = rc
-      ? {
-          price_comps: rc.comps,
-          price_estimate_low: rc.priceLow,
-          price_estimate_high: rc.priceHigh,
-          price_comps_fetched_at: new Date().toISOString(),
-        }
-      : { price_comps: [], price_comps_fetched_at: new Date().toISOString() };
+    // A failed lookup keeps the comparables already stored instead of wiping them.
+    if (rc.status === "error") {
+      revalidatePath(`/${lang}/listing/new`);
+      return;
+    }
+    const update =
+      rc.status === "ok"
+        ? {
+            price_comps: rc.estimate.comps,
+            price_estimate_low: rc.estimate.priceLow,
+            price_estimate_high: rc.estimate.priceHigh,
+            price_comps_fetched_at: new Date().toISOString(),
+          }
+        : { price_comps: [], price_comps_fetched_at: new Date().toISOString() };
     await supabase
       .from("properties")
       .update(update)
@@ -2042,15 +2049,18 @@ export default async function ListingNewPage({
           {draft && draft.bedrooms > 0 && /^33\d{3}$/.test(draft.address_zip) && (
             <SuccessBanner message={copy.step3.autoFilledNote} />
           )}
-          <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-3">
-            <form action={autofillStep3}>
-              <input type="hidden" name="id" value={draftId ?? ""} />
-              <SecondaryButton>{copy.step3.autofillButton}</SecondaryButton>
-            </form>
-            <p className="text-xs text-ink/55 leading-relaxed">
-              {copy.step3.autofillCaption}
-            </p>
-          </div>
+          {/* Only where the automatic county lookup applies (Miami-Dade ZIPs). */}
+          {draft && /^33\d{3}$/.test(draft.address_zip) && (
+            <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-3">
+              <form action={autofillStep3}>
+                <input type="hidden" name="id" value={draftId ?? ""} />
+                <SecondaryButton>{copy.step3.autofillButton}</SecondaryButton>
+              </form>
+              <p className="text-xs text-ink/55 leading-relaxed">
+                {copy.step3.autofillCaption}
+              </p>
+            </div>
+          )}
           {autofillMessage && (
             autofillResult === "notfound" ? (
               <ErrorBanner message={autofillMessage} />
@@ -2133,7 +2143,16 @@ export default async function ListingNewPage({
 
               {draft.price_comps.length === 0 ? (
                 <p className="text-sm text-ink/60 italic">
-                  {copy.step3.compsEmpty}
+                  {copy.step3.compsEmpty}{" "}
+                  {/* New tab: the step 3 form isn't saved yet. */}
+                  <a
+                    href={`/${lang}/consultations`}
+                    target="_blank"
+                    rel="noopener"
+                    className="not-italic font-medium text-ink underline underline-offset-2 hover:text-gold"
+                  >
+                    {copy.step3.compsEmptyCta}
+                  </a>
                 </p>
               ) : (
                 <>

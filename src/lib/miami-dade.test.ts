@@ -91,6 +91,15 @@ describe("condado: qué parcela y qué año se aceptan (regla 2026-10-16)", () =
     expect(pickCountyCandidate(house, "35 SE 6th St")).toBe("0102100301500");
     expect(pickCountyCandidate(house, "36 SE 6th St")).toBeNull();
   });
+  it("direccional escrita completa (Google Places): 'Northwest' = 'NW' (auditoría #04)", () => {
+    // Candidato REAL de GetAddress (2026-10-26) para la dirección de la auditoría del CMO.
+    const doral = [{ Strap: "35-3029-114-0580", SiteAddress: "10279 NW 30 TER", SiteUnit: "" }];
+    expect(pickCountyCandidate(doral, "10279 Northwest 30th Terrace")).toBe("3530291140580");
+    expect(pickCountyCandidate(doral, "10279 NW 30th Ter")).toBe("3530291140580");
+    expect(pickCountyCandidate(doral, "10279 Northwest 31st Terrace")).toBeNull();
+    const se = [{ Strap: "01-0210-030-1500", SiteAddress: "35 SE 6 ST", SiteUnit: "" }];
+    expect(pickCountyCandidate(se, "35 Southeast 6th Street")).toBe("0102100301500");
+  });
 
   it("año: 'Multiple (See Building Info.)' o '0' → el año real más antiguo de los edificios", () => {
     expect(countyYearBuilt("Multiple (See Building Info.)", [{ Actual: 1975 }, { Actual: 1963 }], 2026)).toBe(1963);

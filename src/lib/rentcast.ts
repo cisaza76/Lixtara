@@ -24,6 +24,17 @@ export interface RentcastComp {
   isSold: boolean;
 }
 
+/**
+ * Resultado de la consulta. "error" (sin clave, HTTP no-OK, red, JSON inválido) NO se guarda
+ * como "sin comparables": el paso 3 vuelve a intentar en la siguiente visita y "Actualizar"
+ * conserva lo que ya había (auditoría #05, 2026-10-26: en Preview faltaba la clave y el
+ * borrador quedó marcado para siempre como "sin comparables").
+ */
+export type RentcastLookup =
+  | { status: "ok"; estimate: RentcastEstimate }
+  | { status: "no_data" }
+  | { status: "error" };
+
 export interface RentcastEstimate {
   price: number;
   priceLow: number;
@@ -57,11 +68,11 @@ export async function fetchRentcastEstimate(
   city: string,
   state: string,
   zip: string,
-): Promise<RentcastEstimate | null> {
+): Promise<RentcastLookup> {
   const apiKey = process.env.RENTCAST_API_KEY;
   if (!apiKey) {
     console.error("RENTCAST_API_KEY missing");
-    return null;
+    return { status: "error" };
   }
   const fullAddress = `${street}, ${city}, ${state} ${zip}`;
   const url =
@@ -74,7 +85,8 @@ export async function fetchRentcastEstimate(
     });
     if (!res.ok) {
       console.error("Rentcast failed", res.status, await res.text());
-      return null;
+      // 404: Rentcast no tiene la dirección → sin datos (no es una falla nuestra).
+      return res.status === 404 ? { status: "no_data" } : { status: "error" };
     }
     const data = (await res.json()) as {
       price?: number;
@@ -82,7 +94,7 @@ export async function fetchRentcastEstimate(
       priceRangeHigh?: number;
       comparables?: RentcastRawComp[];
     };
-    if (!data.price || !data.comparables) return null;
+    if (!data.price || !data.comparables) return { status: "no_data" };
 
     const cutoff = ninetyDaysAgo();
     const enriched: RentcastComp[] = data.comparables
@@ -132,13 +144,16 @@ export async function fetchRentcastEstimate(
     }
 
     return {
-      price: data.price,
-      priceLow: data.priceRangeLow ?? data.price,
-      priceHigh: data.priceRangeHigh ?? data.price,
-      comps: top,
+      status: "ok",
+      estimate: {
+        price: data.price,
+        priceLow: data.priceRangeLow ?? data.price,
+        priceHigh: data.priceRangeHigh ?? data.price,
+        comps: top,
+      },
     };
   } catch (e) {
     console.error("Rentcast call threw", e);
-    return null;
+    return { status: "error" };
   }
 }
