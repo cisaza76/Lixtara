@@ -110,6 +110,8 @@ async function main() {
       listing: c.listing,
       tier: PRICING_TIERS[c.tier],
       sellerName: "TEST Seller (made-up data)",
+      // Made-up contact for lines 247–249 (case c: no phone → line 247 blank).
+      seller: { phone: c.key.startsWith("c-") ? null : "305-555-0100", email: SELLER.email },
       brokerName: "Lixtara LLC",
       buyerOffer: c.buyerOffer,
       verifiedLegal: c.verifiedLegal,

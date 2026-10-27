@@ -6,12 +6,16 @@ import { BROKERAGE } from "@/config/brokerage";
 import { CONTACT } from "@/config/contact";
 import { t } from "@/lib/i18n";
 import { PROTECTION_NOTICE_DAYS, PROTECTION_PERIOD_DAYS, RETAINED_DEPOSITS_PCT } from "@/config/listing-agreement";
-import { ERS21TN_FIELDS, fitsOnLine } from "./ers21tn-layout";
+import { ERS21TN_FIELDS, fitsOnLine, textField, textRoom, textWidthPt } from "./ers21tn-layout";
 import {
   ADDITIONAL_TERMS_LABELS,
+  addCalendarMonths,
   additionalTermsClauses,
   attachmentHtml,
+  contractPhone,
   listingAgreementTabs,
+  longDate,
+  nyCalendarDate,
   splitOverLabels,
   splitOverLines,
   usDate,
@@ -34,6 +38,7 @@ const base: AgreementInput = {
   },
   tier: PRICING_TIERS.pro,
   sellerName: "Test Seller",
+  seller: { phone: "305-555-0100", email: "test-seller@example.com" },
   brokerName: "Lixtara LLC",
   buyerOffer: { type: "percent", pct: 2.5 },
   verifiedLegal: "SABAL PALM COURT PB 46-66\nLOT 4 BLK 1",
@@ -231,8 +236,97 @@ describe("Listing Agreement: valores por línea", () => {
     expect(ERS21TN_FIELDS.filter((f) => f.kind === "text" && ADDITIONAL_TERMS_LABELS.includes(f.label)).map((f) => f.line)).toEqual(Array.from({ length: 15 }, (_, i) => 230 + i));
   });
 
+  it("contacto del vendedor (L247–249) y copia por email (L257), de solo lectura", () => {
+    const r = run();
+    expect(r.text).toMatchObject({
+      seller_phone: "+1 (305) 555-0100",
+      // Sin dirección postal guardada: la de la propiedad.
+      seller_address: "200 S Biscayne Blvd, Unit 4, Miami, FL 33131",
+      seller_email: "test-seller@example.com",
+    });
+    for (const k of ["seller_phone", "seller_address", "seller_email"]) expect(r.lockedText, k).toContain(k);
+    expect(r.checkbox.copy_returned_by_email).toBe(true);
+    expect(r.lockedCheckbox).toContain("copy_returned_by_email");
+    // La fecha de L257 no la manda el sitio: la pone DocuSign (fecha de firma de la broker).
+    expect(Object.keys(r.text).some((k) => /copy_returned/.test(k))).toBe(false);
+    expect(r.attachment).toEqual([]);
+  });
+
+  it("contacto: postal si existe; sin teléfono, L247 en blanco; lo que no cabe va al anexo", () => {
+    expect(run({ seller: { phone: null, email: "a@example.com", mailingAddress: "PO Box 1, Doral, FL 33172" } }).text).toMatchObject({
+      seller_phone: "",
+      seller_address: "PO Box 1, Doral, FL 33172",
+    });
+    expect(run({ seller: { phone: "  ", email: "a@example.com" } }).text.seller_phone).toBe("");
+    const long = run({ seller: { phone: "+44 20 7946 0000 ext. 12345678", email: "a@example.com", mailingAddress: "x ".repeat(200) } });
+    expect(long.text).toMatchObject({ seller_phone: "See Attachment", seller_address: "See Attachment" });
+    expect(long.attachment.map((a) => a.heading)).toEqual(["Seller's Address (line 248)", "Seller's Telephone (line 247)"]);
+  });
+
+  it("teléfono de EE. UU. con el formato de la brokerage; otro país, como lo escribió", () => {
+    expect(contractPhone("3055550100")).toBe("+1 (305) 555-0100");
+    expect(contractPhone("+1 (305) 555-0100")).toBe("+1 (305) 555-0100");
+    expect(contractPhone("1-305-555-0100")).toBe("+1 (305) 555-0100");
+    expect(contractPhone("+57 300 123 4567")).toBe("+57 300 123 4567");
+    expect(contractPhone(null)).toBe("");
+    expect(fitsOnLine("seller_phone", contractPhone("3055550100"))).toBe(true);
+  });
+
+  it("el endpoint manda el teléfono del perfil y el email de la cuenta", () => {
+    const route = readFileSync("src/app/api/agreement/create/route.ts", "utf8");
+    expect(route).toContain('.select("first_name, last_name, phone")');
+    expect(route).toContain("seller: { phone: profile?.phone ?? null, email: signerEmail }");
+  });
+
+  it("párrafo 15 dentro del margen: cada línea deja el inset de DocuSign (5.5 pt) y termina ≥ 10 pt antes del fin de la raya", () => {
+    // v2 (2026-10-26): L231 y L235 llegaban al fin de la raya (567.7 pt) con 2 pt de holgura.
+    for (const tier of Object.values(PRICING_TIERS)) {
+      const r = run({ tier });
+      for (const label of ADDITIONAL_TERMS_LABELS) {
+        const f = ERS21TN_FIELDS.find((x) => x.kind === "text" && x.label === label) as { x: number; width: number };
+        const end = f.x + 5.5 + textWidthPt(r.text[label]);
+        expect(end, `${tier.id} ${label}`).toBeLessThanOrEqual(f.x + f.width - 8);
+      }
+    }
+    expect(textRoom("additional_terms_2")).toBe(textField("additional_terms_2").width - 6.5);
+  });
+
   it("fechas del plazo: hoy y hoy + 24 meses", () => {
     expect(run().text).toMatchObject({ start_date: "October 21, 2026", termination_date: "October 21, 2028" });
+  });
+
+  it("fechas en Nueva York, nunca UTC (bug de producción 2026-10-26: 22:05 EDT salía «October 27»)", () => {
+    const at = (iso: string) => run({ today: new Date(iso) }).text;
+    // El caso de producción: 02:05 UTC del 27 = 22:05 EDT del 26.
+    expect(at("2026-10-27T02:05:00Z")).toMatchObject({ start_date: "October 26, 2026", termination_date: "October 26, 2028" });
+    // Borde de medianoche con EDT (UTC−4): 03:30Z = 23:30 del 26; 04:30Z = 00:30 del 27.
+    expect(at("2026-10-27T03:30:00Z").start_date).toBe("October 26, 2026");
+    expect(at("2026-10-27T04:30:00Z").start_date).toBe("October 27, 2026");
+    // Con EST (UTC−5): 04:30Z del 1 de diciembre = 23:30 del 30 de noviembre.
+    expect(at("2026-12-01T04:30:00Z")).toMatchObject({ start_date: "November 30, 2026", termination_date: "November 30, 2028" });
+    expect(at("2026-12-01T05:30:00Z").start_date).toBe("December 1, 2026");
+    // Cambio de hora de marzo (8 de marzo de 2026, 02:00 EST → 03:00 EDT).
+    expect(at("2026-03-08T04:59:00Z").start_date).toBe("March 7, 2026"); // 23:59 EST del 7
+    expect(at("2026-03-08T05:00:00Z").start_date).toBe("March 8, 2026"); // 00:00 EST del 8
+    expect(at("2026-03-09T03:59:00Z").start_date).toBe("March 8, 2026"); // 23:59 EDT del 8
+    // Cambio de hora de noviembre (1 de noviembre de 2026, 02:00 EDT → 01:00 EST).
+    expect(at("2026-11-01T03:59:00Z").start_date).toBe("October 31, 2026"); // 23:59 EDT del 31
+    expect(at("2026-11-01T04:00:00Z").start_date).toBe("November 1, 2026"); // 00:00 EDT del 1
+    expect(at("2026-11-02T04:59:00Z").start_date).toBe("November 1, 2026"); // 23:59 EST del 1
+  });
+
+  it("el vencimiento sale de la fecha de inicio en Nueva York, con el último día del mes si no existe", () => {
+    const at = (iso: string, over: Partial<AgreementInput> = {}) => run({ today: new Date(iso), ...over }).text.termination_date;
+    // 31 de enero a las 22:00 EST (03:00Z del 1 de febrero): inicio 31 de enero → vence 31 de enero.
+    expect(at("2026-02-01T03:00:00Z")).toBe("January 31, 2028");
+    // 29 de febrero de 2028 + 24 meses → 28 de febrero de 2030 (no 1 de marzo).
+    expect(at("2028-02-29T15:00:00Z")).toBe("February 28, 2030");
+    expect(addCalendarMonths({ y: 2026, m: 8, d: 31 }, 1)).toEqual({ y: 2026, m: 9, d: 30 });
+    expect(addCalendarMonths({ y: 2026, m: 12, d: 15 }, 2)).toEqual({ y: 2027, m: 2, d: 15 });
+    // Otro plazo del plan: la misma regla.
+    expect(at("2026-10-27T02:05:00Z", { tier: { ...PRICING_TIERS.pro, termMonths: 12 } })).toBe("October 26, 2027");
+    expect(nyCalendarDate(new Date("2026-10-27T02:05:00Z"))).toEqual({ y: 2026, m: 10, d: 26 });
+    expect(longDate({ y: 2026, m: 10, d: 26 })).toBe("October 26, 2026");
   });
 
   it("utilidades: fecha MM/DD/YYYY, reparto en dos líneas, anexo sin HTML inyectado", () => {

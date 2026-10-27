@@ -165,7 +165,7 @@ export async function POST(req: Request) {
   // The signer's profile name comes from public.users (Lovable schema).
   const { data: profile } = await supabase
     .from("users")
-    .select("first_name, last_name")
+    .select("first_name, last_name, phone")
     .eq("id", user.id)
     .maybeSingle();
   const signerName =
@@ -214,6 +214,9 @@ export async function POST(req: Request) {
         listing: property,
         tier,
         sellerName: signerName,
+        // Lines 247–249: phone from sign-up, the account email; no mailing address is stored,
+        // so line 248 carries the property's.
+        seller: { phone: profile?.phone ?? null, email: signerEmail },
         brokerName: BROKERAGE_LICENSED_ENTITY,
         buyerOffer,
         verifiedLegal,

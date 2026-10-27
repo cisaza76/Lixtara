@@ -1,7 +1,7 @@
 // Plan de arreglos de la plantilla del Listing Agreement (ERS-21tn): con los errores que tenía
 // la plantilla Demo (2026-10-21), y que aplicarlo una vez deja la plantilla igual al layout. Sin red.
 import { describe, it, expect } from "vitest";
-import { ERS21TN_FIELDS, ERS21TN_INITIALS, ERS21TN_SELLER_SIGNATURES } from "./ers21tn-layout";
+import { ERS21TN_BROKER_SIGNATURES, ERS21TN_FIELDS, ERS21TN_INITIALS, ERS21TN_SELLER_SIGNATURES } from "./ers21tn-layout";
 import { formatPlan, planInitialFixes, planSignatureFixes, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "./template-fix-plan";
 
 let n = 0;
@@ -134,13 +134,16 @@ describe("arreglos de la plantilla ERS-21tn", () => {
   it("iniciales: las del vendedor y las de la broker van al espacio del pie de cada página, más chicas", () => {
     const seller = planInitialFixes(demoTemplate(), "Seller");
     expect(seller).toHaveLength(6);
-    for (const s of seller) expect(s.changes).toMatchObject({ yPosition: [expect.any(String), "708"], scaleValue: ["", "0.5"] });
+    for (const s of seller) expect(s.changes).toMatchObject({ yPosition: [expect.any(String), "710"], scaleValue: ["", "0.5"] });
+    // El marco de DocuSign (y + 5.5 … y + 20.6 a escala 0.5) no toca L106 (descendentes en 713.9,
+    // página 2), L204 (710.3) ni el pie de la página 1 (709.2): 2026-10-26, la v2 lo tocaba en y 708.
+    for (const i of ERS21TN_INITIALS) expect(i.y + 5.5).toBeGreaterThanOrEqual(713.9 + 1.5);
     expect(seller.find((s) => s.label === "Seller initials p1")!.changes!.xPosition).toEqual(["73", "81"]);
     // Sin iniciales de la broker en el ejemplo: se crean, una por página.
     const broker = planInitialFixes({}, "Broker");
     expect(broker.map((s) => s.action)).toEqual(Array(6).fill("create"));
     expect(broker.map((s) => (s.tab as { xPosition: string }).xPosition)).toEqual(Array(6).fill("270"));
-    // Dentro del espacio de 24 pt de cada parte, y por debajo del texto de la página (y 712).
+    // Dentro del espacio de 24 pt de cada parte.
     for (const i of ERS21TN_INITIALS) expect(i.x).toBeGreaterThanOrEqual(i.role === "Seller" ? 77 : 266);
     const after = applyLocally(demoTemplate(), seller);
     expect(planInitialFixes(after, "Seller")).toEqual([]);
@@ -170,6 +173,27 @@ describe("arreglos de la plantilla ERS-21tn", () => {
     // La firma de la página 6 no se toca, y aplicado una vez el plan queda vacío.
     expect(plan.some((s) => s.label === "Signature" || s.label === "Date Signed")).toBe(false);
     expect(planSignatureFixes(applyLocally(live, plan))).toEqual([]);
+  });
+
+  it("página 6: contacto del vendedor en L247–249 y «email» en L257, de solo lectura; la fecha de L257 es la firma de la broker", () => {
+    const plan = planTemplateFixes(demoTemplate());
+    for (const [label, line] of [["seller_phone", 247], ["seller_address", 248], ["seller_email", 249]] as const) {
+      const s = find(plan, label)[0];
+      expect(s.action, label).toBe("create");
+      expect(s.tab, label).toMatchObject({ pageNumber: "6", locked: "true", height: "11", disableAutoSize: "true" });
+      expect(ERS21TN_FIELDS.find((f) => f.kind === "text" && f.label === label)?.line).toBe(line);
+    }
+    // Encima de su raya (L247 y 69.7, L248 y 92.7, L249 y 116.1), sin pasar a la de abajo.
+    expect(find(plan, "seller_phone")[0].tab).toMatchObject({ xPosition: "135", yPosition: "56", width: "96" });
+    expect(find(plan, "seller_email")[0].tab).toMatchObject({ yPosition: "102" });
+    const box = find(plan, "copy_returned_by_email")[0];
+    expect(box.tab).toMatchObject({ pageNumber: "6", locked: "true", xPosition: "330", yPosition: "304" });
+    // La fecha la pone DocuSign: dateSigned de la broker (firma la última), no un texto del sitio.
+    const broker = planSignatureFixes({}, ERS21TN_BROKER_SIGNATURES, "broker");
+    expect(broker.map((s) => [s.action, s.kind, s.label])).toEqual([["create", "dateSignedTabs", "copy_returned_date"]]);
+    expect(broker[0].tab).toMatchObject({ pageNumber: "6", xPosition: "194", yPosition: "302" });
+    expect(broker[0].reason).toMatch(/^broker's date, line 257/);
+    expect(planSignatureFixes(applyLocally({}, broker), ERS21TN_BROKER_SIGNATURES, "broker")).toEqual([]);
   });
 
   it("aplicado una vez, el siguiente plan está vacío (idempotente)", () => {

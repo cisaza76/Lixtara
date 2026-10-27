@@ -161,25 +161,42 @@ export const ERS21TN_FIELDS: LayoutField[] = [
   ...ADDITIONAL_TERMS_UNDERLINES.map((u, i) =>
     text({ label: `additional_terms_${i + 1}`, line: 230 + i, page: 5, ...onBlank(i === 0 ? 157.5 : 50.5, i === 0 ? 569 : 567.5, u), ...(i === 0 ? { anchor: "Additional Terms:" } : {}), locked: true, required: false }),
   ),
-  // ── Page 6 ── the broker signs and dates line 254 herself.
+  // ── Page 6 ──
+  // Lines 247–249, the seller's contact (owner, 2026-10-26): phone on "Home Telephone" (Work
+  // Telephone and Facsimile stay blank), the mailing address (the property's: the site has no
+  // other), the email. Lines 251–253 are a second seller's: blank. Underlines measured on the
+  // template image, 2026-10-26.
+  text({ label: "seller_phone", line: 247, page: 6, ...onBlank(132.8, 232.9, 69.7), anchor: "Home Telephone:", locked: true, required: false }),
+  text({ label: "seller_address", line: 248, page: 6, ...onBlank(92.9, 571.3, 92.7), locked: true, required: true }),
+  text({ label: "seller_email", line: 249, page: 6, ...onBlank(120.6, 571.3, 116.1), locked: true, required: true }),
+  // The broker signs and dates line 254 herself.
   text({ label: "brokerage_firm_name", line: 255, page: 6, ...onBlank(154.5, 404.5, 253.5), anchor: "Brokerage Firm Name:", locked: true, required: true }),
   text({ label: "brokerage_phone", line: 255, page: 6, ...onBlank(460.5, 571.5, 253.5), locked: true, required: true }),
   text({ label: "brokerage_address", line: 256, page: 6, ...onBlank(92.5, 571, 276.5), locked: true, required: true }),
+  // Line 257, "Copy returned to Seller on ____ by [x] email": DocuSign emails every signer the
+  // completed envelope, so "email" is checked and read-only. The date is the broker's
+  // dateSigned (ERS21TN_BROKER_SIGNATURES). Box measured on the template image, 2026-10-26.
+  box({ label: "copy_returned_by_email", line: 257, page: 6, ...overBox(333.7, 307.8), locked: true }),
 ];
 
 /**
  * Initials on each page's footer: "Seller (____) (____) and Broker/Authorized Associate (____)
- * (____)". The first blank of each party, 24 pt wide, underline at y 726 on every page; the
- * text above ends at y 712 (page 2). The template had them ~40 pt higher, over lines 47–48,
- * 105–106 and 204, and on page 6 over the form's footer. Checked on signed envelopes
- * (2026-10-21): at y 708 the stamp sits between the parentheses and DocuSign's frame label
- * clears the text above; the frame's bottom edge touches the next line. `scale` = DocuSign's
- * scaleValue (0.5 is its minimum): the full-size stamp (~32×29 pt) doesn't fit in the blank.
+ * (____)". The first blank of each party, 24 pt wide, underline at y 726 on every page. The
+ * template had them ~40 pt higher, over lines 47–48, 105–106 and 204, and on page 6 over the
+ * form's footer. `scale` = DocuSign's scaleValue (0.5 is its minimum): the full-size stamp
+ * (~32×29 pt) doesn't fit in the blank.
+ *
+ * y (owner, 2026-10-26: the frame touched L106 at y 708). Measured at 200 dpi on a signed
+ * envelope: at scale 0.5 DocuSign's frame runs from y + 5.5 to y + 20.6. The lowest text above
+ * the footer is L106's descenders at 713.9 (page 2; L204 ends at 710.3, page 1 at 709.2) and the
+ * italic line below starts at 729.7. y 710 → frame 715.5–730.6: 1.6 pt clear of L106, and only
+ * the frame's bottom edge reaches the italic line's ascenders (the stamp is inside the blank).
  */
+export const ERS21TN_INITIALS_Y = 710;
 export type InitialField = { role: "Seller" | "Broker"; page: number; x: number; y: number; scale: number };
 const FOOTER_BLANK = { Seller: 77.5, Broker: 267 } as const;
 export const ERS21TN_INITIALS: InitialField[] = ([1, 2, 3, 4, 5, 6] as const).flatMap((page) =>
-  (["Seller", "Broker"] as const).map((role) => ({ role, page, x: FOOTER_BLANK[role] + 3, y: 708, scale: 0.5 })),
+  (["Seller", "Broker"] as const).map((role) => ({ role, page, x: FOOTER_BLANK[role] + 3, y: ERS21TN_INITIALS_Y, scale: 0.5 })),
 );
 
 /**
@@ -207,6 +224,15 @@ export const ERS21TN_SELLER_SIGNATURES: SignatureField[] = [
   { kind: "dateSignedTabs", label: "transition_consent_date", line: 201, page: 4, ...dateOnLine(436, 666) },
 ];
 
+/**
+ * The broker's date on line 257 ("Copy returned to Seller on ____"): blank 191.5–308.5,
+ * underline at 315.5. The broker signs last (routing order 2), so her dateSigned is the day
+ * DocuSign completes the envelope and emails the copy. Owner, 2026-10-26: DocuSign sets it.
+ */
+export const ERS21TN_BROKER_SIGNATURES: SignatureField[] = [
+  { kind: "dateSignedTabs", label: "copy_returned_date", line: 257, page: 6, ...dateOnLine(191.5, 315.5) },
+];
+
 /** Height of every text tab: one line, no auto-grow. */
 export const ERS21TN_TEXT_HEIGHT = TEXT_HEIGHT;
 
@@ -232,7 +258,24 @@ export function textField(label: string): TextField {
   return f;
 }
 
-/** Whether `value` fits on its line without being cut (2 pt of slack for DocuSign's padding). */
+/**
+ * DocuSign draws a text tab's value 5.5 pt right of the tab's x (measured at 200 dpi on a signed
+ * envelope, 2026-10-26: tab at 52.5, text from 58.0). The tab ends 2 pt before the rule's end
+ * (onBlank), and the text keeps 3 pt more of clearance. With only 2 pt of slack, lines 231 and
+ * 235 of paragraph 15 reached the end of the rule (owner, 2026-10-26); paragraph 15's running
+ * text keeps 5 pt more (PARAGRAPH_RIGHT_MARGIN_PT), inside the form's own right margin.
+ */
+const TEXT_INSET_PT = 5.5;
+const RIGHT_CLEARANCE_PT = 3;
+/** Running text over several lines (paragraph 15) ends ≥ 10 pt before the rule's end (567.7). */
+export const PARAGRAPH_RIGHT_MARGIN_PT = 5;
+
+/** Printed width available for the value of the text tab `label`, in points. */
+export function textRoom(label: string): number {
+  return textField(label).width + 2 - TEXT_INSET_PT - RIGHT_CLEARANCE_PT;
+}
+
+/** Whether `value` fits on its line, inside the rule, without being cut. */
 export function fitsOnLine(label: string, value: string): boolean {
-  return textWidthPt(value) <= textField(label).width - 2;
+  return textWidthPt(value) <= textRoom(label);
 }

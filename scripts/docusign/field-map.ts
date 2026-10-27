@@ -11,7 +11,7 @@ import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
-import { ERS21TN_FIELDS, ERS21TN_SELLER_SIGNATURES, ERS21TN_TEXT_HEIGHT } from "../../src/lib/docusign/ers21tn-layout";
+import { ERS21TN_BROKER_SIGNATURES, ERS21TN_FIELDS, ERS21TN_SELLER_SIGNATURES, ERS21TN_TEXT_HEIGHT } from "../../src/lib/docusign/ers21tn-layout";
 import { TEMPLATE_ENVS } from "./dump-templates";
 
 type Tab = Record<string, unknown> & { tabLabel?: string; pageNumber?: string; xPosition?: string; yPosition?: string; width?: string; height?: string };
@@ -25,8 +25,8 @@ const tmp = mkdtempSync(join(tmpdir(), "fieldmap-"));
 const ERS_SOURCE: Record<string, string> = {
   seller_name: "Perfil del vendedor (`users.first_name` + `last_name`; si no hay, el correo)",
   broker_name: "`BROKERAGE_LICENSED_ENTITY` (`src/lib/broker.ts`)",
-  start_date: "Fecha de creación del sobre",
-  termination_date: "Inicio + `termMonths` del plan (`pricing-tiers.ts`)",
+  start_date: "Fecha de creación del sobre en Nueva York (`nyCalendarDate`, America/New_York; nunca UTC)",
+  termination_date: "Inicio en Nueva York + `termMonths` del plan (`pricing-tiers.ts`); si el día no existe, el último del mes (`addCalendarMonths`)",
   street_address: "`properties.address_street` (con unidad)",
   city_state_zip: "`address_city`, `address_state` `address_zip`",
   city: "`address_city` (se quita: va en `city_state_zip`)",
@@ -69,6 +69,11 @@ const ERS_SOURCE: Record<string, string> = {
   single_agent_date: "Fecha de firma del vendedor (L171)",
   transition_consent_signature: "Firma del vendedor en el consentimiento a transaction broker (L201); L203 sin tab",
   transition_consent_date: "Fecha de firma del vendedor (L201)",
+  seller_phone: "`users.phone` (registro), formato `+1 (305) 555-0123` si es de EE. UU.; vacío si no hay. Work Telephone y Facsimile quedan en blanco",
+  seller_address: "Dirección postal del vendedor; el sitio no guarda otra: la de la propiedad (`address_street`, `city_state_zip`)",
+  seller_email: "Email de la cuenta (el mismo al que DocuSign manda el sobre)",
+  copy_returned_by_email: "Siempre marcada: DocuSign manda por email el sobre completado",
+  copy_returned_date: "Fecha de firma de la broker (rol Broker, firma la última): el día en que DocuSign completa el sobre",
 };
 const CASSB1_SOURCE: Record<string, string> = {
   fee_amount: "`cassb1Tabs`: monto fijo (hoy apagado: `CASSB1_ENABLED = false`)",
@@ -248,7 +253,7 @@ function ersAfter(): string {
     const cond = f.kind === "text" && f.conditional ? `solo si \`${f.conditional.parentLabel}\` = ${f.conditional.parentValue}` : "—";
     return `| ${f.line} | \`${name}\` | ${f.kind} | ${ERS_SOURCE[name] ?? "Lo llena quien firma"} | ${"required" in f && f.required ? "sí" : "no"} | ${f.locked ? "no" : "sí"} | ${geo} | ${f.kind === "text" ? "no" : "—"} | ${cond} |`;
   });
-  for (const f of ERS21TN_SELLER_SIGNATURES) {
+  for (const f of [...ERS21TN_SELLER_SIGNATURES, ...ERS21TN_BROKER_SIGNATURES]) {
     const geo = `p${f.page} x${Math.round(f.x)} y${Math.round(f.y)}${f.scale ? ` · escala ${f.scale}` : " · 9 pt"}`;
     rows.push(`| ${f.line} | \`${f.label}\` | ${f.kind.replace("Tabs", "")} | ${ERS_SOURCE[f.label] ?? "Lo llena quien firma"} | sí | — | ${geo} | — | — |`);
   }
@@ -256,7 +261,7 @@ function ersAfter(): string {
     "",
     "## Después del arreglo (`scripts/docusign/apply-template-fixes.ts`)",
     "",
-    "Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5). El vendedor firma y fecha además el aviso de single agent (L171) y el consentimiento a transaction broker (L201) (`ERS21TN_SELLER_SIGNATURES`, escala 0.65); L173 y L203 (segundo vendedor) quedan en blanco: el sitio tiene un vendedor por acuerdo. La firma y la fecha de la página 6 y el pie de Lixtara no cambian.",
+    "Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-layout.ts`). Las iniciales del vendedor y de la broker pasan al espacio «Seller (____)» / «Broker/Authorized Associate (____)» del pie de cada página (`ERS21TN_INITIALS`, escala 0.5, y 710: el marco no toca L106, L204 ni el texto sobre el pie). El texto del párrafo 15 termina al menos 10 pt antes del fin de la raya (`PARAGRAPH_RIGHT_MARGIN_PT`). Plantillas: v2 `e7f904fe-fd51-4974-9994-86ffcccb2784` (Production desde #217, no se modifica) y v3 `fcdf42ef-17ed-457e-a970-7b423d337b1a` (#231, copia de la v2 con las iniciales en y 710). El vendedor firma y fecha además el aviso de single agent (L171) y el consentimiento a transaction broker (L201) (`ERS21TN_SELLER_SIGNATURES`, escala 0.65); L173 y L203 (segundo vendedor) quedan en blanco: el sitio tiene un vendedor por acuerdo. En la página 6, el sitio llena el teléfono, la dirección y el email del vendedor (L247–249; L251–253, segundo vendedor, en blanco) y marca «email» en L257; la fecha de L257 es la fecha de firma de la broker (`ERS21TN_BROKER_SIGNATURES`), que firma la última. La firma y la fecha de L246 y L254 y el pie de Lixtara no cambian.",
     "",
     "| Línea | Campo | Tipo | Origen del dato | Obligatorio | Editable | Posición y tamaño | Auto-grow | Condición |",
     "|---|---|---|---|---|---|---|---|---|",
