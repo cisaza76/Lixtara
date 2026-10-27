@@ -7,6 +7,11 @@ import { offerFromRow, type BuyerCompRow } from "@/lib/buyer-comp";
 import { isFinancingTerm } from "@/lib/financing-terms";
 
 export const PROPERTY_TYPES = ["single_family", "condo", "townhouse", "multi_family"] as const;
+/** Ocupación (L20 del acuerdo: con inquilino = "is"; vacía o el dueño = "is not"). Obligatoria. */
+export const OCCUPANCY_STATUSES = ["vacant", "owner_occupied", "tenant_occupied"] as const;
+export type OccupancyStatus = (typeof OCCUPANCY_STATUSES)[number];
+export const isOccupancyStatus = (v: unknown): v is OccupancyStatus =>
+  OCCUPANCY_STATUSES.includes(v as OccupancyStatus);
 
 export interface ListingCompletenessFacts {
   address_street: string | null;
@@ -21,6 +26,8 @@ export interface ListingCompletenessFacts {
   list_price: number | null;
   /** Financing accepted (line 23 of the agreement): at least one, since migration 20261021120000. */
   financing_terms: string[] | null;
+  /** Occupancy (line 20 of the agreement): required, so the seller never fills it in DocuSign. */
+  occupancy_status: string | null;
   description: string | null;
   photos_rights_confirmed: boolean | null;
   photoCount: number;
@@ -47,7 +54,8 @@ export function stepComplete(step: number, f: ListingCompletenessFacts, now = ne
         inRange(f.sqft, 0, 100000, true) &&
         inRange(f.year_built, 1800, now.getFullYear() + 2) &&
         inRange(f.list_price, 0, 1000000000, true) &&
-        (f.financing_terms ?? []).some(isFinancingTerm)
+        (f.financing_terms ?? []).some(isFinancingTerm) &&
+        isOccupancyStatus(f.occupancy_status)
       );
     case 4:
       return (f.description ?? "").trim().length >= 10;

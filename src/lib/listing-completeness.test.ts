@@ -27,6 +27,7 @@ const fresh: ListingCompletenessFacts = {
   year_built: null,
   list_price: 0,
   financing_terms: null,
+  occupancy_status: null,
   description: null,
   photos_rights_confirmed: false,
   photoCount: 0,
@@ -43,6 +44,7 @@ const complete: ListingCompletenessFacts = {
   year_built: 1995,
   list_price: 450000,
   financing_terms: ["cash", "conventional"],
+  occupancy_status: "owner_occupied",
   description: "Bright corner home near the park.",
   photos_rights_confirmed: true,
   photoCount: MIN_OWN_PHOTOS,
@@ -70,10 +72,18 @@ describe("firstIncompleteStep", () => {
     // Sin financiamiento elegido (L23 del acuerdo), el paso 3 no está completo.
     expect(firstIncompleteStep({ ...complete, financing_terms: null }, NOW)).toBe(3);
     expect(firstIncompleteStep({ ...complete, financing_terms: [] }, NOW)).toBe(3);
+    // Sin ocupación elegida (L20 del acuerdo), tampoco: el vendedor no la llena en DocuSign.
+    expect(firstIncompleteStep({ ...complete, occupancy_status: null }, NOW)).toBe(3);
+    expect(firstIncompleteStep({ ...complete, occupancy_status: "" }, NOW)).toBe(3);
+    expect(firstIncompleteStep({ ...complete, occupancy_status: "unknown" }, NOW)).toBe(3);
     expect(firstIncompleteStep({ ...complete, description: "short" }, NOW)).toBe(4);
     expect(firstIncompleteStep({ ...complete, photoCount: MIN_OWN_PHOTOS - 1 }, NOW)).toBe(5);
     expect(firstIncompleteStep({ ...complete, photos_rights_confirmed: false }, NOW)).toBe(5);
     expect(firstIncompleteStep({ ...complete, buyerComp: null }, NOW)).toBe(6);
+  });
+
+  it.each(["vacant", "owner_occupied", "tenant_occupied"])("ocupación %s completa el paso 3", (o) => {
+    expect(stepComplete(3, { ...complete, occupancy_status: o }, NOW)).toBe(true);
   });
 
   it("estudio (0 habitaciones) es válido, como en el paso 3", () => {
