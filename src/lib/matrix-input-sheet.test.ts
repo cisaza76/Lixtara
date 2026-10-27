@@ -120,8 +120,38 @@ describe("buildMatrixInputSheet", () => {
   it("computes the expiration from the list date and the tier term, clamping month ends", () => {
     expect(row(sheet, "List Date")?.value).toBe("01/31/2026");
     expect(row(sheet, "Expiration Date")?.value).toBe("01/31/2028");
-    const leap = buildMatrixInputSheet({ ...base, mls_published_at: "2026-02-28T00:00:00Z" }, [])!;
+    const leap = buildMatrixInputSheet({ ...base, mls_published_at: "2026-02-28T15:00:00Z" }, [])!;
     expect(row(leap, "Expiration Date")?.value).toBe("02/28/2028");
+  });
+
+  // [instante de publicación en UTC, List Date esperada en Miami]
+  const MIAMI_DAYS: Array<[string, string]> = [
+    ["2026-10-27T02:17:00Z", "10/26/2026"], // 22:17 del 26 en Miami (EDT, UTC-4)
+    ["2026-10-27T04:00:00Z", "10/27/2026"], // medianoche exacta en Miami
+    ["2026-07-01T03:59:00Z", "06/30/2026"], // verano: 23:59 EDT
+    ["2026-01-01T04:59:00Z", "12/31/2025"], // invierno: 23:59 EST (UTC-5), cambia el año
+    ["2026-01-01T05:00:00Z", "01/01/2026"],
+    ["2026-03-08T04:30:00Z", "03/07/2026"], // día del cambio a verano: aún EST
+    ["2026-03-09T03:30:00Z", "03/08/2026"], // ya EDT
+    ["2026-11-01T04:30:00Z", "11/01/2026"], // día del cambio a invierno: aún EDT
+    ["2026-11-02T04:30:00Z", "11/01/2026"], // ya EST
+  ];
+  it.each(MIAMI_DAYS)("List Date is the Miami calendar day: %s → %s", (instant, want) => {
+    const s = buildMatrixInputSheet({ ...base, mls_published_at: instant }, [])!;
+    expect(row(s, "List Date")?.value).toBe(want);
+  });
+
+  it("counts the expiration from the Miami day, not the UTC day", () => {
+    // 23:00 del 31 de enero en Miami = 1 de febrero en UTC.
+    const s = buildMatrixInputSheet({ ...base, mls_published_at: "2026-02-01T04:00:00Z" }, [])!;
+    expect(row(s, "List Date")?.value).toBe("01/31/2026");
+    expect(row(s, "Expiration Date")?.value).toBe("01/31/2028");
+  });
+
+  it("an unreadable publication date leaves both dates empty", () => {
+    const s = buildMatrixInputSheet({ ...base, mls_published_at: "not a date" }, [])!;
+    expect(row(s, "List Date")?.value).toBeNull();
+    expect(row(s, "Expiration Date")?.value).toBeNull();
   });
 
   it("puts the primary photo first", () => {

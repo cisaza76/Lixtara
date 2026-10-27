@@ -165,6 +165,14 @@ const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const num = (n: number | null) => (n === null ? null : String(n));
 const yesNo = (b: boolean | null) => (b === null ? null : b ? "Yes" : "No");
 
+// La List Date es el día de Miami (America/New_York) en que se publicó, no el de UTC:
+// publicado a las 22:00 del 26 de octubre en Miami son ya las 02:00 del 27 en UTC.
+function miamiDate(instant: string): string | null {
+  const d = new Date(instant);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 function addMonths(iso: string, months: number): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
@@ -215,7 +223,7 @@ export function buildMatrixInputSheet(
   const equipmentNeedsGasCheck = appliances.includes("range_oven") || appliances.includes("water_heater");
 
   const termMonths = isPricingTierId(p.pricing_tier) ? PRICING_TIERS[p.pricing_tier].termMonths : null;
-  const listDate = p.mls_published_at ? p.mls_published_at.slice(0, 10) : null;
+  const listDate = p.mls_published_at ? miamiDate(p.mls_published_at) : null;
   const expiration = listDate && termMonths ? addMonths(listDate, termMonths) : null;
 
   const remarks = p.description?.trim() || null;
