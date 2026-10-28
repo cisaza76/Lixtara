@@ -23,9 +23,13 @@ import {
   getEnvelopeStatus,
   mapEnvelopeStatus,
   secondSellerHasSigned,
+  secondSellerOf,
   sellerHasSigned,
   type AgreementStatus,
+  type EnvelopeSigner,
 } from "@/lib/docusign";
+import { notifyCosignerSigned, notifySigningExpired, type Cosigner } from "@/lib/cosigner-notify.server";
+import { isSigningExpired, type DeadlineRow } from "@/lib/signing-deadline";
 import { sendAgreementSigned } from "@/lib/email";
 import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { SITE_URL } from "@/lib/config";
@@ -78,6 +82,10 @@ export async function refreshAgreementResult(
   let next: AgreementStatus;
   let signedAt: string | null = null;
   let countersigned = false;
+  // Con dos vendedores (#220): el sobre anulado o vencido después del plazo queda "expired" y
+  // avisa a los dos (signing-deadline.ts).
+  let deadlineExpired = false;
+  let cosigner: Cosigner | null = null;
   try {
     const env = await getEnvelopeStatus(a.envelope_id);
     if (env.completedDateTime) signedAt = env.completedDateTime;
@@ -86,8 +94,19 @@ export async function refreshAgreementResult(
     const signers = needSigners ? await getEnvelopeSigners(a.envelope_id) : null;
     // Con dos vendedores (#220) cuenta solo cuando firmaron todos (sellerHasSigned).
     const signed = signers ? sellerHasSigned(signers, a.property_id) : false;
-    if (signers && secondSellerHasSigned(signers)) await markSecondSellerSigned(a.id);
+    if (signers && secondSellerHasSigned(signers) && (await markSecondSellerSigned(a.id)) && !signed) {
+      // Firmó el segundo y falta el vendedor: se le avisa una vez (la escritura que ganó).
+      await notifyCosignerSigned(a.id, cosignerOf(signers));
+    }
     next = resolveAgreementStatus(env.status, signed);
+    if (next === "voided" || next === "expired") {
+      // Solo el acuerdo vigente del listing: uno reemplazado por un sobre nuevo no avisa.
+      deadlineExpired = isSigningExpired(await deadlineRow(a.id), new Date()) && (await isLatestAgreement(a));
+      if (deadlineExpired) {
+        next = "expired";
+        cosigner = cosignerOf(await getEnvelopeSigners(a.envelope_id).catch(() => []));
+      }
+    }
     if (next === "completed") {
       // Solo para el embudo: el estado pasa a "completed" aunque esta lectura falle.
       countersigned = await getEnvelopeSigners(a.envelope_id)
@@ -122,6 +141,10 @@ export async function refreshAgreementResult(
     await notifySellerSigned(a.property_id).catch((e) =>
       console.error("agreement refresh: email failed", e instanceof Error ? e.message : e),
     );
+  }
+  // Plazo vencido sin todas las firmas: aviso a los dos, una vez (la transición que ganó).
+  if (won && next === "expired" && deadlineExpired) {
+    await notifySigningExpired(a.id, cosigner);
   }
   // Contrafirma de la broker: una vez, en la transición a "completed" (a.status nunca es
   // final aquí). Evento de servidor; recordFunnelEvent decide is_test y nunca lanza.
@@ -191,13 +214,44 @@ async function notifySellerSigned(propertyId: string) {
   });
 }
 
-/** agreements.additional_signer_signed_at, una vez (#220). Best-effort: nunca lanza. */
-async function markSecondSellerSigned(agreementId: string): Promise<void> {
-  const { error } = await createService()
+/**
+ * agreements.additional_signer_signed_at, una vez (#220). true solo para la escritura que lo
+ * marcó (dos lecturas a la vez: una sola manda el aviso). Best-effort: nunca lanza.
+ */
+async function markSecondSellerSigned(agreementId: string): Promise<boolean> {
+  const { data, error } = await createService()
     .from("agreements")
     .update({ additional_signer_signed_at: new Date().toISOString() })
     .eq("id", agreementId)
     .eq("sellers_required", 2)
-    .is("additional_signer_signed_at", null);
+    .is("additional_signer_signed_at", null)
+    .select("id");
   if (error) console.error("agreement refresh: second seller mark failed", error.code);
+  return Boolean(data && data.length > 0);
+}
+
+async function deadlineRow(agreementId: string): Promise<DeadlineRow> {
+  const { data } = await createService()
+    .from("agreements")
+    .select("sellers_required,additional_signer_signed_at,signing_deadline_at")
+    .eq("id", agreementId)
+    .maybeSingle();
+  return (data ?? { sellers_required: 1, additional_signer_signed_at: null, signing_deadline_at: null }) as DeadlineRow;
+}
+
+/** ¿Es el acuerdo más reciente del listing? (uno reemplazado por otro sobre no cuenta). */
+export async function isLatestAgreement(a: Pick<AgreementRef, "id" | "property_id">): Promise<boolean> {
+  const { data } = await createService()
+    .from("agreements")
+    .select("id")
+    .eq("property_id", a.property_id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.id === a.id;
+}
+
+function cosignerOf(signers: EnvelopeSigner[]): Cosigner | null {
+  const r = secondSellerOf(signers);
+  return r?.email ? { name: r.name ?? "", email: r.email } : null;
 }

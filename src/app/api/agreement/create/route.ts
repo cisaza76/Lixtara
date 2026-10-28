@@ -18,6 +18,7 @@ import {
   InvalidAdditionalSignerError,
   LIXTARA_BROKER_ROLE,
   templateHasRole,
+  voidEnvelope,
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { offerFromRow, offerWithinLimit } from "@/lib/buyer-comp";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/listing-ownership";
 import { verifiedLegalDescription } from "@/lib/miami-dade";
 import { recordAgreementSent } from "@/lib/agreement-legal.server";
+import { notifyCosignerInvitation } from "@/lib/cosigner-notify.server";
 import { attachmentHtml, listingAgreementTabs } from "@/lib/docusign/listing-agreement-tabs";
 
 interface Body {
@@ -234,6 +236,10 @@ export async function POST(req: Request) {
     let agreementRowId = reusable ? (existing?.id ?? null) : null;
 
     if (!envelopeId) {
+      // El sobre en curso con otros firmantes queda reemplazado: se anula, para que nadie firme
+      // el viejo (ni le lleguen recordatorios). Best-effort: el nuevo sale igual.
+      if (existing?.envelope_id && !reusable) await voidSupersededAgreement(existing.id, existing.envelope_id);
+
       // Sin el email de firma de la broker no se crea ningún sobre (#137 f).
       const broker = brokerSigner();
       if (!broker) {
@@ -337,6 +343,9 @@ export async function POST(req: Request) {
       agreementRowId = inserted?.id ?? null;
       // Auditoría (el bloqueo lee agreements.legal_description_status).
       await recordAgreementSent({ propertyId, userId: user.id, envelopeId, legal: contract.legalStatus });
+      // #220: además del correo de DocuSign, Lixtara le explica al segundo firmante qué firma y
+      // por qué (una vez por acuerdo; nunca lanza).
+      if (plan.signer && agreementRowId) await notifyCosignerInvitation(agreementRowId, "invite");
     }
 
     const view = await getRecipientView({
@@ -362,5 +371,19 @@ export async function POST(req: Request) {
       { error: "docusign_failed", detail: msg },
       { status: 502 },
     );
+  }
+}
+
+/** #220: anula el sobre de un acuerdo que otro reemplaza (los firmantes cambiaron). Nunca lanza. */
+async function voidSupersededAgreement(agreementId: string, envelopeId: string): Promise<void> {
+  try {
+    await voidEnvelope(envelopeId, "Replaced by a new listing agreement with different signers.");
+    await createService()
+      .from("agreements")
+      .update({ status: "voided", updated_at: new Date().toISOString() })
+      .eq("id", agreementId)
+      .in("status", ["pending", "sent", "delivered"]);
+  } catch (e) {
+    console.error(JSON.stringify({ event: "agreement_supersede_void_failed", agreementId, error: e instanceof Error ? e.message.slice(0, 200) : "unknown" }));
   }
 }

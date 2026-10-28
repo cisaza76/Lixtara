@@ -231,6 +231,219 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
   });
 }
 
+// ─── Segundo vendedor (#220) ─────────────────────────────────────────
+//
+// El segundo firmante no tiene cuenta: firma por el correo de DocuSign. Lixtara le escribe aparte
+// para explicarle qué firma y por qué (y los recordatorios de los días 2 y 5). Como no sabemos su
+// idioma, sus correos van en los dos, primero el del vendedor. Todo lo que escribió el vendedor
+// (nombres, dirección) va escapado.
+
+export type CosignerRelationship = "title_holder" | "homestead_spouse";
+export type CosignerEmailKind = "invite" | "reminder" | "resend";
+
+/** "November 4, 2026" / "4 de noviembre de 2026", en hora de Miami. */
+export function signingDeadlineLabel(iso: string, lang: Lang): string {
+  return new Date(iso).toLocaleDateString(lang === "es" ? "es-US" : "en-US", {
+    timeZone: "America/New_York",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export interface CosignerInvitationInput {
+  to: string;
+  /** Idioma del vendedor: el asunto y el primer bloque. */
+  lang?: Lang;
+  kind: CosignerEmailKind;
+  sellerName: string;
+  signerName: string;
+  relationship: CosignerRelationship;
+  propertyAddress: string;
+  deadlineIso: string;
+  idempotencyKey: string;
+}
+
+function cosignerInvitationLines(input: CosignerInvitationInput, lang: Lang, html: boolean): string[] {
+  const esc = html ? escapeHtml : (v: string) => v;
+  const seller = esc(input.sellerName);
+  const signer = esc(input.signerName);
+  const strong = (v: string) => (html ? `<strong>${v}</strong>` : v);
+  const address = strong(esc(input.propertyAddress));
+  const date = strong(signingDeadlineLabel(input.deadlineIso, lang));
+  if (lang === "es") {
+    return [
+      input.kind === "reminder"
+        ? `Hola, ${signer}: te recordamos que el acuerdo de listado de ${address} espera tu firma.`
+        : `Hola, ${signer}: ${seller} quiere poner a la venta ${address} con Lixtara y necesita tu firma en el acuerdo de listado.`,
+      `El acuerdo autoriza a Lixtara, la brokerage con licencia en Florida, a publicar la propiedad a la venta. Ahí están la tarifa, la comisión y el plazo del listado.`,
+      input.relationship === "title_holder"
+        ? `Te pedimos firmar porque figuras en el título de la propiedad junto con ${seller}.`
+        : `Te pedimos firmar porque la propiedad es la residencia principal (homestead) de un propietario casado: en ese caso, el cónyuge también firma el acuerdo.`,
+      `DocuSign te mandó un correo aparte con el enlace para leerlo y firmarlo. Búscalo en tu bandeja de entrada o en la carpeta de spam. El plazo para firmar vence el ${date}. Si no firmas para esa fecha, el acuerdo se anula y no se publica nada.`,
+      `Si no esperabas este correo, respóndelo y te ayudamos.`,
+    ];
+  }
+  return [
+    input.kind === "reminder"
+      ? `Hi ${signer}, this is a reminder that the listing agreement for ${address} is waiting for your signature.`
+      : `Hi ${signer}, ${seller} wants to list ${address} for sale with Lixtara and needs your signature on the listing agreement.`,
+    `The agreement authorizes Lixtara, a licensed Florida brokerage, to list the property for sale. It sets out the fee, the commission and the term of the listing.`,
+    input.relationship === "title_holder"
+      ? `We're asking you to sign because you're on the property's title together with ${seller}.`
+      : `We're asking you to sign because the property is the primary residence (homestead) of a married owner: in that case, the spouse signs the agreement too.`,
+    `DocuSign sent you a separate email with the link to read and sign it. Look for it in your inbox or your spam folder. The deadline to sign is ${date}. If it isn't signed by then, the agreement is voided and nothing is published.`,
+    `If you weren't expecting this email, reply to it and we'll help.`,
+  ];
+}
+
+function cosignerInvitationBlock(input: CosignerInvitationInput, lang: Lang): { html: string; text: string } {
+  const p = (v: string) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${v}</p>`;
+  return {
+    html: cosignerInvitationLines(input, lang, true).map(p).join(""),
+    text: cosignerInvitationLines(input, lang, false).join("\n\n"),
+  };
+}
+
+export async function sendCosignerInvitation(input: CosignerInvitationInput) {
+  const lang = input.lang ?? "en";
+  const other: Lang = lang === "es" ? "en" : "es";
+  const first = cosignerInvitationBlock(input, lang);
+  const second = cosignerInvitationBlock(input, other);
+  const address = input.propertyAddress;
+  const subject =
+    lang === "es"
+      ? input.kind === "reminder"
+        ? `Recordatorio: el acuerdo de listado de ${address} espera tu firma`
+        : `${input.sellerName} te pidió firmar el acuerdo de listado de ${address}`
+      : input.kind === "reminder"
+        ? `Reminder: the listing agreement for ${address} is waiting for your signature`
+        : `${input.sellerName} asked you to sign the listing agreement for ${address}`;
+  const divider = `<hr style="border:none;border-top:1px solid #ece6d6;margin:28px 0;">`;
+  return send({
+    to: input.to,
+    subject,
+    html: shell({
+      preheader: lang === "es" ? "Tu firma en el acuerdo de listado" : "Your signature on the listing agreement",
+      body: first.html + divider + `<div lang="${other}">${second.html}</div>`,
+      lang,
+    }),
+    text: `${first.text}\n\n---\n\n${second.text}`,
+    idempotencyKey: input.idempotencyKey,
+  });
+}
+
+export interface CosignerSignedInput {
+  to: string;
+  lang?: Lang;
+  signerName: string;
+  propertyAddress: string;
+  stepUrl: string;
+}
+
+/** Al vendedor, cuando el segundo firmante firmó y falta su firma. */
+export async function sendCosignerSigned(input: CosignerSignedInput) {
+  const isEs = (input.lang ?? "en") === "es";
+  const signer = escapeHtml(input.signerName);
+  const address = escapeHtml(input.propertyAddress);
+  const body = isEs
+    ? `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">${signer} firmó el acuerdo.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${signer} firmó el acuerdo de listado de <strong>${address}</strong>. Solo falta tu firma, en el paso 7. Después sigue el pago.</p>
+    ${button(input.stepUrl, "Firmar el acuerdo")}
+  `
+    : `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">${signer} signed the agreement.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${signer} signed the listing agreement for <strong>${address}</strong>. Only your signature is missing, in step 7. Payment comes next.</p>
+    ${button(input.stepUrl, "Sign the agreement")}
+  `;
+  return send({
+    to: input.to,
+    subject: isEs ? `${input.signerName} firmó el acuerdo de listado` : `${input.signerName} signed the listing agreement`,
+    html: shell({ preheader: isEs ? "Falta tu firma" : "Your signature is next", body, lang: isEs ? "es" : "en" }),
+    text: isEs
+      ? `${input.signerName} firmó el acuerdo de listado de ${input.propertyAddress}. Solo falta tu firma: ${input.stepUrl}`
+      : `${input.signerName} signed the listing agreement for ${input.propertyAddress}. Only your signature is missing: ${input.stepUrl}`,
+  });
+}
+
+export interface SigningExpiredInput {
+  to: string;
+  lang?: Lang;
+  /** Quién no firmó a tiempo (el segundo firmante). */
+  signerName: string;
+  propertyAddress: string;
+  stepUrl: string;
+  idempotencyKey: string;
+}
+
+/** Al vendedor, cuando el plazo de 7 días venció sin todas las firmas. */
+export async function sendSigningExpired(input: SigningExpiredInput) {
+  const isEs = (input.lang ?? "en") === "es";
+  const signer = escapeHtml(input.signerName);
+  const address = escapeHtml(input.propertyAddress);
+  const body = isEs
+    ? `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">El plazo para firmar venció.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">El acuerdo de listado de <strong>${address}</strong> no tiene la firma de ${signer}, y pasaron los 7 días para firmarlo. Lo anulamos.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Tu listing sigue como borrador y no se te cobró nada. Cuando quieras, envía un acuerdo nuevo desde el paso 7: hay otros 7 días para firmarlo.</p>
+    ${button(input.stepUrl, "Enviar un acuerdo nuevo")}
+  `
+    : `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">The signing deadline passed.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">The listing agreement for <strong>${address}</strong> doesn't have ${signer}'s signature, and the 7 days to sign it are over. We voided it.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Your listing is still a draft and you haven't been charged. Whenever you're ready, send a new agreement from step 7: it comes with another 7 days to sign.</p>
+    ${button(input.stepUrl, "Send a new agreement")}
+  `;
+  return send({
+    to: input.to,
+    subject: isEs ? `El acuerdo de listado de ${input.propertyAddress} venció sin todas las firmas` : `The listing agreement for ${input.propertyAddress} expired without every signature`,
+    html: shell({ preheader: isEs ? "Plazo de firma vencido" : "Signing deadline passed", body, lang: isEs ? "es" : "en" }),
+    text: isEs
+      ? `El acuerdo de listado de ${input.propertyAddress} venció sin la firma de ${input.signerName}. Tu listing sigue como borrador y no se te cobró nada. Envía un acuerdo nuevo: ${input.stepUrl}`
+      : `The listing agreement for ${input.propertyAddress} expired without ${input.signerName}'s signature. Your listing is still a draft and you haven't been charged. Send a new agreement: ${input.stepUrl}`,
+    idempotencyKey: input.idempotencyKey,
+  });
+}
+
+export interface CosignerExpiredInput {
+  to: string;
+  lang?: Lang;
+  sellerName: string;
+  propertyAddress: string;
+  idempotencyKey: string;
+}
+
+/** Al segundo firmante, cuando el plazo venció (en los dos idiomas, como su invitación). */
+export async function sendCosignerExpired(input: CosignerExpiredInput) {
+  const lang = input.lang ?? "en";
+  const seller = escapeHtml(input.sellerName);
+  const address = escapeHtml(input.propertyAddress);
+  const es = (s: string, a: string) =>
+    `El acuerdo de listado de ${a} que te mandó ${s} venció sin tu firma y lo anulamos. No tienes que hacer nada. Si ${s} manda uno nuevo, DocuSign te va a escribir otra vez.`;
+  const en = (s: string, a: string) =>
+    `The listing agreement for ${a} that ${s} sent you expired without your signature, and we voided it. You don't need to do anything. If ${s} sends a new one, DocuSign will email you again.`;
+  const [firstOf, secondOf] = lang === "es" ? [es, en] : [en, es];
+  const first = firstOf(seller, `<strong>${address}</strong>`);
+  const second = secondOf(seller, `<strong>${address}</strong>`);
+  const plain = `${firstOf(input.sellerName, input.propertyAddress)}\n\n---\n\n${secondOf(input.sellerName, input.propertyAddress)}`;
+  const p = (s: string) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${s}</p>`;
+  return send({
+    to: input.to,
+    subject:
+      lang === "es"
+        ? `El acuerdo de listado de ${input.propertyAddress} venció`
+        : `The listing agreement for ${input.propertyAddress} expired`,
+    html: shell({
+      preheader: lang === "es" ? "Acuerdo anulado" : "Agreement voided",
+      body: p(first) + `<hr style="border:none;border-top:1px solid #ece6d6;margin:28px 0;">` + p(second),
+      lang,
+    }),
+    text: plain,
+    idempotencyKey: input.idempotencyKey,
+  });
+}
+
 export interface ListingApprovedInput {
   to: string;
   lang?: Lang;

@@ -15,6 +15,10 @@ const loadOwnership = vi.fn(async (): Promise<Owners> => ONE_SELLER);
 const templateHasRole = vi.fn(async () => true);
 const inserted: Array<Record<string, unknown>> = [];
 const recordAcceptance = vi.fn(async () => true);
+const notifyCosignerInvitation = vi.fn(async () => true);
+const voidEnvelope = vi.fn(async (...a: unknown[]) => void a);
+const svcUpdates: Array<Record<string, unknown>> = [];
+let existingAgreement: Record<string, unknown> | null = null;
 const fetchBuyerComp = vi.fn(async () => ({
   buyer_agent_comp_type: "percent",
   buyer_agent_commission: 2.5,
@@ -37,7 +41,9 @@ vi.mock("@/lib/supabase/server", () => ({
     from: (t: string) =>
       t === "properties"
         ? chain({ data: { id: "p1", owner_id: "u1", pricing_tier: "pro", mls_status: "draft", list_price: 400000 } })
-        : chain({ data: null, error: null }),
+        : t === "agreements"
+          ? chain({ data: existingAgreement, error: null })
+          : chain({ data: null, error: null }),
   }),
 }));
 vi.mock("@/lib/ratelimit", () => ({ apiLimiter: () => null, enforceLimit: async () => null }));
@@ -52,6 +58,10 @@ vi.mock("@/lib/supabase/service", () => ({
         inserted.push(row);
         return { select: () => ({ single: async () => ({ data: { id: "a1" }, error: null }) }) };
       },
+      update: (row: Record<string, unknown>) => {
+        svcUpdates.push(row);
+        return chain({ data: null, error: null });
+      },
     }),
   }),
 }));
@@ -61,6 +71,9 @@ vi.mock("@/config/brokerage", async (orig) => ({
 }));
 vi.mock("@/lib/miami-dade", () => ({ verifiedLegalDescription: async () => null }));
 vi.mock("@/lib/agreement-legal.server", () => ({ recordAgreementSent: async () => undefined }));
+vi.mock("@/lib/cosigner-notify.server", () => ({
+  notifyCosignerInvitation: (...a: unknown[]) => notifyCosignerInvitation(...(a as [])),
+}));
 vi.mock("@/lib/buyer-comp.server", () => ({ fetchBuyerComp: (...a: unknown[]) => fetchBuyerComp(...(a as [])) }));
 vi.mock("@/lib/legal/consents.server", () => ({ recordAcceptance: (...a: unknown[]) => recordAcceptance(...(a as [])) }));
 vi.mock("@/lib/docusign", () => ({
@@ -68,6 +81,7 @@ vi.mock("@/lib/docusign", () => ({
   getRecipientView: async () => ({ url: "https://docusign.test/view" }),
   LIXTARA_BROKER_ROLE: { listingAgreement: "Broker" },
   templateHasRole: (...a: unknown[]) => templateHasRole(...(a as [])),
+  voidEnvelope: (...a: unknown[]) => voidEnvelope(...a),
   InvalidAdditionalSignerError: class extends Error {},
 }));
 
@@ -133,6 +147,8 @@ describe("POST /api/agreement/create: quién firma (#220)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     inserted.length = 0;
+    svcUpdates.length = 0;
+    existingAgreement = null;
     loadFirstIncompleteStep.mockResolvedValue(null);
     process.env.DOCUSIGN_LISTING_AGREEMENT_TEMPLATE_ID = "tpl-v4";
   });
@@ -178,6 +194,26 @@ describe("POST /api/agreement/create: quién firma (#220)", () => {
     expect((env.textTabs as Record<string, string>).seller_name).toMatch(/ and Luis Pérez$/);
     expect(inserted[0]).toMatchObject({ sellers_required: 2 });
     expect(typeof inserted[0].signing_deadline_at).toBe("string");
+    // Lixtara le explica al segundo firmante qué firma (además del correo de DocuSign).
+    expect(notifyCosignerInvitation).toHaveBeenCalledWith("a1", "invite");
+  });
+
+  it("el paso 3 cambió los firmantes: el sobre en curso se anula y sale uno nuevo", async () => {
+    existingAgreement = { id: "old", envelope_id: "env-old", status: "sent", signer_email: "s@example.com", signer_name: "Ana", sellers_required: 1 };
+    loadOwnership.mockResolvedValueOnce(owners({ other_title_holders: true }, [LUIS]));
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+    expect(voidEnvelope).toHaveBeenCalledWith("env-old", expect.any(String));
+    expect(svcUpdates[0]).toMatchObject({ status: "voided" });
+    expect(createEnvelope).toHaveBeenCalledTimes(1);
+  });
+
+  it("mismo plan de firmantes: se reutiliza el sobre en curso (no se anula)", async () => {
+    existingAgreement = { id: "old", envelope_id: "env-old", status: "sent", signer_email: "s@example.com", signer_name: "Ana", sellers_required: 1 };
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+    expect(voidEnvelope).not.toHaveBeenCalled();
+    expect(createEnvelope).not.toHaveBeenCalled();
   });
 
   it("un vendedor: sin Seller 2, sellers_required 1", async () => {
@@ -185,6 +221,7 @@ describe("POST /api/agreement/create: quién firma (#220)", () => {
     expect(res.status).toBe(200);
     expect((createEnvelope.mock.calls[0][0] as Record<string, unknown>).additionalSigners).toBeUndefined();
     expect(inserted[0]).toMatchObject({ sellers_required: 1, signing_deadline_at: null });
+    expect(notifyCosignerInvitation).not.toHaveBeenCalled();
   });
 
   it("dos vendedores con una plantilla sin 'Seller 2' (v3) → 503, sin sobre", async () => {
