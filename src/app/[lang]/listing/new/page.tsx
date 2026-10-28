@@ -297,8 +297,8 @@ export default async function ListingNewPage({
   let draft: Draft | null = null;
   let step3County: string | null = null;
   let step3MiamiDade: boolean | null = null;
-  // El condado clasificó la parcela como no residencial (no se autollenó nada).
-  let step3NonResidential = false;
+  // El condado no permite autollenar la parcela: no residencial o edificio de 5+ unidades.
+  let step3CountyBlock: "nonresidential" | "multifamily5" | null = null;
   let photos: Array<{
     id: string;
     url: string;
@@ -459,8 +459,8 @@ export default async function ListingNewPage({
         tasks.push(
           lookupMiamiDadeProperty(baseStreetForLookup(draft.address_street), draft.address_zip, unitFromStoredStreet(draft.address_street)).then(
             (result) => {
-              if (result.nonResidential) {
-                step3NonResidential = true;
+              if (result.nonResidential || result.largeMultifamily) {
+                step3CountyBlock = result.largeMultifamily ? "multifamily5" : "nonresidential";
                 return;
               }
               if (result.folio) updates.folio = result.folio;
@@ -1099,8 +1099,8 @@ export default async function ListingNewPage({
     }
 
     const result = await lookupMiamiDadeProperty(baseStreetForLookup(row.address_street), row.address_zip, unitFromStoredStreet(row.address_street));
-    if (result.nonResidential) {
-      redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=nonresidential`);
+    if (result.nonResidential || result.largeMultifamily) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=${result.largeMultifamily ? "multifamily5" : "nonresidential"}`);
     }
     if (!result.found || !result.details) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=notfound`);
@@ -1805,7 +1805,8 @@ export default async function ListingNewPage({
     typeof sp === "object" && "improved" in sp ? (sp.improved as string) : null;
   const propertyTypeDefault = step3PropertyTypeDefault(
     draft,
-    step3NonResidential || (typeof sp === "object" && "autofill" in sp && sp.autofill === "nonresidential"),
+    step3CountyBlock !== null ||
+      (typeof sp === "object" && "autofill" in sp && (sp.autofill === "nonresidential" || sp.autofill === "multifamily5")),
   );
   const autofillResult =
     typeof sp === "object" && "autofill" in sp ? (sp.autofill as string) : null;
@@ -1814,6 +1815,8 @@ export default async function ListingNewPage({
       ? copy.step3.autofillNotFound
       : autofillResult === "nonresidential"
         ? copy.step3.autofillNonResidential
+        : autofillResult === "multifamily5"
+          ? copy.step3.autofillMultifamily5
       : autofillResult && /^\d+$/.test(autofillResult)
         ? copy.step3.autofillSuccess.replace("{count}", autofillResult)
         : null;
@@ -2104,11 +2107,19 @@ export default async function ListingNewPage({
               </p>
             </div>
           )}
-          {step3NonResidential && autofillResult !== "nonresidential" && (
-            <ErrorBanner message={copy.step3.autofillNonResidential} />
+          {step3CountyBlock && autofillResult !== step3CountyBlock && (
+            <ErrorBanner
+              message={
+                step3CountyBlock === "multifamily5"
+                  ? copy.step3.autofillMultifamily5
+                  : copy.step3.autofillNonResidential
+              }
+            />
           )}
           {autofillMessage && (
-            autofillResult === "notfound" || autofillResult === "nonresidential" ? (
+            autofillResult === "notfound" ||
+            autofillResult === "nonresidential" ||
+            autofillResult === "multifamily5" ? (
               <ErrorBanner message={autofillMessage} />
             ) : (
               <SuccessBanner message={autofillMessage} />

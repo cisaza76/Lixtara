@@ -66,6 +66,8 @@ export interface MiamiDadeLookupResult {
   found: boolean;
   /** El condado clasifica la parcela como no residencial: no se autollena nada. */
   nonResidential?: boolean;
+  /** Multifamiliar de 5 o más unidades: en el MLS es comercial; no se autollena (aviso propio). */
+  largeMultifamily?: boolean;
   folio?: string | null;
   details?: MiamiDadeDetails;
   filledFields?: Array<keyof MiamiDadeDetails>;
@@ -90,6 +92,18 @@ function multifamilyUpToFour(code: string, desc: string, unitCount: unknown): bo
   const n = Number(unitCount);
   if (Number.isInteger(n) && n > 0) return n >= 2 && n <= 4;
   return code === "0802" || /\b2 LIVING UNITS\b/.test(desc);
+}
+
+/**
+ * Edificio de 5 o más unidades: clase 03 (10+) o clase 08 con UnitCount ≥ 5. Si el condado no
+ * da el número de unidades (0803 "3 OR MORE"), no se sabe: no cuenta.
+ */
+export function isLargeMultifamily(dor: string | null | undefined, unitCount?: unknown): boolean {
+  const code = String(dor ?? "").trim();
+  if (!/^\d{4}$/.test(code)) return false;
+  if (code.startsWith("03")) return true;
+  const n = Number(unitCount);
+  return code.startsWith("08") && Number.isInteger(n) && n >= 5;
 }
 
 export function mapDorToType(
@@ -253,7 +267,7 @@ async function searchByAddress(
   return pickCountyCandidate(infos, street, unit);
 }
 
-async function fetchByFolio(folio: string): Promise<{ details: MiamiDadeDetails; dorCode: string } | null> {
+async function fetchByFolio(folio: string): Promise<{ details: MiamiDadeDetails; dorCode: string; unitCount: unknown } | null> {
   const url =
     `${MD_PA_BASE}?Operation=GetPropertySearchByFolio&clientAppName=PropertySearch` +
     `&folioNumber=${encodeURIComponent(folio)}`;
@@ -337,7 +351,7 @@ async function fetchByFolio(folio: string): Promise<{ details: MiamiDadeDetails;
     legal_description: legalDescription,
     tax_annual_amount: taxAnnualEstimate,
   };
-  return { details, dorCode: String(info.DORCode ?? "").trim() };
+  return { details, dorCode: String(info.DORCode ?? "").trim(), unitCount: info.UnitCount };
 }
 
 // Strip a trailing unit/apt token so county + comps lookups match the building
@@ -382,7 +396,11 @@ export async function lookupMiamiDadeProperty(
     // Sin código de uso no se sabe qué es: como no encontrada. Con un código que no es
     // vivienda, nada (ni el folio: la descripción legal del contrato sale de ese folio).
     if (!parcel.dorCode) return { found: false };
-    if (parcel.details.property_type === null) return { found: false, nonResidential: true };
+    if (parcel.details.property_type === null) {
+      return isLargeMultifamily(parcel.dorCode, parcel.unitCount)
+        ? { found: false, largeMultifamily: true }
+        : { found: false, nonResidential: true };
+    }
     const details = parcel.details;
     const filled = (Object.keys(details) as Array<keyof MiamiDadeDetails>).filter(
       (k) => details[k] !== null,
@@ -411,11 +429,11 @@ export function step3PropertyTypeDefault(
     year_built: number | null;
     address_street: string;
   } | null,
-  nonResidential: boolean,
+  countyBlocked: boolean,
 ): string {
   if (!draft) return "";
   const confirmed = draft.sqft > 0 || draft.bedrooms > 0 || draft.year_built != null;
   if (confirmed) return draft.property_type;
-  if (nonResidential) return "";
+  if (countyBlocked) return "";
   return unitFromStoredStreet(draft.address_street) ? "condo" : "";
 }

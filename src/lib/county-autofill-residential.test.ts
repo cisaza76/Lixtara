@@ -9,6 +9,7 @@ import { join } from "node:path";
 import {
   COUNTY_TAX_AUTOFILL_MAX_USD,
   acceptCountyTax,
+  isLargeMultifamily,
   lookupMiamiDadeProperty,
   step3PropertyTypeDefault,
   unitFromStoredStreet,
@@ -120,6 +121,67 @@ describe("lookupMiamiDadeProperty: solo viviendas", () => {
   });
 });
 
+describe("edificios de 5 o más unidades: aviso propio", () => {
+  // Extracto de un multifamiliar del condado; solo cambian el código y UnitCount.
+  const multi = (DORCode: string, DORDescription: string, UnitCount: number): Parcel => ({
+    candidate: { Strap: "01-0000-000-0000", SiteAddress: "1500 NW 7 ST", SiteUnit: "" },
+    info: {
+      DORCode, DORDescription, UnitCount,
+      BedroomCount: 12, BathroomCount: 8, HalfBathroomCount: 0,
+      LotSize: 15000, YearBuilt: "1962", BuildingEffectiveArea: 9800,
+    },
+    taxable: 2_400_000,
+    legal: "TEST SUB|PB 1-1|LOT 1",
+  });
+
+  it("10+ unidades (clase 03) → largeMultifamily, sin datos ni folio", async () => {
+    stubCounty(multi("0303", "MULTIFAMILY 10 UNITS PLUS : MULTIFAMILY 3 OR MORE UNITS", 24));
+    expect(await lookupMiamiDadeProperty("1500 NW 7th St", "33125", null)).toEqual({ found: false, largeMultifamily: true });
+  });
+
+  it("clase 08 con 5 unidades → largeMultifamily; con 4 → se autollena", async () => {
+    const desc = "MULTIFAMILY 2-9 UNITS : MULTIFAMILY 3 OR MORE UNITS";
+    stubCounty(multi("0803", desc, 5));
+    expect(await lookupMiamiDadeProperty("1500 NW 7th St", "33125", null)).toEqual({ found: false, largeMultifamily: true });
+    stubCounty(multi("0803", desc, 4));
+    const r = await lookupMiamiDadeProperty("1500 NW 7th St", "33125", null);
+    expect(r.found).toBe(true);
+    expect(r.details?.property_type).toBe("multi_family");
+  });
+
+  it("isLargeMultifamily: sin número de unidades no se asume; oficinas no cuentan", () => {
+    expect(isLargeMultifamily("0303")).toBe(true);
+    expect(isLargeMultifamily("0803", 9)).toBe(true);
+    expect(isLargeMultifamily("0803")).toBe(false);
+    expect(isLargeMultifamily("0802", 2)).toBe(false);
+    expect(isLargeMultifamily("1813", 40)).toBe(false);
+  });
+
+  it("200 S Biscayne sigue siendo 'no residencial', no 5+ unidades", async () => {
+    stubCounty(BISCAYNE_200);
+    expect(await lookupMiamiDadeProperty("200 S Biscayne Blvd", "33131", null)).toEqual({ found: false, nonResidential: true });
+  });
+
+  it("cooperativa (0508) sigue siendo condominio", async () => {
+    stubCounty({
+      ...BRICKELL_500_3001,
+      info: { ...BRICKELL_500_3001.info, DORCode: "0508", DORDescription: "COOPERATIVE - RESIDENTIAL : COOPERATIVE - RESIDENTIAL" },
+    });
+    const r = await lookupMiamiDadeProperty("500 Brickell Ave", "33131", "3001");
+    expect(r.details?.property_type).toBe("condo");
+  });
+
+  it("el aviso de 5+ unidades existe en EN y ES con el texto acordado, distinto del de no residencial", () => {
+    const es = dictionaries.es.listingForm.step3;
+    const en = dictionaries.en.listingForm.step3;
+    expect(es.autofillMultifamily5).toBe(
+      "Los edificios de 5 o más unidades se publican en el MLS como propiedad comercial. Por ahora Lixtara lista vivienda de hasta 4 unidades; escríbenos y la broker revisa tu caso.",
+    );
+    expect(en.autofillMultifamily5).toMatch(/5 or more units/);
+    expect(es.autofillMultifamily5).not.toBe(es.autofillNonResidential);
+  });
+});
+
 describe("acceptCountyTax: topes del impuesto estimado", () => {
   it("el impuesto de 200 S Biscayne ($8,100,000) nunca se autollena", () => {
     expect(acceptCountyTax(8_100_000, 0)).toBeNull();
@@ -168,8 +230,9 @@ describe("el paso 3 usa los controles", () => {
   const page = readFileSync(join(process.cwd(), "src/app/[lang]/listing/new/page.tsx"), "utf8");
 
   it("el autollenado automático y el botón respetan 'no residencial' y los topes del impuesto", () => {
-    expect(page).toMatch(/if \(result\.nonResidential\) \{\s*step3NonResidential = true;\s*return;/);
-    expect(page).toContain("autofill=nonresidential");
+    expect(page).toMatch(/if \(result\.nonResidential \|\| result\.largeMultifamily\) \{\s*step3CountyBlock = result\.largeMultifamily \? "multifamily5" : "nonresidential";\s*return;/);
+    expect(page).toContain('autofill=${result.largeMultifamily ? "multifamily5" : "nonresidential"}');
+    expect(page).toContain("copy.step3.autofillMultifamily5");
     expect(page.match(/acceptCountyTax\(d\.tax_annual_amount/g)).toHaveLength(2);
     expect(page).not.toMatch(/tax_annual_amount = d\.tax_annual_amount/);
   });
