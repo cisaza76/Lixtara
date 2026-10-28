@@ -155,7 +155,7 @@ describe("migración 20261018170000: guard de mls_published_at", () => {
   it("la ficha marca el ✓ del número al escribirlo, con la regla del servidor", () => {
     const form = read("src/components/admin/mark-published-form.tsx");
     expect(form).toContain("parseMlsNumber(mlsNumber).ok");
-    expect(form).toContain("Listing approved (active)");
+    expect(form).toContain("[active, labels.approved]");
     expect(form).toContain("disabled={!ready}");
   });
 

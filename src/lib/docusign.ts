@@ -477,10 +477,18 @@ export interface EnvelopeSigner {
  * pays only once every seller signed (owner, 2026-10-21).
  */
 export function sellerHasSigned(signers: EnvelopeSigner[], clientUserId: string): boolean {
+  return primarySellerHasSigned(signers, clientUserId) && secondSellersSigned(signers);
+}
+
+/**
+ * Solo la firma del vendedor de la cuenta (el firmante embebido), sin mirar a "Seller 2": con dos
+ * vendedores, el paso 7 deja de ofrecerle firmar en cuanto él firmó, aunque el otro falte (#220).
+ */
+export function primarySellerHasSigned(signers: EnvelopeSigner[], clientUserId: string): boolean {
   const seller =
     signers.find((r) => r.clientUserId === clientUserId) ??
     signers.find((r) => r.roleName?.toLowerCase() === "seller");
-  return isDone(seller) && secondSellersSigned(signers);
+  return isDone(seller);
 }
 
 const isDone = (r: EnvelopeSigner | undefined) => {

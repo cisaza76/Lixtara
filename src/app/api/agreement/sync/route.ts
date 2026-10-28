@@ -8,7 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { refreshAgreement } from "@/lib/agreement-refresh";
+import { refreshAgreementResult } from "@/lib/agreement-refresh";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 
 export const maxDuration = 30;
@@ -53,6 +53,8 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (!agreement) return NextResponse.json({ status: "none" });
 
-  const status = await refreshAgreement(agreement);
-  return NextResponse.json({ status });
+  // own_signed: the account's seller signed, even if a second seller (#220) is still missing —
+  // the poller stops there instead of waiting for "signed".
+  const { status, ownSigned } = await refreshAgreementResult(agreement);
+  return NextResponse.json({ status, own_signed: ownSigned === true });
 }

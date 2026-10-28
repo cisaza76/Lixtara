@@ -118,3 +118,13 @@ Campos que llena el sitio, con su posición nueva (`src/lib/docusign/ers21tn-lay
 | 250 | `seller2_date` | dateSigned (Seller 2, v4) | «Date» del segundo vendedor (L250) | sí | — | p6 x468 y125 · 9 pt | — | — |
 | 253 | `seller2_email` | text (Seller 2, v4) | Email del segundo vendedor (lo pone el sitio) | sí | sí | p6 x123 y194 w447 · 9 pt | — | — |
 | 257 | `copy_returned_date` | dateSigned | Fecha de firma de la broker (rol Broker, firma la última): el día en que DocuSign completa el sobre | sí | — | p6 x194 y302 · 9 pt | — | — |
+
+## Pendientes para la próxima plantilla (v5)
+
+La v4 (`3c9363c5`) está en Production y no se modifica: estos arreglos van a una copia nueva (`--copy-as "… v5"`), y la variable de Production cambia en el mismo deploy que el código.
+
+- L250: el «Sign» del segundo vendedor (`seller2_signature`) queda encima del email de L249 (prueba en producción del 2026-10-28, sobre `DE79267B`).
+- L203: la firma del segundo vendedor (`seller2_transition_consent_signature`) toca el «Signature» impreso de L204.
+- La «x» de las casillas está corrida en L16, L23 y L257.
+- El «Sign» de L246 queda encima del título de arriba.
+- Aceptado, no se arregla: el marco de las iniciales (y 710) toca la línea en cursiva «The Parties acknowledge…».

@@ -5,6 +5,8 @@ import {
   buildTemplateRoles,
   createEnvelopeFromTemplate,
   mapEnvelopeStatus,
+  primarySellerHasSigned,
+  sellerHasSigned,
 } from "@/lib/docusign";
 
 describe("mapEnvelopeStatus", () => {
@@ -86,5 +88,17 @@ describe("sellerHasSigned", () => {
   it("falls back to the Seller role when clientUserId is missing", async () => {
     const { sellerHasSigned } = await import("@/lib/docusign");
     expect(sellerHasSigned([{ roleName: "Seller", status: "completed" }], "p1")).toBe(true);
+  });
+});
+
+describe("primarySellerHasSigned (#220)", () => {
+  const seller = { roleName: "Seller", clientUserId: "p1", status: "completed" };
+  const second = { roleName: "Seller 2", email: "luis@example.com", status: "sent" };
+  it("cuenta solo la firma del vendedor de la cuenta, aunque falte el otro", () => {
+    expect(primarySellerHasSigned([seller, second], "p1")).toBe(true);
+    expect(sellerHasSigned([seller, second], "p1")).toBe(false);
+  });
+  it("el segundo firmó y el vendedor no: false", () => {
+    expect(primarySellerHasSigned([{ ...seller, status: "sent" }, { ...second, status: "completed" }], "p1")).toBe(false);
   });
 });

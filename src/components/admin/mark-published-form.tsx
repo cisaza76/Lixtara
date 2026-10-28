@@ -14,21 +14,24 @@ export function MarkPublishedForm({
   active,
   agreementCompleted,
   planPaid,
+  labels,
 }: {
   action: (formData: FormData) => Promise<void>;
   defaultMlsNumber: string | null;
   active: boolean;
   agreementCompleted: boolean;
   planPaid: boolean;
+  /** EN/ES (admin-review-copy.ts). */
+  labels: { approved: string; agreement: string; paid: string; mlsNumber: string; submit: string };
 }) {
   const [mlsNumber, setMlsNumber] = useState(defaultMlsNumber ?? "");
   const mlsValid = parseMlsNumber(mlsNumber).ok;
   const ready = active && agreementCompleted && planPaid && mlsValid;
   const items: Array<[boolean, string]> = [
-    [active, "Listing approved (active)"],
-    [agreementCompleted, "Listing agreement completed (seller signed, broker countersigned)"],
-    [planPaid, "Plan payment succeeded"],
-    [mlsValid, "MLS number"],
+    [active, labels.approved],
+    [agreementCompleted, labels.agreement],
+    [planPaid, labels.paid],
+    [mlsValid, labels.mlsNumber],
   ];
 
   return (
@@ -42,7 +45,7 @@ export function MarkPublishedForm({
       </ul>
       <form action={action} className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">MLS number</span>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">{labels.mlsNumber}</span>
           <input
             name="mls_number"
             type="text"
@@ -60,7 +63,7 @@ export function MarkPublishedForm({
           disabled={!ready}
           className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Mark as published on the MLS
+          {labels.submit}
         </button>
       </form>
     </>

@@ -115,12 +115,14 @@ describe("listing de prueba (is_test): no se aprueba ni manda el correo", () => 
 
   it("las dos pantallas lo comprueban antes de aprobar y deshabilitan el botón", () => {
     const home = read("src/app/[lang]/admin/page.tsx");
-    expect(home).toContain("if (await isTestListing(supabase, id)) redirect(`/${lang}/admin?error=${TEST_LISTING_ERROR}`);");
+    expect(home).toContain("const blocked = await approvalBlocker(supabase, id);");
     expect(home).toMatch(/\.eq\("mls_status", "pending_approval"\)\s*\.eq\("is_test", false\)/);
-    expect(home).toContain("disabled={legalPending.has(p.id) || p.is_test || !!ownerBlocked}");
+    expect(home).toContain("disabled={legalPending.has(p.id) || p.is_test || !!ownerBlocked || !!agreementBlocked}");
+    // La tarjeta dice por qué: "Listing de prueba: no se puede aprobar ni publicar".
+    expect(home).toMatch(/\{p\.is_test && \(\s*<span data-test-listing[^>]*>\s*\{testListingMessage\(lang\)\}/);
     const review = read("src/app/[lang]/admin/listings/[id]/review/page.tsx");
-    expect(review).toContain("if (await isTestListing(supabase, id)) {");
-    expect(review).toContain("disabled={legalPending || prop.is_test || !ownerGate.ok}");
+    expect(review).toContain("const blocked = await approvalBlocker(supabase, id);");
+    expect(review).toContain("disabled={legalPending || prop.is_test || !ownerGate.ok || !!approvalBlock}");
   });
 });
 

@@ -16,8 +16,9 @@
 // Rule (owner, 2026-10-26): NEVER --apply in place to the template Production uses
 // (DOCUSIGN_LISTING_AGREEMENT_TEMPLATE_ID in Vercel). Always --copy-as a new version, test it,
 // and switch the variable to the new id in the same deploy as the code. v2 = e7f904fe…
-// (Production since #217), v3 = fcdf42ef-17ed-457e-a970-7b423d337b1a (#231, Production),
-// v4 = 3c9363c5-8450-4d93-a665-47987438f709 (#220: v3 + "Seller 2", created 2026-10-27).
+// (Production since #217), v3 = fcdf42ef-17ed-457e-a970-7b423d337b1a (#231, now the rollback),
+// v4 = 3c9363c5-8450-4d93-a665-47987438f709 (#220: v3 + "Seller 2", created 2026-10-27,
+// Production since #241, 2026-10-28). The next copy is v5 (pending fixes: field map, end).
 //
 // Second seller (#220, v4 onward): the "Seller 2" role (signs by email, routing order 1, in
 // parallel with the seller) is created on the template if it doesn't have it, with its
@@ -60,6 +61,7 @@ const NEVER_IN_PLACE = new Set([
   "bee86256",
   "e7f904fe",
   "fcdf42ef",
+  "3c9363c5",
 ]);
 
 async function ds(method: "POST" | "PUT" | "DELETE", path: string, body: unknown): Promise<unknown> {

@@ -22,6 +22,7 @@ import {
   getEnvelopeSigners,
   getEnvelopeStatus,
   mapEnvelopeStatus,
+  primarySellerHasSigned,
   secondSellerHasSigned,
   secondSellerOf,
   sellerHasSigned,
@@ -30,7 +31,7 @@ import {
 } from "@/lib/docusign";
 import { notifyCosignerSigned, notifySigningExpired, type Cosigner } from "@/lib/cosigner-notify.server";
 import { isSigningExpired, type DeadlineRow } from "@/lib/signing-deadline";
-import { sendAgreementSigned } from "@/lib/email";
+import { sendAgreementSigned, sendAllSellersSigned } from "@/lib/email";
 import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { SITE_URL } from "@/lib/config";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
@@ -70,14 +71,24 @@ export async function refreshAgreement(a: AgreementRef): Promise<string> {
   return (await refreshAgreementResult(a)).status;
 }
 
+export interface RefreshResult {
+  status: string;
+  /** Whether DocuSign could be read. */
+  fetched: boolean;
+  /**
+   * The account's seller signed (the embedded signer), whoever else is missing: with two sellers
+   * step 7 stops offering to sign (#220). null when the signers weren't read (final status,
+   * DocuSign down, envelope no longer waiting).
+   */
+  ownSigned: boolean | null;
+}
+
 /**
  * refreshAgreement plus whether DocuSign could be read (`fetched`). The Connect
  * webhook answers 503 when it couldn't, so DocuSign retries the delivery.
  */
-export async function refreshAgreementResult(
-  a: AgreementRef,
-): Promise<{ status: string; fetched: boolean }> {
-  if (!a.envelope_id || isFinalAgreementStatus(a.status)) return { status: a.status, fetched: true };
+export async function refreshAgreementResult(a: AgreementRef): Promise<RefreshResult> {
+  if (!a.envelope_id || isFinalAgreementStatus(a.status)) return { status: a.status, fetched: true, ownSigned: null };
 
   let next: AgreementStatus;
   let signedAt: string | null = null;
@@ -86,6 +97,7 @@ export async function refreshAgreementResult(
   // avisa a los dos (signing-deadline.ts).
   let deadlineExpired = false;
   let cosigner: Cosigner | null = null;
+  let ownSigned: boolean | null = null;
   try {
     const env = await getEnvelopeStatus(a.envelope_id);
     if (env.completedDateTime) signedAt = env.completedDateTime;
@@ -94,6 +106,7 @@ export async function refreshAgreementResult(
     const signers = needSigners ? await getEnvelopeSigners(a.envelope_id) : null;
     // Con dos vendedores (#220) cuenta solo cuando firmaron todos (sellerHasSigned).
     const signed = signers ? sellerHasSigned(signers, a.property_id) : false;
+    if (signers) ownSigned = primarySellerHasSigned(signers, a.property_id);
     if (signers && secondSellerHasSigned(signers) && (await markSecondSellerSigned(a.id)) && !signed) {
       // Firmó el segundo y falta el vendedor: se le avisa una vez (la escritura que ganó).
       await notifyCosignerSigned(a.id, cosignerOf(signers));
@@ -115,9 +128,9 @@ export async function refreshAgreementResult(
     }
   } catch (e) {
     console.error("agreement refresh: DocuSign fetch failed", e instanceof Error ? e.message : e);
-    return { status: a.status, fetched: false };
+    return { status: a.status, fetched: false, ownSigned: null };
   }
-  if (next === a.status) return { status: a.status, fetched: true };
+  if (next === a.status) return { status: a.status, fetched: true, ownSigned };
 
   const svc = createService();
   const update: Record<string, unknown> = { status: next, updated_at: new Date().toISOString() };
@@ -138,7 +151,7 @@ export async function refreshAgreementResult(
     // Embudo: firmar ES terminar el paso 7. Una sola vez, la de la transición.
     await recordFunnelEvent({ event: "listing_step_complete", propertyId: a.property_id, step: 7 });
     await recordFunnelEvent({ event: "agreement_signed", propertyId: a.property_id, step: 7 });
-    await notifySellerSigned(a.property_id).catch((e) =>
+    await notifySellerSigned(a).catch((e) =>
       console.error("agreement refresh: email failed", e instanceof Error ? e.message : e),
     );
   }
@@ -151,7 +164,7 @@ export async function refreshAgreementResult(
   if (won && next === "completed" && countersigned) {
     await recordFunnelEvent({ event: "broker_countersigned", propertyId: a.property_id, step: 7 });
   }
-  return { status: next, fetched: true };
+  return { status: next, fetched: true, ownSigned };
 }
 
 export type PublishGate =
@@ -194,24 +207,37 @@ export async function checkBrokerCountersigned(propertyId: string): Promise<Publ
   return publishGateDecision(status, signers, BROKER_SIGNER_EMAIL);
 }
 
-async function notifySellerSigned(propertyId: string) {
+/**
+ * The "go pay" email, on the transition into a signed state. With two sellers (#220) it says
+ * every seller signed: whoever signed last, the seller learns here that payment is unlocked.
+ * Once per agreement (the transition that won + Resend idempotency key).
+ */
+async function notifySellerSigned(a: AgreementRef) {
   const svc = createService();
-  const { data: prop } = await svc
-    .from("properties")
-    .select("address_street,address_city,address_state,address_zip,owner_id")
-    .eq("id", propertyId)
-    .maybeSingle();
+  const [{ data: prop }, { data: ag }] = await Promise.all([
+    svc
+      .from("properties")
+      .select("address_street,address_city,address_state,address_zip,owner_id")
+      .eq("id", a.property_id)
+      .maybeSingle(),
+    svc.from("agreements").select("sellers_required").eq("id", a.id).maybeSingle(),
+  ]);
   if (!prop) return;
   const { data: sellerAuth } = await svc.auth.admin.getUserById(prop.owner_id);
   const to = sellerAuth.user?.email;
   if (!to) return;
   const lang = (await lookupRecipientLang(prop.owner_id)) ?? "en";
-  await sendAgreementSigned({
+  const input = {
     to,
     lang,
     propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
-    paymentUrl: `${SITE_URL}/${lang}/listing/new?id=${propertyId}&step=8`,
-  });
+    paymentUrl: `${SITE_URL}/${lang}/listing/new?id=${a.property_id}&step=8`,
+  };
+  if (ag?.sellers_required === 2) {
+    await sendAllSellersSigned({ ...input, idempotencyKey: `all-sellers-signed:${a.id}` });
+  } else {
+    await sendAgreementSigned(input);
+  }
 }
 
 /**

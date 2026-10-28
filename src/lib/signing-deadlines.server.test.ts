@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = Record<string, unknown>;
-const db = vi.hoisted(() => ({ agreements: [] as Row[] }));
+const db = vi.hoisted(() => ({ agreements: [] as Row[], properties: [] as Row[] }));
 const ds = vi.hoisted(() => ({
   envelope: { status: "sent" } as { status: string },
   signers: [] as Array<Record<string, string>>,
@@ -18,7 +18,7 @@ const notify = vi.hoisted(() => ({
 
 // Base mínima: agreements con select/eq/is/in/not/order/limit, update condicionado y maybeSingle.
 function table(name: string) {
-  const rows = name === "agreements" ? db.agreements : [];
+  const rows = name === "agreements" ? db.agreements : name === "properties" ? db.properties : [];
   const filters: Array<(r: Row) => boolean> = [];
   let patch: Row | null = null;
   let wantRows = false;
@@ -48,7 +48,12 @@ function table(name: string) {
   return q;
 }
 
-vi.mock("@/lib/supabase/service", () => ({ createService: () => ({ from: (t: string) => table(t) }) }));
+vi.mock("@/lib/supabase/service", () => ({
+  createService: () => ({
+    from: (t: string) => table(t),
+    auth: { admin: { getUserById: async () => ({ data: { user: { email: "ana@example.com" } } }) } },
+  }),
+}));
 vi.mock("@/lib/docusign", async (orig) => ({
   ...(await orig<typeof import("@/lib/docusign")>()),
   getEnvelopeStatus: async () => ({ ...ds.envelope }),
@@ -64,7 +69,14 @@ vi.mock("@/lib/cosigner-notify.server", () => ({
   notifySigningExpired: (...a: unknown[]) => notify.expired(...a),
 }));
 vi.mock("@/lib/funnel-events.server", () => ({ recordFunnelEvent: async () => undefined }));
-vi.mock("@/lib/email", () => ({ sendAgreementSigned: async () => ({ ok: true }) }));
+const mail = vi.hoisted(() => ({
+  signed: vi.fn(async (...a: unknown[]) => ({ ok: a.length >= 0 })),
+  allSigned: vi.fn(async (...a: unknown[]) => ({ ok: a.length >= 0 })),
+}));
+vi.mock("@/lib/email", () => ({
+  sendAgreementSigned: (...a: unknown[]) => mail.signed(...a),
+  sendAllSellersSigned: (...a: unknown[]) => mail.allSigned(...a),
+}));
 vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => "es" }));
 
 import { runSigningDeadlines } from "@/lib/signing-deadlines.server";
@@ -80,6 +92,7 @@ const BROKER = { roleName: "Broker", name: "Broker", email: "broker@example.com"
 beforeEach(() => {
   vi.clearAllMocks();
   db.agreements.length = 0;
+  db.properties = [];
   db.agreements.push({
     id: "a1",
     envelope_id: "env1",
@@ -172,6 +185,32 @@ describe("refreshAgreementResult con dos vendedores", () => {
     ds.signers = [{ ...SELLER, status: "completed" }, { ...SECOND, status: "completed" }, BROKER];
     expect((await refreshAgreementResult(ref())).status).toBe("signed");
     expect(notify.signed).not.toHaveBeenCalled();
+  });
+
+  it("firma el último vendedor: un solo correo 'ya firmaron todos' (no el de un vendedor), aunque lleguen dos lecturas", async () => {
+    db.properties = [{ id: "p1", owner_id: "u1", address_street: "1 Ocean Dr", address_city: "Miami", address_state: "FL", address_zip: "33139" }];
+    ds.signers = [{ ...SELLER, status: "completed" }, { ...SECOND, status: "completed" }, BROKER];
+    await refreshAgreementResult(ref());
+    await refreshAgreementResult({ ...ref(), status: db.agreements[0].status as string });
+    expect(mail.allSigned).toHaveBeenCalledTimes(1);
+    expect(mail.allSigned.mock.calls[0]![0]).toMatchObject({
+      to: "ana@example.com",
+      lang: "es",
+      idempotencyKey: "all-sellers-signed:a1",
+      paymentUrl: expect.stringContaining("/es/listing/new?id=p1&step=8"),
+    });
+    expect(mail.signed).not.toHaveBeenCalled();
+  });
+
+  it("ownSigned: el vendedor firmó y falta el otro → true, con el estado aún 'sent'; sin firmar → false", async () => {
+    ds.signers = [{ ...SELLER, status: "completed" }, SECOND, BROKER];
+    expect(await refreshAgreementResult(ref())).toMatchObject({ status: "sent", fetched: true, ownSigned: true });
+    ds.signers = [SELLER, { ...SECOND, status: "completed" }, BROKER];
+    expect((await refreshAgreementResult(ref())).ownSigned).toBe(false);
+  });
+
+  it("ownSigned: null si DocuSign no responde o el acuerdo ya es final", async () => {
+    expect((await refreshAgreementResult({ ...ref(), status: "voided" })).ownSigned).toBeNull();
   });
 
   it("anulado ANTES del plazo (no por vencimiento): queda 'voided', sin aviso de plazo", async () => {

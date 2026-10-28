@@ -1,6 +1,6 @@
 // Plazo de firma con dos vendedores (#220): recordatorios a los días 2 y 5, vencimiento al 7.
 import { describe, expect, it } from "vitest";
-import { canResendInvitation, deadlineAction, isSigningExpired, LIXTARA_REMINDER_DAYS } from "@/lib/signing-deadline";
+import { canResendInvitation, deadlineAction, isSigningExpired, LIXTARA_REMINDER_DAYS, onlyWaitingForCosigner } from "@/lib/signing-deadline";
 
 const DAY = 86_400_000;
 const start = new Date("2026-11-02T15:00:00Z");
@@ -56,5 +56,24 @@ describe("canResendInvitation", () => {
     expect(canResendInvitation("expired", row(), at(3))).toBe(false);
     expect(canResendInvitation("sent", row({ additional_signer_signed_at: at(1).toISOString() }), at(3))).toBe(false);
     expect(canResendInvitation("sent", row({ sellers_required: 1, signing_deadline_at: null }), at(3))).toBe(false);
+  });
+});
+
+describe("onlyWaitingForCosigner (paso 7)", () => {
+  const ag = (over: Record<string, unknown> = {}) => ({ ...row(), status: "sent", ...over });
+  it("el vendedor firmó y falta el otro: solo la espera", () => {
+    expect(onlyWaitingForCosigner(ag(), true, true)).toBe(true);
+    expect(onlyWaitingForCosigner(ag({ status: "delivered" }), true, true)).toBe(true);
+  });
+  it("sin la firma del vendedor, o sin poder leer DocuSign: todo, como antes", () => {
+    expect(onlyWaitingForCosigner(ag(), true, false)).toBe(false);
+    expect(onlyWaitingForCosigner(ag(), true, null)).toBe(false);
+  });
+  it("ya firmó el otro, un solo vendedor, sin firmante guardado o el sobre ya no espera: no", () => {
+    expect(onlyWaitingForCosigner(ag({ additional_signer_signed_at: "2026-11-03T00:00:00Z" }), true, true)).toBe(false);
+    expect(onlyWaitingForCosigner(ag({ sellers_required: 1 }), true, true)).toBe(false);
+    expect(onlyWaitingForCosigner(ag(), false, true)).toBe(false);
+    expect(onlyWaitingForCosigner(ag({ status: "signed" }), true, true)).toBe(false);
+    expect(onlyWaitingForCosigner(null, true, true)).toBe(false);
   });
 });

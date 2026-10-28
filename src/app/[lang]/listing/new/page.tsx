@@ -83,6 +83,8 @@ import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
 import { CosignerResendButton } from "@/components/cosigner-resend-button";
+import { refreshAgreementResult } from "@/lib/agreement-refresh";
+import { isAwaitingSellers, onlyWaitingForCosigner } from "@/lib/signing-deadline";
 import { staffMarksToReset } from "@/lib/listing-signers-admin";
 import {
   STEP1_FORM_COOKIE,
@@ -343,6 +345,9 @@ export default async function ListingNewPage({
     stripe_checkout_session_id: string | null;
   };
   type AgreementRow = {
+    id: string;
+    envelope_id: string | null;
+    property_id: string;
     status: "pending" | "sent" | "delivered" | "signed" | "completed" | "declined" | "voided" | "expired";
     sellers_required: number;
     additional_signer_signed_at: string | null;
@@ -359,6 +364,9 @@ export default async function ListingNewPage({
   let additionalSigner: AdditionalSignerRow | null = null;
   let latestPayment: PaymentRow | null = null;
   let latestAgreement: AgreementRow | null = null;
+  // Con dos vendedores (#220): el vendedor de la cuenta ya firmó y el sobre espera al otro.
+  // null = no se pudo leer en DocuSign.
+  let ownSignedAgreement: boolean | null = null;
   if (draftId) {
     const supabase = await createClient();
     const { data } = await supabase
@@ -594,7 +602,7 @@ export default async function ListingNewPage({
     }
 
 
-    if (step === 3 || step === 7) {
+    if (step === 3 || step === 6 || step === 7) {
       const [{ data: own }, { data: signerRows }] = await Promise.all([
         supabase
           .from("listing_ownership")
@@ -612,14 +620,25 @@ export default async function ListingNewPage({
     }
 
     if (step === 7 || step === 8) {
-      const { data: agRow } = await supabase
-        .from("agreements")
-        .select("status,sellers_required,additional_signer_signed_at,signing_deadline_at")
-        .eq("property_id", draftId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (agRow) latestAgreement = agRow as AgreementRow;
+      const loadAgreement = async () => {
+        const { data: agRow } = await supabase
+          .from("agreements")
+          .select("id,envelope_id,property_id,status,sellers_required,additional_signer_signed_at,signing_deadline_at")
+          .eq("property_id", draftId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return (agRow ?? null) as AgreementRow | null;
+      };
+      latestAgreement = await loadAgreement();
+      // Al cargar, el estado sale de DocuSign (no solo del poller de 20 intentos al volver de
+      // firmar): con dos vendedores el otro firma por correo, cuando sea. El refresco manda una
+      // vez el correo "ya firmaron todos" si esta lectura es la que ve la última firma.
+      if (latestAgreement?.envelope_id && isAwaitingSellers(latestAgreement.status)) {
+        const refreshed = await refreshAgreementResult(latestAgreement);
+        ownSignedAgreement = refreshed.ownSigned;
+        if (refreshed.fetched) latestAgreement = (await loadAgreement()) ?? latestAgreement;
+      }
     }
 
     if (step === 8) {
@@ -1835,6 +1854,10 @@ export default async function ListingNewPage({
     redirect(`${back}&verified=1&ev=email_verified_account`);
   }
 
+  // Paso 7 con dos vendedores (#220): el vendedor ya firmó y el sobre espera al otro. Solo se
+  // muestra la espera y "Reenviar", sin el aviso E-SIGN, la casilla, "Volver a abrir DocuSign" ni
+  // "Confirmando tu firma…".
+  const waitingCosignerOnly = onlyWaitingForCosigner(latestAgreement, !!additionalSigner, ownSignedAgreement);
   // Paso 7: aviso y casilla E-SIGN antes de abrir DocuSign (textos versionados, consents.ts).
   const esignProps = {
     notice: consentNotice("esign", lang),
@@ -3348,6 +3371,38 @@ export default async function ListingNewPage({
                   )}
                 </div>
 
+                {/* Segundo firmante (#220): quién más firma, antes de ir a firmar. */}
+                {additionalSigner && (
+                  <div className="border border-gold-soft p-5" data-review-cosigner>
+                    <SectionHeader title={copy.step6.sectionSigners} editStep={3} />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          {copy.step6.signerNameLabel}
+                        </span>
+                        <span className="text-ink">{additionalSigner.full_name}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          {copy.step6.signerEmailLabel}
+                        </span>
+                        <span className="text-ink break-all">{additionalSigner.email}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                          {copy.step6.signerRelationshipLabel}
+                        </span>
+                        <span className="text-ink">
+                          {additionalSigner.relationship === "homestead_spouse"
+                            ? copy.step6.signerRelationshipSpouse
+                            : copy.step6.signerRelationshipTitle}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-ink/55 leading-relaxed">{copy.step6.signerNote.replace("{days}", String(SIGNING_DEADLINE_DAYS))}</p>
+                  </div>
+                )}
+
                 {/* Description + showings */}
                 <div className="border border-gold-soft p-5">
                   <SectionHeader
@@ -3529,7 +3584,7 @@ export default async function ListingNewPage({
       {step === 7 && draftId && (
         <div className="flex flex-col gap-8">
           {/* Ya firmado: solo la confirmación, sin la instrucción de firmar (auditoría #07). */}
-          {(needsAccount || !agreementSignedBySeller(latestAgreement?.status)) && (
+          {(needsAccount || (!agreementSignedBySeller(latestAgreement?.status) && !waitingCosignerOnly)) && (
             <div className="flex flex-col gap-3">
               <h2 className="font-display text-2xl text-ink font-normal">
                 {copy.step7.title}
@@ -3666,6 +3721,7 @@ export default async function ListingNewPage({
                     year: "numeric",
                   })
                 : "";
+              const onlyWaiting = waitingCosignerOnly;
               return (
                 <div className="flex flex-col gap-4">
                   {waitingCosigner ? (
@@ -3674,7 +3730,7 @@ export default async function ListingNewPage({
                         {copy.step7.waitingCosignerTitle.replace("{name}", waitingCosigner.full_name)}
                       </p>
                       <p className="text-sm text-ink/70 leading-relaxed">
-                        {copy.step7.waitingCosignerBody
+                        {(onlyWaiting ? copy.step7.waitingCosignerBodySigned : copy.step7.waitingCosignerBody)
                           .replace("{email}", waitingCosigner.email)
                           .replace("{date}", deadline)}
                       </p>
@@ -3699,23 +3755,25 @@ export default async function ListingNewPage({
                     </p>
                   </div>
                   )}
-                  {sp.signed === "1" && (
+                  {!onlyWaiting && sp.signed === "1" && (
                     <AgreementStatusPoller
                       propertyId={draftId}
                       label={copy.step7.pollingLabel}
                     />
                   )}
-                  <AgreementButton
-                    propertyId={draftId}
-                    lang={lang}
-                    labels={{
-                      startButton: copy.step7.reopenButton,
-                      redirecting: copy.step7.redirecting,
-                      failed: copy.step7.failed,
-                      consentRequired: copy.step7.consentRequired,
-                    }}
-                    esign={esignProps}
-                  />
+                  {!onlyWaiting && (
+                    <AgreementButton
+                      propertyId={draftId}
+                      lang={lang}
+                      labels={{
+                        startButton: copy.step7.reopenButton,
+                        redirecting: copy.step7.redirecting,
+                        failed: copy.step7.failed,
+                        consentRequired: copy.step7.consentRequired,
+                      }}
+                      esign={esignProps}
+                    />
+                  )}
                 </div>
               );
             }

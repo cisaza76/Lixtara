@@ -5,12 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { SuccessBanner, ErrorBanner } from "@/components/auth-shell";
 import {
   TEST_LISTING_ERROR,
-  isTestListing,
   notifyListingApprovedOnce,
   testListingMessage,
 } from "@/lib/listing-approval.server";
 import { parseMlsNumber } from "@/lib/listing-mls-number";
-import { checkBrokerCountersigned } from "@/lib/agreement-refresh";
 import { assertStaffWithUser } from "@/lib/admin-auth";
 import { fetchSellerContacts } from "@/lib/admin-sellers.server";
 import { fetchSubmittedAt } from "@/lib/admin-submitted.server";
@@ -19,7 +17,9 @@ import { shortListingId } from "@/lib/admin-sellers";
 import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
 import { legalPendingMessage } from "@/lib/agreement-legal";
 import { ownershipGateMessage, signersAdminCopy } from "@/lib/listing-signers-admin";
-import { manualReviewQueue, ownershipGateFor, queueSignersByProperty } from "@/lib/listing-signers-admin.server";
+import { manualReviewQueue, queueSignersByProperty } from "@/lib/listing-signers-admin.server";
+import { approvalBlocker } from "@/lib/approval-gate.server";
+import { adminReviewCopy, agreementApprovalBlock, approvalBlockMessage, sellersSignedCount } from "@/lib/admin-review-copy";
 import { createService } from "@/lib/supabase/service";
 import {
   ensureEnterMlsNumberTask,
@@ -99,6 +99,7 @@ export default async function AdminPage({
   // #220: firmantes y titular de cada listing de la cola, y los titulares en revisión manual.
   const signersBy = await queueSignersByProperty(pending.map((p) => p.id));
   const sc = signersAdminCopy(lang);
+  const rc = adminReviewCopy(lang);
   const manualQueue = await manualReviewQueue();
   const { data: manualRows } = manualQueue.length
     ? await createService()
@@ -190,19 +191,10 @@ export default async function AdminPage({
       redirect(`/${lang}/admin?error=mls_number_invalid`);
     }
 
-    // Un listing de prueba no se aprueba: publicarlo mandaría el correo de aprobación.
-    if (await isTestListing(supabase, id)) redirect(`/${lang}/admin?error=${TEST_LISTING_ERROR}`);
-
-    // Acuerdo enviado sin descripción legal verificada: no se publica (#217).
-    if ((await pendingLegalByProperty([id])).has(id)) redirect(`/${lang}/admin?error=legal_pending`);
-
-    // Titular (#220): entidad sin Sunbiz ni documento, o revisión manual sin destrabar.
-    const owner = await ownershipGateFor(id);
-    if (!owner.ok) redirect(`/${lang}/admin?error=${owner.reason}`);
-
-    // Sin la contrafirma de la broker en DocuSign no se publica (el vendedor ya pagó al firmar).
-    const gate = await checkBrokerCountersigned(id);
-    if (!gate.ok) redirect(`/${lang}/admin?error=${gate.reason}`);
+    // Listing de prueba, descripción legal, titular y contrafirma en vivo (approval-gate.server.ts):
+    // el vendedor ya pagó al firmar, pero sin todo eso no se publica.
+    const blocked = await approvalBlocker(supabase, id);
+    if (blocked) redirect(`/${lang}/admin?error=${blocked}`);
 
     const { data: prop, error } = await supabase
       .from("properties")
@@ -410,6 +402,10 @@ export default async function AdminPage({
                 const submitted = submittedAt.get(p.id) ?? null;
                 const signing = signersBy.get(p.id);
                 const ownerBlocked = signing && !signing.gate.ok ? signing.gate.reason : null;
+                // Acuerdo sin completar (falta un vendedor o la contrafirma, o anulado): la acción
+                // lo rechaza igual (checkBrokerCountersigned); aquí el botón ya lo dice.
+                const agreementBlocked = agreementApprovalBlock(signing?.agreementStatus ?? null, signing?.lines ?? []);
+                const signedCount = signing ? sellersSignedCount(signing.lines) : null;
                 return (
                   <div
                     key={p.id}
@@ -453,7 +449,17 @@ export default async function AdminPage({
                       )}
                       {signing && (
                         <>
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55 mt-2">{sc.signers}</p>
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55 mt-2">
+                            {signedCount ? (
+                              <span data-signers-count>
+                                {rc.signersCount
+                                  .replace("{signed}", String(signedCount.signed))
+                                  .replace("{total}", String(signedCount.total))}
+                              </span>
+                            ) : (
+                              sc.signers
+                            )}
+                          </p>
                           <ul className="flex flex-col gap-0.5 text-xs text-ink/80">
                             {signing.lines.map((l) => (
                               <li key={l.role} data-signer={l.role} data-signer-status={l.status}>
@@ -539,7 +545,7 @@ export default async function AdminPage({
                         </label>
                         <button
                           type="submit"
-                          disabled={legalPending.has(p.id) || p.is_test || !!ownerBlocked}
+                          disabled={legalPending.has(p.id) || p.is_test || !!ownerBlocked || !!agreementBlocked}
                           className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {copy.approveButton}
@@ -547,6 +553,14 @@ export default async function AdminPage({
                         {p.is_test && (
                           <span data-test-listing className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
                             {testListingMessage(lang)}
+                          </span>
+                        )}
+                        {!p.is_test && agreementBlocked && (
+                          <span data-approval-block={agreementBlocked} className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
+                            {approvalBlockMessage(agreementBlocked, signing?.agreementStatus, lang)}{" "}
+                            <Link href={`/${lang}/admin/listings/${p.id}/review`} className="underline">
+                              {sc.open}
+                            </Link>
                           </span>
                         )}
                         {legalPending.has(p.id) && (

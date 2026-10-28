@@ -2,6 +2,7 @@ import Link from "next/link";
 import { isFirstSession } from "@/lib/auth/first-session";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
+import { dashboardAgreementState } from "@/lib/dashboard-agreement";
 import { isLocale, t, type Locale } from "@/lib/i18n";
 import { requireUser } from "@/lib/auth";
 import { isStaff } from "@/lib/admin-auth";
@@ -60,6 +61,7 @@ interface PaymentRow {
 interface AgreementRow {
   property_id: string;
   status: string;
+  created_at: string | null;
 }
 
 interface OfferRow {
@@ -86,12 +88,17 @@ function agreementLabel(
   agreements: AgreementRow[],
   copy: ReturnType<typeof t>["dashboard"],
 ): { text: string; tone: "ok" | "warn" | "fail" | "none" } {
-  if (agreements.length === 0) return { text: copy.agreementNone, tone: "none" };
-  if (agreements.some((a) => a.status === "signed" || a.status === "completed"))
-    return { text: copy.agreementSigned, tone: "ok" };
-  if (agreements.some((a) => a.status === "declined" || a.status === "voided"))
-    return { text: copy.agreementDeclined, tone: "fail" };
-  return { text: copy.agreementPending, tone: "warn" };
+  const { key, tone } = dashboardAgreementState(agreements);
+  const text = {
+    none: copy.agreementNone,
+    pending: copy.agreementPending,
+    signed: copy.agreementSigned,
+    completed: copy.agreementCompleted,
+    declined: copy.agreementDeclined,
+    voided: copy.agreementVoided,
+    expired: copy.agreementExpired,
+  }[key];
+  return { text, tone };
 }
 
 
@@ -200,7 +207,7 @@ export default async function DashboardPage({
       ids.length > 0
         ? supabase
             .from("agreements")
-            .select("property_id,status")
+            .select("property_id,status,created_at")
             .in("property_id", ids)
         : Promise.resolve({ data: [] as AgreementRow[] }),
       ids.length > 0

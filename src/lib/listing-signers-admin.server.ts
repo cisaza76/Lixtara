@@ -111,14 +111,21 @@ export async function applyStaffMark(
   return { ok: true };
 }
 
+export interface QueueSigning {
+  lines: ReturnType<typeof agreementSignerLines>;
+  gate: OwnershipGate;
+  /** Estado guardado del acuerdo más reciente (null = sin acuerdo). */
+  agreementStatus: string | null;
+}
+
 /**
  * Para la cola de aprobación: firmantes (estado guardado, sin llamar a DocuSign por fila) y el
  * bloqueo por titular de cada listing.
  */
 export async function queueSignersByProperty(
   propertyIds: string[],
-): Promise<Map<string, { lines: ReturnType<typeof agreementSignerLines>; gate: OwnershipGate }>> {
-  const out = new Map<string, { lines: ReturnType<typeof agreementSignerLines>; gate: OwnershipGate }>();
+): Promise<Map<string, QueueSigning>> {
+  const out = new Map<string, QueueSigning>();
   if (propertyIds.length === 0) return out;
   const svc = createService();
   const [{ data: owners }, { data: signers }, { data: agreements }] = await Promise.all([
@@ -156,6 +163,7 @@ export async function queueSignersByProperty(
         propertyId: id,
       }),
       gate: ownershipApprovalGate(ownership),
+      agreementStatus: agreement?.status ?? null,
     });
   }
   return out;
