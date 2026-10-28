@@ -231,6 +231,37 @@ export async function sendAgreementSigned(input: AgreementSignedInput) {
   });
 }
 
+/**
+ * Dos vendedores (#220): al vendedor, cuando firmó el último de los dos (él o el otro). Reemplaza
+ * a sendAgreementSigned en ese caso: una sola vez por acuerdo (idempotencyKey).
+ */
+export async function sendAllSellersSigned(input: AgreementSignedInput & { idempotencyKey: string }) {
+  const isEs = (input.lang ?? "en") === "es";
+  const address = escapeHtml(input.propertyAddress);
+  const body = isEs
+    ? `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Ya firmaron todos. ✓</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Los dos vendedores firmaron el acuerdo de listado de <strong>${address}</strong>. Completa el pago de tu tarifa fija para continuar.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${publicationTimeline.text.es.sentence}</p>
+    ${button(input.paymentUrl, "Continuar al pago")}
+  `
+    : `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Everyone has signed. ✓</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Both sellers signed the listing agreement for <strong>${address}</strong>. Complete the payment of your flat fee to continue.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${publicationTimeline.text.en.sentence}</p>
+    ${button(input.paymentUrl, "Continue to payment")}
+  `;
+  return send({
+    to: input.to,
+    subject: isEs ? "Ya firmaron todos: completa el pago para continuar" : "Everyone has signed: complete the payment to continue",
+    html: shell({ preheader: isEs ? "Ya firmaron todos" : "Everyone has signed", body, lang: isEs ? "es" : "en" }),
+    text: isEs
+      ? `Ya firmaron todos el acuerdo de listado de ${input.propertyAddress}. Completa el pago para continuar: ${input.paymentUrl}`
+      : `Everyone has signed the listing agreement for ${input.propertyAddress}. Complete the payment to continue: ${input.paymentUrl}`,
+    idempotencyKey: input.idempotencyKey,
+  });
+}
+
 // ─── Segundo vendedor (#220) ─────────────────────────────────────────
 //
 // El segundo firmante no tiene cuenta: firma por el correo de DocuSign. Lixtara le escribe aparte

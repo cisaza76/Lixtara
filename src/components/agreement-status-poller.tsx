@@ -41,8 +41,10 @@ export function AgreementStatusPoller({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ property_id: propertyId }),
         });
-        const data = (await res.json()) as { status?: string };
-        if (data.status === "completed" || data.status === "signed") {
+        const data = (await res.json()) as { status?: string; own_signed?: boolean };
+        // With two sellers (#220) the seller's own signature is enough: step 7 then shows only
+        // the wait for the other one.
+        if (data.status === "completed" || data.status === "signed" || data.own_signed) {
           stopped.current = true;
           clearInterval(interval);
           router.refresh();

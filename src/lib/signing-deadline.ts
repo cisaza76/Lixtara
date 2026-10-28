@@ -67,3 +67,24 @@ export function deadlineAction(row: DeadlineRow, now: Date): DeadlineAction {
 export function canResendInvitation(status: string, row: DeadlineRow, now: Date): boolean {
   return isAwaitingSellers(status) && waitsForCosigner(row) && !isSigningExpired(row, now);
 }
+
+/**
+ * Paso 7: el vendedor ya firmó y el sobre espera al segundo firmante. Solo se muestra "Esperando
+ * la firma de {nombre}" con "Reenviar": sin el aviso E-SIGN, la casilla, "Volver a abrir
+ * DocuSign" ni "Confirmando tu firma…". `ownSigned` viene de DocuSign al cargar (null = no se
+ * pudo leer: se muestra todo, como antes).
+ */
+export function onlyWaitingForCosigner(
+  agreement: (DeadlineRow & { status: string }) | null,
+  hasCosigner: boolean,
+  ownSigned: boolean | null,
+): boolean {
+  return (
+    !!agreement &&
+    (agreement.status === "sent" || agreement.status === "delivered") &&
+    agreement.sellers_required === 2 &&
+    !agreement.additional_signer_signed_at &&
+    hasCosigner &&
+    ownSigned === true
+  );
+}

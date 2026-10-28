@@ -106,6 +106,17 @@ export function AppFormValidation({
           : [el];
       group.forEach(unmark);
       if (el.name) removeMessage(form, el.name);
+      // El resumen solo acompaña a campos marcados: corregido el último, se va.
+      if (!form.querySelector('[aria-invalid="true"]')) setShown(false);
+    };
+
+    // Volver a la página desde el caché del navegador (atrás/adelante) la restaura con el resumen
+    // del intento anterior: al entrar no hay nada marcado.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      form.querySelectorAll(`[${ERROR_ATTR}]`).forEach((n) => n.remove());
+      Array.from(form.elements).filter(isControl).forEach(unmark);
+      setShown(false);
     };
 
     const onSubmit = (e: SubmitEvent) => {
@@ -169,7 +180,9 @@ export function AppFormValidation({
     form.addEventListener("submit", onSubmit);
     form.addEventListener("input", clear);
     form.addEventListener("change", clear);
+    window.addEventListener("pageshow", onPageShow);
     return () => {
+      window.removeEventListener("pageshow", onPageShow);
       form.removeEventListener("submit", onSubmit);
       form.removeEventListener("input", clear);
       form.removeEventListener("change", clear);
