@@ -255,14 +255,10 @@ async function searchByAddress(
     },
     redirect: "follow",
   });
-  if (!res.ok) return null;
-  const text = await res.text();
-  let json: Record<string, unknown>;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    return null;
-  }
+  // Una falla del condado es un error, no "no encontrada": con "no encontrada" el paso 3
+  // borra lo autollenado antes (staleCountyColumns).
+  if (!res.ok) throw new Error(`county GetAddress ${res.status}`);
+  const json = JSON.parse(await res.text()) as Record<string, unknown>;
   const infos = (json?.MinimumPropertyInfos as CountyCandidate[]) ?? [];
   return pickCountyCandidate(infos, street, unit);
 }
@@ -366,7 +362,9 @@ export function baseStreetForLookup(street: string): string {
  * Legal description for the listing agreement, VERIFIED against the county at signing time:
  * the stored address is looked up again (same parcel rule as the step-3 autofill, #202) and
  * must resolve to the folio saved on the listing. Anything else (no folio, outside
- * Miami-Dade, county down, another parcel) → null, and the contract says "See Attachment".
+ * Miami-Dade, county down, another parcel, a non-residential parcel or a 5+ unit building —
+ * lookupMiamiDadeProperty returns found: false for both) → null: the agreement's legal
+ * description stays "pending" and the contract says "See Attachment".
  */
 export async function verifiedLegalDescription(p: {
   address_street: string | null;
@@ -436,4 +434,85 @@ export function step3PropertyTypeDefault(
   if (confirmed) return draft.property_type;
   if (countyBlocked) return "";
   return unitFromStoredStreet(draft.address_street) ? "condo" : "";
+}
+
+/** Datos del condado de un folio, sea o no vivienda (para saber qué se autollenó con él). */
+export async function countyParcelByFolio(folio: string): Promise<MiamiDadeDetails | null> {
+  try {
+    return (await fetchByFolio(folio.replace(/-/g, "").trim()))?.details ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * La consulta no deja datos del condado para esta dirección: no residencial, 5+ unidades o no
+ * encontrada. Un error o una caída del condado NO cuenta (no se borra nada por una falla).
+ */
+export function countyLookupMiss(r: MiamiDadeLookupResult): boolean {
+  if (r.nonResidential || r.largeMultifamily) return true;
+  return !r.found && !r.error && !r.folio;
+}
+
+/** Las columnas del borrador que escribe el autollenado del condado. */
+export interface CountyFilledColumns {
+  address_street: string;
+  property_type: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  sqft: number | null;
+  lot_size: number | null;
+  year_built: number | null;
+  tax_annual_amount: number | null;
+  legal_description: string | null;
+}
+
+/**
+ * Regla (2026-10-27): cuando la consulta ya no da la parcela del folio guardado (la dirección
+ * cambió, o la parcela es no residencial, 5+ unidades o no encontrada), se borra lo que vino
+ * de ESA parcela y el vendedor no editó después: cada columna se borra solo si sigue igual al
+ * dato del condado para el folio guardado (`previous`). Lo que el vendedor escribió a mano
+ * (distinto del condado) se conserva. Sin folio no se sabe qué vino del condado: nada.
+ * Se borra siempre el folio, y con él las marcas "Autofilled" del paso 3.
+ * Valores "vacíos" = los del borrador nuevo (0 en habitaciones y pies², sin año); baños 0
+ * (el campo se muestra vacío) y el tipo vuelve al valor inicial, que el paso 3 no muestra.
+ */
+export function staleCountyColumns(
+  draft: CountyFilledColumns,
+  previous: MiamiDadeDetails,
+): Record<string, string | number | null> {
+  const out: Record<string, string | number | null> = { folio: null };
+  const same = (a: number | null, b: number | null) => a != null && b != null && Number(a) === Number(b);
+  if (same(draft.bedrooms, previous.bedrooms)) out.bedrooms = 0;
+  if (same(draft.bathrooms, previous.bathrooms)) out.bathrooms = 0;
+  if (same(draft.sqft, previous.sqft)) out.sqft = 0;
+  if (same(draft.lot_size, previous.lot_size)) out.lot_size = null;
+  if (same(draft.year_built, previous.year_built)) out.year_built = null;
+  if (same(draft.tax_annual_amount, previous.tax_annual_amount)) out.tax_annual_amount = null;
+  const legal = (v: string | null) => (v ?? "").replace(/\s+/g, " ").trim();
+  if (legal(draft.legal_description) !== "" && legal(draft.legal_description) === legal(previous.legal_description)) {
+    out.legal_description = null;
+  }
+  if (previous.property_type != null && draft.property_type === previous.property_type) {
+    out.property_type = unitFromStoredStreet(draft.address_street) ? "condo" : "single_family";
+  }
+  return out;
+}
+
+/**
+ * Lo que hay que borrar del borrador tras una consulta (automática o con el botón): solo si el
+ * borrador tiene un folio y la consulta ya no lo confirma — no residencial, 5+ unidades, no
+ * encontrada u otra parcela. Si el condado falló, o no se pudo leer la parcela del folio
+ * guardado, nada (se reintenta en la próxima consulta).
+ */
+export async function staleCountyUpdates(
+  draft: CountyFilledColumns & { folio: string | null },
+  result: MiamiDadeLookupResult,
+  previousParcel: (folio: string) => Promise<MiamiDadeDetails | null> = countyParcelByFolio,
+): Promise<Record<string, string | number | null>> {
+  if (!draft.folio) return {};
+  const otherParcel = result.found && !!result.folio && result.folio !== draft.folio;
+  if (!countyLookupMiss(result) && !otherParcel) return {};
+  const previous = await previousParcel(draft.folio);
+  return previous ? staleCountyColumns(draft, previous) : {};
 }

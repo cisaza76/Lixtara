@@ -49,7 +49,7 @@ import {
   improveListingDescription,
   improveShowingInstructions,
 } from "@/lib/ai";
-import { acceptCountyTax, baseStreetForLookup, lookupMiamiDadeProperty, step3PropertyTypeDefault, unitFromStoredStreet } from "@/lib/miami-dade";
+import { acceptCountyTax, baseStreetForLookup, lookupMiamiDadeProperty, staleCountyUpdates, step3PropertyTypeDefault, unitFromStoredStreet } from "@/lib/miami-dade";
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
@@ -161,6 +161,21 @@ function stepCompleted(
 
 
 
+/** Texto con un tramo entre corchetes, que se vuelve un enlace ("…; [escríbenos] y …"). */
+function withLinkedSpan(text: string, href: string): React.ReactNode {
+  const m = text.match(/^([\s\S]*)\[([^\]]+)\]([\s\S]*)$/);
+  if (!m) return text;
+  return (
+    <>
+      {m[1]}
+      <Link href={href} className="font-semibold underline underline-offset-2">
+        {m[2]}
+      </Link>
+      {m[3]}
+    </>
+  );
+}
+
 interface Draft {
   id: string;
   owner_id: string;
@@ -201,6 +216,7 @@ interface Draft {
   tenant_notes: string | null;
   show_phone_on_portals: boolean | null;
   folio: string | null;
+  legal_description: string | null;
   buyer_agent_commission: number | null;
   buyer_agent_comp_type: string | null;
   buyer_agent_comp_amount: number | null;
@@ -323,7 +339,7 @@ export default async function ListingNewPage({
     const { data } = await supabase
       .from("properties")
       .select(
-        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,financing_terms,financing_other,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,appliances",
+        "id,owner_id,address_street,address_city,address_state,address_zip,latitude,longitude,pricing_tier,mls_status,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,list_price,description,showing_instructions,price_comps,price_estimate_low,price_estimate_high,price_comps_fetched_at,parking_spaces,hoa_fee,tax_annual_amount,has_pool,cash_only,financing_terms,financing_other,as_is_sale,flood_zone,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,show_phone_on_portals,folio,legal_description,appliances",
       )
       .eq("id", draftId)
       .maybeSingle();
@@ -450,19 +466,30 @@ export default async function ListingNewPage({
       const tasks: Promise<unknown>[] = [];
       const updates: Record<string, unknown> = {};
 
+      const current = draft;
+      const countyBlock: { value: "nonresidential" | "multifamily5" | null } = { value: null };
       const isMiamiDade = step3MiamiDade === true;
-      const fieldsEmpty =
-        draft.bedrooms === 0 &&
-        draft.sqft === 0 &&
-        (draft.year_built == null || draft.year_built >= new Date().getFullYear());
-      if (isMiamiDade && fieldsEmpty) {
+      const isEmpty = (d: { bedrooms: number; sqft: number; year_built: number | null }) =>
+        d.bedrooms === 0 &&
+        d.sqft === 0 &&
+        (d.year_built == null || d.year_built >= new Date().getFullYear());
+      // Con folio guardado se consulta siempre: si la consulta ya no da esa parcela (la
+      // dirección cambió, o es no residencial, 5+ unidades o no encontrada), se borra lo que
+      // vino de ella y el vendedor no editó (staleCountyUpdates).
+      if (isMiamiDade && (isEmpty(current) || current.folio)) {
         tasks.push(
-          lookupMiamiDadeProperty(baseStreetForLookup(draft.address_street), draft.address_zip, unitFromStoredStreet(draft.address_street)).then(
-            (result) => {
+          lookupMiamiDadeProperty(baseStreetForLookup(current.address_street), current.address_zip, unitFromStoredStreet(current.address_street)).then(
+            async (result) => {
+              const stale = await staleCountyUpdates(current, result);
+              Object.assign(updates, stale);
               if (result.nonResidential || result.largeMultifamily) {
-                step3CountyBlock = result.largeMultifamily ? "multifamily5" : "nonresidential";
+                countyBlock.value = result.largeMultifamily ? "multifamily5" : "nonresidential";
                 return;
               }
+              // Solo se llena un borrador vacío: lo que el vendedor ya escribió no se pisa
+              // (el botón sí lo reemplaza).
+              const merged = { ...current, ...stale };
+              if (!isEmpty(merged as typeof current)) return;
               if (result.folio) updates.folio = result.folio;
               if (result.found && result.details) {
                 const d = result.details;
@@ -477,12 +504,19 @@ export default async function ListingNewPage({
                   updates.legal_description = d.legal_description;
                 // Estimated annual tax — only when the seller hasn't entered one and it
                 // passes the caps (5 % of the list price, $200,000).
-                const tax = acceptCountyTax(d.tax_annual_amount, draft?.list_price);
-                if (tax != null && draft?.tax_annual_amount == null)
+                const tax = acceptCountyTax(d.tax_annual_amount, current.list_price);
+                if (tax != null && merged.tax_annual_amount == null)
                   updates.tax_annual_amount = tax;
               }
             },
           ),
+        );
+      } else if (step3MiamiDade === false && current.folio) {
+        // Fuera de Miami-Dade: el folio guardado es de otra dirección (como no encontrada).
+        tasks.push(
+          staleCountyUpdates(current, { found: false }).then((stale) => {
+            Object.assign(updates, stale);
+          }),
         );
       }
 
@@ -513,6 +547,7 @@ export default async function ListingNewPage({
 
       if (tasks.length > 0) {
         await Promise.allSettled(tasks);
+        step3CountyBlock = countyBlock.value;
         if (Object.keys(updates).length > 0) {
           await supabase
             .from("properties")
@@ -1090,7 +1125,7 @@ export default async function ListingNewPage({
 
     const { data: row } = await supabase
       .from("properties")
-      .select("address_street,address_zip,list_price")
+      .select("address_street,address_zip,list_price,folio,property_type,bedrooms,bathrooms,sqft,lot_size,year_built,tax_annual_amount,legal_description")
       .eq("id", id)
       .eq("owner_id", user.id)
       .single();
@@ -1099,13 +1134,23 @@ export default async function ListingNewPage({
     }
 
     const result = await lookupMiamiDadeProperty(baseStreetForLookup(row.address_street), row.address_zip, unitFromStoredStreet(row.address_street));
-    if (result.nonResidential || result.largeMultifamily) {
-      redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=${result.largeMultifamily ? "multifamily5" : "nonresidential"}`);
+    // Lo que vino de la parcela del folio guardado y el vendedor no editó (si la consulta ya
+    // no la da) se borra, también cuando no hay nada nuevo que llenar.
+    const stale = await staleCountyUpdates(row, result);
+    const miss =
+      result.nonResidential || result.largeMultifamily
+        ? result.largeMultifamily ? "multifamily5" : "nonresidential"
+        : !result.found || !result.details
+          ? "notfound"
+          : null;
+    if (miss) {
+      if (Object.keys(stale).length > 0) {
+        const { error } = await supabase.from("properties").update(stale).eq("id", id).eq("owner_id", user.id);
+        if (error) redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
+      }
+      redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=${miss}`);
     }
-    if (!result.found || !result.details) {
-      redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=notfound`);
-    }
-    const d = result.details;
+    const d = result.details!;
     const update: Record<string, number | string | null> = {};
     if (result.folio) update.folio = result.folio;
     if (d.bedrooms != null) update.bedrooms = d.bedrooms;
@@ -1126,7 +1171,7 @@ export default async function ListingNewPage({
 
     const { error } = await supabase
       .from("properties")
-      .update(update)
+      .update({ ...stale, ...update })
       .eq("id", id)
       .eq("owner_id", user.id);
     if (error) {
@@ -1808,6 +1853,11 @@ export default async function ListingNewPage({
     step3CountyBlock !== null ||
       (typeof sp === "object" && "autofill" in sp && (sp.autofill === "nonresidential" || sp.autofill === "multifamily5")),
   );
+  // Aviso de 5+ unidades: "[escríbenos]" enlaza al contacto con el tema "vender".
+  const multifamily5Notice = withLinkedSpan(
+    copy.step3.autofillMultifamily5,
+    `/${lang}/contact?topic=sell`,
+  );
   const autofillResult =
     typeof sp === "object" && "autofill" in sp ? (sp.autofill as string) : null;
   const autofillMessage =
@@ -2111,7 +2161,7 @@ export default async function ListingNewPage({
             <ErrorBanner
               message={
                 step3CountyBlock === "multifamily5"
-                  ? copy.step3.autofillMultifamily5
+                  ? multifamily5Notice
                   : copy.step3.autofillNonResidential
               }
             />
@@ -2120,7 +2170,7 @@ export default async function ListingNewPage({
             autofillResult === "notfound" ||
             autofillResult === "nonresidential" ||
             autofillResult === "multifamily5" ? (
-              <ErrorBanner message={autofillMessage} />
+              <ErrorBanner message={autofillResult === "multifamily5" ? multifamily5Notice : autofillMessage} />
             ) : (
               <SuccessBanner message={autofillMessage} />
             )
