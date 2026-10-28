@@ -83,9 +83,6 @@ describe("planes: referido a un abogado independiente (sin tarifas)", () => {
       expect(t("es").pricing.tiers[tier].notIncluded.length, tier).toBe(t("en").pricing.tiers[tier].notIncluded.length);
     }
     expect(t("es").faq.items.length).toBe(t("en").faq.items.length);
-    for (const tier of ["silver", "gold", "platinum"] as const) {
-      expect(t("es").investor.tiers[tier].bullets.length, tier).toBe(t("en").investor.tiers[tier].bullets.length);
-    }
   });
 
   it("divulgación con el texto aprobado, en tú y sin tarifas", () => {
@@ -135,7 +132,7 @@ describe("ningún flujo de Lixtara cobra servicios legales", () => {
 describe("Investor Club y acceso anticipado", () => {
   it("sin acceso antes del MLS, off-market, pre-listing ni prioridad (EN/ES)", () => {
     for (const lang of ["en", "es"] as const) {
-      const inv = JSON.stringify(t(lang).investor);
+      const inv = JSON.stringify(t(lang).investorClub);
       expect(inv, lang).not.toMatch(/48|off-market|fuera del mercado|pre-listing|antes de su publicaci|early access|acceso anticipado|priorit|prioridad/i);
     }
   });

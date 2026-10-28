@@ -87,7 +87,7 @@ export function listingErrorHtml(lang: "en" | "es", status: 404 | 410): string {
       ? { title: "Listing no encontrado", body: "Esta propiedad no está publicada." }
       : { title: "Listing not found", body: "This property is not listed." };
   // Al formulario de compra, no a /properties: con el catálogo vacío sería otra página sin fichas.
-  const back = es ? "Cuéntanos qué buscas" : "Tell us what you're looking for";
+  const back = es ? "Contáctanos" : "Contact us";
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${c.title} — Lixtara</title></head><body style="margin:0;font-family:Georgia,serif;background:#f4f1ec;color:#1c1c1c;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center;padding:24px"><main><h1 style="font-weight:400;font-size:32px">${c.title}</h1><p style="font-family:Arial,sans-serif;color:#555">${c.body}</p><p><a href="/${lang}/contact?topic=buy" style="color:#a18943;font-family:Arial,sans-serif;font-size:12px;letter-spacing:.2em;text-transform:uppercase">${back}</a></p></main></body></html>`;
 }
 

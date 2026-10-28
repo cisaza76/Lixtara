@@ -21,8 +21,10 @@ import {
   canUseShowingRequests,
   ensureBrokerOfRecord,
   insertShowingLead,
+  mlsShowingRequestsEnabled,
   resolveTarget,
 } from "@/lib/buyer-leads.server";
+import { recordInlineAcceptance, requestEvidence } from "@/lib/nbr-notice.server";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,10 @@ export async function POST(req: Request): Promise<Response> {
   if (!parsed.ok && parsed.error === "spam") return NextResponse.json({ ok: true, exclusive: false });
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const data = parsed.data;
+  // Fichas de otros brokers: apagadas para el lanzamiento (fase 2), también para el staff.
+  if (data.target.kind === "mls" && !mlsShowingRequestsEnabled()) {
+    return NextResponse.json({ error: "target" }, { status: 404 });
+  }
 
   try {
     const svc = createService();
@@ -62,6 +68,23 @@ export async function POST(req: Request): Promise<Response> {
     const brokerId = await ensureBrokerOfRecord(svc);
     const lead = await insertShowingLead(svc, data, brokerId);
     const exclusive = lead.status === "cancelled";
+
+    // Sin agente: el aviso NBR que aceptó en el formulario, con su evidencia, y el PDF al
+    // comprador y a la broker. Si no se pudiera guardar, el lead queda con el aviso pendiente
+    // y la broker lo reenvía desde la ficha: la visita no se confirma sin él (la base lo exige).
+    let nbrId: string | null = null;
+    if (data.nbrAccepted) {
+      nbrId = await recordInlineAcceptance(svc, { leadId: lead.id }, {
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
+        listingLabel: target.label,
+        propertyId: data.target.kind === "own" ? data.target.propertyId : null,
+        listingKey: data.target.kind === "mls" ? data.target.listingKey : null,
+        lang: data.lang,
+        ...requestEvidence(req.headers),
+      });
+    }
     recordServerEvent({
       event: "buyer_lead_created",
       props: { source: "showing_request", target: data.target.kind, exclusive },
@@ -80,6 +103,14 @@ export async function POST(req: Request): Promise<Response> {
           preferredTimes: data.preferredTimes,
           message: data.message,
           otherAgentStatus: data.otherAgentStatus,
+          buyerAgent: data.buyerAgent
+            ? `${data.buyerAgent.name} · ${data.buyerAgent.brokerage} · ${data.buyerAgent.email} · FL license ${data.buyerAgent.license}. Coordinate the showing with the agent; all communication goes through them.`
+            : null,
+          nbrNotice: data.buyerAgent
+            ? null
+            : nbrId
+              ? "Accepted in the form (PDF in a separate email). Pending: the buyer must verify their email before you confirm."
+              : "PENDING: send it from the lead",
           needsToSell: data.needsToSell,
           consentMarketing: data.consentMarketing,
           consentVersion: CONSENT_VERSION,
@@ -92,10 +123,11 @@ export async function POST(req: Request): Promise<Response> {
           lang: data.lang,
           buyerName: data.fullName,
           ownAddress: target.ownAddress,
+          withAgent: !!data.buyerAgent,
         }),
       ]);
     }
-    return NextResponse.json({ ok: true, exclusive });
+    return NextResponse.json({ ok: true, exclusive, withAgent: !!data.buyerAgent });
   } catch (e) {
     // Sin datos del comprador en el log.
     console.error(JSON.stringify({

@@ -1,5 +1,6 @@
 import { conciergeLegalBullet, legalReferralBullet } from "@/config/legalPartner";
 import { listingTermination, publicationTimeline, termsFaq } from "@/config/legal-terms";
+import { BUYER_SELLER_SIDE_LINE } from "@/config/buyer-relationship";
 
 export const locales = ["en", "es"] as const;
 export type Locale = (typeof locales)[number];
@@ -971,7 +972,7 @@ export const dictionaries = {
       toolNewListing: "Start a new listing",
       toolOffers: "Offers on my listings",
       toolBrowse: "Browse Florida listings",
-      toolBrowseNoListings: "Tell us what you're looking for",
+      toolBrowseNoListings: "Contact us",
       toolConsultations: "Book a Realtor consultation",
       toolForgot: "Forgot your password?",
       signOut: "Sign out",
@@ -1038,7 +1039,7 @@ export const dictionaries = {
       titleBefore: "Submit your ",
       titleAccent: "offer",
       titleAfter: ".",
-      body: "Tell the seller what you'd pay and how you plan to finance. Our broker mediates from here through closing.",
+      body: "Tell the seller what you'd pay and how you plan to finance. Our broker presents your offer to the seller. Lixtara represents the seller and will not advise you in negotiating against the seller.",
       gateTitle: "Sign in to make an offer.",
       gateBody: "Buyers create a free account so we can route your offer to the seller and our broker.",
       gateCta: "Sign in to continue →",
@@ -1327,6 +1328,8 @@ export const dictionaries = {
       successTitle: "Request received",
       successBody: "{brokerFirstName} will contact you to coordinate. Your showing is not confirmed yet.",
       exclusiveBody: "Thanks for letting us know. Since you have an exclusive agreement with another agent, please contact them to see this home.",
+      withAgentBody: "{brokerFirstName} will coordinate the showing with your agent. All communication will go through your agent. Your showing is not confirmed yet.",
+      verifyPending: "We emailed you a copy of the notice with a link to confirm your email. Your showing is pending verification until you confirm it.",
       errors: {
         required: "Please complete the required fields.",
         email: "Please enter a valid email.",
@@ -1336,6 +1339,9 @@ export const dictionaries = {
         target: "This home is no longer available for showing requests.",
         rate_limited: "Too many requests. Please try again later.",
         failed: "We couldn't send your request. Please try again.",
+        agent: "Please enter your agent's name, brokerage, email and Florida license number.",
+        nbr: "Please read and accept the No Brokerage Relationship notice.",
+        esign: "Please accept receiving and signing the notice electronically.",
       },
     },
     property: {
@@ -1493,7 +1499,7 @@ export const dictionaries = {
       titleAfter: ".",
       intro: "{brokerName}, Broker · {brokerYears}+ years in Florida real estate · with her team of licensed agents",
       sellers: "If you're selling, Lixtara pairs simple tools to list your home with a licensed brokerage behind every step: a flat fee when you list, and a Lixtara commission at closing only if your home sells.",
-      buyers: "If you're buying, the team searches for homes with you, shows them, negotiates your offer and stays with you until closing.",
+      buyers: BUYER_SELLER_SIDE_LINE.en,
       factsTitle: "The brokerage",
       brokerageLabel: "Brokerage",
       brokerLabel: "Qualifying Broker",
@@ -1505,7 +1511,7 @@ export const dictionaries = {
       teamTitle: "Our team",
       brokerRole: "Qualifying Broker",
       ctaSell: "Start selling",
-      ctaBuy: "Tell us what you're looking for",
+      ctaBuy: "Contact us",
     },
     comingSoon: {
       titleBefore: "Coming ",
@@ -1716,7 +1722,7 @@ export const dictionaries = {
       emptyBody: "Senior real-estate concierge for Lixtara. I can walk you through listing and comps, or connect you with our broker or showing coordinator.",
       suggestions: [
         "How do I list my home on Lixtara?",
-        "How does buying a home with Lixtara work?",
+        "I'm a buyer: who does Lixtara represent?",
         "I want to talk to a broker about my pricing strategy",
       ],
       toolNotice: "Looking that up…",
@@ -1880,53 +1886,18 @@ export const dictionaries = {
     },
     buyerServices: {
       eyebrow: "For buyers",
-      title: "Find your next home with a team by your side.",
-      body: "{brokerName}, with {brokerYears}+ years of Florida real estate experience, and her team search for homes with you, show them, negotiate your offer and stay with you until closing.",
-      pillar1Title: "We search with you",
-      pillar1Body: "Tell us the area, budget and timeline you have in mind, and the team looks for homes that fit across Miami-Dade, Broward and Palm Beach.",
-      pillar2Title: "Showings and negotiation",
-      pillar2Body: "The team schedules your showings, helps you prepare your offer and supports you through the negotiation. {brokerFirstName}, our licensed broker, reviews your request personally.",
-      pillar3Title: "Until closing, with clear terms",
-      pillar3Body: "We stay with you through every step until closing. Before any showing that requires an agreement, we explain how our services and compensation work, and you decide.",
+      title: "Buying a home listed with Lixtara.",
+      // Texto fijo (decisión del 28-oct): src/config/buyer-relationship.ts.
+      body: BUYER_SELLER_SIDE_LINE.en,
+      pillar1Title: "Lixtara listings",
+      pillar1Body: "See the homes listed with Lixtara on lixtara.com, with their published price and details.",
+      pillar2Title: "Showings",
+      pillar2Body: "Request a showing from the listing. If you have your own agent, {brokerFirstName} coordinates the showing with your agent. If you don't, you receive the No Brokerage Relationship notice Florida law requires before the showing.",
+      pillar3Title: "Your offer",
+      pillar3Body: "Send your offer from the listing and we present it to the seller. We represent the seller, so we don't advise you on how to negotiate; your own agent or attorney can.",
       ctaPrimary: "Explore Homes",
-      ctaPrimaryNoListings: "Tell us what you're looking for",
-      ctaSecondary: "Talk to {brokerFirstName}",
-    },
-    investor: {
-      eyebrow: "Lixtara investor club",
-      titleBefore: "Built for serious ",
-      titleAccent: "investors",
-      titleAfter: ".",
-      body: "Three membership tiers with market alerts, acquisition support and portfolio guidance. Join the waitlist and we'll let you know when memberships open.",
-      waitlistBadge: "Joining Q3 2026 · Waitlist open",
-      ctaWaitlist: "Join the waitlist →",
-      tiers: {
-        silver: {
-          name: "Silver",
-          tagline: "Market alerts",
-          bullets: [
-            "Saved-search alerts tuned by ZIP + price band",
-            "Guidance from a licensed broker through closing",
-          ],
-        },
-        gold: {
-          name: "Gold",
-          tagline: "Active acquisitions",
-          bullets: [
-            "Everything in Silver",
-            "Dedicated acquisitions broker on calls / showings",
-            "Cash-offer + 1031 exchange coordination",
-          ],
-        },
-        platinum: {
-          name: "Platinum",
-          tagline: "Portfolio-grade",
-          bullets: [
-            "Everything in Gold",
-            "Quarterly portfolio review with the broker-of-record",
-          ],
-        },
-      },
+      ctaPrimaryNoListings: "Contact us",
+      ctaSecondary: "Questions about a listing",
     },
     faq: {
       eyebrow: "Frequently asked",
@@ -1973,7 +1944,7 @@ export const dictionaries = {
       body: "The link may be broken, or the page may have moved. Let's get you back on track.",
       homeCta: "Back to home",
       listingsCta: "Browse Florida listings",
-      listingsCtaNoListings: "Tell us what you're looking for",
+      listingsCtaNoListings: "Contact us",
     },
     crm: {
       title: "CRM",
@@ -3130,7 +3101,7 @@ export const dictionaries = {
       toolNewListing: "Empezar un nuevo listado",
       toolOffers: "Ofertas en mis listados",
       toolBrowse: "Ver propiedades en Florida",
-      toolBrowseNoListings: "Cuéntanos qué buscas",
+      toolBrowseNoListings: "Contáctanos",
       toolConsultations: "Reservar una consulta con un Realtor",
       toolForgot: "¿Olvidaste tu contraseña?",
       signOut: "Cerrar sesión",
@@ -3197,7 +3168,7 @@ export const dictionaries = {
       titleBefore: "Envía tu ",
       titleAccent: "oferta",
       titleAfter: ".",
-      body: "Dile al vendedor cuánto pagarías y cómo planeas financiarlo. Nuestro broker media desde acá hasta el cierre.",
+      body: "Dile al vendedor cuánto pagarías y cómo planeas financiarlo. Nuestra broker le presenta tu oferta al vendedor. Lixtara representa al vendedor y no te asesorará para negociar contra el vendedor.",
       gateTitle: "Inicia sesión para hacer una oferta.",
       gateBody: "Crea una cuenta gratis para que podamos enviar tu oferta al vendedor y a nuestro broker.",
       gateCta: "Inicia sesión para continuar →",
@@ -3486,6 +3457,8 @@ export const dictionaries = {
       successTitle: "Solicitud recibida",
       successBody: "{brokerFirstName} te contactará para coordinar. Tu visita aún no está confirmada.",
       exclusiveBody: "Gracias por avisarnos. Como tienes un acuerdo exclusivo con otro agente, contáctalo para ver esta vivienda.",
+      withAgentBody: "{brokerFirstName} coordinará la visita con tu agente. Toda la comunicación irá por tu agente. Tu visita todavía no está confirmada.",
+      verifyPending: "Te enviamos por correo una copia del aviso con un enlace para confirmar tu correo. Tu visita queda pendiente de verificación hasta que lo confirmes.",
       errors: {
         required: "Completa los campos obligatorios.",
         email: "Ingresa un email válido.",
@@ -3495,6 +3468,9 @@ export const dictionaries = {
         target: "Esta vivienda ya no acepta solicitudes de visita.",
         rate_limited: "Demasiadas solicitudes. Inténtalo más tarde.",
         failed: "No pudimos enviar tu solicitud. Inténtalo de nuevo.",
+        agent: "Escribe el nombre, el brokerage, el correo y el número de licencia de Florida de tu agente.",
+        nbr: "Lee y acepta el aviso de ausencia de relación de corretaje.",
+        esign: "Acepta recibir y firmar el aviso electrónicamente.",
       },
     },
     property: {
@@ -3650,7 +3626,7 @@ export const dictionaries = {
       titleAfter: ".",
       intro: "{brokerName}, broker · más de {brokerYears} años en bienes raíces en Florida · con su equipo de agentes licenciados",
       sellers: "Si vendes, Lixtara combina herramientas sencillas para publicar tu casa con una inmobiliaria licenciada detrás de cada paso: una tarifa fija al publicar, y una comisión de Lixtara al cierre solo si tu casa se vende.",
-      buyers: "Si compras, el equipo busca viviendas contigo, te las muestra, negocia tu oferta y te acompaña hasta el cierre.",
+      buyers: BUYER_SELLER_SIDE_LINE.es,
       factsTitle: "La inmobiliaria",
       brokerageLabel: "Inmobiliaria",
       brokerLabel: "Broker responsable (Qualifying Broker)",
@@ -3662,7 +3638,7 @@ export const dictionaries = {
       teamTitle: "Nuestro equipo",
       brokerRole: "Broker responsable (Qualifying Broker)",
       ctaSell: "Empieza a vender",
-      ctaBuy: "Cuéntanos qué buscas",
+      ctaBuy: "Contáctanos",
     },
     comingSoon: {
       titleBefore: "Muy ",
@@ -3873,7 +3849,7 @@ export const dictionaries = {
       emptyBody: "Asistente inmobiliario sénior de Lixtara. Te guío en la publicación de tu propiedad y los comparables, o te conecto con nuestro broker o coordinador de visitas.",
       suggestions: [
         "¿Cómo publico mi casa en Lixtara?",
-        "¿Cómo funciona comprar una vivienda con Lixtara?",
+        "Soy comprador: ¿a quién representa Lixtara?",
         "Quiero hablar con un broker sobre mi estrategia de precio",
       ],
       toolNotice: "Buscando esa información…",
@@ -4037,53 +4013,17 @@ export const dictionaries = {
     },
     buyerServices: {
       eyebrow: "Para compradores",
-      title: "Encuentra tu próximo hogar con un equipo a tu lado.",
-      body: "{brokerName}, con más de {brokerYears} años de experiencia en bienes raíces en Florida, y su equipo buscan viviendas contigo, te las muestran, negocian tu oferta y te acompañan hasta el cierre.",
-      pillar1Title: "Buscamos contigo",
-      pillar1Body: "Cuéntanos la zona, el presupuesto y los plazos que tienes en mente, y el equipo busca viviendas que encajen en Miami-Dade, Broward y Palm Beach.",
-      pillar2Title: "Visitas y negociación",
-      pillar2Body: "El equipo agenda tus visitas, te ayuda a preparar la oferta y te acompaña en la negociación. {brokerFirstName}, nuestra broker licenciada, revisa tu solicitud personalmente.",
-      pillar3Title: "Hasta el cierre, con condiciones claras",
-      pillar3Body: "Te acompañamos en cada paso hasta el cierre. Antes de cualquier visita que requiera un acuerdo, te explicamos cómo funcionan nuestros servicios y la compensación, y tú decides.",
+      title: "Comprar una casa listada con Lixtara.",
+      body: BUYER_SELLER_SIDE_LINE.es,
+      pillar1Title: "Propiedades de Lixtara",
+      pillar1Body: "Mira las viviendas listadas con Lixtara en lixtara.com, con su precio y sus datos publicados.",
+      pillar2Title: "Visitas",
+      pillar2Body: "Pide la visita desde la propiedad. Si tienes tu propio agente, {brokerFirstName} coordina la visita con tu agente. Si no, antes de la visita recibes el aviso de ausencia de relación de corretaje que exige la ley de Florida.",
+      pillar3Title: "Tu oferta",
+      pillar3Body: "Envía tu oferta desde la propiedad y se la presentamos al vendedor. Representamos al vendedor, así que no te asesoramos sobre cómo negociar; tu propio agente o abogado sí puede.",
       ctaPrimary: "Explorar viviendas",
-      ctaPrimaryNoListings: "Cuéntanos qué buscas",
-      ctaSecondary: "Hablar con {brokerFirstName}",
-    },
-    investor: {
-      eyebrow: "Club de Inversionistas Lixtara",
-      titleBefore: "Hecho para inversionistas ",
-      titleAccent: "serios",
-      titleAfter: ".",
-      body: "Tres niveles de membresía con alertas del mercado, apoyo en adquisiciones y acompañamiento para tu portafolio. Únete a la lista de espera y te avisamos cuando abramos las membresías.",
-      waitlistBadge: "Disponible en el 3.er trimestre de 2026 · Lista de espera abierta",
-      ctaWaitlist: "Unirme a la lista de espera →",
-      tiers: {
-        silver: {
-          name: "Silver",
-          tagline: "Alertas del mercado",
-          bullets: [
-            "Alertas de búsqueda ajustadas por código postal + rango de precio",
-            "Acompañamiento de una broker licenciada hasta el cierre",
-          ],
-        },
-        gold: {
-          name: "Gold",
-          tagline: "Adquisiciones activas",
-          bullets: [
-            "Todo lo de Silver",
-            "Broker de adquisiciones dedicado en llamadas y visitas",
-            "Coordinación de ofertas en efectivo e intercambios 1031",
-          ],
-        },
-        platinum: {
-          name: "Platinum",
-          tagline: "Nivel portafolio",
-          bullets: [
-            "Todo lo de Gold",
-            "Revisión trimestral de portafolio con la broker principal",
-          ],
-        },
-      },
+      ctaPrimaryNoListings: "Contáctanos",
+      ctaSecondary: "Preguntas sobre una propiedad",
     },
     faq: {
       eyebrow: "Preguntas frecuentes",
@@ -4130,7 +4070,7 @@ export const dictionaries = {
       body: "Puede que el enlace esté roto o que la página se haya movido. Te ayudamos a volver.",
       homeCta: "Volver al inicio",
       listingsCta: "Ver propiedades en Florida",
-      listingsCtaNoListings: "Cuéntanos qué buscas",
+      listingsCtaNoListings: "Contáctanos",
     },
     crm: {
       title: "CRM",

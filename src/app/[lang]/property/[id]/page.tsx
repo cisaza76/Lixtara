@@ -80,6 +80,7 @@ export default async function PropertyDetailPage({
     ...showingCopy,
     intro: fillBrokerageCopy(showingCopy.intro),
     successBody: fillBrokerageCopy(showingCopy.successBody),
+    withAgentBody: fillBrokerageCopy(showingCopy.withAgentBody),
   };
   const saveCopy = t(lang).save;
   // Map coords: prefer the stored lat/lng; if missing (geocode never ran when

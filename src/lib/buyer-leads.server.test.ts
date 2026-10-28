@@ -65,6 +65,23 @@ describe("resolveTarget", () => {
       ["properties", "eq", ["is_test", false]],
     ]));
   });
+
+  it("listado de prueba (is_test, cualquier estado): solo el staff, con la marca [TEST]", async () => {
+    let n = 0;
+    const svc = {
+      from: () => {
+        const q: Record<string, unknown> = {};
+        for (const m of ["select", "eq", "is", "in"]) q[m] = () => q;
+        // Primera lectura (activo, no de prueba): nada. Segunda (is_test): el listado.
+        q.maybeSingle = async () => ({ data: n++ === 0 ? null : { address_street: "1 TEST St", address_city: "Miami", address_zip: "33130" } });
+        return q;
+      },
+    } as never;
+    expect(await resolveTarget(svc, { kind: "own", propertyId: "p1" }, { host: null, staff: false })).toBeNull();
+    n = 0;
+    expect(await resolveTarget(svc, { kind: "own", propertyId: "p1" }, { host: null, staff: true }))
+      .toEqual({ label: "[TEST] 1 TEST St, Miami 33130", ownAddress: "[TEST] 1 TEST St, Miami 33130" });
+  });
 });
 
 describe("ensureBrokerOfRecord", () => {
@@ -93,7 +110,7 @@ describe("insertShowingLead", () => {
     await insertShowingLead(svc, {
       target: { kind: "mls", listingKey: "K1" }, fullName: "A", email: "a@b.co", phone: null,
       preferredTimes: null, message: null, otherAgentStatus: "none", needsToSell: null,
-      consentMarketing: false, lang: "en",
+      consentMarketing: false, lang: "en", buyerAgent: null, nbrAccepted: true,
     }, "broker-1");
     expect(inserts[0]).toMatchObject({
       assigned_agent_id: "broker-1",

@@ -104,7 +104,9 @@ export function sanitizeUrl(url: string): string {
  * de propiedades, y no es audiencia de marketing ni de producto).
  */
 export function isAnalyticsExcludedPath(pathname: string): boolean {
-  return /^\/(en|es)\/admin(\/|$)/.test(pathname);
+  // /showing-notice/<token>: el aviso NBR por enlace. El token va en la ruta; ninguna
+  // herramienta de terceros lo recibe.
+  return /^\/(en|es)\/(admin|showing-notice)(\/|$)/.test(pathname);
 }
 
 /**

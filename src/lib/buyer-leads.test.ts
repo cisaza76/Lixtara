@@ -26,6 +26,11 @@ const MIGRATION = readFileSync(
   "utf8",
 );
 const sql = MIGRATION.replace(/--.*$/gm, "");
+// El motivo `represented_buyer_own_listing` llega en la migración del aviso NBR (28-oct).
+const NBR_SQL = readFileSync(
+  resolve(__dirname, "../../supabase/migrations/20261029120000_buyer_nbr_notice.sql"),
+  "utf8",
+).replace(/--.*$/gm, "");
 
 const form = (over: Record<string, string> = {}) => {
   const base: Record<string, string> = {
@@ -34,6 +39,8 @@ const form = (over: Record<string, string> = {}) => {
     email: "Jane@Example.com",
     other_agent_status: "none",
     consent_contact: "true",
+    esign_consent: "true",
+    nbr_accept: "true",
     lang: "es",
   };
   const all = { ...base, ...over };
@@ -62,8 +69,11 @@ describe("estados: código y base coinciden", () => {
       ...LEAD_STATUSES, ...LEGACY_ONLY_STATUSES, ...AGREEMENT_TYPES, ...AGREEMENT_EXCEPTION_CODES,
       ...OTHER_AGENT_OPTIONS, ...NEEDS_TO_SELL_OPTIONS,
     ]) {
-      expect(sql, v).toContain(`'${v}'`);
+      expect(sql + NBR_SQL, v).toContain(`'${v}'`);
     }
+    // La restricción vigente del catálogo de motivos está en la migración del aviso NBR.
+    const rule = NBR_SQL.slice(NBR_SQL.indexOf("add constraint buyer_leads_exception_code_check"));
+    for (const c of AGREEMENT_EXCEPTION_CODES) expect(rule.slice(0, 400), c).toContain(`'${c}'`);
   });
 
   it("la regla de acuerdo de la base cubre exactamente los mismos estados", () => {
@@ -184,11 +194,37 @@ describe("formulario de solicitud de visita", () => {
     expect(parseShowingRequest(form({ website: "http://spam" }))).toEqual({ ok: false, error: "spam" });
   });
 
-  it("acuerdo exclusivo con otro broker: se registra cancelado con motivo", () => {
-    const r = parseShowingRequest(form({ other_agent_status: "exclusive" }));
-    expect(r.ok && initialStatusFor(r.data)).toMatchObject({ status: "cancelled" });
+  it("acuerdo exclusivo: en un listado de Lixtara NO se cancela; en una ficha de otro broker (fase 2) sí", () => {
+    const own = parseShowingRequest(form({ listing_key: "", property_id: "8a4f6d2e-1b3c-4d5e-8f90-112233445566", other_agent_status: "exclusive", buyer_agent_name: "Ana Agente", buyer_agent_brokerage: "Acme Realty", buyer_agent_email: "ana@example.com", buyer_agent_license: "SL123456" }));
+    expect(own.ok && initialStatusFor(own.data)).toEqual({ status: "received", cancelReason: null });
+    const mls = parseShowingRequest(form({ other_agent_status: "exclusive", buyer_agent_name: "Ana Agente", buyer_agent_brokerage: "Acme Realty", buyer_agent_email: "ana@example.com", buyer_agent_license: "SL123456" }));
+    expect(mls.ok && initialStatusFor(mls.data)).toMatchObject({ status: "cancelled" });
     const ok = parseShowingRequest(form());
     expect(ok.ok && initialStatusFor(ok.data)).toEqual({ status: "received", cancelReason: null });
+  });
+});
+
+describe("aviso NBR y agente del comprador (F.S. 475.278(4))", () => {
+  it("sin agente o sin saberlo: consentimiento E-SIGN y aviso NBR obligatorios", () => {
+    expect(parseShowingRequest(form({ esign_consent: "" }))).toEqual({ ok: false, error: "esign" });
+    expect(parseShowingRequest(form({ nbr_accept: "" }))).toEqual({ ok: false, error: "nbr" });
+    expect(parseShowingRequest(form({ other_agent_status: "unsure", nbr_accept: "" }))).toEqual({ ok: false, error: "nbr" });
+    const ok = parseShowingRequest(form());
+    expect(ok.ok && ok.data).toMatchObject({ nbrAccepted: true, buyerAgent: null });
+  });
+
+  it("con agente: nombre, brokerage, correo y licencia; sin aviso NBR (aunque llegue marcado)", () => {
+    expect(parseShowingRequest(form({ other_agent_status: "non_exclusive" }))).toEqual({ ok: false, error: "agent" });
+    expect(parseShowingRequest(form({ other_agent_status: "non_exclusive", buyer_agent_name: "Ana Agente", buyer_agent_brokerage: "Acme Realty", buyer_agent_email: "nope", buyer_agent_license: "SL123456" })))
+      .toEqual({ ok: false, error: "agent" });
+    const ok = parseShowingRequest(form({
+      other_agent_status: "non_exclusive", esign_consent: "", nbr_accept: "",
+      buyer_agent_name: " Ana Agente ", buyer_agent_brokerage: "Acme Realty", buyer_agent_email: "Ana@Example.com", buyer_agent_license: "sl 123456",
+    }));
+    expect(ok.ok && ok.data).toMatchObject({
+      buyerAgent: { name: "Ana Agente", brokerage: "Acme Realty", email: "ana@example.com", license: "SL123456" },
+      nbrAccepted: false,
+    });
   });
 });
 

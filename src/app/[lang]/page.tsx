@@ -48,7 +48,6 @@ export default async function Home({
   const investorClubCopy = t(lang).investorClub;
   const toursCopy = t(lang).tours;
   const buyerCopy = t(lang).buyerServices;
-  const investorCopy = t(lang).investor;
   const faqCopy = t(lang).faq;
 
   // Investor Club is on hold — hidden from the landing for now while we decide
@@ -357,9 +356,8 @@ export default async function Home({
         </div>
       </section>
 
-      {/* Compradores: búsqueda con acompañamiento humano. Sin porcentajes, rebate ni
-          ahorros: los términos económicos se explican en el flujo correspondiente, antes de
-          cualquier acuerdo (docs/planning/2026-10-compradores, anexo C.1). */}
+      {/* Compradores (decisión del 28-oct): Lixtara representa al vendedor. Sin promesas de
+          acompañamiento ni representación al comprador (src/config/buyer-relationship.ts). */}
       <section
         id="buyers"
         className="border-t border-gold-soft scroll-mt-20"
@@ -373,7 +371,7 @@ export default async function Home({
               {buyerCopy.title}
             </h2>
             <p className="max-w-xl text-base leading-relaxed text-ink/70">
-              {fillBrokerageCopy(buyerCopy.body)}
+              {buyerCopy.body}
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12 mb-12">

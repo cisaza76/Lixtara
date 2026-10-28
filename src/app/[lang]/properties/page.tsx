@@ -128,7 +128,7 @@ export default async function PropertiesPage({
             {/* Inventario de terceros. Cada tarjeta lleva su atribución obligatoria; no
                 es una prop opcional, va dentro del componente. */}
             {mls.listings.map((l) => (
-              <MlsListingCard key={l.listingKey} listing={l} />
+              <MlsListingCard key={l.listingKey} listing={l} lang={lang} />
             ))}
           </div>
         )}

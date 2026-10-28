@@ -915,7 +915,10 @@ export default async function ListingReviewPage({
           </button>
           {prop.is_test && (
             <span data-test-listing className="text-[11px] text-red-700">
-              {testListingMessage(lang)}
+              {testListingMessage(lang)}{" "}
+              <Link href={`/${lang}/admin/listings/${prop.id}/showing-test`} className="underline">
+                {lang === "es" ? "Probar la solicitud de visita →" : "Test the showing request →"}
+              </Link>
             </span>
           )}
         </form>

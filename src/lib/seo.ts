@@ -5,7 +5,7 @@ import { locales } from "@/lib/i18n";
 export const PATHNAME_HEADER = "x-lixtara-pathname";
 
 // Logged-in / transactional areas: kept out of search (robots.txt) and the sitemap.
-export const PRIVATE_SECTIONS = ["admin", "dashboard", "account", "listing", "auth", "sign-in", "sign-up"];
+export const PRIVATE_SECTIONS = ["admin", "dashboard", "account", "listing", "auth", "sign-in", "sign-up", "showing-notice"];
 
 /**
  * Canonical + hreflang for a localized path. `/es/services?x=1` →

@@ -24,6 +24,14 @@ import {
   type ShowingTarget,
 } from "@/lib/buyer-leads";
 
+/**
+ * Visitas a fichas de OTROS brokers (feed IDX): apagadas para el lanzamiento (decisión del
+ * 28-oct), se retoman en la fase 2. Solo el literal "true" las abre, también para el staff.
+ */
+export function mlsShowingRequestsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.BUYER_SHOWING_REQUESTS_MLS_ENABLED === "true";
+}
+
 /** Solo el literal "true" abre la solicitud al público. */
 export function showingRequestsPublic(env: Record<string, string | undefined> = process.env): boolean {
   return env.BUYER_SHOWING_REQUESTS_ENABLED === "true";
@@ -98,8 +106,21 @@ export async function resolveTarget(
       .eq("mls_status", "active")
       .eq("is_test", false)
       .maybeSingle();
-    if (!data) return null;
-    const address = `${data.address_street}, ${data.address_city} ${data.address_zip}`;
+    if (data) {
+      const address = `${data.address_street}, ${data.address_city} ${data.address_zip}`;
+      return { label: address, ownAddress: address };
+    }
+    // Prueba en producción (CLAUDE.md "Test data"): el staff puede pedir una visita a un listado
+    // `is_test` en cualquier estado (nunca llega a activo: la aprobación lo bloquea). Nadie más.
+    if (!opts.staff) return null;
+    const { data: test } = await svc
+      .from("properties")
+      .select("id,address_street,address_city,address_zip")
+      .eq("id", target.propertyId)
+      .eq("is_test", true)
+      .maybeSingle();
+    if (!test) return null;
+    const address = `[TEST] ${test.address_street}, ${test.address_city} ${test.address_zip}`;
     return { label: address, ownAddress: address };
   }
 
@@ -140,6 +161,10 @@ export async function insertShowingLead(
       preferred_times: req.preferredTimes,
       message: req.message,
       other_agent_status: req.otherAgentStatus,
+      buyer_agent_name: req.buyerAgent?.name ?? null,
+      buyer_agent_brokerage: req.buyerAgent?.brokerage ?? null,
+      buyer_agent_email: req.buyerAgent?.email ?? null,
+      buyer_agent_license: req.buyerAgent?.license ?? null,
       needs_to_sell: req.needsToSell,
       lang: req.lang,
       listing_key: req.target.kind === "mls" ? req.target.listingKey : null,
