@@ -266,16 +266,16 @@ export default async function AdminBuyerLeadsPage({
   const mlsKeys = [...new Set(leads.map((l) => l.listing_key).filter((v): v is string => !!v))];
   const [{ data: ownRows }, { data: mlsRows }] = await Promise.all([
     ownIds.length
-      ? svc.from("properties").select("id,address_street,address_city").in("id", ownIds)
+      ? svc.from("properties").select("id,address_street,address_city,is_test").in("id", ownIds)
       : Promise.resolve({ data: [] }),
     mlsKeys.length
       ? svc.from("mls_listings").select("listing_key,listing_id,city").in("listing_key", mlsKeys)
       : Promise.resolve({ data: [] }),
   ]);
   const ownLabel = new Map(
-    ((ownRows ?? []) as Array<{ id: string; address_street: string; address_city: string }>).map((r) => [
+    ((ownRows ?? []) as Array<{ id: string; address_street: string; address_city: string; is_test: boolean }>).map((r) => [
       r.id,
-      `${r.address_street}, ${r.address_city}`,
+      `${r.is_test ? "[TEST] " : ""}${r.address_street}, ${r.address_city}`,
     ]),
   );
   const mlsLabel = new Map(

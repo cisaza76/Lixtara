@@ -106,8 +106,21 @@ export async function resolveTarget(
       .eq("mls_status", "active")
       .eq("is_test", false)
       .maybeSingle();
-    if (!data) return null;
-    const address = `${data.address_street}, ${data.address_city} ${data.address_zip}`;
+    if (data) {
+      const address = `${data.address_street}, ${data.address_city} ${data.address_zip}`;
+      return { label: address, ownAddress: address };
+    }
+    // Prueba en producción (CLAUDE.md "Test data"): el staff puede pedir una visita a un listado
+    // `is_test` en cualquier estado (nunca llega a activo: la aprobación lo bloquea). Nadie más.
+    if (!opts.staff) return null;
+    const { data: test } = await svc
+      .from("properties")
+      .select("id,address_street,address_city,address_zip")
+      .eq("id", target.propertyId)
+      .eq("is_test", true)
+      .maybeSingle();
+    if (!test) return null;
+    const address = `[TEST] ${test.address_street}, ${test.address_city} ${test.address_zip}`;
     return { label: address, ownAddress: address };
   }
 

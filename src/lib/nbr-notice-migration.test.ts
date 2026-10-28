@@ -86,3 +86,15 @@ describe("pantallas y Loui", () => {
     expect(route).not.toContain("scheduled: true");
   });
 });
+
+describe("prueba en producción con un listado is_test", () => {
+  it("la página de prueba exige staff y solo carga listados is_test; la ficha pública no cambia", () => {
+    const page = readFileSync("src/app/[lang]/admin/listings/[id]/showing-test/page.tsx", "utf8");
+    expect(page).toContain("await assertStaff(lang);");
+    expect(page).toContain("getStaffTestProperty(id)");
+    const loader = readFileSync("src/lib/staff-test-listing.server.ts", "utf8");
+    expect(loader).toContain('.eq("is_test", true)');
+    const publicQuery = readFileSync("src/lib/properties.ts", "utf8");
+    expect(publicQuery).toContain('.eq("is_test", false)');
+  });
+});
