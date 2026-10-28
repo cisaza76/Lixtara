@@ -140,7 +140,7 @@ export function needsNbrNotice(status: string | null | undefined): boolean {
   return !hasOwnAgent(status);
 }
 
-/** Licencia de Florida del agente: letras y números (SL/BK + dígitos, p. ej. SL3456789). */
+/** Licencia de Florida del agente: letras y números (SL o BK seguido de dígitos). */
 export function normalizeAgentLicense(raw: string): string | null {
   const v = raw.trim().toUpperCase().replace(/\s+/g, "");
   return /^[A-Z]{0,3}\d{4,10}$/.test(v) ? v : null;
