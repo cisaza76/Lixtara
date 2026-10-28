@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { countyYearBuilt, mapDorToType, pickCountyCandidate, propertyTypeFromCounty, unitFromStoredStreet } from "@/lib/miami-dade";
+import { countyYearBuilt, mapDorToType, pickCountyCandidate, unitFromStoredStreet } from "@/lib/miami-dade";
 
 describe("mapDorToType: código de uso del condado (4 dígitos: clase DOR + subcódigo)", () => {
   // Pares REALES de GetPropertySearchByFolio (2026-10-17): DORCode | DORDescription.
@@ -14,8 +14,10 @@ describe("mapDorToType: código de uso del condado (4 dígitos: clase DOR + subc
     ["0410", "RESIDENTIAL - TOTAL VALUE : TOWNHOUSE", "townhouse"],
     ["0508", "COOPERATIVE - RESIDENTIAL : COOPERATIVE - RESIDENTIAL", "condo"],
     ["0802", "MULTIFAMILY 2-9 UNITS : 2 LIVING UNITS", "multi_family"],
-    ["0803", "MULTIFAMILY 2-9 UNITS : MULTIFAMILY 3 OR MORE UNITS", "multi_family"],
-    ["0303", "MULTIFAMILY 10 UNITS PLUS : MULTIFAMILY 3 OR MORE UNITS", "multi_family"],
+    // 3 o más sin UnitCount: puede pasar de 4 → no se autollena. 10+ nunca.
+    ["0803", "MULTIFAMILY 2-9 UNITS : MULTIFAMILY 3 OR MORE UNITS", null],
+    ["0303", "MULTIFAMILY 10 UNITS PLUS : MULTIFAMILY 3 OR MORE UNITS", null],
+    ["1813", "OFFICE BUILDING - MULTISTORY : OFFICE BUILDING", null],
     ["0081", "VACANT RESIDENTIAL : VACANT LAND", null],
     ["0420", "RESIDENTIAL - TOTAL VALUE : DOCK - TOTAL VALUE", null],
   ];
@@ -28,7 +30,15 @@ describe("mapDorToType: código de uso del condado (4 dígitos: clase DOR + subc
     expect(mapDorToType("0407")).toBe("condo");
     expect(mapDorToType("0508")).toBe("condo");
     expect(mapDorToType("0802")).toBe("multi_family");
-    expect(mapDorToType("0303")).toBe("multi_family");
+    expect(mapDorToType("0303")).toBeNull();
+  });
+
+  it("multifamiliar: solo de 2 a 4 unidades (UnitCount del condado)", () => {
+    const desc = "MULTIFAMILY 2-9 UNITS : MULTIFAMILY 3 OR MORE UNITS";
+    expect(mapDorToType("0803", desc, 3)).toBe("multi_family");
+    expect(mapDorToType("0803", desc, 4)).toBe("multi_family");
+    expect(mapDorToType("0803", desc, 5)).toBeNull();
+    expect(mapDorToType("0802", "MULTIFAMILY 2-9 UNITS : 2 LIVING UNITS", 2)).toBe("multi_family");
   });
 
   it("los códigos viejos mal leídos ya no se aceptan (0081 es terreno, no townhouse)", () => {
@@ -45,22 +55,8 @@ describe("mapDorToType: código de uso del condado (4 dígitos: clase DOR + subc
   });
 });
 
-describe("propertyTypeFromCounty: unidad sin código claro → Condo", () => {
-  it("500 Brickell Ave #3001 (0407) es Condo, no casa unifamiliar", () => {
-    expect(propertyTypeFromCounty("0407", "RESIDENTIAL - TOTAL VALUE : CONDOMINIUM - RESIDENTIAL", true)).toBe("condo");
-  });
-  it("con unidad y código no claro o ausente → condo", () => {
-    expect(propertyTypeFromCounty("0420", "RESIDENTIAL - TOTAL VALUE : DOCK - TOTAL VALUE", true)).toBe("condo");
-    expect(propertyTypeFromCounty(undefined, undefined, true)).toBe("condo");
-  });
-  it("sin unidad y código no claro → null (el vendedor elige)", () => {
-    expect(propertyTypeFromCounty("9999", "", false)).toBeNull();
-  });
-  it("un código claro manda aunque haya unidad", () => {
-    expect(propertyTypeFromCounty("0410", "RESIDENTIAL - TOTAL VALUE : TOWNHOUSE", true)).toBe("townhouse");
-    expect(propertyTypeFromCounty("0802", "MULTIFAMILY 2-9 UNITS : 2 LIVING UNITS", true)).toBe("multi_family");
-  });
-  it("el borrador nuevo con unidad nace como Condo", () => {
+describe("el borrador nuevo", () => {
+  it("con unidad nace como Condo (la columna es NOT NULL; el paso 3 no lo muestra hasta confirmarlo)", () => {
     const wizard = readFileSync(join(resolve(__dirname, "../.."), "src/app/[lang]/listing/new/page.tsx"), "utf8");
     expect(wizard).toContain('property_type: unitFromStoredStreet(street) ? "condo" : "single_family"');
   });

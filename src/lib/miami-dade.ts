@@ -64,6 +64,8 @@ function latestTaxableValue(json: Record<string, unknown>): number | null {
 
 export interface MiamiDadeLookupResult {
   found: boolean;
+  /** El condado clasifica la parcela como no residencial: no se autollena nada. */
+  nonResidential?: boolean;
   folio?: string | null;
   details?: MiamiDadeDetails;
   filledFields?: Array<keyof MiamiDadeDetails>;
@@ -72,50 +74,62 @@ export interface MiamiDadeLookupResult {
 
 // Código de uso del condado → property_type. El DORCode de Miami-Dade tiene 4 dígitos: los dos
 // primeros son la clase estatal del DOR y los dos últimos el subcódigo del condado
-// (verificado contra GetPropertySearchByFolio, 2026-10-17):
+// (verificado contra GetPropertySearchByFolio, 2026-10-17 y 2026-10-27):
 //   0101 SINGLE FAMILY : 1 UNIT · 0105 CLUSTER HOME · 0407 CONDOMINIUM - RESIDENTIAL ·
-//   0410 TOWNHOUSE · 0508 COOPERATIVE · 0802 MULTIFAMILY 2-9 UNITS · 0303 MULTIFAMILY 10+ ·
-//   0081 VACANT LAND · 0420 DOCK.
-// La descripción manda cuando nombra el tipo (0410 es clase 04 pero es TOWNHOUSE).
+//   0410 TOWNHOUSE · 0508 COOPERATIVE · 0802 MULTIFAMILY 2-9 UNITS : 2 LIVING UNITS ·
+//   0803 MULTIFAMILY 2-9 UNITS : 3 OR MORE · 0303 MULTIFAMILY 10+ · 0081 VACANT LAND ·
+//   0420 DOCK · 1813 OFFICE BUILDING - MULTISTORY (200 S Biscayne Blvd).
+// Regla (2026-10-27): solo se autollena una vivienda — unifamiliar, condominio (y cooperativa),
+// townhouse o multifamiliar de 2 a 4 unidades. Cualquier otro código → null = no residencial:
+// no se autollena nada (200 S Biscayne, un edificio de oficinas, salía "Single family" con un
+// impuesto de $8,100,000).
 export type CountyPropertyType = "single_family" | "condo" | "townhouse" | "multi_family";
+
+/** Multifamiliar de 2 a 4 unidades: UnitCount del condado o, si no llegó, el subcódigo 0802. */
+function multifamilyUpToFour(code: string, desc: string, unitCount: unknown): boolean {
+  const n = Number(unitCount);
+  if (Number.isInteger(n) && n > 0) return n >= 2 && n <= 4;
+  return code === "0802" || /\b2 LIVING UNITS\b/.test(desc);
+}
 
 export function mapDorToType(
   dor: string | null | undefined,
   description?: string | null,
+  unitCount?: unknown,
 ): CountyPropertyType | null {
+  const code = String(dor ?? "").trim();
+  if (!/^\d{4}$/.test(code)) return null;
   const desc = String(description ?? "").toUpperCase();
-  if (/\bTOWNHOUSE\b/.test(desc)) return "townhouse";
-  if (/\bDOCK\b|\bVACANT\b/.test(desc)) return null;
-  if (/\bCONDOMINIUM\b|\bCOOPERATIVE\b/.test(desc)) return "condo";
-  if (/\bMULTIFAMILY\b|\bMULTI-FAMILY\b|\bDUPLEX\b/.test(desc)) return "multi_family";
-  if (/\bSINGLE FAMILY\b/.test(desc)) return "single_family";
-
-  const code = String(dor ?? "").trim().match(/^(\d{2})\d{2}\b/)?.[1];
-  switch (code) {
+  if (/\b(?:DOCK|VACANT|COMMERCIAL|OFFICE)\b/.test(desc)) return null;
+  switch (code.slice(0, 2)) {
     case "01":
-      return "single_family";
+      return /\bTOWNHOUSE\b/.test(desc) ? "townhouse" : "single_family";
     case "04":
+      // Clase 04 = condominios; 0410 es TOWNHOUSE y 0420 un muelle (DOCK).
+      if (code === "0410" || /\bTOWNHOUSE\b/.test(desc)) return "townhouse";
+      if (code === "0407" || /\bCONDOMINIUM - RESIDENTIAL\b/.test(desc)) return "condo";
+      return null;
     case "05":
       return "condo";
-    case "03":
     case "08":
-      return "multi_family";
+      return multifamilyUpToFour(code, desc, unitCount) ? "multi_family" : null;
     default:
       return null;
   }
 }
 
-/**
- * Tipo de propiedad para el autollenado: el código de uso del condado y, si no es claro
- * (o no llegó), Condo cuando la dirección tiene unidad (decisión del owner 2026-10-17:
- * 500 Brickell Ave #3001 salía "Casa unifamiliar").
- */
-export function propertyTypeFromCounty(
-  dor: string | null | undefined,
-  description: string | null | undefined,
-  hasUnit: boolean,
-): CountyPropertyType | null {
-  return mapDorToType(dor, description) ?? (hasUnit ? "condo" : null);
+// Controles del impuesto estimado (regla 2026-10-27): no se autollena si supera cualquiera
+// de los dos topes; el vendedor lo escribe y la broker lo verifica.
+export const COUNTY_TAX_AUTOFILL_MAX_USD = 200_000;
+export const COUNTY_TAX_AUTOFILL_MAX_SHARE_OF_PRICE = 0.05;
+
+/** El impuesto estimado del condado, o null si no pasa los topes. Sin precio de lista (0), solo el tope fijo. */
+export function acceptCountyTax(tax: number | null | undefined, listPrice: number | null | undefined): number | null {
+  if (tax == null || !Number.isFinite(tax) || tax <= 0) return null;
+  if (tax > COUNTY_TAX_AUTOFILL_MAX_USD) return null;
+  const price = Number(listPrice ?? 0);
+  if (price > 0 && tax > price * COUNTY_TAX_AUTOFILL_MAX_SHARE_OF_PRICE) return null;
+  return tax;
 }
 
 /**
@@ -239,7 +253,7 @@ async function searchByAddress(
   return pickCountyCandidate(infos, street, unit);
 }
 
-async function fetchByFolio(folio: string, unit?: string | null): Promise<MiamiDadeDetails | null> {
+async function fetchByFolio(folio: string): Promise<{ details: MiamiDadeDetails; dorCode: string } | null> {
   const url =
     `${MD_PA_BASE}?Operation=GetPropertySearchByFolio&clientAppName=PropertySearch` +
     `&folioNumber=${encodeURIComponent(folio)}`;
@@ -309,20 +323,21 @@ async function fetchByFolio(folio: string, unit?: string | null): Promise<MiamiD
       ? Math.round((taxableValue * MIAMI_DADE_EST_MILLAGE_RATE) / 10) * 10
       : null;
 
-  return {
+  const details: MiamiDadeDetails = {
     bedrooms: beds > 0 && beds < 30 ? beds : null,
     bathrooms: totalBaths > 0 && totalBaths < 30 ? totalBaths : null,
     sqft: sqft > 100 && sqft < 50000 ? Math.round(sqft) : null,
     lot_size: lot > 0 ? lot : null,
     year_built: year,
-    property_type: propertyTypeFromCounty(
+    property_type: mapDorToType(
       info.DORCode as string | undefined,
       info.DORDescription as string | undefined,
-      Boolean(unit?.trim()),
+      info.UnitCount,
     ),
     legal_description: legalDescription,
     tax_annual_amount: taxAnnualEstimate,
   };
+  return { details, dorCode: String(info.DORCode ?? "").trim() };
 }
 
 // Strip a trailing unit/apt token so county + comps lookups match the building
@@ -362,8 +377,13 @@ export async function lookupMiamiDadeProperty(
     }
     const folio = await searchByAddress(street.trim(), zip, unit);
     if (!folio) return { found: false };
-    const details = await fetchByFolio(folio, unit);
-    if (!details) return { found: false, folio };
+    const parcel = await fetchByFolio(folio);
+    if (!parcel) return { found: false, folio };
+    // Sin código de uso no se sabe qué es: como no encontrada. Con un código que no es
+    // vivienda, nada (ni el folio: la descripción legal del contrato sale de ese folio).
+    if (!parcel.dorCode) return { found: false };
+    if (parcel.details.property_type === null) return { found: false, nonResidential: true };
+    const details = parcel.details;
     const filled = (Object.keys(details) as Array<keyof MiamiDadeDetails>).filter(
       (k) => details[k] !== null,
     );
@@ -374,4 +394,28 @@ export async function lookupMiamiDadeProperty(
       error: e instanceof Error ? e.message : "Unknown error",
     };
   }
+}
+
+/**
+ * Tipo de propiedad que muestra el paso 3. El borrador nace con "single_family" (la columna es
+ * NOT NULL), pero ese valor no es un dato: solo se muestra cuando el condado lo confirmó o el
+ * vendedor ya guardó el paso 3 (hay pies², habitaciones o año; el condado solo los llena en una
+ * vivienda). Si no: con unidad, Condo (decisión del owner 2026-10-17), salvo que el condado diga
+ * que la parcela no es residencial; sin unidad, nada — el vendedor elige.
+ */
+export function step3PropertyTypeDefault(
+  draft: {
+    property_type: string;
+    sqft: number;
+    bedrooms: number;
+    year_built: number | null;
+    address_street: string;
+  } | null,
+  nonResidential: boolean,
+): string {
+  if (!draft) return "";
+  const confirmed = draft.sqft > 0 || draft.bedrooms > 0 || draft.year_built != null;
+  if (confirmed) return draft.property_type;
+  if (nonResidential) return "";
+  return unitFromStoredStreet(draft.address_street) ? "condo" : "";
 }

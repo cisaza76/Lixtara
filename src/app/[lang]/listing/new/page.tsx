@@ -49,7 +49,7 @@ import {
   improveListingDescription,
   improveShowingInstructions,
 } from "@/lib/ai";
-import { baseStreetForLookup, lookupMiamiDadeProperty, unitFromStoredStreet } from "@/lib/miami-dade";
+import { acceptCountyTax, baseStreetForLookup, lookupMiamiDadeProperty, step3PropertyTypeDefault, unitFromStoredStreet } from "@/lib/miami-dade";
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
@@ -297,6 +297,8 @@ export default async function ListingNewPage({
   let draft: Draft | null = null;
   let step3County: string | null = null;
   let step3MiamiDade: boolean | null = null;
+  // El condado clasificó la parcela como no residencial (no se autollenó nada).
+  let step3NonResidential = false;
   let photos: Array<{
     id: string;
     url: string;
@@ -457,6 +459,10 @@ export default async function ListingNewPage({
         tasks.push(
           lookupMiamiDadeProperty(baseStreetForLookup(draft.address_street), draft.address_zip, unitFromStoredStreet(draft.address_street)).then(
             (result) => {
+              if (result.nonResidential) {
+                step3NonResidential = true;
+                return;
+              }
               if (result.folio) updates.folio = result.folio;
               if (result.found && result.details) {
                 const d = result.details;
@@ -469,12 +475,11 @@ export default async function ListingNewPage({
                   updates.property_type = d.property_type;
                 if (d.legal_description != null)
                   updates.legal_description = d.legal_description;
-                // Estimated annual tax — only when the seller hasn't entered one.
-                if (
-                  d.tax_annual_amount != null &&
-                  draft?.tax_annual_amount == null
-                )
-                  updates.tax_annual_amount = d.tax_annual_amount;
+                // Estimated annual tax — only when the seller hasn't entered one and it
+                // passes the caps (5 % of the list price, $200,000).
+                const tax = acceptCountyTax(d.tax_annual_amount, draft?.list_price);
+                if (tax != null && draft?.tax_annual_amount == null)
+                  updates.tax_annual_amount = tax;
               }
             },
           ),
@@ -1085,7 +1090,7 @@ export default async function ListingNewPage({
 
     const { data: row } = await supabase
       .from("properties")
-      .select("address_street,address_zip")
+      .select("address_street,address_zip,list_price")
       .eq("id", id)
       .eq("owner_id", user.id)
       .single();
@@ -1094,6 +1099,9 @@ export default async function ListingNewPage({
     }
 
     const result = await lookupMiamiDadeProperty(baseStreetForLookup(row.address_street), row.address_zip, unitFromStoredStreet(row.address_street));
+    if (result.nonResidential) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=nonresidential`);
+    }
     if (!result.found || !result.details) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&autofill=notfound`);
     }
@@ -1108,8 +1116,8 @@ export default async function ListingNewPage({
     if (d.property_type != null) update.property_type = d.property_type;
     if (d.legal_description != null)
       update.legal_description = d.legal_description;
-    if (d.tax_annual_amount != null)
-      update.tax_annual_amount = d.tax_annual_amount;
+    const tax = acceptCountyTax(d.tax_annual_amount, row.list_price);
+    if (tax != null) update.tax_annual_amount = tax;
 
     const filledCount = Object.keys(update).length;
     if (filledCount === 0) {
@@ -1795,11 +1803,17 @@ export default async function ListingNewPage({
   }
   const improvedFlag =
     typeof sp === "object" && "improved" in sp ? (sp.improved as string) : null;
+  const propertyTypeDefault = step3PropertyTypeDefault(
+    draft,
+    step3NonResidential || (typeof sp === "object" && "autofill" in sp && sp.autofill === "nonresidential"),
+  );
   const autofillResult =
     typeof sp === "object" && "autofill" in sp ? (sp.autofill as string) : null;
   const autofillMessage =
     autofillResult === "notfound"
       ? copy.step3.autofillNotFound
+      : autofillResult === "nonresidential"
+        ? copy.step3.autofillNonResidential
       : autofillResult && /^\d+$/.test(autofillResult)
         ? copy.step3.autofillSuccess.replace("{count}", autofillResult)
         : null;
@@ -2090,8 +2104,11 @@ export default async function ListingNewPage({
               </p>
             </div>
           )}
+          {step3NonResidential && autofillResult !== "nonresidential" && (
+            <ErrorBanner message={copy.step3.autofillNonResidential} />
+          )}
           {autofillMessage && (
-            autofillResult === "notfound" ? (
+            autofillResult === "notfound" || autofillResult === "nonresidential" ? (
               <ErrorBanner message={autofillMessage} />
             ) : (
               <SuccessBanner message={autofillMessage} />
@@ -2276,9 +2293,13 @@ export default async function ListingNewPage({
               </span>
               <select
                 name="property_type"
-                defaultValue={draft?.property_type ?? "single_family"}
+                required
+                defaultValue={propertyTypeDefault}
                 className="bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 text-base text-ink"
               >
+                <option value="" disabled>
+                  {copy.step3.propertyTypePlaceholder}
+                </option>
                 {PROPERTY_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {copy.step3.types[t]}
