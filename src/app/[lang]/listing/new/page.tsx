@@ -82,6 +82,7 @@ import {
   suggestedTierParam,
 } from "@/lib/listing-step1-form";
 import { AppFormValidation } from "@/components/app-form-validation";
+import { FocusedErrorBanner } from "@/components/focused-error-banner";
 import { PASSWORD_MIN_LENGTH, passwordRejection } from "@/lib/auth/password-errors";
 import { FootnoteText } from "@/components/footnote-text";
 import { fetchBuyerComp } from "@/lib/buyer-comp.server";
@@ -218,6 +219,10 @@ export default async function ListingNewPage({
     improved?: string;
     autofill?: string;
     uploaded?: string;
+    /** Paso 5: la casilla de derechos estaba marcada en el envío que falló. */
+    rights?: string;
+    /** Paso 5: intento de envío (vuelve a montar el aviso de error). */
+    n?: string;
     deleted?: string;
     primary?: string;
     success?: string;
@@ -1411,11 +1416,15 @@ export default async function ListingNewPage({
     // Every plan: at least minPhotos (MIN_OWN_PHOTOS on Essentials without photography; the
     // front photo with professional photography, which the MLS needs within 2 business days,
     // SEFMLS §15.1.1/§15.1.12), and the rights box.
+    // `n`: un intento por redirección, para que el aviso vuelva a llevar el scroll y el foco
+    // aunque el error se repita. `rights=1`: la casilla sigue marcada si lo que faltaba eran
+    // las fotos (React reinicia el formulario después de la acción).
+    const attempt = `&n=${new Date().getTime().toString(36)}`;
     if (formData.get("photos_rights_confirmed") !== "1") {
-      redirect(`/${lang}/listing/new?step=5&id=${id}&error=rights_required`);
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=rights_required${attempt}`);
     }
     if (photoCount < requiredPhotos) {
-      redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough`);
+      redirect(`/${lang}/listing/new?step=5&id=${id}&error=not_enough&rights=1${attempt}`);
     }
 
     // Persist confirmation once migration 20260517_add_listing_extended_fields
@@ -2657,7 +2666,7 @@ export default async function ListingNewPage({
             <p className="text-sm leading-relaxed text-ink/70">{copy.step5.noMarksNote}</p>
           </div>
 
-          {errorMessage && <ErrorBanner message={errorMessage} />}
+          {errorMessage && <FocusedErrorBanner key={`${sp.error}-${sp.n ?? ""}`} message={errorMessage} />}
           {sp.uploaded && (
             <SuccessBanner
               message={
@@ -2846,6 +2855,7 @@ export default async function ListingNewPage({
                 name="photos_rights_confirmed"
                 value="1"
                 required
+                defaultChecked={sp.rights === "1"}
                 className="mt-1 accent-gold w-4 h-4 shrink-0"
               />
               <span>{copy.step5.ownershipCheckLabel}</span>
