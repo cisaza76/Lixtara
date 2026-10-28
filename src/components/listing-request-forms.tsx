@@ -154,8 +154,10 @@ export function ListingChangeRequestForm({
               ) : (
                 <input
                   id={id}
-                  type={spec.kind === "text" ? "text" : "number"}
-                  step={spec.kind === "number" ? spec.step : spec.kind === "int" ? 1 : undefined}
+                  // Texto, no type="number": con "1,500" el navegador entregaba "" y se pedía
+                  // borrar el valor. El servidor lee la coma de miles (parseFormNumber).
+                  type="text"
+                  inputMode={spec.kind === "number" ? "decimal" : spec.kind === "int" ? "numeric" : undefined}
                   maxLength={spec.kind === "text" ? spec.max : undefined}
                   className={inputClass}
                   value={values[f] as string}

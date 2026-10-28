@@ -175,6 +175,8 @@ const STEP_ERROR_FIELDS: Record<string, string> = {
   invalid_sqft: "sqft",
   invalid_year: "year_built",
   invalid_price: "list_price",
+  invalid_lot: "lot_size",
+  invalid_rent: "monthly_rent",
   invalid_parking: "parking_spaces",
   invalid_hoa: "hoa_fee",
   invalid_tax: "tax_annual_amount",

@@ -9,6 +9,7 @@
 // format, line 20) unless the seller checks "I don't know" (src/lib/lease-end.ts).
 
 import { useState } from "react";
+import { NUMBER_PATTERNS } from "@/lib/form-numbers";
 
 type Occupancy = "" | "vacant" | "owner_occupied" | "tenant_occupied";
 type Cooperation = "" | "cooperative" | "advance_notice" | "difficult";
@@ -98,10 +99,10 @@ export function OccupancySection({
           <label className="flex flex-col gap-2">
             <span className={labelClass}>{L.monthlyRentLabel}</span>
             <input
-              type="number"
+              type="text"
               name="monthly_rent"
-              min={0}
-              step={1}
+              pattern={NUMBER_PATTERNS.money}
+              inputMode="decimal"
               defaultValue={initialRent}
               className={fieldClass}
             />
