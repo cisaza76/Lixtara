@@ -12,12 +12,12 @@ const COPY = {
   en: {
     title: "Listing not found",
     body: "This property is no longer active or never existed.",
-    back: "Tell us what you're looking for",
+    back: "Contact us",
   },
   es: {
     title: "Listing no encontrado",
     body: "Esta propiedad ya no está activa o nunca existió.",
-    back: "Cuéntanos qué buscas",
+    back: "Contáctanos",
   },
 } as const;
 

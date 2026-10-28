@@ -24,6 +24,7 @@ function table() {
     select: () => q,
     eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
     is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
+    not: (c: string) => (filters.push((r) => r[c] != null), q),
     gt: (c: string, v: string) => (filters.push((r) => String(r[c] ?? "") > v), q),
     in: (c: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[c])), q),
     order: () => q,
@@ -47,6 +48,8 @@ const svc = { from: () => table() } as never;
 import {
   acceptFromLink,
   findOpenNotice,
+  findUnverified,
+  verifyEmail,
   hashToken,
   latestNotices,
   noticeTextSha256,
@@ -54,7 +57,7 @@ import {
   requestEvidence,
   sendNbrLink,
 } from "@/lib/nbr-notice.server";
-import { NBR_NOTICE_VERSION } from "@/lib/nbr-notice";
+import { ESIGN_VERSION, NBR_NOTICE_VERSION } from "@/lib/nbr-notice";
 
 const evidence = {
   fullName: "Jane Buyer",
@@ -107,7 +110,11 @@ describe("enlace del aviso", () => {
       token_hash: null,
       property_id: "P1",
       notice_text_sha256: noticeTextSha256("es"),
+      esign_version: ESIGN_VERSION,
     });
+    expect(db.rows[0]!.esign_consent_at).toBe(db.rows[0]!.accepted_at);
+    // El enlace llegó a su correo: queda verificado a la vez.
+    expect(db.rows[0]!.email_verified_at).toBe(db.rows[0]!.accepted_at);
     expect(db.rows[0]!.accepted_at).toBeTruthy();
     expect(db.rows[0]!.pdf_emailed_at).toBeTruthy();
     const calls = mail.accepted.mock.calls.map((c) => c[0] as { recipient: string; to: string; idempotencyKey: string });
@@ -120,11 +127,33 @@ describe("enlace del aviso", () => {
 });
 
 describe("aceptación en el formulario", () => {
-  it("el aviso nace aceptado, con la evidencia, y sale el PDF", async () => {
+  it("nace aceptado con E-SIGN y el correo SIN verificar; el PDF al comprador lleva el enlace de verificación", async () => {
     const id = await recordInlineAcceptance(svc, { leadId: "L2" }, { ...evidence, propertyId: null, listingKey: "K1" });
     expect(id).toBeTruthy();
-    expect(db.rows[0]).toMatchObject({ lead_id: "L2", listing_key: "K1", email: "jane@example.com", notice_version: NBR_NOTICE_VERSION });
+    expect(db.rows[0]).toMatchObject({ lead_id: "L2", listing_key: "K1", email: "jane@example.com", notice_version: NBR_NOTICE_VERSION, esign_version: ESIGN_VERSION });
+    expect(db.rows[0]!.email_verified_at ?? null).toBeNull();
     expect(mail.accepted).toHaveBeenCalledTimes(2);
+    const buyer = mail.accepted.mock.calls.map((c) => c[0] as { recipient: string; verifyUrl?: string | null }).find((c) => c.recipient === "buyer")!;
+    const broker = mail.accepted.mock.calls.map((c) => c[0] as { recipient: string; verifyUrl?: string | null }).find((c) => c.recipient === "broker")!;
+    expect(buyer.verifyUrl).toMatch(/\/es\/showing-notice\/verify\/[A-Za-z0-9_-]{43}$/);
+    expect(broker.verifyUrl ?? null).toBeNull();
+    const token = buyer.verifyUrl!.split("/verify/")[1]!;
+    expect(db.rows[0]!.verify_token_hash).toBe(hashToken(token));
+    expect(JSON.stringify(db.rows[0])).not.toContain(token);
+  });
+
+  it("verificar: abrir no verifica; el botón sí, una sola vez", async () => {
+    await recordInlineAcceptance(svc, { leadId: "L3" }, evidence);
+    const buyer = mail.accepted.mock.calls.map((c) => c[0] as { recipient: string; verifyUrl: string }).find((c) => c.recipient === "buyer")!;
+    const token = buyer.verifyUrl.split("/verify/")[1]!;
+    expect(await findUnverified(svc, token)).not.toBeNull();
+    expect(db.rows[0]!.email_verified_at ?? null).toBeNull();
+    expect(await verifyEmail(svc, token)).toBe(true);
+    expect(db.rows[0]!.email_verified_at).toBeTruthy();
+    expect(db.rows[0]!.verify_token_hash).toBeNull();
+    expect(await verifyEmail(svc, token)).toBe(false);
+    expect(await findUnverified(svc, token)).toBeNull();
+    expect(await verifyEmail(svc, "x")).toBe(false);
   });
 });
 

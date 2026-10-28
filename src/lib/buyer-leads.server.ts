@@ -24,6 +24,14 @@ import {
   type ShowingTarget,
 } from "@/lib/buyer-leads";
 
+/**
+ * Visitas a fichas de OTROS brokers (feed IDX): apagadas para el lanzamiento (decisión del
+ * 28-oct), se retoman en la fase 2. Solo el literal "true" las abre, también para el staff.
+ */
+export function mlsShowingRequestsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.BUYER_SHOWING_REQUESTS_MLS_ENABLED === "true";
+}
+
 /** Solo el literal "true" abre la solicitud al público. */
 export function showingRequestsPublic(env: Record<string, string | undefined> = process.env): boolean {
   return env.BUYER_SHOWING_REQUESTS_ENABLED === "true";
@@ -140,8 +148,10 @@ export async function insertShowingLead(
       preferred_times: req.preferredTimes,
       message: req.message,
       other_agent_status: req.otherAgentStatus,
-      buyer_agent_name: req.buyerAgentName,
-      buyer_agent_license: req.buyerAgentLicense,
+      buyer_agent_name: req.buyerAgent?.name ?? null,
+      buyer_agent_brokerage: req.buyerAgent?.brokerage ?? null,
+      buyer_agent_email: req.buyerAgent?.email ?? null,
+      buyer_agent_license: req.buyerAgent?.license ?? null,
       needs_to_sell: req.needsToSell,
       lang: req.lang,
       listing_key: req.target.kind === "mls" ? req.target.listingKey : null,

@@ -93,7 +93,7 @@ describe("insertShowingLead", () => {
     await insertShowingLead(svc, {
       target: { kind: "mls", listingKey: "K1" }, fullName: "A", email: "a@b.co", phone: null,
       preferredTimes: null, message: null, otherAgentStatus: "none", needsToSell: null,
-      consentMarketing: false, lang: "en", buyerAgentName: null, buyerAgentLicense: null, nbrAccepted: true,
+      consentMarketing: false, lang: "en", buyerAgent: null, nbrAccepted: true,
     }, "broker-1");
     expect(inserts[0]).toMatchObject({
       assigned_agent_id: "broker-1",

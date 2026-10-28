@@ -24,6 +24,7 @@ import {
   type CommercialSenderIdentity,
 } from "@/lib/email-compliance";
 import { escapeHtml } from "@/lib/contact-form";
+import { BUYER_SELLER_SIDE_LINE } from "@/config/buyer-relationship";
 import { PRICING_TIERS, isPricingTierId } from "@/lib/pricing-tiers";
 
 let _client: Resend | null = null;
@@ -802,7 +803,7 @@ export async function sendBrokerShowingRequest(input: {
   ];
   const body = `
     <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">New showing request</p>
-    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Contact the buyer, verify prior representation and handle the written agreement before any tour. The showing is not confirmed.</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">Lixtara represents the seller. Buyer with an agent: coordinate the showing with the agent; all communication goes through them. Buyer without an agent (or not sure): No Brokerage Relationship; the notice must be accepted and the buyer's email verified before you confirm. The showing is not confirmed.</p>
     <table cellpadding="0" cellspacing="0" style="margin:16px 0;font-size:13px;color:#1c1c1c;">
       ${rows
         .map(
@@ -829,6 +830,8 @@ export async function sendShowingRequestReceived(input: {
   buyerName: string;
   /** Solo para listings propios; null para fichas del feed IDX. */
   ownAddress: string | null;
+  /** Con agente propio: la broker coordina con el agente. Sin agente: la línea de "No estoy seguro". */
+  withAgent?: boolean;
 }) {
   const isEs = input.lang === "es";
   const broker = BROKERAGE.brokerName.split(" ")[0];
@@ -838,13 +841,25 @@ export async function sendShowingRequestReceived(input: {
   const lines = isEs
     ? [
         `Hola ${input.buyerName}, gracias por tu interés${interest}.`,
-        `${broker}, nuestra broker licenciada, te contactará para coordinar.`,
-        "Tu visita no está confirmada hasta que ella la confirme contigo.",
+        input.withAgent
+          ? `${broker}, nuestra broker licenciada, coordinará la visita con tu agente.`
+          : `${broker}, nuestra broker licenciada, te contactará para coordinar.`,
+        input.withAgent
+          ? "Tu visita no está confirmada hasta que ella la confirme con tu agente."
+          : "Tu visita no está confirmada hasta que ella la confirme contigo.",
+        ...(input.withAgent ? [] : ["Si tiene un acuerdo con un agente, avísenos para coordinar la visita con él."]),
+        BUYER_SELLER_SIDE_LINE.es,
       ]
     : [
         `Hi ${input.buyerName}, thanks for your interest${interest}.`,
-        `${broker}, our licensed broker, will contact you to coordinate.`,
-        "Your showing is not confirmed until she confirms it with you.",
+        input.withAgent
+          ? `${broker}, our licensed broker, will coordinate the showing with your agent.`
+          : `${broker}, our licensed broker, will contact you to coordinate.`,
+        input.withAgent
+          ? "Your showing is not confirmed until she confirms it with your agent."
+          : "Your showing is not confirmed until she confirms it with you.",
+        ...(input.withAgent ? [] : ["If you have an agreement with an agent, let us know so we can coordinate the showing with them."]),
+        BUYER_SELLER_SIDE_LINE.en,
       ];
   const body = lines
     .map((l) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${escapeHtml(l)}</p>`)
@@ -897,6 +912,8 @@ export async function sendNbrNoticeAccepted(input: {
   listingLabel: string | null;
   pdf: Uint8Array;
   idempotencyKey: string;
+  /** Formulario: el enlace para verificar el correo (la visita queda pendiente hasta entonces). */
+  verifyUrl?: string | null;
 }) {
   const isEs = input.lang === "es" && input.recipient === "buyer";
   const subject =
@@ -912,18 +929,24 @@ export async function sendNbrNoticeAccepted(input: {
       : isEs
         ? [
             `Hola ${input.buyerName}, adjuntamos la copia del aviso de ausencia de relación de corretaje que aceptaste${where}.`,
+            ...(input.verifyUrl ? ["Confirma tu correo con el botón de abajo: tu visita queda pendiente de verificación hasta entonces."] : []),
             "Tu visita no está confirmada hasta que la broker la confirme contigo.",
+            "Si tiene un acuerdo con un agente, avísenos para coordinar la visita con él.",
           ]
         : [
             `Hi ${input.buyerName}, attached is your copy of the No Brokerage Relationship notice you accepted${where}.`,
+            ...(input.verifyUrl ? ["Please confirm your email with the button below: your showing is pending verification until then."] : []),
             "Your showing is not confirmed until the broker confirms it with you.",
+            "If you have an agreement with an agent, let us know so we can coordinate the showing with them.",
           ];
-  const body = lines.map((l) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${escapeHtml(l)}</p>`).join("");
+  const verify =
+    input.recipient === "buyer" && input.verifyUrl ? button(input.verifyUrl, isEs ? "Confirmar mi correo" : "Confirm my email") : "";
+  const body = lines.map((l) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${escapeHtml(l)}</p>`).join("") + verify;
   return send({
     to: input.to,
     subject,
     html: shell({ preheader: subject, body, lang: isEs ? "es" : "en" }),
-    text: lines.join("\n\n"),
+    text: [...lines, ...(input.recipient === "buyer" && input.verifyUrl ? [input.verifyUrl] : [])].join("\n\n"),
     attachments: [{ filename: "lixtara-no-brokerage-relationship-notice.pdf", content: Buffer.from(input.pdf) }],
     idempotencyKey: input.idempotencyKey,
   });

@@ -11,7 +11,7 @@
 //
 // PURO: sin I/O.
 
-import { hasOwnAgent, normalizeAgentLicense } from "@/lib/nbr-notice";
+import { hasOwnAgent, parseBuyerAgent, type BuyerAgent } from "@/lib/nbr-notice";
 
 export const LEAD_STATUSES = [
   "received",
@@ -108,12 +108,16 @@ export const AGREEMENT_TYPE_LABELS: Record<AgreementType, string> = {
 export const AGREEMENT_EXCEPTION_CODES = [
   "open_house_seller_side",
   "unrepresented_buyer_own_listing",
+  // Comprador con su propio agente en un listado de Lixtara (decisión del 28-oct): Lixtara
+  // actúa por el vendedor y coordina con el agente (migración 20261029120000).
+  "represented_buyer_own_listing",
 ] as const;
 export type AgreementExceptionCode = (typeof AGREEMENT_EXCEPTION_CODES)[number];
 
 export const AGREEMENT_EXCEPTION_LABELS: Record<AgreementExceptionCode, string> = {
   open_house_seller_side: "Open house of a Lixtara listing, hosted for the seller",
   unrepresented_buyer_own_listing: "Unrepresented buyer on a Lixtara listing (seller side only)",
+  represented_buyer_own_listing: "Buyer represented by their own agent on a Lixtara listing (seller side only)",
 };
 
 export interface AgreementRecord {
@@ -222,10 +226,12 @@ export interface ShowingRequest {
   needsToSell: NeedsToSell | null;
   consentMarketing: boolean;
   lang: "en" | "es";
-  /** Con agente propio: su nombre y su licencia de Florida (sin aviso NBR). */
-  buyerAgentName: string | null;
-  buyerAgentLicense: string | null;
-  /** Sin agente (o sin saberlo): aceptó el aviso NBR en el formulario (F.S. 475.278(4)). */
+  /** Con agente propio: nombre, brokerage, correo y licencia (sin aviso NBR). */
+  buyerAgent: BuyerAgent | null;
+  /**
+   * Sin agente (o sin saberlo): aceptó el consentimiento E-SIGN y el aviso NBR en el formulario
+   * (F.S. 475.278(4)). Las dos casillas son obligatorias.
+   */
   nbrAccepted: boolean;
 }
 
@@ -238,6 +244,7 @@ export type ShowingRequestError =
   | "too_long"
   | "consent"
   | "agent"
+  | "esign"
   | "nbr";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -303,12 +310,12 @@ export function parseShowingRequest(
   if (phone && !normalizedPhone) return { ok: false, error: "phone" };
   if (!truthy(get("consent_contact"))) return { ok: false, error: "consent" };
 
-  // Con agente: nombre y licencia, sin aviso NBR. Sin agente o sin saberlo: el aviso NBR,
-  // aceptado antes de enviar (la visita no se confirma sin él; la base también lo exige).
+  // Con agente: sus datos, sin aviso NBR. Sin agente o sin saberlo: consentimiento E-SIGN y
+  // aviso NBR aceptados antes de enviar (la visita no se confirma sin ellos; la base lo exige).
   const withAgent = hasOwnAgent(otherAgent);
-  const agentName = (get("buyer_agent_name") ?? "").trim();
-  const agentLicense = withAgent ? normalizeAgentLicense(get("buyer_agent_license") ?? "") : null;
-  if (withAgent && (!agentName || agentName.length > 120 || !agentLicense)) return { ok: false, error: "agent" };
+  const buyerAgent = withAgent ? parseBuyerAgent(get) : null;
+  if (withAgent && !buyerAgent) return { ok: false, error: "agent" };
+  if (!withAgent && !truthy(get("esign_consent"))) return { ok: false, error: "esign" };
   const nbrAccepted = !withAgent && truthy(get("nbr_accept"));
   if (!withAgent && !nbrAccepted) return { ok: false, error: "nbr" };
 
@@ -327,19 +334,21 @@ export function parseShowingRequest(
         : null,
       consentMarketing: truthy(get("consent_marketing")),
       lang,
-      buyerAgentName: withAgent ? agentName : null,
-      buyerAgentLicense: agentLicense,
+      buyerAgent,
       nbrAccepted,
     },
   };
 }
 
 /**
- * Comprador con acuerdo EXCLUSIVO con otro broker: Lixtara no firma ni coordina la visita
- * (Código de Ética, art. 16). El lead se registra cancelado, con el motivo, para medirlo.
+ * Estado inicial del lead. Comprador con acuerdo EXCLUSIVO con otro broker:
+ *   - en un listado de Lixtara (decisión del 28-oct): NO se cancela; la visita se coordina con
+ *     su agente (Lixtara actúa por el vendedor);
+ *   - en una ficha de otro broker (fase 2, hoy apagada): Lixtara no coordina la visita (Código
+ *     de Ética, art. 16); se registra cancelado, con el motivo, para medirlo.
  */
 export function initialStatusFor(r: ShowingRequest): { status: LeadStatus; cancelReason: string | null } {
-  return r.otherAgentStatus === "exclusive"
+  return r.otherAgentStatus === "exclusive" && r.target.kind === "mls"
     ? { status: "cancelled", cancelReason: "Buyer reported an exclusive agreement with another brokerage" }
     : { status: "received", cancelReason: null };
 }

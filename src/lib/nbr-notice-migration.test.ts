@@ -8,10 +8,15 @@ const raw = readFileSync("supabase/migrations/20261029120000_buyer_nbr_notice.sq
 const sql = raw.replace(/--.*$/gm, "");
 
 describe("migración del aviso NBR", () => {
-  it("sin $$ ni corchetes fuera de comentarios (se pega en el SQL Editor) y con rollback", () => {
+  it("sin $$ ni corchetes fuera de comentarios y con rollback", () => {
     expect(sql).not.toMatch(/[$[]/);
-    expect(raw).toContain("-- ── ROLLBACK");
-    expect(raw).toContain("-- drop table if exists public.buyer_nbr_notices;");
+    // Las cadenas vacías dentro del cuerpo entre comillas simples van dobladas ('').
+    const q4 = "'".repeat(4);
+    expect(sql).toContain(`coalesce(btrim(agent_name), ${q4}) = ${q4}`);
+    expect(raw).toContain("scripts/sql/rollback_20261029120000_buyer_nbr_notice.sql");
+    const rollback = readFileSync("scripts/sql/rollback_20261029120000_buyer_nbr_notice.sql", "utf8");
+    expect(rollback).toContain("drop table if exists public.buyer_nbr_notices;");
+    expect(rollback).toContain("drop function if exists public.guard_showing_nbr();");
   });
 
   it("RLS activa, solo lectura de staff, sin políticas de escritura", () => {
@@ -21,7 +26,8 @@ describe("migración del aviso NBR", () => {
   });
 
   it("la aceptación exige la evidencia y, aceptada, no se cambia ni se borra", () => {
-    expect(sql).toMatch(/accepted_at is null\s+or \(full_name is not null and email is not null and lang is not null\s+and ip is not null and user_agent is not null and notice_text_sha256 is not null\)/);
+    expect(sql).toMatch(/accepted_at is null\s+or \(full_name is not null and email is not null and lang is not null\s+and ip is not null and user_agent is not null and notice_text_sha256 is not null\s+and esign_consent_at is not null and esign_version is not null\)/);
+    expect(sql).toContain("email_verified_at is null or accepted_at is not null");
     expect(sql).toContain("An accepted NBR notice cannot be deleted.");
     expect(sql).toContain("An accepted NBR notice cannot be changed.");
     expect(sql).toContain("before update or delete on public.buyer_nbr_notices");
@@ -33,6 +39,9 @@ describe("migración del aviso NBR", () => {
     // El admin reconoce el motivo por el principio del mensaje (dbNbrReason).
     expect(sql).toContain("raise exception ''nbr_notice_missing:");
     expect(sql).toContain("raise exception ''nbr_buyer_agent_missing:");
+    expect(sql).toContain("raise exception ''nbr_email_unverified:");
+    // Sin agente: aceptado no alcanza; hace falta el correo verificado.
+    expect(sql).toContain("elsif state = ''accepted'' then");
     // El comprador no programa su propia visita.
     expect(sql).toContain("Only staff can schedule a showing.");
   });
@@ -40,7 +49,7 @@ describe("migración del aviso NBR", () => {
   it("el trigger corre como quien escribe; solo el helper de lectura es SECURITY DEFINER", () => {
     const guard = sql.slice(sql.indexOf("create or replace function public.guard_showing_nbr()"));
     expect(guard.slice(0, guard.indexOf("as '"))).not.toContain("security definer");
-    const helper = sql.slice(sql.indexOf("create or replace function public.nbr_notice_accepted"), sql.indexOf("create or replace function public.guard_showing_nbr()"));
+    const helper = sql.slice(sql.indexOf("create or replace function public.nbr_notice_state"), sql.indexOf("create or replace function public.guard_showing_nbr()"));
     expect(helper).toContain("security definer");
     expect(sql).toContain("revoke all on function public.guard_showing_nbr() from public, anon, authenticated;");
   });
@@ -54,6 +63,12 @@ describe("pantallas y Loui", () => {
     expect(page).toContain('(dbNbrReason(error.message) ?? "agreement_missing")');
     expect(page).toContain("data-nbr-status");
     expect(page).toContain("data-loui-showings");
+    expect(page).toContain("data-showing-wait");
+    expect(page).toContain("The buyer reports an agreement with an agent");
+  });
+
+  it("nuevo motivo de catálogo para el comprador representado en un listado propio", () => {
+    expect(sql).toContain("'open_house_seller_side', 'unrepresented_buyer_own_listing', 'represented_buyer_own_listing'");
   });
 
   it("Loui: sin consejos de precio ni negociación al comprador sin agente, con la frase exacta", () => {
@@ -61,6 +76,7 @@ describe("pantallas y Loui", () => {
     expect(LOUI_SYSTEM_PROMPT).toContain('"Lixtara representa al vendedor; te recomendamos consultar a tu propio agente o abogado."');
     expect(LOUI_SYSTEM_PROMPT).toContain("never say a showing is scheduled or confirmed");
     expect(LOUI_SYSTEM_PROMPT).not.toContain("accompanied by Lixtara's licensed broker through showings, offer and closing");
+    expect(LOUI_SYSTEM_PROMPT).toContain("never request or schedule a showing of another brokerage's listing");
   });
 
   it("Loui pide el estado del agente para una visita y no devuelve 'scheduled'", () => {

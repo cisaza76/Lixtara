@@ -11,7 +11,10 @@ import { CONTACT } from "@/config/contact";
 import { SITE_URL } from "@/lib/config";
 import { sendNbrNoticeAccepted, sendNbrNoticeLink } from "@/lib/email";
 import { renderNbrNoticePdf } from "@/lib/nbr-notice-pdf";
-import { NBR_LINK_DAYS, NBR_NOTICE_VERSION, noticePlainText } from "@/lib/nbr-notice";
+import { ESIGN_VERSION, NBR_LINK_DAYS, NBR_NOTICE_VERSION, noticePlainText } from "@/lib/nbr-notice";
+
+/** Contacto del consentimiento E-SIGN (copia en papel, retiro): src/config/contact.ts. */
+export const ESIGN_CONTACT = { email: CONTACT.inboxEmail, phone: CONTACT.phoneDisplay };
 
 export type NbrSubject = { leadId: string } | { scheduleRequestId: string };
 
@@ -36,6 +39,7 @@ export interface NbrNoticeRow {
   sent_at: string | null;
   expires_at: string | null;
   accepted_at: string | null;
+  email_verified_at: string | null;
   full_name: string | null;
   email: string | null;
   phone: string | null;
@@ -44,10 +48,10 @@ export interface NbrNoticeRow {
 }
 
 const COLUMNS =
-  "id,lead_id,schedule_request_id,notice_version,sent_at,expires_at,accepted_at,full_name,email,phone,listing_label,lang";
+  "id,lead_id,schedule_request_id,notice_version,sent_at,expires_at,accepted_at,email_verified_at,full_name,email,phone,listing_label,lang";
 
 export function noticeTextSha256(lang: string): string {
-  return createHash("sha256").update(noticePlainText(lang), "utf8").digest("hex");
+  return createHash("sha256").update(noticePlainText(lang, ESIGN_CONTACT), "utf8").digest("hex");
 }
 
 export function hashToken(token: string): string {
@@ -110,6 +114,10 @@ export async function findOpenNotice(svc: SupabaseClient, token: string, now = n
 function evidenceColumns(e: NbrEvidence, acceptedAt: string) {
   return {
     accepted_at: acceptedAt,
+    // El consentimiento E-SIGN se marca en la misma pantalla, antes del aviso; la casilla es
+    // obligatoria, así que su hora es la del envío.
+    esign_consent_at: acceptedAt,
+    esign_version: ESIGN_VERSION,
     notice_version: NBR_NOTICE_VERSION,
     full_name: e.fullName.slice(0, 120),
     email: e.email.slice(0, 200),
@@ -124,28 +132,62 @@ function evidenceColumns(e: NbrEvidence, acceptedAt: string) {
   };
 }
 
-/** Aceptación en el mismo formulario de la solicitud: el aviso nace aceptado. */
+/**
+ * Aceptación en el mismo formulario de la solicitud: el aviso nace aceptado, con el correo SIN
+ * verificar. El correo con el PDF lleva el enlace para verificarlo; hasta entonces la visita
+ * queda "pendiente de verificación" (la base no deja confirmarla).
+ */
 export async function recordInlineAcceptance(svc: SupabaseClient, subject: NbrSubject, e: NbrEvidence): Promise<string | null> {
   const acceptedAt = new Date().toISOString();
+  const verifyToken = randomBytes(32).toString("base64url");
   const { data, error } = await svc
     .from("buyer_nbr_notices")
-    .insert({ ...subjectColumns(subject), ...evidenceColumns(e, acceptedAt) })
+    .insert({ ...subjectColumns(subject), ...evidenceColumns(e, acceptedAt), verify_token_hash: hashToken(verifyToken) })
     .select("id")
     .single();
   if (error || !data) {
     console.error(JSON.stringify({ event: "nbr_inline_insert_failed", code: error?.code }));
     return null;
   }
-  await deliverAcceptedPdf(svc, data.id as string, e, acceptedAt);
+  await deliverAcceptedPdf(svc, data.id as string, e, acceptedAt, `${SITE_URL}/${e.lang}/showing-notice/verify/${verifyToken}`);
   return data.id as string;
 }
 
-/** Aceptación desde el enlace: solo si sigue pendiente y no venció (escritura condicional). */
+/** El aviso aceptado que espera la verificación del correo con ese token, o null. */
+export async function findUnverified(svc: SupabaseClient, token: string): Promise<NbrNoticeRow | null> {
+  if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return null;
+  const { data } = await svc.from("buyer_nbr_notices").select(COLUMNS).eq("verify_token_hash", hashToken(token)).maybeSingle();
+  const row = data as NbrNoticeRow | null;
+  return row && row.accepted_at && !row.email_verified_at ? row : null;
+}
+
+/**
+ * Verifica el correo (el comprador pulsa el botón de la página del enlace; abrir el enlace no
+ * verifica nada, así los escáneres de correo no lo marcan solos). Escritura condicional y de
+ * un solo uso: se guarda la hora y se borra el hash.
+ */
+export async function verifyEmail(svc: SupabaseClient, token: string): Promise<boolean> {
+  if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return false;
+  const { data, error } = await svc
+    .from("buyer_nbr_notices")
+    .update({ email_verified_at: new Date().toISOString(), verify_token_hash: null })
+    .eq("verify_token_hash", hashToken(token))
+    .is("email_verified_at", null)
+    .not("accepted_at", "is", null)
+    .select("id")
+    .maybeSingle();
+  return !error && !!data;
+}
+
+/**
+ * Aceptación desde el enlace: solo si sigue pendiente y no venció (escritura condicional). El
+ * enlace llegó al correo del comprador, así que el correo queda verificado a la vez.
+ */
 export async function acceptFromLink(svc: SupabaseClient, noticeId: string, e: NbrEvidence): Promise<boolean> {
   const acceptedAt = new Date().toISOString();
   const { data, error } = await svc
     .from("buyer_nbr_notices")
-    .update({ ...evidenceColumns(e, acceptedAt), token_hash: null })
+    .update({ ...evidenceColumns(e, acceptedAt), email_verified_at: acceptedAt, token_hash: null })
     .eq("id", noticeId)
     .is("accepted_at", null)
     .gt("expires_at", acceptedAt)
@@ -157,7 +199,13 @@ export async function acceptFromLink(svc: SupabaseClient, noticeId: string, e: N
 }
 
 /** PDF al comprador y a la broker (best-effort; la aceptación ya quedó guardada). */
-async function deliverAcceptedPdf(svc: SupabaseClient, noticeId: string, e: NbrEvidence, acceptedAt: string): Promise<void> {
+async function deliverAcceptedPdf(
+  svc: SupabaseClient,
+  noticeId: string,
+  e: NbrEvidence,
+  acceptedAt: string,
+  verifyUrl: string | null = null,
+): Promise<void> {
   try {
     const pdf = await renderNbrNoticePdf({
       lang: e.lang,
@@ -170,10 +218,11 @@ async function deliverAcceptedPdf(svc: SupabaseClient, noticeId: string, e: NbrE
       ip: e.ip,
       userAgent: e.userAgent,
       textSha256: noticeTextSha256(e.lang),
+      esignVersion: ESIGN_VERSION,
     });
     const common = { buyerName: e.fullName, listingLabel: e.listingLabel, pdf };
     const [buyer, broker] = await Promise.all([
-      sendNbrNoticeAccepted({ ...common, to: e.email, lang: e.lang, recipient: "buyer", idempotencyKey: `nbr-accepted-buyer:${noticeId}` }),
+      sendNbrNoticeAccepted({ ...common, to: e.email, lang: e.lang, recipient: "buyer", verifyUrl, idempotencyKey: `nbr-accepted-buyer:${noticeId}` }),
       sendNbrNoticeAccepted({ ...common, to: CONTACT.inboxEmail, lang: "en", recipient: "broker", idempotencyKey: `nbr-accepted-broker:${noticeId}` }),
     ]);
     if (buyer.ok && broker.ok) {

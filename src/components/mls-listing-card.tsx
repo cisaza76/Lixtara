@@ -14,7 +14,12 @@
 import { ATTRIBUTION_TYPOGRAPHY } from "@/lib/mls/display-compliance";
 import type { MlsPublicListing } from "@/lib/mls/public-listings";
 
-export function MlsListingCard({ listing }: { listing: MlsPublicListing }) {
+// Visitas a fichas de otros brokers: apagadas para el lanzamiento (decisión del 28-oct; flag
+// BUYER_SHOWING_REQUESTS_MLS_ENABLED, fase 2). En su lugar, un botón de contacto, sin datos
+// de la ficha en la URL.
+const CONTACT_LABEL = { en: "Questions about this home? Contact us", es: "¿Preguntas sobre esta vivienda? Contáctanos" } as const;
+
+export function MlsListingCard({ listing, lang = "en" }: { listing: MlsPublicListing; lang?: "en" | "es" }) {
   const precio =
     listing.listPrice === null
       ? null
@@ -67,6 +72,13 @@ export function MlsListingCard({ listing }: { listing: MlsPublicListing }) {
           {listing.attribution.extraFields.join(" · ")}
         </p>
       )}
+      <a
+        href={`/${lang}/contact`}
+        data-mls-contact
+        className="self-start text-[10px] font-semibold uppercase tracking-[0.2em] text-ink/70 hover:text-gold transition-colors"
+      >
+        {CONTACT_LABEL[lang]} →
+      </a>
     </article>
   );
 }

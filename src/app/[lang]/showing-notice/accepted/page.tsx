@@ -14,6 +14,7 @@ export default async function ShowingNoticeAcceptedPage({ params }: { params: Pr
     <section role="status" className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-12 flex flex-col gap-3">
       <h1 className="font-display text-3xl text-ink font-normal">{c.acceptedTitle}</h1>
       <p className="text-sm text-ink/75">{c.acceptedBody}</p>
+      <p className="text-sm text-ink/75">{c.haveAgentLine}</p>
     </section>
   );
 }

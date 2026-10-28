@@ -7,7 +7,7 @@ import { isLocale } from "@/lib/i18n";
 import { createService } from "@/lib/supabase/service";
 import { nbrCopy } from "@/lib/nbr-notice";
 import { findOpenNotice } from "@/lib/nbr-notice.server";
-import { NbrNoticeText } from "@/components/nbr-notice-text";
+import { EsignConsent, NbrNoticeText } from "@/components/nbr-notice-text";
 import { acceptNbrNotice } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -39,10 +39,12 @@ export default async function ShowingNoticePage({
       ) : (
         <>
           <p className="text-sm text-ink/75">{c.explain}</p>
-          <div className="border border-gold-soft bg-ivory-strong/40 p-5">
-            <NbrNoticeText lang={lang} />
-          </div>
           <form action={acceptNbrNotice} className="flex flex-col gap-4">
+            {/* Primero el consentimiento E-SIGN; después el aviso y su aceptación. */}
+            <EsignConsent lang={lang} />
+            <div className="border border-gold-soft bg-ivory-strong/40 p-5">
+              <NbrNoticeText lang={lang} />
+            </div>
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="lang" value={lang} />
             <label className="flex flex-col gap-1.5">
@@ -59,7 +61,7 @@ export default async function ShowingNoticePage({
             </label>
             {error && (
               <p role="alert" className="text-sm text-red-800">
-                {error === "name" ? c.errors.name : error === "expired" ? c.expired : c.errors.nbr}
+                {error === "name" ? c.errors.name : error === "expired" ? c.expired : error === "esign" ? c.errors.esign : c.errors.nbr}
               </p>
             )}
             <button

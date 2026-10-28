@@ -15,6 +15,7 @@ export async function acceptNbrNotice(formData: FormData): Promise<void> {
   const base = `/${lang}/showing-notice/${encodeURIComponent(token)}`;
   const fullName = String(formData.get("full_name") ?? "").trim();
   const phoneRaw = String(formData.get("phone") ?? "").trim();
+  if (formData.get("esign_consent") !== "on") redirect(`${base}?error=esign`);
   if (formData.get("nbr_accept") !== "on") redirect(`${base}?error=nbr`);
   if (!fullName || fullName.length > 120) redirect(`${base}?error=name`);
   const phone = phoneRaw ? normalizePhone(phoneRaw) : null;

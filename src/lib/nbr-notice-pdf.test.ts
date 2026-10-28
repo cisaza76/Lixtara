@@ -11,6 +11,7 @@ const input = {
   phone: "+13055550100",
   listingLabel: "123 TEST Street, Miami 33131",
   noticeVersion: "nbr-2026-10-29-pending-legal-review",
+  esignVersion: "esign-2026-10-29-pending-legal-review",
   acceptedAt: "2026-10-29T15:04:05Z",
   ip: "203.0.113.7",
   userAgent: "Mozilla/5.0 (TEST)",

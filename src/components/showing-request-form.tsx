@@ -8,7 +8,8 @@ import { useState } from "react";
 import type { t } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
 import { hasOwnAgent, nbrCopy } from "@/lib/nbr-notice";
-import { NbrNoticeText } from "@/components/nbr-notice-text";
+import { EsignConsent, NbrNoticeText } from "@/components/nbr-notice-text";
+import { buyerSellerSideLine } from "@/config/buyer-relationship";
 
 type Widen<T> = { [K in keyof T]: T[K] extends string ? string : Widen<T[K]> };
 /** Los textos del diccionario, ya con {brokerFirstName} resuelto por el servidor. */
@@ -33,7 +34,7 @@ export function ShowingRequestForm({
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<null | "received" | "exclusive">(null);
+  const [done, setDone] = useState<null | "received" | "with_agent" | "exclusive">(null);
   // Respuesta a "¿firmaste con otro agente?": con agente se piden nombre y licencia; sin
   // agente o sin saberlo, el aviso NBR (F.S. 475.278(4)) se acepta antes de enviar.
   const [agentStatus, setAgentStatus] = useState<string>("");
@@ -55,7 +56,10 @@ export function ShowingRequestForm({
       other_agent_status: String(fd.get("other_agent_status") ?? ""),
       needs_to_sell: String(fd.get("needs_to_sell") ?? ""),
       buyer_agent_name: String(fd.get("buyer_agent_name") ?? ""),
+      buyer_agent_brokerage: String(fd.get("buyer_agent_brokerage") ?? ""),
+      buyer_agent_email: String(fd.get("buyer_agent_email") ?? ""),
       buyer_agent_license: String(fd.get("buyer_agent_license") ?? ""),
+      esign_consent: fd.get("esign_consent") === "on",
       nbr_accept: fd.get("nbr_accept") === "on",
       consent_contact: fd.get("consent_contact") === "on",
       consent_marketing: fd.get("consent_marketing") === "on",
@@ -68,7 +72,7 @@ export function ShowingRequestForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; exclusive?: boolean; error?: string };
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; exclusive?: boolean; withAgent?: boolean; error?: string };
       if (res.ok && data.ok) {
         track({
           event: "showing_request_submitted",
@@ -76,7 +80,7 @@ export function ShowingRequestForm({
           target: "listingKey" in target ? "mls" : "own",
           exclusive: !!data.exclusive,
         });
-        setDone(data.exclusive ? "exclusive" : "received");
+        setDone(data.exclusive ? "exclusive" : data.withAgent ? "with_agent" : "received");
         return;
       }
       const key = (data.error ?? "failed") as keyof ShowingRequestLabels["errors"];
@@ -97,6 +101,14 @@ export function ShowingRequestForm({
             <p className="text-sm text-ink/75">
               {labels.successBody}
             </p>
+            {/* Sin agente o "No estoy seguro": el correo con el PDF trae el enlace de verificación. */}
+            <p data-verify-pending className="text-sm text-ink/75">{labels.verifyPending}</p>
+            <p data-have-agent-line className="text-sm text-ink/75">{nbr.haveAgentLine}</p>
+          </>
+        ) : done === "with_agent" ? (
+          <>
+            <p className="font-display text-xl text-ink">{labels.successTitle}</p>
+            <p className="text-sm text-ink/75">{labels.withAgentBody}</p>
           </>
         ) : (
           <p className="text-sm text-ink/75">{labels.exclusiveBody}</p>
@@ -123,6 +135,7 @@ export function ShowingRequestForm({
   return (
     <form onSubmit={onSubmit} className="border border-gold-soft p-5 flex flex-col gap-4" noValidate>
       <p className="text-sm text-ink/75">{labels.intro}</p>
+      <p data-buyer-seller-side className="text-xs text-ink/70">{buyerSellerSideLine(lang)}</p>
 
       {/* Honeypot: invisible para personas. */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
@@ -179,6 +192,14 @@ export function ShowingRequestForm({
             <input name="buyer_agent_name" required maxLength={120} className={CONTROL} />
           </label>
           <label className={FIELD}>
+            <span className={LABEL}>{nbr.agentBrokerage}</span>
+            <input name="buyer_agent_brokerage" required maxLength={160} className={CONTROL} />
+          </label>
+          <label className={FIELD}>
+            <span className={LABEL}>{nbr.agentEmail}</span>
+            <input name="buyer_agent_email" type="email" required maxLength={200} className={CONTROL} />
+          </label>
+          <label className={FIELD}>
             <span className={LABEL}>{nbr.agentLicense}</span>
             <input name="buyer_agent_license" required maxLength={20} placeholder="SL…" className={CONTROL} />
           </label>
@@ -189,6 +210,8 @@ export function ShowingRequestForm({
         <div className="border border-gold-soft bg-ivory-strong/40 p-4 flex flex-col gap-3">
           <p className="font-display text-lg text-ink">{nbr.heading}</p>
           <p className="text-xs text-ink/75">{nbr.explain}</p>
+          {/* Primero el consentimiento E-SIGN; después el aviso y su aceptación. */}
+          <EsignConsent lang={lang} />
           <NbrNoticeText lang={lang} />
           <label className="flex items-start gap-2 text-xs text-ink/80">
             <input type="checkbox" name="nbr_accept" required className="mt-0.5" />

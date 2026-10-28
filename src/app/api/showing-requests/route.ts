@@ -21,6 +21,7 @@ import {
   canUseShowingRequests,
   ensureBrokerOfRecord,
   insertShowingLead,
+  mlsShowingRequestsEnabled,
   resolveTarget,
 } from "@/lib/buyer-leads.server";
 import { recordInlineAcceptance, requestEvidence } from "@/lib/nbr-notice.server";
@@ -54,6 +55,10 @@ export async function POST(req: Request): Promise<Response> {
   if (!parsed.ok && parsed.error === "spam") return NextResponse.json({ ok: true, exclusive: false });
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const data = parsed.data;
+  // Fichas de otros brokers: apagadas para el lanzamiento (fase 2), también para el staff.
+  if (data.target.kind === "mls" && !mlsShowingRequestsEnabled()) {
+    return NextResponse.json({ error: "target" }, { status: 404 });
+  }
 
   try {
     const svc = createService();
@@ -98,8 +103,14 @@ export async function POST(req: Request): Promise<Response> {
           preferredTimes: data.preferredTimes,
           message: data.message,
           otherAgentStatus: data.otherAgentStatus,
-          buyerAgent: data.buyerAgentName ? `${data.buyerAgentName} · FL license ${data.buyerAgentLicense}` : null,
-          nbrNotice: data.buyerAgentName ? null : nbrId ? "Accepted in the form (PDF attached in a separate email)" : "PENDING: send it from the lead",
+          buyerAgent: data.buyerAgent
+            ? `${data.buyerAgent.name} · ${data.buyerAgent.brokerage} · ${data.buyerAgent.email} · FL license ${data.buyerAgent.license}. Coordinate the showing with the agent; all communication goes through them.`
+            : null,
+          nbrNotice: data.buyerAgent
+            ? null
+            : nbrId
+              ? "Accepted in the form (PDF in a separate email). Pending: the buyer must verify their email before you confirm."
+              : "PENDING: send it from the lead",
           needsToSell: data.needsToSell,
           consentMarketing: data.consentMarketing,
           consentVersion: CONSENT_VERSION,
@@ -112,10 +123,11 @@ export async function POST(req: Request): Promise<Response> {
           lang: data.lang,
           buyerName: data.fullName,
           ownAddress: target.ownAddress,
+          withAgent: !!data.buyerAgent,
         }),
       ]);
     }
-    return NextResponse.json({ ok: true, exclusive });
+    return NextResponse.json({ ok: true, exclusive, withAgent: !!data.buyerAgent });
   } catch (e) {
     // Sin datos del comprador en el log.
     console.error(JSON.stringify({

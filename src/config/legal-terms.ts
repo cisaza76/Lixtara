@@ -271,7 +271,7 @@ export function termsFaq(lang: Lang) {
       },
       earlyAccess: {
         q: "¿Puedo ver propiedades antes de que salgan al MLS?",
-        a: `No. ${propertyAccess.text.es} Si buscas casa, la broker te acompaña desde que una propiedad está publicada.`,
+        a: `No. ${propertyAccess.text.es} Si buscas casa, puedes pedir una visita desde que una propiedad está publicada.`,
       },
     } satisfies Record<string, FaqItem>;
   }
@@ -302,7 +302,7 @@ export function termsFaq(lang: Lang) {
     },
     earlyAccess: {
       q: "Can I see properties before they hit the MLS?",
-      a: `No. ${propertyAccess.text.en} If you're buying, the broker can help you as soon as a property is published.`,
+      a: `No. ${propertyAccess.text.en} If you're buying, you can request a showing as soon as a property is published.`,
     },
   } satisfies Record<string, FaqItem>;
 }

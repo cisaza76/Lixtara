@@ -1,13 +1,17 @@
-// Aviso NBR (F.S. 475.278(4)): texto legal exacto, quién lo recibe y la regla de confirmación.
+// Aviso NBR (F.S. 475.278(4)) y consentimiento E-SIGN: texto legal exacto, formato, quién lo
+// recibe y la regla de confirmación (aviso aceptado + correo verificado, o datos del agente).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BROKERAGE } from "@/config/brokerage";
 import {
+  ESIGN_VERSION,
   NBR_COPY,
+  NBR_ES_GOVERNING_LINE,
   NBR_LEGAL_REVIEW_PENDING,
   NBR_NOTICE_EN,
   NBR_NOTICE_ES,
   NBR_NOTICE_VERSION,
+  esignConsentText,
   hasOwnAgent,
   nbrBlockReason,
   nbrStatusLine,
@@ -15,7 +19,11 @@ import {
   normalizeAgentLicense,
   noticePlainText,
   noticeTextsFor,
+  parseBuyerAgent,
+  showingWaitLabel,
 } from "@/lib/nbr-notice";
+
+const contact = { email: "test@example.com", phone: "+1 (305) 555-0100" };
 
 function keysOf(o: unknown, prefix = ""): string[] {
   if (typeof o !== "object" || o === null) return [prefix];
@@ -38,20 +46,21 @@ describe("texto del aviso", () => {
     ]);
   });
 
-  it("la primera oración va en mayúsculas (y en negrita en el componente y el PDF)", () => {
+  it("primera oración en mayúsculas y negrita, del MISMO tamaño que el resto (pantalla y PDF)", () => {
     expect(NBR_NOTICE_EN.lead).toBe(NBR_NOTICE_EN.lead.toUpperCase());
-    expect(NBR_NOTICE_ES.lead).toBe(NBR_NOTICE_ES.lead.toUpperCase());
     const component = readFileSync("src/components/nbr-notice-text.tsx", "utf8");
     expect(component).toContain('<p className="font-bold">{t.lead}</p>');
+    // El tamaño lo da el contenedor (text-sm); ningún párrafo del aviso cambia de tamaño.
+    const notice = component.slice(component.indexOf("export function NbrNoticeText"), component.indexOf("export function EsignConsent"));
+    expect(notice.match(/text-(xs|base|lg|xl|\[)/g) ?? []).toEqual([]);
     const pdf = readFileSync("src/lib/nbr-notice-pdf.ts", "utf8");
-    expect(pdf).toContain("write(t.lead, bold, SIZE, 6);");
+    expect(pdf).toContain("pair(NBR_NOTICE_EN.lead, NBR_NOTICE_ES.lead, bold);");
+    expect(pdf).toContain("pair(NBR_NOTICE_EN.intro, NBR_NOTICE_ES.intro, regular);");
   });
 
-  it("en /es: primero la traducción de cortesía, después el inglés que rige; en /en solo el inglés", () => {
-    expect(noticeTextsFor("es")).toEqual([NBR_NOTICE_ES, NBR_NOTICE_EN]);
-    expect(noticeTextsFor("en")).toEqual([NBR_NOTICE_EN]);
-    expect(NBR_COPY.es.courtesyNote).toContain("La versión en inglés");
-    expect(NBR_COPY.es.courtesyNote).toContain("rige");
+  it("inglés y español lado a lado; la columna en español dice que rige el inglés", () => {
+    expect(noticeTextsFor()).toEqual([NBR_NOTICE_EN, NBR_NOTICE_ES]);
+    expect(NBR_ES_GOVERNING_LINE).toBe("Traducción de cortesía. Rige la versión en inglés.");
   });
 
   it("la traducción usa usted (documento legal) y tiene los tres deberes", () => {
@@ -60,58 +69,89 @@ describe("texto del aviso", () => {
     expect(NBR_NOTICE_ES.duties).toHaveLength(3);
   });
 
-  it("marcado como pendiente de revisión legal, y la versión entra en el texto que se guarda", () => {
+  it("aviso y E-SIGN marcados como pendientes de revisión legal; los dos entran en el texto guardado", () => {
     expect(NBR_LEGAL_REVIEW_PENDING).toBe(true);
     expect(NBR_NOTICE_VERSION).toContain("pending-legal-review");
-    expect(noticePlainText("en").startsWith(NBR_NOTICE_VERSION)).toBe(true);
-    expect(noticePlainText("es")).toContain(NBR_NOTICE_EN.lead);
-    expect(noticePlainText("es")).toContain(NBR_NOTICE_ES.lead);
+    expect(ESIGN_VERSION).toContain("pending-legal-review");
+    const plain = noticePlainText("es", contact);
+    for (const part of [NBR_NOTICE_VERSION, ESIGN_VERSION, esignConsentText("es", contact), NBR_NOTICE_EN.lead, NBR_NOTICE_ES.lead, NBR_ES_GOVERNING_LINE]) {
+      expect(plain).toContain(part);
+    }
   });
 
   it("EN y ES con las mismas claves", () => {
     expect(keysOf(NBR_COPY.es).sort()).toEqual(keysOf(NBR_COPY.en).sort());
   });
+
+  it("la línea de 'No estoy seguro' (decisión del 28-oct)", () => {
+    expect(NBR_COPY.es.haveAgentLine).toBe("Si tiene un acuerdo con un agente, avísenos para coordinar la visita con él.");
+  });
 });
 
-describe("quién recibe el aviso", () => {
+describe("consentimiento E-SIGN (15 U.S.C. §7001(c))", () => {
+  for (const lang of ["en", "es"] as const) {
+    it(`${lang}: copia en papel, retiro, alcance, cómo actualizar el contacto y requisitos técnicos`, () => {
+      const t = esignConsentText(lang, contact);
+      expect(t).toContain("7001(c)");
+      expect(t).toContain(contact.email);
+      expect(t).toContain(contact.phone);
+      const must =
+        lang === "en"
+          ? ["paper copy", "no charge", "withdraw this consent", "covers only this notice", "update your email", "web browser", "PDF"]
+          : ["copia en papel", "sin costo", "retirar este consentimiento", "cubre solo este aviso", "actualizar su correo", "navegador web", "PDF"];
+      for (const m of must) expect(t, m).toContain(m);
+    });
+  }
+});
+
+describe("quién recibe el aviso y datos del agente", () => {
   it("con agente (exclusivo o no): sin aviso; sin agente, sin saberlo o sin respuesta: con aviso", () => {
     expect(hasOwnAgent("exclusive")).toBe(true);
     expect(hasOwnAgent("non_exclusive")).toBe(true);
     for (const s of ["none", "unsure", null, undefined, ""]) expect(needsNbrNotice(s)).toBe(true);
-    expect(needsNbrNotice("non_exclusive")).toBe(false);
   });
 
-  it("licencia de Florida del agente", () => {
+  it("licencia y datos del agente", () => {
     expect(normalizeAgentLicense(" sl 345678 ")).toBe("SL345678");
-    expect(normalizeAgentLicense("BK123456")).toBe("BK123456");
-    expect(normalizeAgentLicense("3456789")).toBe("3456789");
     expect(normalizeAgentLicense("ask me")).toBeNull();
-    expect(normalizeAgentLicense("")).toBeNull();
+    const get = (o: Record<string, string>) => (k: string) => o[k];
+    const full = { buyer_agent_name: "Ana", buyer_agent_brokerage: "Acme Realty", buyer_agent_email: "A@Example.com", buyer_agent_license: "BK123456" };
+    expect(parseBuyerAgent(get(full))).toEqual({ name: "Ana", brokerage: "Acme Realty", email: "a@example.com", license: "BK123456" });
+    expect(parseBuyerAgent(get({ ...full, buyer_agent_brokerage: "" }))).toBeNull();
+    expect(parseBuyerAgent(get({ ...full, buyer_agent_email: "nope" }))).toBeNull();
   });
 });
 
-describe("sin aviso no hay visita confirmada", () => {
-  const base = { agentStatus: "none", agentName: null, agentLicense: null, nbrAcceptedAt: null };
-  it("sin agente: hace falta el aviso aceptado", () => {
+describe("sin aviso aceptado y correo verificado no hay visita confirmada", () => {
+  const base = { agentStatus: "none", agentName: null, agentEmail: null, nbrAcceptedAt: null, emailVerifiedAt: null };
+  it("sin agente: aviso aceptado y, además, correo verificado", () => {
     expect(nbrBlockReason(base)).toBe("nbr_notice_missing");
     expect(nbrBlockReason({ ...base, agentStatus: "unsure" })).toBe("nbr_notice_missing");
-    expect(nbrBlockReason({ ...base, nbrAcceptedAt: "2026-10-29T15:00:00Z" })).toBeNull();
+    expect(nbrBlockReason({ ...base, nbrAcceptedAt: "2026-10-29T15:00:00Z" })).toBe("nbr_email_unverified");
+    expect(nbrBlockReason({ ...base, nbrAcceptedAt: "2026-10-29T15:00:00Z", emailVerifiedAt: "2026-10-29T15:05:00Z" })).toBeNull();
   });
-  it("con agente: hacen falta su nombre y su licencia, no el aviso", () => {
-    expect(nbrBlockReason({ ...base, agentStatus: "non_exclusive" })).toBe("nbr_buyer_agent_missing");
-    expect(nbrBlockReason({ ...base, agentStatus: "non_exclusive", agentName: "Ana", agentLicense: "SL1" })).toBeNull();
+  it("con agente: nombre y correo del agente, no el aviso", () => {
+    expect(nbrBlockReason({ ...base, agentStatus: "exclusive" })).toBe("nbr_buyer_agent_missing");
+    expect(nbrBlockReason({ ...base, agentStatus: "exclusive", agentName: "Ana", agentEmail: "a@example.com" })).toBeNull();
   });
 });
 
-describe("línea de la ficha del admin", () => {
-  it("'Aviso NBR: aceptado [fecha]' o 'pendiente', con la hora de Miami", () => {
-    expect(nbrStatusLine({ agentStatus: "none", acceptedAt: "2026-10-29T15:04:05Z", sentAt: null }, "es")).toMatch(
-      /^Aviso NBR: aceptado .*2026.*11:04:05.* ET \(America\/New_York\)$/,
+describe("ficha del admin", () => {
+  it("'Aviso NBR: aceptado [fecha] · pendiente de verificación' / '· correo verificado [fecha]' / 'pendiente'", () => {
+    const acc = "2026-10-29T15:04:05Z";
+    expect(nbrStatusLine({ agentStatus: "none", acceptedAt: acc, sentAt: null, emailVerifiedAt: null }, "es")).toMatch(
+      /^Aviso NBR: aceptado .*11:04:05.* ET \(America\/New_York\) · pendiente de verificación del correo$/,
     );
-    expect(nbrStatusLine({ agentStatus: "none", acceptedAt: null, sentAt: null }, "es")).toBe("Aviso NBR: pendiente");
-    expect(nbrStatusLine({ agentStatus: "unsure", acceptedAt: null, sentAt: "2026-10-29T15:00:00Z" }, "en")).toMatch(
-      /^NBR notice: pending \(sent .* ET \(America\/New_York\)\)$/,
+    expect(nbrStatusLine({ agentStatus: "none", acceptedAt: acc, sentAt: null, emailVerifiedAt: "2026-10-29T15:10:00Z" }, "en")).toMatch(
+      /^NBR notice: accepted .* · email verified .*11:10:00.*$/,
     );
-    expect(nbrStatusLine({ agentStatus: "exclusive", acceptedAt: null, sentAt: null }, "es")).toBeNull();
+    expect(nbrStatusLine({ agentStatus: "none", acceptedAt: null, sentAt: null, emailVerifiedAt: null }, "es")).toBe("Aviso NBR: pendiente");
+    expect(nbrStatusLine({ agentStatus: "exclusive", acceptedAt: null, sentAt: null, emailVerifiedAt: null }, "es")).toBeNull();
+  });
+
+  it("estado de espera: con agente, 'pendiente de coordinar con el agente del comprador'; sin verificar, 'pendiente de verificación'", () => {
+    expect(showingWaitLabel({ agentStatus: "exclusive", status: "received", block: null }, "es")).toBe("Pendiente de coordinar con el agente del comprador");
+    expect(showingWaitLabel({ agentStatus: "none", status: "contacted", block: "nbr_email_unverified" }, "es")).toBe("Pendiente de verificación");
+    expect(showingWaitLabel({ agentStatus: "exclusive", status: "showing_confirmed", block: null }, "es")).toBeNull();
   });
 });

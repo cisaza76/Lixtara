@@ -7,7 +7,7 @@ import { LOUI_SYSTEM_PROMPT } from "@/lib/loui-prompt";
 import { louiLimiter, clientIp, enforceLimit } from "@/lib/ratelimit";
 import { validateLouiMessages } from "@/lib/loui-request";
 import { createService } from "@/lib/supabase/service";
-import { hasOwnAgent, normalizeAgentLicense } from "@/lib/nbr-notice";
+import { hasOwnAgent, parseBuyerAgent } from "@/lib/nbr-notice";
 import { sendNbrLink } from "@/lib/nbr-notice.server";
 
 const CHAT_MODEL = "claude-sonnet-4-6";
@@ -168,7 +168,7 @@ export async function POST(req: Request) {
     }),
     request_schedule: tool({
       description:
-        "Create a scheduling request that goes to Lixtara's brokerage. Use this whenever the user wants to talk to a realtor or the broker, or schedule a showing, instead of inventing answers. Never use it for legal questions: Lixtara is not a law firm; give the attorney referral instead. For 'showing', first ask whether the buyer signed an agreement with their own real estate agent and pass buyer_agent_status; if they have an agent, also pass the agent's name and Florida license. A showing request is never a confirmed showing.",
+        "Create a scheduling request that goes to Lixtara's brokerage. Use this whenever the user wants to talk to a realtor or the broker, or schedule a showing, instead of inventing answers. Never use it for legal questions: Lixtara is not a law firm; give the attorney referral instead. For 'showing' (only homes listed with Lixtara, never another brokerage's listing), first ask whether the buyer signed an agreement with their own real estate agent and pass buyer_agent_status; if they have an agent, also pass the agent's name, brokerage, email and Florida license. A showing request is never a confirmed showing.",
       inputSchema: z.object({
         type: z.enum(SCHEDULE_TYPES),
         topic: z
@@ -188,9 +188,11 @@ export async function POST(req: Request) {
           .optional()
           .describe("Showings only: has the buyer signed an agreement with their own agent? exclusive / non_exclusive / none / unsure"),
         buyer_agent_name: z.string().max(120).optional().describe("Showings only, buyer with an agent: the agent's name"),
+        buyer_agent_brokerage: z.string().max(160).optional().describe("Showings only, buyer with an agent: the agent's brokerage"),
+        buyer_agent_email: z.string().max(200).optional().describe("Showings only, buyer with an agent: the agent's email"),
         buyer_agent_license: z.string().max(20).optional().describe("Showings only, buyer with an agent: the agent's Florida license number"),
       }),
-      execute: async ({ type, topic, preferred_time, notes, buyer_agent_status, buyer_agent_name, buyer_agent_license }) => {
+      execute: async ({ type, topic, preferred_time, notes, buyer_agent_status, ...agentInput }) => {
         if (!user) {
           return {
             error: "not_signed_in",
@@ -202,12 +204,12 @@ export async function POST(req: Request) {
         // el aviso NBR por correo, que el comprador acepta antes de la visita.
         const showing = type === "showing";
         const withAgent = showing && hasOwnAgent(buyer_agent_status);
-        const license = withAgent ? normalizeAgentLicense(buyer_agent_license ?? "") : null;
+        const agent = withAgent ? parseBuyerAgent((k) => agentInput[k as keyof typeof agentInput]) : null;
         if (showing && !buyer_agent_status) {
           return { error: "buyer_agent_status_required", message: "Ask whether the buyer signed an agreement with their own real estate agent before requesting the showing." };
         }
-        if (withAgent && (!buyer_agent_name?.trim() || !license)) {
-          return { error: "buyer_agent_required", message: "Ask for the buyer's agent name and Florida license number." };
+        if (withAgent && !agent) {
+          return { error: "buyer_agent_required", message: "Ask for the buyer's agent name, brokerage, email and Florida license number." };
         }
         const { data: created, error } = await supabase
           .from("schedule_requests")
@@ -222,8 +224,10 @@ export async function POST(req: Request) {
             ...(showing
               ? {
                   buyer_agent_status,
-                  buyer_agent_name: withAgent ? buyer_agent_name!.trim() : null,
-                  buyer_agent_license: license,
+                  buyer_agent_name: agent?.name ?? null,
+                  buyer_agent_brokerage: agent?.brokerage ?? null,
+                  buyer_agent_email: agent?.email ?? null,
+                  buyer_agent_license: agent?.license ?? null,
                 }
               : {}),
           })
@@ -258,6 +262,7 @@ export async function POST(req: Request) {
           confirmed: false,
           type,
           topic,
+          ...(withAgent ? { note: "The broker will coordinate the showing with the buyer's agent; all communication goes through the agent." } : {}),
           response_window: "one business day",
         };
       },
