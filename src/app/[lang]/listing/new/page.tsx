@@ -118,7 +118,7 @@ import { CONSENTS, consentCheckbox, consentNotice } from "@/lib/legal/consents";
 import { recordAcceptance, termsAcceptedIn } from "@/lib/legal/consents.server";
 import { reconcileTierCheckout } from "@/lib/checkout-return.server";
 import { LocalizedValidation } from "@/components/localized-validation";
-import { PROPERTY_TYPES, allowedStep, isOccupancyStatus, type OccupancyStatus } from "@/lib/listing-completeness";
+import { PROPERTY_TYPES, allowedStep, bedroomsFieldValue, isOccupancyStatus, type OccupancyStatus } from "@/lib/listing-completeness";
 import { loadFirstIncompleteStep } from "@/lib/listing-completeness.server";
 
 const TOTAL_STEPS = 8;
@@ -784,8 +784,9 @@ export default async function ListingNewPage({
         ...addressUpdate,
         // Hasta que el condado diga otra cosa (paso 3): con unidad, Condo.
         property_type: unitFromStoredStreet(street) ? "condo" : "single_family",
+        // 0 = vacío hasta que lo llene el vendedor o el condado; antes nacía con 1 baño, mostrado como dato.
         bedrooms: 0,
-        bathrooms: 1,
+        bathrooms: 0,
         sqft: 0,
         // Sin año hasta que lo dé el condado o el vendedor. Antes se guardaba el año actual,
         // que se mostraba como si fuera el dato real (p. ej. 2026 en 100 Biscayne Blvd).
@@ -956,6 +957,11 @@ export default async function ListingNewPage({
     ) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_type`);
     }
+    // Vacío → mensaje del campo. Habitaciones admite 0 escrito (estudio); baños y pies², no.
+    const blank = (name: string) => String(formData.get(name) ?? "").trim() === "";
+    if (blank("bedrooms")) redirect(`/${lang}/listing/new?step=3&id=${id}&error=beds_required`);
+    if (blank("bathrooms")) redirect(`/${lang}/listing/new?step=3&id=${id}&error=baths_required`);
+    if (blank("sqft")) redirect(`/${lang}/listing/new?step=3&id=${id}&error=sqft_required`);
     // NaN (campo vacío o no numérico) nunca pasa: el formulario es noValidate.
     if (!Number.isFinite(bedrooms) || bedrooms < 0 || bedrooms > 30) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_beds`);
@@ -1783,6 +1789,12 @@ export default async function ListingNewPage({
           ? copy.stepErrors.invalid
           : sp.error === "invalid_type"
             ? copy.stepErrors.invalidType
+            : sp.error === "beds_required"
+              ? copy.fieldErrors.bedrooms
+            : sp.error === "baths_required"
+              ? copy.fieldErrors.bathrooms
+            : sp.error === "sqft_required"
+              ? copy.fieldErrors.sqft
             : sp.error === "invalid_beds"
               ? copy.stepErrors.invalidBeds
               : sp.error === "invalid_baths"
@@ -2376,7 +2388,8 @@ export default async function ListingNewPage({
                 label={copy.step3.bedroomsLabel}
                 name="bedrooms"
                 type="text"
-                defaultValue={draft?.bedrooms ? String(draft.bedrooms) : ""}
+                defaultValue={bedroomsFieldValue(draft)}
+                help={copy.step3.bedroomsHelp}
                 autofilled={!!draft?.folio}
                 autofilledLabel={copy.step3.autofilledBadge}
               />

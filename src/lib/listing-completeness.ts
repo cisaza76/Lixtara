@@ -39,6 +39,16 @@ const filled = (v: string | null | undefined) => (v ?? "").trim().length > 0;
 const inRange = (v: number | null | undefined, min: number, max: number, minExclusive = false) =>
   typeof v === "number" && Number.isFinite(v) && (minExclusive ? v > min : v >= min) && v <= max;
 
+/**
+ * Valor del campo Habitaciones del paso 3. El borrador nace con 0 = vacío; 0 es también un
+ * estudio. Se muestra "0" solo cuando el paso ya tiene datos (pies² > 0: el vendedor guardó el
+ * paso 3 o el condado lo llenó); si no, en blanco.
+ */
+export function bedroomsFieldValue(d: { bedrooms: number | null; sqft: number | null } | null): string {
+  if (!d || d.bedrooms == null) return "";
+  return d.bedrooms > 0 || (d.sqft ?? 0) > 0 ? String(d.bedrooms) : "";
+}
+
 /** ¿Está completo el paso `step` (1–6)? Las reglas reflejan la validación de su server action. */
 export function stepComplete(step: number, f: ListingCompletenessFacts, now = new Date()): boolean {
   switch (step) {

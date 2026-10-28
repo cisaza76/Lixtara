@@ -265,9 +265,9 @@ describe("ed8132ef: baños = 1 y el aviso de autollenado (2026-10-27)", () => {
     expect((await countyParcelByFolio(folioOf(BISCAYNE_200)))?.bathrooms).toBeNull();
   });
 
-  it("1 es el valor con que nace todo borrador (paso 1), no un dato del condado", () => {
+  it("el 1 era el valor con que nacía todo borrador (paso 1), no un dato del condado; ahora nace en 0 (vacío)", () => {
     const page = readFileSync(join(process.cwd(), "src/app/[lang]/listing/new/page.tsx"), "utf8");
-    expect(page).toMatch(/bedrooms: 0,\s*bathrooms: 1,\s*sqft: 0,/);
+    expect(page).toMatch(/bedrooms: 0,\s*bathrooms: 0,\s*sqft: 0,/);
   });
 
   it("la comparación no depende del formato numérico (numeric de Postgres: 1 / 1.0 / \"2.5\")", () => {
