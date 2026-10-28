@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type Row = Record<string, unknown>;
 const db = vi.hoisted(() => ({ rows: [] as Row[] }));
 const mail = vi.hoisted(() => ({
-  link: vi.fn(async (..._a: unknown[]) => ({ ok: true })),
-  accepted: vi.fn(async (..._a: unknown[]) => ({ ok: true })),
+  link: vi.fn(async (...a: unknown[]) => ({ ok: a.length >= 0 })),
+  accepted: vi.fn(async (...a: unknown[]) => ({ ok: a.length >= 0 })),
 }));
 vi.mock("@/lib/email", () => ({
   sendNbrNoticeLink: (...a: unknown[]) => mail.link(...a),

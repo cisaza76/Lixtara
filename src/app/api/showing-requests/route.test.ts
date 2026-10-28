@@ -13,7 +13,7 @@ const insertShowingLead = vi.fn(async () => ({
 }));
 const sendBroker = vi.fn(async () => ({ ok: true }));
 const sendBuyer = vi.fn(async () => ({ ok: true }));
-const recordNbr = vi.fn(async (..._a: unknown[]) => "nbr-1");
+const recordNbr = vi.fn(async (...a: unknown[]) => (a.length >= 0 ? "nbr-1" : null));
 
 vi.mock("@/lib/buyer-leads.server", () => ({
   canUseShowingRequests: async () => ({ allowed: state.allowed, staff: state.staff }),
