@@ -175,7 +175,7 @@ describe("edificios de 5 o más unidades: aviso propio", () => {
     const es = dictionaries.es.listingForm.step3;
     const en = dictionaries.en.listingForm.step3;
     expect(es.autofillMultifamily5).toBe(
-      "Los edificios de 5 o más unidades se publican en el MLS como propiedad comercial. Por ahora Lixtara lista vivienda de hasta 4 unidades; escríbenos y la broker revisa tu caso.",
+      "Los edificios de 5 o más unidades se publican en el MLS como propiedad comercial. Por ahora Lixtara lista vivienda de hasta 4 unidades; [escríbenos] y la broker revisa tu caso.",
     );
     expect(en.autofillMultifamily5).toMatch(/5 or more units/);
     expect(es.autofillMultifamily5).not.toBe(es.autofillNonResidential);
@@ -230,8 +230,9 @@ describe("el paso 3 usa los controles", () => {
   const page = readFileSync(join(process.cwd(), "src/app/[lang]/listing/new/page.tsx"), "utf8");
 
   it("el autollenado automático y el botón respetan 'no residencial' y los topes del impuesto", () => {
-    expect(page).toMatch(/if \(result\.nonResidential \|\| result\.largeMultifamily\) \{\s*step3CountyBlock = result\.largeMultifamily \? "multifamily5" : "nonresidential";\s*return;/);
-    expect(page).toContain('autofill=${result.largeMultifamily ? "multifamily5" : "nonresidential"}');
+    expect(page).toMatch(/if \(result\.nonResidential \|\| result\.largeMultifamily\) \{\s*countyBlock\.value = result\.largeMultifamily \? "multifamily5" : "nonresidential";\s*return;/);
+    expect(page).toContain('result.largeMultifamily ? "multifamily5" : "nonresidential"');
+    expect(page).toContain("autofill=${miss}");
     expect(page).toContain("copy.step3.autofillMultifamily5");
     expect(page.match(/acceptCountyTax\(d\.tax_annual_amount/g)).toHaveLength(2);
     expect(page).not.toMatch(/tax_annual_amount = d\.tax_annual_amount/);
