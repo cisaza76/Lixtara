@@ -19,11 +19,8 @@ import { lookupRecipientLang, type EmailLang } from "@/lib/email-recipient-lang"
 /** Código de error de las dos pantallas de aprobación para un listing de prueba. */
 export const TEST_LISTING_ERROR = "test_listing";
 
-export function testListingMessage(lang: string): string {
-  return lang === "es"
-    ? "Listing de prueba: no se puede aprobar ni publicar."
-    : "Test listing: it can't be approved or published.";
-}
+// El texto vive en admin-approval-reasons.ts (puro: lo usa la tarjeta con los demás motivos).
+export { testListingMessage } from "@/lib/admin-approval-reasons";
 
 /** ¿Es un listing de prueba? Si no se puede leer, se trata como de prueba (no se aprueba). */
 export async function isTestListing(supabase: SupabaseClient, id: string): Promise<boolean> {

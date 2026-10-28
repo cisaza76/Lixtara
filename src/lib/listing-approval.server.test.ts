@@ -117,9 +117,9 @@ describe("listing de prueba (is_test): no se aprueba ni manda el correo", () => 
     const home = read("src/app/[lang]/admin/page.tsx");
     expect(home).toContain("const blocked = await approvalBlocker(supabase, id);");
     expect(home).toMatch(/\.eq\("mls_status", "pending_approval"\)\s*\.eq\("is_test", false\)/);
-    expect(home).toContain("disabled={legalPending.has(p.id) || p.is_test || !!ownerBlocked || !!agreementBlocked}");
-    // La tarjeta dice por qué: "Listing de prueba: no se puede aprobar ni publicar".
-    expect(home).toMatch(/\{p\.is_test && \(\s*<span data-test-listing[^>]*>\s*\{testListingMessage\(lang\)\}/);
+    // La tarjeta dice por qué ("Listado de prueba: …") junto con los demás motivos (admin-approval-reasons.test.ts).
+    expect(home).toContain("isTest: p.is_test,");
+    expect(home).toContain("disabled={reasons.length > 0}");
     const review = read("src/app/[lang]/admin/listings/[id]/review/page.tsx");
     expect(review).toContain("const blocked = await approvalBlocker(supabase, id);");
     expect(review).toContain("disabled={legalPending || prop.is_test || !ownerGate.ok || !!approvalBlock}");

@@ -19,7 +19,8 @@ import { legalPendingMessage } from "@/lib/agreement-legal";
 import { ownershipGateMessage, signersAdminCopy } from "@/lib/listing-signers-admin";
 import { manualReviewQueue, queueSignersByProperty } from "@/lib/listing-signers-admin.server";
 import { approvalBlocker } from "@/lib/approval-gate.server";
-import { adminReviewCopy, agreementApprovalBlock, approvalBlockMessage, sellersSignedCount } from "@/lib/admin-review-copy";
+import { adminReviewCopy, agreementApprovalBlock, signersProgress } from "@/lib/admin-review-copy";
+import { approvalReasons } from "@/lib/admin-approval-reasons";
 import { createService } from "@/lib/supabase/service";
 import {
   ensureEnterMlsNumberTask,
@@ -405,7 +406,18 @@ export default async function AdminPage({
                 // Acuerdo sin completar (falta un vendedor o la contrafirma, o anulado): la acción
                 // lo rechaza igual (checkBrokerCountersigned); aquí el botón ya lo dice.
                 const agreementBlocked = agreementApprovalBlock(signing?.agreementStatus ?? null, signing?.lines ?? []);
-                const signedCount = signing ? sellersSignedCount(signing.lines) : null;
+                const progress = signing ? signersProgress(signing.lines, lang) : null;
+                // Todos los motivos, no solo el primero: un listado de prueba con el acuerdo anulado dice los dos.
+                const reasons = approvalReasons(
+                  {
+                    isTest: p.is_test,
+                    legalPending: legalPending.has(p.id),
+                    ownerBlocked,
+                    agreementBlocked,
+                    agreementStatus: signing?.agreementStatus,
+                  },
+                  lang,
+                );
                 return (
                   <div
                     key={p.id}
@@ -450,15 +462,7 @@ export default async function AdminPage({
                       {signing && (
                         <>
                           <p className="text-[10px] uppercase tracking-[0.18em] text-ink/55 mt-2">
-                            {signedCount ? (
-                              <span data-signers-count>
-                                {rc.signersCount
-                                  .replace("{signed}", String(signedCount.signed))
-                                  .replace("{total}", String(signedCount.total))}
-                              </span>
-                            ) : (
-                              sc.signers
-                            )}
+                            {progress ? <span data-signers-count>{progress}</span> : sc.signers}
                           </p>
                           <ul className="flex flex-col gap-0.5 text-xs text-ink/80">
                             {signing.lines.map((l) => (
@@ -545,36 +549,27 @@ export default async function AdminPage({
                         </label>
                         <button
                           type="submit"
-                          disabled={legalPending.has(p.id) || p.is_test || !!ownerBlocked || !!agreementBlocked}
+                          disabled={reasons.length > 0}
                           className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {copy.approveButton}
                         </button>
-                        {p.is_test && (
-                          <span data-test-listing className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
-                            {testListingMessage(lang)}
-                          </span>
-                        )}
-                        {!p.is_test && agreementBlocked && (
-                          <span data-approval-block={agreementBlocked} className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
-                            {approvalBlockMessage(agreementBlocked, signing?.agreementStatus, lang)}{" "}
-                            <Link href={`/${lang}/admin/listings/${p.id}/review`} className="underline">
-                              {sc.open}
-                            </Link>
-                          </span>
-                        )}
-                        {legalPending.has(p.id) && (
-                          <span data-legal-pending className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
-                            {legalPendingMessage(lang)}
-                          </span>
-                        )}
-                        {ownerBlocked && (
-                          <span data-owner-gate={ownerBlocked} className="text-[11px] text-red-700 max-w-[16rem] lg:text-right">
-                            {ownershipGateMessage(ownerBlocked, lang)}{" "}
-                            <Link href={`/${lang}/admin/listings/${p.id}/review`} className="underline">
-                              {sc.open}
-                            </Link>
-                          </span>
+                        {reasons.length > 0 && (
+                          <ul data-approval-reasons className="flex flex-col gap-1 max-w-[16rem] lg:items-end lg:text-right">
+                            {reasons.map((r) => (
+                              <li key={r.kind} data-approval-reason={r.kind} data-reason-code={r.code} className="text-[11px] text-red-700">
+                                {r.message}
+                                {r.openReview && (
+                                  <>
+                                    {" "}
+                                    <Link href={`/${lang}/admin/listings/${p.id}/review`} className="underline">
+                                      {sc.open}
+                                    </Link>
+                                  </>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         )}
                       </form>
                     </div>
@@ -601,7 +596,7 @@ export default async function AdminPage({
                   <li key={m.property_id} className="border border-gold-soft bg-ivory px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink">
                     <span className="font-display">{a ? `${a.address_street}, ${a.address_city}` : shortListingId(m.property_id)}</span>
                     <span className="text-ink/60">{sc.reasons[m.manual_review_reason ?? ""] ?? m.manual_review_reason}</span>
-                    {a?.is_test && <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50">test</span>}
+                    {a?.is_test && <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50">{rc.testBadge}</span>}
                     <Link href={`/${lang}/admin/listings/${m.property_id}/review`} className="ml-auto text-[10px] uppercase tracking-[0.22em] text-ink/60 hover:text-gold">
                       {sc.open}
                     </Link>
