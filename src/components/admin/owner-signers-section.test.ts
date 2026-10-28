@@ -45,7 +45,7 @@ function render(lang: string, live: Array<Record<string, string>> | null, status
 }
 
 describe("OwnerSignersSection", () => {
-  it("dos vendedores que firmaron (en vivo): titular, cada firmante con su relación y su firma, y 2/2", () => {
+  it("dos vendedores que firmaron (en vivo): titular, cada firmante con su relación y su firma, y «Vendedores 2/2 · Broker pendiente»", () => {
     const html = render("es", [
       { roleName: "Seller", clientUserId: "p1", name: "QA SMTPTest", status: "completed" },
       { roleName: "Seller 2", name: "QA Spouse", status: "completed" },
@@ -59,7 +59,7 @@ describe("OwnerSignersSection", () => {
     expect(html).toContain("QA Spouse");
     expect(html).toContain("Cónyuge (homestead)");
     expect(html).toMatch(/data-signer="broker" data-signer-status="pending"/);
-    expect(html).toMatch(/data-signers-count[^>]*>2\/2</);
+    expect(html).toMatch(/data-signers-count[^>]*>Vendedores 2\/2 · Broker pendiente</);
   });
 
   it("sin DocuSign (estado guardado) el segundo firmante sale igual", () => {

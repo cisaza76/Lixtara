@@ -97,7 +97,9 @@ export const ADMIN_REVIEW_COPY = {
       mlsNumber: "MLS number",
       submit: "Mark as published on the MLS",
     },
-    signersCount: "Signers {signed}/{total}",
+    signersProgress: "Sellers {signed}/{total}",
+    brokerProgress: { signed: "Broker signed", pending: "Broker pending" },
+    testBadge: "test",
     agreementLabels: {
       none: "No agreement",
       pending: "Created, not sent",
@@ -164,7 +166,7 @@ export const ADMIN_REVIEW_COPY = {
     } as Record<string, string>,
   },
   es: {
-    back: "← Listings",
+    back: "← Listados",
     done: "Listo: {what}.",
     nothingChanged: "No se cambió nada.",
     doneLabels: {
@@ -184,7 +186,7 @@ export const ADMIN_REVIEW_COPY = {
     sellerRequestsHelp: "Haz el cambio primero en Matrix. Al aprobar se aplica en lixtara.com; antes no se publica nada.",
     requestChange: "Cambio",
     requestWithdrawal: "Retiro",
-    withdrawalBody: "Sacar este listing del mercado (→ retirado).",
+    withdrawalBody: "Sacar este listado del mercado (→ retirado).",
     matrixDoneChange: "Ya lo actualicé en Matrix",
     matrixDoneWithdrawal: "Ya lo retiré en Matrix",
     noteToSeller: "Nota para el vendedor (opcional)",
@@ -195,10 +197,10 @@ export const ADMIN_REVIEW_COPY = {
     feeEarned: "La tarifa fija está devengada: si el vendedor cancela ahora, no se reembolsa (salvo un cobro doble o un error técnico).",
     notPublished: "No está marcado como publicado.",
     fullRefund: "Si el vendedor cancela ahora, la tarifa fija se reembolsa completa.",
-    publishHelp: "Hazlo cuando el listing ya esté en Matrix. La fecha es la de ahora; después no se puede editar (solo un admin la corrige, con una nota).",
+    publishHelp: "Hazlo cuando el listado ya esté en Matrix. La fecha es la de ahora; después no se puede editar (solo un admin la corrige, con una nota).",
     correctDate: "Corregir la fecha (admin) →",
     publishedOnMiami: "Publicado el (hora de Miami)",
-    clearDate: "Borrar la fecha (el listing nunca se publicó)",
+    clearDate: "Borrar la fecha (el listado nunca se publicó)",
     correctionNote: "¿Por qué se corrige la fecha? (obligatorio)",
     saveCorrection: "Guardar la corrección",
     history: "Historial",
@@ -209,7 +211,7 @@ export const ADMIN_REVIEW_COPY = {
     correctIt: "Corregirlo",
     recordIt: "Anotarlo",
     saveMlsNumber: "Guardar el número de MLS",
-    mlsNumberHelp: "Anótalo cuando el listing ya esté en Matrix. Al guardarlo se cierra la tarea «Anotar el número de MLS».",
+    mlsNumberHelp: "Anótalo cuando el listado ya esté en Matrix. Al guardarlo se cierra la tarea «Anotar el número de MLS».",
     matrixSheet: "Hoja para Matrix →",
     fields: {
       type: "Tipo",
@@ -245,13 +247,15 @@ export const ADMIN_REVIEW_COPY = {
     requestChangesPlaceholder: "¿Qué hay que cambiar antes de aprobarlo?",
     sendBack: "Devolver al vendedor (borrador)",
     published: {
-      approved: "Listing aprobado (activo)",
+      approved: "Listado aprobado (activo)",
       agreement: "Acuerdo completo (firmado por los vendedores y contrafirmado por la broker)",
       paid: "Pago del plan confirmado",
       mlsNumber: "Número de MLS",
       submit: "Marcar como publicado en el MLS",
     },
-    signersCount: "Firmantes {signed}/{total}",
+    signersProgress: "Vendedores {signed}/{total}",
+    brokerProgress: { signed: "Broker firmó", pending: "Broker pendiente" },
+    testBadge: "prueba",
     agreementLabels: {
       none: "Sin acuerdo",
       pending: "Creado, sin enviar",
@@ -300,18 +304,18 @@ export const ADMIN_REVIEW_COPY = {
     mlsErrors: {
       invalid_format: "Ese número de MLS no parece correcto (p. ej. A11234567).",
       empty: "Escribe el número de MLS.",
-      taken: "Ese número de MLS ya está en otro listing.",
+      taken: "Ese número de MLS ya está en otro listado.",
       failed: "No se pudo guardar el número de MLS. Inténtalo de nuevo.",
       matrix_required: "Confirma que ya hiciste el cambio en Matrix.",
       not_pending: "Esa solicitud ya se atendió.",
-      apply_failed: "No se pudo aplicar la solicitud al listing. Inténtalo de nuevo.",
+      apply_failed: "No se pudo aplicar la solicitud al listado. Inténtalo de nuevo.",
       not_countersigned: "La broker todavía no contrafirmó el acuerdo de listado en DocuSign.",
       mark_not_applicable: "Esa marca ya no corresponde a este titular (puede que el vendedor lo haya cambiado).",
       mark_save_failed: "No se pudo guardar la marca. Inténtalo de nuevo.",
       docusign_unavailable: "No se pudo confirmar la contrafirma de la broker con DocuSign. Inténtalo de nuevo.",
-      listing_not_active: "Aprueba el listing (activo) antes de marcarlo como publicado en el MLS.",
-      already_published: "Este listing ya tiene fecha de publicación en el MLS. Solo un admin puede corregirla.",
-      mls_number_required: "Escribe el número de MLS para marcar el listing como publicado.",
+      listing_not_active: "Aprueba el listado (activo) antes de marcarlo como publicado en el MLS.",
+      already_published: "Este listado ya tiene fecha de publicación en el MLS. Solo un admin puede corregirla.",
+      mls_number_required: "Escribe el número de MLS para marcar el listado como publicado.",
       agreement_not_completed: "El acuerdo de listado todavía no está completo (firmado por los vendedores y contrafirmado).",
       payment_not_succeeded: "El pago del plan todavía no se confirmó.",
       future_date: "La fecha de publicación no puede ser futura.",
@@ -361,9 +365,20 @@ export function approvalBlockMessage(block: ApprovalBlock, status: string | null
   return c.approvalBlock[block].replace("{status}", agreementStatusLabel(status, lang).toLowerCase());
 }
 
-/** "Firmantes 1/2": vendedores que firmaron / vendedores del acuerdo (null con un solo vendedor). */
+/** Vendedores que firmaron / vendedores del acuerdo (null sin vendedores). */
 export function sellersSignedCount(lines: SignerLine[]): { signed: number; total: number } | null {
   const sellers = lines.filter((l) => l.role !== "broker");
-  if (sellers.length < 2) return null;
+  if (sellers.length === 0) return null;
   return { signed: sellers.filter((l) => l.status === "signed").length, total: sellers.length };
+}
+
+/** "Vendedores 2/2 · Broker pendiente": los vendedores y, aparte, la contrafirma de la broker. */
+export function signersProgress(lines: SignerLine[], lang: string): string | null {
+  const count = sellersSignedCount(lines);
+  if (!count) return null;
+  const c = adminReviewCopy(lang);
+  const sellers = c.signersProgress.replace("{signed}", String(count.signed)).replace("{total}", String(count.total));
+  const broker = lines.find((l) => l.role === "broker");
+  if (!broker) return sellers;
+  return `${sellers} · ${c.brokerProgress[broker.status === "signed" ? "signed" : "pending"]}`;
 }

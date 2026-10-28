@@ -14,7 +14,7 @@ import {
   type SignerLine,
   type StaffOwnership,
 } from "@/lib/listing-signers-admin";
-import { sellersSignedCount } from "@/lib/admin-review-copy";
+import { signersProgress } from "@/lib/admin-review-copy";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -43,7 +43,7 @@ export function OwnerSignersSection({
   actions: { markSunbizListed: Action; markSunbizNotListed: Action; markAuthorityDocument: Action; clearManualReview: Action };
 }) {
   const sc = signersAdminCopy(lang);
-  const count = sellersSignedCount(signerLines);
+  const progress = signersProgress(signerLines, lang);
   return (
     <section data-owner-signers className="border border-gold-soft p-6 flex flex-col gap-4">
       <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">{sc.title}</span>
@@ -66,9 +66,9 @@ export function OwnerSignersSection({
       <div className="flex flex-col gap-2">
         <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
           {sc.signers}
-          {count && (
+          {progress && (
             <span data-signers-count className="ml-2 normal-case tracking-normal text-ink/70">
-              {count.signed}/{count.total}
+              {progress}
             </span>
           )}
         </span>

@@ -28,7 +28,9 @@ describe("descripción legal pendiente", () => {
     // Las dos acciones pasan por approvalBlocker (approval-gate.server.ts).
     const home = readFileSync("src/app/[lang]/admin/page.tsx", "utf8");
     expect(home).toContain("const blocked = await approvalBlocker(supabase, id);");
-    expect(home).toContain("disabled={legalPending.has(p.id) ||");
+    // La tarjeta: legalPending es uno de los motivos que deshabilitan el botón (admin-approval-reasons).
+    expect(home).toContain("legalPending: legalPending.has(p.id),");
+    expect(home).toContain("disabled={reasons.length > 0}");
     const review = readFileSync("src/app/[lang]/admin/listings/[id]/review/page.tsx", "utf8");
     expect(review).toContain("const blocked = await approvalBlocker(supabase, id);");
     expect(review).toContain("disabled={legalPending ||");

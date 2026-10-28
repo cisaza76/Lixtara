@@ -225,7 +225,7 @@ export const SIGNERS_ADMIN_COPY = {
     title: "Titular y firmantes",
     kindLabel: "Titular",
     kind: { individuals: "Persona(s) física(s)", fl_entity: "LLC o corporación de Florida", manual_review: "Revisión manual" },
-    noOwnership: "El vendedor no contestó quién es el dueño (listings creados antes de este paso).",
+    noOwnership: "El vendedor no contestó quién es el dueño (listados creados antes de este paso).",
     otherOnTitle: "Otra persona en el título",
     marriedHomestead: "Homestead de un propietario casado",
     yes: "Sí",
@@ -270,7 +270,7 @@ export const SIGNERS_ADMIN_COPY = {
     gate: {
       sunbiz_unchecked: "Revisa al firmante en Sunbiz antes de aprobar (y antes de contrafirmar en DocuSign).",
       entity_authority_pending: "El firmante no figura en Sunbiz: marca la resolución o el poder como recibidos antes de aprobar. No contrafirmes en DocuSign hasta entonces.",
-      manual_review_pending: "Este listing está en revisión manual: destrábalo primero.",
+      manual_review_pending: "Este listado está en revisión manual: destrábalo primero.",
     },
     sellerMissing: "Falta la firma de un vendedor. DocuSign le manda el acuerdo a la broker solo cuando firmaron todos; la aprobación queda bloqueada hasta entonces.",
     queueManual: "Titular en revisión manual",

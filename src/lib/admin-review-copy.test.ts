@@ -6,6 +6,7 @@ import {
   approvalBlockMessage,
   readableValue,
   sellersSignedCount,
+  signersProgress,
 } from "@/lib/admin-review-copy";
 import type { SignerLine } from "@/lib/listing-signers-admin";
 
@@ -76,9 +77,28 @@ describe("agreementApprovalBlock: aprobar solo con el acuerdo completo", () => {
   });
 });
 
-describe("sellersSignedCount", () => {
-  it("'Firmantes 1/2' solo con segundo firmante", () => {
+describe("sellersSignedCount / signersProgress", () => {
+  it("cuenta solo a los vendedores", () => {
     expect(sellersSignedCount([line("seller", "signed"), line("second_seller", "pending"), line("broker", "pending")])).toEqual({ signed: 1, total: 2 });
-    expect(sellersSignedCount([line("seller", "signed"), line("broker", "pending")])).toBeNull();
+    expect(sellersSignedCount([line("seller", "signed"), line("broker", "pending")])).toEqual({ signed: 1, total: 1 });
+    expect(sellersSignedCount([line("broker", "pending")])).toBeNull();
+  });
+  it("'Vendedores 2/2 · Broker pendiente': la broker aparte, en EN/ES", () => {
+    const two = [line("seller", "signed"), line("second_seller", "signed")];
+    expect(signersProgress([...two, line("broker", "pending")], "es")).toBe("Vendedores 2/2 · Broker pendiente");
+    expect(signersProgress([...two, line("broker", "not_sent")], "es")).toBe("Vendedores 2/2 · Broker pendiente");
+    expect(signersProgress([...two, line("broker", "signed")], "es")).toBe("Vendedores 2/2 · Broker firmó");
+    expect(signersProgress([line("seller", "signed"), line("second_seller", "pending"), line("broker", "pending")], "en")).toBe("Sellers 1/2 · Broker pending");
+    expect(signersProgress([line("seller", "pending")], "es")).toBe("Vendedores 0/1");
+    expect(signersProgress([], "es")).toBeNull();
+  });
+});
+
+describe("admin en /es sin restos en inglés", () => {
+  it("'listado', no 'listing'", () => {
+    const strings = keysOf(ADMIN_REVIEW_COPY.es).map((k) => k.split(".").reduce<unknown>((o, p) => (o as Record<string, unknown>)[p], ADMIN_REVIEW_COPY.es));
+    for (const v of strings) expect(String(v), String(v)).not.toMatch(/\blistings?\b/i);
+    expect(ADMIN_REVIEW_COPY.es.published.approved).toBe("Listado aprobado (activo)");
+    expect(ADMIN_REVIEW_COPY.es.publishHelp).toMatch(/^Hazlo cuando el listado ya esté en Matrix/);
   });
 });
