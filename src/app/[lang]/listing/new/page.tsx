@@ -49,6 +49,7 @@ import {
   improveListingDescription,
   improveShowingInstructions,
 } from "@/lib/ai";
+import { BATHROOMS_PATTERN, SQFT_PATTERN } from "@/lib/step3-number-patterns";
 import { acceptCountyTax, baseStreetForLookup, lookupMiamiDadeProperty, staleCountyUpdates, step3PropertyTypeDefault, unitFromStoredStreet } from "@/lib/miami-dade";
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
@@ -1870,6 +1871,11 @@ export default async function ListingNewPage({
     copy.step3.autofillMultifamily5,
     `/${lang}/contact?topic=sell`,
   );
+  // Paso 3: baños y pies² en 0 se rechazan en el navegador con el mismo mensaje del servidor.
+  const step3InvalidMessages = {
+    bathrooms: copy.stepErrors.invalidBaths,
+    sqft: copy.stepErrors.invalidSqft,
+  };
   const autofillResult =
     typeof sp === "object" && "autofill" in sp ? (sp.autofill as string) : null;
   const autofillMessage =
@@ -2353,6 +2359,7 @@ export default async function ListingNewPage({
             <AppFormValidation step={3} lang={lang} message={copy.stepErrors.checkMarked}
               labels={copy.validation}
               fieldMessages={copy.fieldErrors}
+              invalidMessages={step3InvalidMessages}
             />
             <input type="hidden" name="id" value={draftId ?? ""} />
 
@@ -2400,6 +2407,8 @@ export default async function ListingNewPage({
                 defaultValue={
                   draft?.bathrooms ? String(draft.bathrooms) : ""
                 }
+                pattern={BATHROOMS_PATTERN}
+                inputMode="decimal"
                 autofilled={!!draft?.folio}
                 autofilledLabel={copy.step3.autofilledBadge}
               />
@@ -2426,6 +2435,8 @@ export default async function ListingNewPage({
                 name="sqft"
                 type="text"
                 defaultValue={draft?.sqft ? String(draft.sqft) : ""}
+                pattern={SQFT_PATTERN}
+                inputMode="numeric"
                 autofilled={!!draft?.folio}
                 autofilledLabel={copy.step3.autofilledBadge}
               />
