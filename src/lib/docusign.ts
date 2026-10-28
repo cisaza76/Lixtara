@@ -17,6 +17,12 @@
 // `consent_required`, surface the consent URL so the user can grant it.
 
 import { SignJWT, importPKCS8 } from "jose";
+import {
+  SECOND_SELLER_ROLE,
+  SIGNING_DEADLINE_DAYS,
+  SIGNING_REMINDER_EVERY_DAYS,
+  SIGNING_REMINDER_FIRST_DAY,
+} from "@/lib/listing-ownership";
 
 const SCOPES = "signature impersonation";
 
@@ -187,6 +193,20 @@ export interface CreateEnvelopeInput {
    * como "Needs to Sign" con nombre y email vacíos (los llena el código).
    */
   brokerSigner: { roleName: string; name: string; email: string } | null;
+  /**
+   * Otros vendedores (#220: "Seller 2", copropietario o cónyuge por homestead). Firman por email
+   * (sin clientUserId) en paralelo con el vendedor (routingOrder 1), antes que la broker. Con
+   * alguno, el sobre lleva recordatorios y vence a los SIGNING_DEADLINE_DAYS días.
+   */
+  additionalSigners?: Array<{
+    roleName: string;
+    name: string;
+    email: string;
+    textTabs?: Record<string, string>;
+    lockedTextTabs?: string[];
+    /** Solo sobres TEST (scripts/docusign/test-envelopes.ts --sign-urls); el sitio no lo pone. */
+    clientUserId?: string;
+  }>;
 }
 
 /** Rol del broker de Lixtara en cada plantilla (#137 f; confirmar con scripts/check-docusign-template.ts). */
@@ -206,9 +226,18 @@ export class MissingBrokerSignerError extends Error {
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
 
+export class InvalidAdditionalSignerError extends Error {
+  constructor() {
+    super("additional_signer_invalid");
+    this.name = "InvalidAdditionalSignerError";
+  }
+}
+
 /**
- * Roles del sobre: vendedor (1) y broker de Lixtara (2). Lanza ANTES de cualquier llamada
- * a DocuSign si falta el broker o su email: ningún acuerdo sale con una sola firma.
+ * Roles del sobre: vendedor (1), otros vendedores (1, en paralelo, por email) y broker de
+ * Lixtara (2). Lanza ANTES de cualquier llamada a DocuSign si falta el broker o su email (ningún
+ * acuerdo sale con una sola firma), o si otro vendedor no tiene un correo propio (distinto del
+ * vendedor y de la broker).
  */
 export function buildTemplateRoles(input: CreateEnvelopeInput, tabs: Record<string, unknown>) {
   const b = input.brokerSigner;
@@ -219,6 +248,26 @@ export function buildTemplateRoles(input: CreateEnvelopeInput, tabs: Record<stri
     // El vendedor no puede firmar también como broker.
     throw new MissingBrokerSignerError();
   }
+  const taken = new Set([input.signerEmail.trim().toLowerCase(), b.email.trim().toLowerCase()]);
+  const others = (input.additionalSigners ?? []).map((o) => {
+    const email = o.email.trim();
+    if (!o.roleName.trim() || !o.name.trim() || !EMAIL_RE.test(email) || taken.has(email.toLowerCase())) {
+      throw new InvalidAdditionalSignerError();
+    }
+    taken.add(email.toLowerCase());
+    const locked = new Set(o.lockedTextTabs ?? []);
+    const text = Object.entries(o.textTabs ?? {}).map(([k, v]) =>
+      locked.has(k) ? { tabLabel: k, value: v, locked: "true" } : { tabLabel: k, value: v },
+    );
+    return {
+      email,
+      name: o.name.trim(),
+      roleName: o.roleName,
+      routingOrder: "1",
+      ...(o.clientUserId ? { clientUserId: o.clientUserId } : {}),
+      ...(text.length > 0 ? { tabs: { textTabs: text } } : {}),
+    };
+  });
   return [
     {
       email: input.signerEmail,
@@ -228,6 +277,7 @@ export function buildTemplateRoles(input: CreateEnvelopeInput, tabs: Record<stri
       routingOrder: "1",
       tabs: Object.keys(tabs).length > 0 ? tabs : undefined,
     },
+    ...others,
     {
       email: b.email,
       name: b.name,
@@ -235,6 +285,24 @@ export function buildTemplateRoles(input: CreateEnvelopeInput, tabs: Record<stri
       routingOrder: "2",
     },
   ];
+}
+
+/**
+ * Con otros vendedores: recordatorios de DocuSign a los SIGNING_REMINDER_FIRST_DAY días y luego
+ * cada SIGNING_REMINDER_EVERY_DAYS (día 2 y día 5), y el sobre vence a los SIGNING_DEADLINE_DAYS
+ * (owner, 2026-10-21). Sin ellos, la configuración de la cuenta (como hasta ahora).
+ */
+export function envelopeNotification(input: Pick<CreateEnvelopeInput, "additionalSigners">) {
+  if (!input.additionalSigners?.length) return undefined;
+  return {
+    useAccountDefaults: "false",
+    reminders: {
+      reminderEnabled: "true",
+      reminderDelay: String(SIGNING_REMINDER_FIRST_DAY),
+      reminderFrequency: String(SIGNING_REMINDER_EVERY_DAYS),
+    },
+    expirations: { expireEnabled: "true", expireAfter: String(SIGNING_DEADLINE_DAYS), expireWarn: "1" },
+  };
 }
 
 export interface CreateEnvelopeResult {
@@ -294,15 +362,16 @@ export async function createEnvelopeFromTemplate(
   // Roles definitivos: vendedor (1) + broker de Lixtara (2). buildTemplateRoles lanza antes
   // de la llamada si falta la broker (#137 f).
   const roles = buildTemplateRoles(input, tabs);
+  const notification = envelopeNotification(input);
   if (input.attachments?.length) {
     return authedRequest<CreateEnvelopeResult>("/envelopes", {
       method: "POST",
-      body: compositeEnvelopeBody(input, roles, body.emailSubject),
+      body: { ...compositeEnvelopeBody(input, roles, body.emailSubject), ...(notification ? { notification } : {}) },
     });
   }
   return authedRequest<CreateEnvelopeResult>("/envelopes", {
     method: "POST",
-    body: { ...body, templateRoles: roles },
+    body: { ...body, templateRoles: roles, ...(notification ? { notification } : {}) },
   });
 }
 
@@ -403,13 +472,54 @@ export interface EnvelopeSigner {
  * the seller stuck on "Waiting for your signature" after they had signed.
  * The seller is the embedded signer: matched by clientUserId (the property
  * id), or by the "Seller" role.
+ * With a second seller ("Seller 2", #220) BOTH must have signed: the seller
+ * pays only once every seller signed (owner, 2026-10-21).
  */
 export function sellerHasSigned(signers: EnvelopeSigner[], clientUserId: string): boolean {
   const seller =
     signers.find((r) => r.clientUserId === clientUserId) ??
     signers.find((r) => r.roleName?.toLowerCase() === "seller");
-  const st = seller?.status?.toLowerCase();
+  return isDone(seller) && secondSellersSigned(signers);
+}
+
+const isDone = (r: EnvelopeSigner | undefined) => {
+  const st = r?.status?.toLowerCase();
   return st === "completed" || st === "signed";
+};
+
+/** Los otros vendedores del sobre ("Seller 2", #220): todos firmaron (true si no hay). */
+export function secondSellersSigned(signers: EnvelopeSigner[]): boolean {
+  return signers.filter(isSecondSeller).every(isDone);
+}
+
+/** ¿El sobre tiene otro vendedor y ya firmó? (para agreements.additional_signer_signed_at). */
+export function secondSellerHasSigned(signers: EnvelopeSigner[]): boolean {
+  const others = signers.filter(isSecondSeller);
+  return others.length > 0 && others.every(isDone);
+}
+
+function isSecondSeller(r: EnvelopeSigner): boolean {
+  return r.roleName?.trim().toLowerCase() === SECOND_SELLER_ROLE.toLowerCase();
+}
+
+const _templateRoles = new Map<string, { roles: string[]; at: number }>();
+
+/**
+ * ¿La plantilla tiene ese rol? Un sobre con un rol que la plantilla no tiene saldría sin las
+ * firmas de ese rol: con dos vendedores, el acuerdo exige "Seller 2" (plantilla v4 en adelante).
+ * Caché de 10 min por proceso.
+ */
+export async function templateHasRole(templateId: string, role: string): Promise<boolean> {
+  const hit = _templateRoles.get(templateId);
+  let roles = hit && Date.now() - hit.at < 600_000 ? hit.roles : null;
+  if (!roles) {
+    const r = await authedRequest<{ signers?: Array<{ roleName?: string }> }>(
+      `/templates/${encodeURIComponent(templateId)}/recipients`,
+    );
+    roles = (r.signers ?? []).map((s) => s.roleName ?? "");
+    _templateRoles.set(templateId, { roles, at: Date.now() });
+  }
+  return roles.includes(role);
 }
 
 /**

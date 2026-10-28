@@ -8,6 +8,10 @@
 //   … --sign-urls        → creates them and prints the TEST seller's signing link (Demo) for each
 //   … --download <ids>   → after signing: saves each PDF and voids the envelope
 //   … --only <key>       → just one of the cases (e.g. b-no-tenant-other)
+//   … --second-seller    → adds the "Seller 2" role (#220, template v4+): a made-up co-owner
+//                          (test-coowner@example.com), embedded only here so --sign-urls can
+//                          print their link too (the site makes them a remote, email signer)
+//   … --recipients       → prints each envelope's signers (role, routing order, tabs), then voids
 //
 // DocuSign prints the values the site filled in only once the signer finished: an envelope
 // that was just sent downloads as the blank form (seen on 2026-10-21). To review values, sign
@@ -22,6 +26,7 @@ import "./env";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createEnvelopeFromTemplate, getAccessToken, getRecipientView, LIXTARA_BROKER_ROLE } from "../../src/lib/docusign";
+import { SECOND_SELLER_ROLE } from "../../src/lib/listing-ownership";
 import { attachmentHtml, listingAgreementTabs, type AgreementListing } from "../../src/lib/docusign/listing-agreement-tabs";
 import type { BuyerCompOffer } from "../../src/lib/buyer-comp";
 import { PRICING_TIERS, type PricingTierId } from "../../src/lib/pricing-tiers";
@@ -86,6 +91,9 @@ async function voidEnvelope(id: string) {
 }
 
 const SELLER = { email: "test-seller@example.com", name: "TEST Seller (made-up data)" };
+const COOWNER = { email: "test-coowner@example.com", name: "TEST Co-Owner (made-up data)" };
+const SECOND = process.argv.includes("--second-seller");
+const RECIPIENTS = process.argv.includes("--recipients");
 
 async function download(ids: string[]) {
   mkdirSync(out, { recursive: true });
@@ -109,7 +117,7 @@ async function main() {
     const contract = listingAgreementTabs({
       listing: c.listing,
       tier: PRICING_TIERS[c.tier],
-      sellerName: "TEST Seller (made-up data)",
+      sellerName: SECOND ? `${SELLER.name} and ${COOWNER.name}` : SELLER.name,
       // Made-up contact for lines 247–249 (case c: no phone → line 247 blank).
       seller: { phone: c.key.startsWith("c-") ? null : "305-555-0100", email: SELLER.email },
       brokerName: "Lixtara LLC",
@@ -125,6 +133,9 @@ async function main() {
       signerName: SELLER.name,
       clientUserId: `test-${c.key}`,
       brokerSigner: { roleName: LIXTARA_BROKER_ROLE.listingAgreement, name: "TEST Broker", email: "test-broker@example.com" },
+      additionalSigners: SECOND
+        ? [{ roleName: SECOND_SELLER_ROLE, ...COOWNER, clientUserId: `test-${c.key}-2`, textTabs: { seller2_email: COOWNER.email }, lockedTextTabs: ["seller2_email"] }]
+        : undefined,
       textTabs: contract.text,
       lockedTextTabs: contract.lockedText,
       checkboxTabs: contract.checkbox,
@@ -135,9 +146,27 @@ async function main() {
         : undefined,
       emailSubject: `TEST — listing agreement template review (${c.key})`,
     });
+    if (RECIPIENTS) {
+      const r = (await (await dsGet(`/envelopes/${envelopeId}/recipients?include_tabs=true`)).json()) as {
+        signers?: Array<{ roleName?: string; routingOrder?: string; email?: string; clientUserId?: string; tabs?: Record<string, unknown[]> }>;
+      };
+      console.log(`${c.key} (${envelopeId})${SECOND ? " · second seller" : ""}`);
+      for (const sg of r.signers ?? []) {
+        const tabs = Object.entries(sg.tabs ?? {}).map(([k, v]) => `${k.replace("Tabs", "")} ${v.length}`).join(", ");
+        console.log(`  ${sg.roleName} · order ${sg.routingOrder} · ${sg.email} · ${sg.clientUserId ? "embedded" : "email"} · ${tabs || "no tabs"}`);
+      }
+      const env = (await (await dsGet(`/envelopes/${envelopeId}/notification`)).json()) as Record<string, Record<string, string>>;
+      console.log(`  notification: reminders ${env.reminders?.reminderEnabled}/${env.reminders?.reminderDelay}/${env.reminders?.reminderFrequency} · expires ${env.expirations?.expireEnabled}/${env.expirations?.expireAfter}`);
+      if (!KEEP) await voidEnvelope(envelopeId);
+      continue;
+    }
     if (signUrls) {
       const view = await getRecipientView({ envelopeId, signerEmail: SELLER.email, signerName: SELLER.name, clientUserId: `test-${c.key}`, returnUrl: "https://example.com/signed" });
       console.log(`${c.key}\t${envelopeId}\t${view.url}`);
+      if (SECOND) {
+        const v2 = await getRecipientView({ envelopeId, signerEmail: COOWNER.email, signerName: COOWNER.name, clientUserId: `test-${c.key}-2`, returnUrl: "https://example.com/signed" });
+        console.log(`${c.key} (Seller 2)\t${envelopeId}\t${v2.url}`);
+      }
       continue;
     }
     const pdf = Buffer.from(await (await dsGet(`/envelopes/${envelopeId}/documents/combined`, "application/pdf")).arrayBuffer());

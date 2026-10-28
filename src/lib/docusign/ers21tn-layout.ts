@@ -193,7 +193,7 @@ export const ERS21TN_FIELDS: LayoutField[] = [
  * the frame's bottom edge reaches the italic line's ascenders (the stamp is inside the blank).
  */
 export const ERS21TN_INITIALS_Y = 710;
-export type InitialField = { role: "Seller" | "Broker"; page: number; x: number; y: number; scale: number };
+export type InitialField = { role: "Seller" | "Broker" | "Seller 2"; page: number; x: number; y: number; scale: number };
 const FOOTER_BLANK = { Seller: 77.5, Broker: 267 } as const;
 export const ERS21TN_INITIALS: InitialField[] = ([1, 2, 3, 4, 5, 6] as const).flatMap((page) =>
   (["Seller", "Broker"] as const).map((role) => ({ role, page, x: FOOTER_BLANK[role] + 3, y: ERS21TN_INITIALS_Y, scale: 0.5 })),
@@ -204,9 +204,9 @@ export const ERS21TN_INITIALS: InitialField[] = ([1, 2, 3, 4, 5, 6] as const).fl
  * consent to transition to transaction broker (lines 201–202). Owner, 2026-10-21: single agent
  * with consent to transition (paragraph 6(f)); both required.
  *
- * Lines 173–174 and 203–204 are for a second seller. The site has one seller per agreement (one
- * "Seller" role on the envelope, no co-owner in the listing), so they get no tabs: they stay
- * blank. A second seller needs a second role on the template and the co-owner in the data first.
+ * Lines 173–174 and 203–204 are for a second seller: the "Seller 2" role from template v4 on
+ * (ERS21TN_SELLER2_SIGNATURES, #220). With one seller the role isn't sent and DocuSign drops it,
+ * so they stay blank.
  *
  * Signature: 22 pt of free space between the text above and the line (measured on the template
  * image, 2026-10-21); the full-size stamp with its frame is ~34 pt, at `scale` 0.65 ~22 pt. Its
@@ -231,6 +231,40 @@ export const ERS21TN_SELLER_SIGNATURES: SignatureField[] = [
  */
 export const ERS21TN_BROKER_SIGNATURES: SignatureField[] = [
   { kind: "dateSignedTabs", label: "copy_returned_date", line: 257, page: 6, ...dateOnLine(191.5, 315.5) },
+];
+
+/**
+ * Second seller ("Seller 2", template v4 onward, #220): a co-owner on the title or the spouse of
+ * a married owner when it's their homestead. Signs by email, in parallel with the seller. Measured
+ * on the template image at 200 dpi, 2026-10-27:
+ *   - initials: the SECOND "Seller (____)" blank of each footer, x 109.1–132.8, underline 726.1
+ *     (the first is 77.4–101.2); same y and scale as the seller's;
+ *   - lines 173 and 203 (page 4): the second "Signature / Date" pair, same x as 171 and 201,
+ *     underlines at 295 and 700.2. Free space above: 27.5 pt (text ends at 267.5) and 21.6 pt
+ *     (678.6); the 0.65 signature frame starts 1.1 pt below that text;
+ *   - line 250 (page 6): "Seller's Signature" 140.8–413.3 and "Date" 465.5–571.3, underline 138.6
+ *     (22.6 pt below line 249's underline);
+ *   - line 253: email, 120.6–571.3, underline 207.7. Lines 251–252 (phones, address) stay blank:
+ *     the site doesn't ask the second seller for them.
+ * Line 2 carries both names in the seller's field (seller_name: "A and B").
+ */
+export const ERS21TN_SELLER2_INITIALS: InitialField[] = ([1, 2, 3, 4, 5, 6] as const).map((page) => ({
+  role: "Seller 2",
+  page,
+  x: 109.1 + 3,
+  y: ERS21TN_INITIALS_Y,
+  scale: 0.5,
+}));
+export const ERS21TN_SELLER2_SIGNATURES: SignatureField[] = [
+  { kind: "signHereTabs", label: "seller2_single_agent_signature", line: 173, page: 4, ...signOnLine(50.5, 295) },
+  { kind: "dateSignedTabs", label: "seller2_single_agent_date", line: 173, page: 4, ...dateOnLine(436, 295) },
+  { kind: "signHereTabs", label: "seller2_transition_consent_signature", line: 203, page: 4, ...signOnLine(50.5, 700.2) },
+  { kind: "dateSignedTabs", label: "seller2_transition_consent_date", line: 203, page: 4, ...dateOnLine(436, 700.2) },
+  { kind: "signHereTabs", label: "seller2_signature", line: 250, page: 6, ...signOnLine(140.8, 138.6) },
+  { kind: "dateSignedTabs", label: "seller2_date", line: 250, page: 6, ...dateOnLine(465.5, 138.6) },
+];
+export const ERS21TN_SELLER2_FIELDS: TextField[] = [
+  text({ label: "seller2_email", line: 253, page: 6, ...onBlank(120.6, 571.3, 207.7), locked: true, required: true }),
 ];
 
 /** Height of every text tab: one line, no auto-grow. */

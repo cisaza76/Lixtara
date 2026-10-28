@@ -27,6 +27,9 @@ import {
   ERS21TN_FONT_SIZE_PT,
   ERS21TN_INITIALS,
   ERS21TN_SELLER_SIGNATURES,
+  ERS21TN_SELLER2_FIELDS,
+  ERS21TN_SELLER2_INITIALS,
+  ERS21TN_SELLER2_SIGNATURES,
   ERS21TN_TEXT_HEIGHT,
   type CheckboxField,
   type LayoutField,
@@ -241,10 +244,11 @@ function planRadio(f: RadioGroupField, live: LiveSellerTabs): PlanStep[] {
  * Initials of one role (Seller or Broker): one per page, moved into that party's blank of the
  * page footer (ERS21TN_INITIALS). Matched by page; a page without one gets it created.
  */
-export function planInitialFixes(live: LiveSellerTabs, role: "Seller" | "Broker"): PlanStep[] {
+export function planInitialFixes(live: LiveSellerTabs, role: "Seller" | "Broker" | "Seller 2"): PlanStep[] {
   const steps: PlanStep[] = [];
   const tabs = live.initialHereTabs ?? [];
-  for (const f of ERS21TN_INITIALS.filter((i) => i.role === role)) {
+  const fields = role === "Seller 2" ? ERS21TN_SELLER2_INITIALS : ERS21TN_INITIALS.filter((i) => i.role === role);
+  for (const f of fields) {
     const want = { pageNumber: String(f.page), xPosition: String(Math.round(f.x)), yPosition: String(Math.round(f.y)), scaleValue: String(f.scale) };
     const found = tabs.find((t) => num(t.pageNumber) === f.page);
     const label = `${role} initials p${f.page}`;
@@ -254,7 +258,8 @@ export function planInitialFixes(live: LiveSellerTabs, role: "Seller" | "Broker"
     }
     const changes: Record<string, [string, string]> = {};
     for (const [k, v] of Object.entries(want)) if (Number(fmt(found[k]) || NaN) !== Number(v)) changes[k] = [fmt(found[k]), v];
-    if (Object.keys(changes).length > 0) steps.push({ action: "update", kind: "initialHereTabs", tabId: found.tabId, label, reason: `into the "${role === "Seller" ? "Seller" : "Broker/Authorized Associate"} (____)" blank of the footer`, changes });
+    const blank = role === "Broker" ? 'the "Broker/Authorized Associate (____)"' : role === "Seller" ? 'the first "Seller (____)"' : 'the second "Seller (____)"';
+    if (Object.keys(changes).length > 0) steps.push({ action: "update", kind: "initialHereTabs", tabId: found.tabId, label, reason: `into ${blank} blank of the footer`, changes });
   }
   return steps;
 }
@@ -268,7 +273,7 @@ export function planInitialFixes(live: LiveSellerTabs, role: "Seller" | "Broker"
 export function planSignatureFixes(
   live: LiveSellerTabs,
   fields: SignatureField[] = ERS21TN_SELLER_SIGNATURES,
-  who: "seller" | "broker" = "seller",
+  who: "seller" | "broker" | "second seller" = "seller",
 ): PlanStep[] {
   const steps: PlanStep[] = [];
   for (const f of fields) {
@@ -298,6 +303,25 @@ export function planSignatureFixes(
       if (!same) changes[k] = [before, v];
     }
     if (Object.keys(changes).length > 0) steps.push({ action: "update", kind: f.kind, tabId: found.tabId, label: f.label, reason: `${who}'s ${what}, line ${f.line}`, changes });
+  }
+  return steps;
+}
+
+/**
+ * The second seller ("Seller 2", v4 onward, #220): initials in the second "Seller (____)" blank
+ * of each footer, signature and date on lines 173, 203 and 250, and the email on line 253.
+ */
+export function planSecondSellerFixes(live: LiveSellerTabs): PlanStep[] {
+  const steps: PlanStep[] = [...planInitialFixes(live, "Seller 2"), ...planSignatureFixes(live, ERS21TN_SELLER2_SIGNATURES, "second seller")];
+  for (const f of ERS21TN_SELLER2_FIELDS) {
+    const want = desiredText(f, false);
+    const found = (live.textTabs ?? []).find((t) => t.tabLabel === f.label);
+    if (!found) {
+      steps.push({ action: "create", kind: "textTabs", label: f.label, reason: `second seller's email, line ${f.line}`, tab: { ...want, documentId: "1", font: "arial", fontColor: "black", tabType: "text" } });
+      continue;
+    }
+    const changes = diff(found, want);
+    if (Object.keys(changes).length > 0) steps.push({ action: "update", kind: "textTabs", tabId: found.tabId, label: f.label, reason: "fit to the line", changes });
   }
   return steps;
 }

@@ -22,6 +22,7 @@ import {
   getEnvelopeSigners,
   getEnvelopeStatus,
   mapEnvelopeStatus,
+  secondSellerHasSigned,
   sellerHasSigned,
   type AgreementStatus,
 } from "@/lib/docusign";
@@ -82,9 +83,10 @@ export async function refreshAgreementResult(
     if (env.completedDateTime) signedAt = env.completedDateTime;
     const mapped = mapEnvelopeStatus(env.status);
     const needSigners = mapped === "pending" || mapped === "sent" || mapped === "delivered";
-    const signed = needSigners
-      ? sellerHasSigned(await getEnvelopeSigners(a.envelope_id), a.property_id)
-      : false;
+    const signers = needSigners ? await getEnvelopeSigners(a.envelope_id) : null;
+    // Con dos vendedores (#220) cuenta solo cuando firmaron todos (sellerHasSigned).
+    const signed = signers ? sellerHasSigned(signers, a.property_id) : false;
+    if (signers && secondSellerHasSigned(signers)) await markSecondSellerSigned(a.id);
     next = resolveAgreementStatus(env.status, signed);
     if (next === "completed") {
       // Solo para el embudo: el estado pasa a "completed" aunque esta lectura falle.
@@ -187,4 +189,15 @@ async function notifySellerSigned(propertyId: string) {
     propertyAddress: `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`,
     paymentUrl: `${SITE_URL}/${lang}/listing/new?id=${propertyId}&step=8`,
   });
+}
+
+/** agreements.additional_signer_signed_at, una vez (#220). Best-effort: nunca lanza. */
+async function markSecondSellerSigned(agreementId: string): Promise<void> {
+  const { error } = await createService()
+    .from("agreements")
+    .update({ additional_signer_signed_at: new Date().toISOString() })
+    .eq("id", agreementId)
+    .eq("sellers_required", 2)
+    .is("additional_signer_signed_at", null);
+  if (error) console.error("agreement refresh: second seller mark failed", error.code);
 }

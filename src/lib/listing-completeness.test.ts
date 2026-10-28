@@ -33,6 +33,7 @@ const fresh: ListingCompletenessFacts = {
   photoCount: 0,
   photographyPaid: false,
   buyerComp: null,
+  ownershipComplete: false,
 };
 
 const complete: ListingCompletenessFacts = {
@@ -49,6 +50,7 @@ const complete: ListingCompletenessFacts = {
   photos_rights_confirmed: true,
   photoCount: MIN_OWN_PHOTOS,
   buyerComp: { buyer_agent_comp_type: "percent", buyer_agent_commission: 2.5, buyer_agent_comp_amount: null },
+  ownershipComplete: true,
 };
 
 describe("firstIncompleteStep", () => {
@@ -76,6 +78,8 @@ describe("firstIncompleteStep", () => {
     expect(firstIncompleteStep({ ...complete, occupancy_status: null }, NOW)).toBe(3);
     expect(firstIncompleteStep({ ...complete, occupancy_status: "" }, NOW)).toBe(3);
     expect(firstIncompleteStep({ ...complete, occupancy_status: "unknown" }, NOW)).toBe(3);
+    // Sin titular guardado, o con otro en el título / homestead y sin segundo firmante (#220).
+    expect(firstIncompleteStep({ ...complete, ownershipComplete: false }, NOW)).toBe(3);
     expect(firstIncompleteStep({ ...complete, description: "short" }, NOW)).toBe(4);
     expect(firstIncompleteStep({ ...complete, photoCount: MIN_OWN_PHOTOS - 1 }, NOW)).toBe(5);
     expect(firstIncompleteStep({ ...complete, photos_rights_confirmed: false }, NOW)).toBe(5);
