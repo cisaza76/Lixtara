@@ -2137,7 +2137,9 @@ export default async function ListingNewPage({
               </div>
             </div>
           )}
-          {draft && draft.bedrooms > 0 && step3MiamiDade && (
+          {/* Same condition as the "Autofilled" marks: a folio (cleared when the county no
+              longer confirms the parcel), not bedrooms > 0, which may be the seller's. */}
+          {draft?.folio && step3MiamiDade && (
             <SuccessBanner message={copy.step3.autoFilledNote} />
           )}
           {/* Only where Google places the address in Miami-Dade County. */}

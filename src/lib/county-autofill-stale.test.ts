@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   countyLookupMiss,
+  countyParcelByFolio,
   lookupMiamiDadeProperty,
   staleCountyColumns,
   staleCountyUpdates,
@@ -253,5 +254,35 @@ describe("el paso 3 aplica la limpieza y el enlace", () => {
     expect(page).toContain("`/${lang}/contact?topic=sell`");
     expect(dictionaries.es.listingForm.step3.autofillMultifamily5).toContain("[escríbenos]");
     expect(dictionaries.en.listingForm.step3.autofillMultifamily5).toContain("[write to us]");
+  });
+});
+
+describe("ed8132ef: baños = 1 y el aviso de autollenado (2026-10-27)", () => {
+  it("el condado no da baños para 200 S Biscayne (0 completos, 0 medios): el 1 no vino de él", async () => {
+    stubCounty();
+    const r = await lookupMiamiDadeProperty("10279 NW 30th Ter", "33172", null);
+    expect(r.details?.bathrooms).toBe(2.5); // 2 completos + 1 medio
+    expect((await countyParcelByFolio(folioOf(BISCAYNE_200)))?.bathrooms).toBeNull();
+  });
+
+  it("1 es el valor con que nace todo borrador (paso 1), no un dato del condado", () => {
+    const page = readFileSync(join(process.cwd(), "src/app/[lang]/listing/new/page.tsx"), "utf8");
+    expect(page).toMatch(/bedrooms: 0,\s*bathrooms: 1,\s*sqft: 0,/);
+  });
+
+  it("la comparación no depende del formato numérico (numeric de Postgres: 1 / 1.0 / \"2.5\")", () => {
+    const previous = { bathrooms: 1, lot_size: 1495, tax_annual_amount: 9270 } as MiamiDadeDetails;
+    const asText = { ...filledFrom10279("x"), bathrooms: "1.0", lot_size: "1495.00", tax_annual_amount: "9270" } as unknown as CountyFilledColumns;
+    const out = staleCountyColumns(asText, previous);
+    expect(out.bathrooms).toBe(0);
+    expect(out.lot_size).toBeNull();
+    expect(out.tax_annual_amount).toBeNull();
+    expect(staleCountyColumns({ ...filledFrom10279("x"), bathrooms: 2.5 }, { bathrooms: 2.5 } as MiamiDadeDetails).bathrooms).toBe(0);
+  });
+
+  it("el aviso 'pre-filled from Miami-Dade' depende del folio, como las marcas 'Autofilled'", () => {
+    const page = readFileSync(join(process.cwd(), "src/app/[lang]/listing/new/page.tsx"), "utf8");
+    expect(page).toMatch(/\{draft\?\.folio && step3MiamiDade && \(\s*<SuccessBanner message=\{copy\.step3\.autoFilledNote\} \/>/);
+    expect(page).not.toContain("draft.bedrooms > 0 && step3MiamiDade");
   });
 });
