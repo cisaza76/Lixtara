@@ -16,7 +16,13 @@
 // Rule (owner, 2026-10-26): NEVER --apply in place to the template Production uses
 // (DOCUSIGN_LISTING_AGREEMENT_TEMPLATE_ID in Vercel). Always --copy-as a new version, test it,
 // and switch the variable to the new id in the same deploy as the code. v2 = e7f904fe…
-// (Production since #217), v3 = fcdf42ef-17ed-457e-a970-7b423d337b1a (#231).
+// (Production since #217), v3 = fcdf42ef-17ed-457e-a970-7b423d337b1a (#231, Production),
+// v4 = 3c9363c5-8450-4d93-a665-47987438f709 (#220: v3 + "Seller 2", created 2026-10-27).
+//
+// Second seller (#220, v4 onward): the "Seller 2" role (signs by email, routing order 1, in
+// parallel with the seller) is created on the template if it doesn't have it, with its
+// initials, signatures/dates on lines 173, 203 and 250 and the email on line 253
+// (ERS21TN_SELLER2_*). v4 = a --copy-as of v3; v3 stays as it is.
 //
 // Order with the code: the site sends the NEW labels (city_state_zip, financing_cash,
 // buyer_comp_pct…). Fix a copy, test it, and switch DOCUSIGN_LISTING_AGREEMENT_TEMPLATE_ID to
@@ -28,7 +34,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getAccessToken } from "../../src/lib/docusign";
 import { ERS21TN_BROKER_SIGNATURES, ERS21TN_FIELDS } from "../../src/lib/docusign/ers21tn-layout";
-import { formatPlan, planInitialFixes, planSignatureFixes, planTemplateFixes, type LiveSellerTabs, type PlanStep } from "../../src/lib/docusign/template-fix-plan";
+import {
+  formatPlan,
+  planInitialFixes,
+  planSecondSellerFixes,
+  planSignatureFixes,
+  planTemplateFixes,
+  type LiveSellerTabs,
+  type PlanStep,
+} from "../../src/lib/docusign/template-fix-plan";
 import { apiBase, dsGet } from "./dump-templates";
 
 const arg = (name: string) => {
@@ -40,6 +54,13 @@ const ANCHORS = process.argv.includes("--anchors");
 const COPY_AS = arg("--copy-as");
 const SELLER_ROLE = "Seller";
 const BROKER_ROLE = "Broker";
+const SELLER2_ROLE = "Seller 2";
+// Templates in use or kept for rollback: never fixed in place (rule above).
+const NEVER_IN_PLACE = new Set([
+  "bee86256",
+  "e7f904fe",
+  "fcdf42ef",
+]);
 
 async function ds(method: "POST" | "PUT" | "DELETE", path: string, body: unknown): Promise<unknown> {
   const token = await getAccessToken();
@@ -56,20 +77,38 @@ async function ds(method: "POST" | "PUT" | "DELETE", path: string, body: unknown
 type Recipient = { recipientId: string; roleName?: string; routingOrder?: string; tabs?: LiveSellerTabs & Record<string, unknown[]> };
 
 async function recipientOf(templateId: string, role: string): Promise<Recipient> {
-  const r = (await (await dsGet(`/templates/${templateId}/recipients?include_tabs=true&include_extended=true`)).json()) as { signers?: Recipient[] };
-  const signer = (r.signers ?? []).find((s) => s.roleName === role);
+  const signer = await recipientOrNull(templateId, role);
   if (!signer) throw new Error(`template ${templateId} has no "${role}" role`);
   return signer;
 }
 
+async function recipientOrNull(templateId: string, role: string): Promise<Recipient | null> {
+  const r = (await (await dsGet(`/templates/${templateId}/recipients?include_tabs=true&include_extended=true`)).json()) as { signers?: Recipient[] };
+  return (r.signers ?? []).find((s) => s.roleName === role) ?? null;
+}
+
+/** The "Seller 2" role (routing order 1, like the seller), created if the template lacks it. */
+async function ensureSecondSellerRole(templateId: string): Promise<void> {
+  const r = (await (await dsGet(`/templates/${templateId}/recipients`)).json()) as { signers?: Recipient[] };
+  if ((r.signers ?? []).some((s) => s.roleName === SELLER2_ROLE)) return;
+  const next = Math.max(0, ...(r.signers ?? []).map((s) => Number(s.recipientId) || 0)) + 1;
+  await ds("POST", `/templates/${templateId}/recipients`, {
+    signers: [{ recipientId: String(next), roleName: SELLER2_ROLE, routingOrder: "1" }],
+  });
+  console.log(`Role "${SELLER2_ROLE}" created (recipientId ${next}, routing order 1).\n`);
+}
+
 /** Seller: every field the site fills, the seller's initials and page-4 signatures; Broker: the broker's initials and the L257 date. */
 async function planFor(templateId: string, role: string): Promise<{ recipientId: string; steps: PlanStep[] }> {
-  const r = await recipientOf(templateId, role);
+  // Dry run on a template without "Seller 2": every tab of the role shows as created.
+  const r = role === SELLER2_ROLE ? ((await recipientOrNull(templateId, role)) ?? { recipientId: "(new)" }) : await recipientOf(templateId, role);
   const tabs = r.tabs ?? {};
   const steps =
     role === SELLER_ROLE
       ? [...planTemplateFixes(tabs, { anchors: ANCHORS }), ...planInitialFixes(tabs, "Seller"), ...planSignatureFixes(tabs)]
-      : [...planInitialFixes(tabs, "Broker"), ...planSignatureFixes(tabs, ERS21TN_BROKER_SIGNATURES, "broker")];
+      : role === SELLER2_ROLE
+        ? planSecondSellerFixes(tabs)
+        : [...planInitialFixes(tabs, "Broker"), ...planSignatureFixes(tabs, ERS21TN_BROKER_SIGNATURES, "broker")];
   return { recipientId: r.recipientId, steps };
 }
 
@@ -137,12 +176,16 @@ async function main() {
   console.log(`${APPLY ? "APPLY" : "DRY RUN (nothing is written)"} · ${host} · template ${templateId}${COPY_AS ? ` → copy "${COPY_AS}"` : ""}${ANCHORS ? " · anchors" : ""}\n`);
   if (ANCHORS) await checkAnchors(templateId);
 
+  if (APPLY && !COPY_AS && NEVER_IN_PLACE.has(templateId.slice(0, 8))) {
+    throw new Error(`template ${templateId} is in use or kept for rollback: --apply only with --copy-as`);
+  }
   if (APPLY && COPY_AS) {
     templateId = await copyTemplate(templateId, COPY_AS);
     console.log(`Copy created: ${templateId}\n`);
   }
+  if (APPLY) await ensureSecondSellerRole(templateId);
   let pending = 0;
-  for (const role of [SELLER_ROLE, BROKER_ROLE]) {
+  for (const role of [SELLER_ROLE, BROKER_ROLE, SELLER2_ROLE]) {
     const { recipientId, steps } = await planFor(templateId, role);
     console.log(`── ${role} ──\n${formatPlan(steps)}\n`);
     if (!APPLY || steps.length === 0) continue;

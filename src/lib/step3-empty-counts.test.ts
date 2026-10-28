@@ -33,6 +33,7 @@ const complete: ListingCompletenessFacts = {
   photoCount: MIN_OWN_PHOTOS,
   photographyPaid: false,
   buyerComp: { buyer_agent_comp_type: "percent", buyer_agent_commission: 2.5, buyer_agent_comp_amount: null },
+  ownershipComplete: true,
 };
 
 describe("el borrador nace con habitaciones, baños y pies² vacíos", () => {
@@ -105,12 +106,14 @@ describe("creación del acuerdo: rechaza baños o pies² vacíos", () => {
           ? q({ data: prop, error: null })
           : table === "property_photos"
             ? q({ count: MIN_OWN_PHOTOS, error: null })
-            : q({ data: [], error: null }),
+            : table === "listing_ownership"
+              ? q({ data: { owner_kind: "individuals", other_title_holders: false, married_homestead: false, manual_review_reason: null, manual_review_cleared_at: null }, error: null })
+              : q({ data: [], error: null }),
       rpc: async () => ({ data: [complete.buyerComp], error: null }),
     } as never;
   }
   const row = Object.fromEntries(
-    Object.entries(complete).filter(([k]) => !["photoCount", "photographyPaid", "buyerComp"].includes(k)),
+    Object.entries(complete).filter(([k]) => !["photoCount", "photographyPaid", "buyerComp", "ownershipComplete"].includes(k)),
   );
 
   it("listing completo → null (se crea)", async () => {

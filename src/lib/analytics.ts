@@ -13,6 +13,7 @@
 
 import { analyticsConfig, isAnalyticsExcludedPath, readConsent } from "@/lib/analytics-config";
 import { FIRST_TOUCH_COOKIE, FIRST_TOUCH_MAX_AGE_S, firstTouchCookieValue } from "@/lib/funnel-events";
+import { isOwnershipError, OWNERSHIP_ERROR_FIELD } from "@/lib/listing-ownership";
 
 export const LISTING_STEP_SLUGS = [
   "address",
@@ -201,6 +202,7 @@ const STEP_ERROR_FIELDS: Record<string, string> = {
 };
 
 export function listingErrorField(code: string | null | undefined): string | null {
+  if (isOwnershipError(code)) return OWNERSHIP_ERROR_FIELD[code];
   return (code && Object.hasOwn(STEP_ERROR_FIELDS, code) && STEP_ERROR_FIELDS[code]) || null;
 }
 

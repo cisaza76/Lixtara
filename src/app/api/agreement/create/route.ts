@@ -15,7 +15,9 @@ import { createService } from "@/lib/supabase/service";
 import {
   createEnvelopeFromTemplate,
   getRecipientView,
+  InvalidAdditionalSignerError,
   LIXTARA_BROKER_ROLE,
+  templateHasRole,
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { offerFromRow, offerWithinLimit } from "@/lib/buyer-comp";
@@ -26,7 +28,13 @@ import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { t } from "@/lib/i18n";
 import { CONSENTS } from "@/lib/legal/consents";
 import { recordAcceptance } from "@/lib/legal/consents.server";
-import { loadFirstIncompleteStep } from "@/lib/listing-completeness.server";
+import { loadFirstIncompleteStep, loadOwnership } from "@/lib/listing-completeness.server";
+import {
+  agreementSellerNames,
+  agreementSignerFields,
+  SECOND_SELLER_ROLE,
+  signerPlan,
+} from "@/lib/listing-ownership";
 import { verifiedLegalDescription } from "@/lib/miami-dade";
 import { recordAgreementSent } from "@/lib/agreement-legal.server";
 import { attachmentHtml, listingAgreementTabs } from "@/lib/docusign/listing-agreement-tabs";
@@ -123,6 +131,33 @@ export async function POST(req: Request) {
     );
   }
 
+  // Quién firma (#220). El acuerdo se inserta con service_role, que no pasa por la política
+  // "own agreements insert": sellers_required = 1 + firmantes guardados se valida aquí
+  // (agreementSignerFields), igual que el correo propio del segundo firmante y la revisión manual.
+  const step3 = (code?: string) =>
+    `/${lang}/listing/new?step=3&id=${encodeURIComponent(property.id)}${code ? `&error=${code}` : ""}`;
+  let owners;
+  try {
+    owners = await loadOwnership(supabase, property.id);
+  } catch (err) {
+    console.error("agreement/create: ownership read failed", err);
+    return NextResponse.json({ error: "ownership_check_failed" }, { status: 500 });
+  }
+  const plan = signerPlan(owners.ownership, owners.signers, user.email);
+  if (!plan.ok) {
+    if (plan.error === "manual_review") {
+      return NextResponse.json({ error: "manual_review" }, { status: 409 });
+    }
+    return NextResponse.json(
+      { error: "listing_incomplete", step: 3, redirect: step3(plan.error === "signer_same_email" ? "signer_same_email" : undefined) },
+      { status: 409 },
+    );
+  }
+  const signerFields = agreementSignerFields(plan, owners.signers.length, new Date());
+  if (!signerFields.ok) {
+    return NextResponse.json({ error: "listing_incomplete", step: 3, redirect: step3() }, { status: 409 });
+  }
+
   // La oferta al agente del comprador se elige en el paso 6 (0% es válido). Sin elección no
   // se arma un contrato con un valor que el vendedor no decidió. Se lee con la función (la
   // tabla no expone esas columnas a la API); si falla, no se arma el contrato.
@@ -147,7 +182,7 @@ export async function POST(req: Request) {
   // Reuse any in-flight envelope so we don't create duplicates on retry.
   const { data: existing } = await supabase
     .from("agreements")
-    .select("id, envelope_id, status, signer_email, signer_name")
+    .select("id, envelope_id, status, signer_email, signer_name, sellers_required")
     .eq("property_id", propertyId)
     .in("status", ["pending", "sent", "delivered", "signed"])
     .order("created_at", { ascending: false })
@@ -191,8 +226,12 @@ export async function POST(req: Request) {
   const returnUrl = `${origin}/${lang}/listing/new?step=7&id=${propertyId}&signed=1`;
 
   try {
-    let envelopeId = existing?.envelope_id ?? null;
-    let agreementRowId = existing?.id ?? null;
+    // Un sobre en curso armado con otros firmantes (el paso 3 cambió) no se reutiliza, salvo que
+    // el vendedor ya haya firmado.
+    const reusable =
+      existing && (existing.status === "signed" || (existing.sellers_required ?? 1) === signerFields.fields.sellers_required);
+    let envelopeId = reusable ? (existing?.envelope_id ?? null) : null;
+    let agreementRowId = reusable ? (existing?.id ?? null) : null;
 
     if (!envelopeId) {
       // Sin el email de firma de la broker no se crea ningún sobre (#137 f).
@@ -206,6 +245,13 @@ export async function POST(req: Request) {
       // with the county, "See Attachment", occupancy as one choice…): listingAgreementTabs and
       // docs/docusign/field-map-ers21tn.md. DocuSign silently ignores a tabLabel the template
       // doesn't bind: scripts/check-docusign-template.ts compares both.
+      // Con dos vendedores, la plantilla tiene que tener "Seller 2" (v4 en adelante): si no, el
+      // sobre saldría sin esa firma.
+      if (plan.signer && !(await templateHasRole(templateId, SECOND_SELLER_ROLE))) {
+        console.error(JSON.stringify({ event: "docusign_second_seller_role_missing", propertyId }));
+        return NextResponse.json({ error: "second_seller_not_supported" }, { status: 503 });
+      }
+
       const tierId = (property.pricing_tier ?? "pro") as PricingTierId;
       const tier = PRICING_TIERS[tierId] ?? PRICING_TIERS.pro;
       // Re-checked with the county now; if it can't be verified the contract says "See Attachment".
@@ -213,7 +259,8 @@ export async function POST(req: Request) {
       const contract = listingAgreementTabs({
         listing: property,
         tier,
-        sellerName: signerName,
+        // L2: los dos vendedores ("Ana Pérez and Luis Pérez").
+        sellerName: agreementSellerNames(signerName, plan.signer),
         // Lines 247–249: phone from sign-up, the account email; no mailing address is stored,
         // so line 248 carries the property's.
         seller: { phone: profile?.phone ?? null, email: signerEmail },
@@ -236,6 +283,18 @@ export async function POST(req: Request) {
         clientUserId: propertyId,
         // La broker contrafirma después del vendedor (routingOrder 2) (#137 f).
         brokerSigner: { roleName: LIXTARA_BROKER_ROLE.listingAgreement, ...broker },
+        // Segundo vendedor (#220): firma por email, en paralelo; su correo en L253.
+        additionalSigners: plan.signer
+          ? [
+              {
+                roleName: SECOND_SELLER_ROLE,
+                name: plan.signer.full_name,
+                email: plan.signer.email,
+                textTabs: { seller2_email: plan.signer.email },
+                lockedTextTabs: ["seller2_email"],
+              },
+            ]
+          : undefined,
         textTabs: contract.text,
         // Lo que puso el sitio (precio, dirección, nombres, fechas, plan, comisión) no se edita
         // en DocuSign.
@@ -267,6 +326,8 @@ export async function POST(req: Request) {
           signer_name: signerName,
           // Sin descripción legal verificada, el admin no puede aprobar el listing (#217).
           legal_description_status: contract.legalStatus,
+          // #220: validados arriba contra los firmantes guardados.
+          ...signerFields.fields,
         })
         .select("id")
         .single();
@@ -292,6 +353,10 @@ export async function POST(req: Request) {
       agreement_id: agreementRowId,
     });
   } catch (e) {
+    // El segundo firmante con el correo del vendedor o de la broker: de vuelta al paso 3.
+    if (e instanceof InvalidAdditionalSignerError) {
+      return NextResponse.json({ error: "listing_incomplete", step: 3, redirect: step3("signer_same_email") }, { status: 409 });
+    }
     const msg = e instanceof Error ? e.message : "unknown";
     return NextResponse.json(
       { error: "docusign_failed", detail: msg },

@@ -59,6 +59,15 @@ import { TourCoaching } from "@/components/tour-coaching";
 import { PhotographyCheckoutButton } from "@/components/photography-checkout-button";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { OccupancySection } from "@/components/occupancy-section";
+import { OwnershipSection } from "@/components/ownership-section";
+import {
+  isOwnershipError,
+  OWNERSHIP_ERROR_COPY,
+  ownershipFormInitial,
+  parseOwnershipForm,
+  type StoredOwnership,
+  type StoredSigner,
+} from "@/lib/listing-ownership";
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import { CheckAllToggle } from "@/components/check-all-toggle";
 import { PhotoGridDraggable } from "@/components/photo-grid-draggable";
@@ -332,7 +341,19 @@ export default async function ListingNewPage({
   };
   type AgreementRow = {
     status: "pending" | "sent" | "delivered" | "signed" | "completed" | "declined" | "voided" | "expired";
+    sellers_required: number;
+    additional_signer_signed_at: string | null;
+    signing_deadline_at: string | null;
   };
+  // Titular y segundo firmante (#220): pasos 3 y 7.
+  type OwnershipRowFull = StoredOwnership & {
+    entity_name: string | null;
+    entity_signer_title: string | null;
+    entity_authority_confirmed_at: string | null;
+  };
+  let ownership: OwnershipRowFull | null = null;
+  type AdditionalSignerRow = StoredSigner & { permission_confirmed_at: string };
+  let additionalSigner: AdditionalSignerRow | null = null;
   let latestPayment: PaymentRow | null = null;
   let latestAgreement: AgreementRow | null = null;
   if (draftId) {
@@ -570,10 +591,27 @@ export default async function ListingNewPage({
     }
 
 
+    if (step === 3 || step === 7) {
+      const [{ data: own }, { data: signerRows }] = await Promise.all([
+        supabase
+          .from("listing_ownership")
+          .select("owner_kind,other_title_holders,married_homestead,entity_name,entity_signer_title,entity_authority_confirmed_at,manual_review_reason,manual_review_cleared_at")
+          .eq("property_id", draftId)
+          .maybeSingle(),
+        supabase
+          .from("listing_additional_signers")
+          .select("full_name,email,relationship,permission_confirmed_at")
+          .eq("property_id", draftId)
+          .limit(1),
+      ]);
+      ownership = (own ?? null) as OwnershipRowFull | null;
+      additionalSigner = ((signerRows ?? [])[0] ?? null) as AdditionalSignerRow | null;
+    }
+
     if (step === 7 || step === 8) {
       const { data: agRow } = await supabase
         .from("agreements")
-        .select("status")
+        .select("status,sellers_required,additional_signer_signed_at,signing_deadline_at")
         .eq("property_id", draftId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -998,6 +1036,12 @@ export default async function ListingNewPage({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/sign-in?next=/listing/new`);
 
+    // Titular y segundo firmante (#220). Con el correo de la cuenta: el segundo firmante
+    // necesita otro. En una sesión anónima no hay correo con qué comparar: la creación del
+    // acuerdo lo vuelve a comprobar.
+    const owned = parseOwnershipForm((n) => formData.get(n), user.email ?? null, new Date());
+    if (!owned.ok) redirect(`/${lang}/listing/new?step=3&id=${id}&error=${owned.error}`);
+
     const { error } = await supabase
       .from("properties")
       .update({
@@ -1028,6 +1072,24 @@ export default async function ListingNewPage({
       .eq("id", id)
       .eq("owner_id", user.id);
     if (error) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
+    }
+    // Con la sesión del vendedor: RLS + guard_listing_signers (solo con el listing en borrador).
+    // El firmante se guarda o se borra según las respuestas: sellers_required = 1 + firmantes.
+    const { error: ownError } = await supabase
+      .from("listing_ownership")
+      .upsert({ property_id: id, owner_id: user.id, ...owned.ownership }, { onConflict: "property_id" });
+    const { error: signerError } = owned.signer
+      ? await supabase
+          .from("listing_additional_signers")
+          .upsert({ property_id: id, owner_id: user.id, ...owned.signer }, { onConflict: "property_id" })
+      : await supabase.from("listing_additional_signers").delete().eq("property_id", id);
+    if (ownError || signerError) {
+      // El trigger rechaza el correo del vendedor (23514) aunque el paso no lo viera.
+      if (signerError?.code === "23514" && /differ from the seller/.test(signerError.message ?? "")) {
+        redirect(`/${lang}/listing/new?step=3&id=${id}&error=signer_same_email`);
+      }
+      console.error("step 3 ownership save failed", ownError?.code ?? signerError?.code);
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
     }
     stepCompleted(lang, 3, id, user.id);
@@ -1834,6 +1896,8 @@ export default async function ListingNewPage({
                                                 ? copy.stepErrors.leaseEndInvalid
                                                 : sp.error === "lease_end_past"
                                                   ? copy.stepErrors.leaseEndPast
+                                                  : isOwnershipError(sp.error)
+                                                    ? copy.stepErrors[OWNERSHIP_ERROR_COPY[sp.error]]
                                                   : sp.error === "occupancy_required"
                                                     ? copy.stepErrors.occupancyRequired
                                                     : sp.error === "financing_required"
@@ -1882,6 +1946,8 @@ export default async function ListingNewPage({
     hoa_fee: copy.stepErrors.invalidHoa,
     tax_annual_amount: copy.stepErrors.invalidTax,
     monthly_rent: copy.stepErrors.invalidRent,
+    // Patrón que rechaza el correo del vendedor (#220).
+    signer_email: copy.stepErrors.signerSameEmail,
   };
   const autofillResult =
     typeof sp === "object" && "autofill" in sp ? (sp.autofill as string) : null;
@@ -2604,6 +2670,12 @@ export default async function ListingNewPage({
                   tenantNotesPlaceholder: copy.step3.tenantNotesPlaceholder,
                   occupancyPlaceholder: copy.step3.occupancyPlaceholder,
                 }}
+              />
+
+              <OwnershipSection
+                initial={ownershipFormInitial(ownership, additionalSigner)}
+                sellerEmail={sessionUser?.email ?? null}
+                labels={copy.step3.ownership}
               />
 
               <fieldset className="flex flex-col gap-3 border border-gold-soft p-4">
@@ -3550,8 +3622,32 @@ export default async function ListingNewPage({
             }
 
             if (agStatus === "sent" || agStatus === "delivered") {
+              // Dos vendedores (#220): el pago espera la firma del segundo (por email, 7 días).
+              const cosigner = additionalSigner;
+              const waitingCosigner =
+                latestAgreement?.sellers_required === 2 && !latestAgreement.additional_signer_signed_at ? cosigner : null;
+              const deadline = latestAgreement?.signing_deadline_at
+                ? new Date(latestAgreement.signing_deadline_at).toLocaleDateString(lang === "es" ? "es-US" : "en-US", {
+                    timeZone: "America/New_York",
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "";
               return (
                 <div className="flex flex-col gap-4">
+                  {waitingCosigner ? (
+                    <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-2" data-waiting-cosigner>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+                        {copy.step7.waitingCosignerTitle.replace("{name}", waitingCosigner.full_name)}
+                      </p>
+                      <p className="text-sm text-ink/70 leading-relaxed">
+                        {copy.step7.waitingCosignerBody
+                          .replace("{email}", waitingCosigner.email)
+                          .replace("{date}", deadline)}
+                      </p>
+                    </div>
+                  ) : (
                   <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-2">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
                       {copy.step7.sentTitle}
@@ -3560,6 +3656,7 @@ export default async function ListingNewPage({
                       {copy.step7.sentBody}
                     </p>
                   </div>
+                  )}
                   {sp.signed === "1" && (
                     <AgreementStatusPoller
                       propertyId={draftId}
@@ -3577,6 +3674,19 @@ export default async function ListingNewPage({
                     }}
                     esign={esignProps}
                   />
+                </div>
+              );
+            }
+
+            // Revisión manual (#220: trust, sucesión, 3+ firmantes…): sin acuerdo automático hasta
+            // que la broker lo destrabe.
+            if (ownership?.owner_kind === "manual_review" && !ownership.manual_review_cleared_at) {
+              return (
+                <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-2" data-manual-review>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink/70">
+                    {copy.step7.manualReviewTitle}
+                  </p>
+                  <p className="text-sm text-ink/70 leading-relaxed">{copy.step7.manualReviewBody}</p>
                 </div>
               );
             }

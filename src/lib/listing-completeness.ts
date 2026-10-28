@@ -33,6 +33,11 @@ export interface ListingCompletenessFacts {
   photoCount: number;
   photographyPaid: boolean;
   buyerComp: BuyerCompRow | null;
+  /**
+   * Titular y segundo firmante del paso 3 (#220): guardado y coherente (con otro en el título o
+   * homestead de un casado, el segundo firmante está). ownershipStepComplete().
+   */
+  ownershipComplete: boolean;
 }
 
 const filled = (v: string | null | undefined) => (v ?? "").trim().length > 0;
@@ -65,7 +70,8 @@ export function stepComplete(step: number, f: ListingCompletenessFacts, now = ne
         inRange(f.year_built, 1800, now.getFullYear() + 2) &&
         inRange(f.list_price, 0, 1000000000, true) &&
         (f.financing_terms ?? []).some(isFinancingTerm) &&
-        isOccupancyStatus(f.occupancy_status)
+        isOccupancyStatus(f.occupancy_status) &&
+        f.ownershipComplete
       );
     case 4:
       return (f.description ?? "").trim().length >= 10;
