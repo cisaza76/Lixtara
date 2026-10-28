@@ -23,6 +23,7 @@ import {
   insertShowingLead,
   resolveTarget,
 } from "@/lib/buyer-leads.server";
+import { recordInlineAcceptance, requestEvidence } from "@/lib/nbr-notice.server";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,23 @@ export async function POST(req: Request): Promise<Response> {
     const brokerId = await ensureBrokerOfRecord(svc);
     const lead = await insertShowingLead(svc, data, brokerId);
     const exclusive = lead.status === "cancelled";
+
+    // Sin agente: el aviso NBR que aceptó en el formulario, con su evidencia, y el PDF al
+    // comprador y a la broker. Si no se pudiera guardar, el lead queda con el aviso pendiente
+    // y la broker lo reenvía desde la ficha: la visita no se confirma sin él (la base lo exige).
+    let nbrId: string | null = null;
+    if (data.nbrAccepted) {
+      nbrId = await recordInlineAcceptance(svc, { leadId: lead.id }, {
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
+        listingLabel: target.label,
+        propertyId: data.target.kind === "own" ? data.target.propertyId : null,
+        listingKey: data.target.kind === "mls" ? data.target.listingKey : null,
+        lang: data.lang,
+        ...requestEvidence(req.headers),
+      });
+    }
     recordServerEvent({
       event: "buyer_lead_created",
       props: { source: "showing_request", target: data.target.kind, exclusive },
@@ -80,6 +98,8 @@ export async function POST(req: Request): Promise<Response> {
           preferredTimes: data.preferredTimes,
           message: data.message,
           otherAgentStatus: data.otherAgentStatus,
+          buyerAgent: data.buyerAgentName ? `${data.buyerAgentName} · FL license ${data.buyerAgentLicense}` : null,
+          nbrNotice: data.buyerAgentName ? null : nbrId ? "Accepted in the form (PDF attached in a separate email)" : "PENDING: send it from the lead",
           needsToSell: data.needsToSell,
           consentMarketing: data.consentMarketing,
           consentVersion: CONSENT_VERSION,

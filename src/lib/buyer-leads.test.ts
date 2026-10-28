@@ -34,6 +34,7 @@ const form = (over: Record<string, string> = {}) => {
     email: "Jane@Example.com",
     other_agent_status: "none",
     consent_contact: "true",
+    nbr_accept: "true",
     lang: "es",
   };
   const all = { ...base, ...over };
@@ -185,10 +186,27 @@ describe("formulario de solicitud de visita", () => {
   });
 
   it("acuerdo exclusivo con otro broker: se registra cancelado con motivo", () => {
-    const r = parseShowingRequest(form({ other_agent_status: "exclusive" }));
+    const r = parseShowingRequest(form({ other_agent_status: "exclusive", buyer_agent_name: "Ana Agente", buyer_agent_license: "SL123456" }));
     expect(r.ok && initialStatusFor(r.data)).toMatchObject({ status: "cancelled" });
     const ok = parseShowingRequest(form());
     expect(ok.ok && initialStatusFor(ok.data)).toEqual({ status: "received", cancelReason: null });
+  });
+});
+
+describe("aviso NBR y agente del comprador (F.S. 475.278(4))", () => {
+  it("sin agente o sin saberlo: el aviso NBR aceptado es obligatorio", () => {
+    expect(parseShowingRequest(form({ nbr_accept: "" }))).toEqual({ ok: false, error: "nbr" });
+    expect(parseShowingRequest(form({ other_agent_status: "unsure", nbr_accept: "" }))).toEqual({ ok: false, error: "nbr" });
+    const ok = parseShowingRequest(form());
+    expect(ok.ok && ok.data).toMatchObject({ nbrAccepted: true, buyerAgentName: null, buyerAgentLicense: null });
+  });
+
+  it("con agente: nombre y licencia, sin aviso NBR (aunque llegue marcado)", () => {
+    expect(parseShowingRequest(form({ other_agent_status: "non_exclusive" }))).toEqual({ ok: false, error: "agent" });
+    expect(parseShowingRequest(form({ other_agent_status: "non_exclusive", buyer_agent_name: "Ana", buyer_agent_license: "nope" })))
+      .toEqual({ ok: false, error: "agent" });
+    const ok = parseShowingRequest(form({ other_agent_status: "non_exclusive", buyer_agent_name: " Ana Agente ", buyer_agent_license: "sl 123456" }));
+    expect(ok.ok && ok.data).toMatchObject({ buyerAgentName: "Ana Agente", buyerAgentLicense: "SL123456", nbrAccepted: false });
   });
 });
 

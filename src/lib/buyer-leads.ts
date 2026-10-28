@@ -11,6 +11,8 @@
 //
 // PURO: sin I/O.
 
+import { hasOwnAgent, normalizeAgentLicense } from "@/lib/nbr-notice";
+
 export const LEAD_STATUSES = [
   "received",
   "contact_pending",
@@ -220,6 +222,11 @@ export interface ShowingRequest {
   needsToSell: NeedsToSell | null;
   consentMarketing: boolean;
   lang: "en" | "es";
+  /** Con agente propio: su nombre y su licencia de Florida (sin aviso NBR). */
+  buyerAgentName: string | null;
+  buyerAgentLicense: string | null;
+  /** Sin agente (o sin saberlo): aceptó el aviso NBR en el formulario (F.S. 475.278(4)). */
+  nbrAccepted: boolean;
 }
 
 export type ShowingRequestError =
@@ -229,7 +236,9 @@ export type ShowingRequestError =
   | "email"
   | "phone"
   | "too_long"
-  | "consent";
+  | "consent"
+  | "agent"
+  | "nbr";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LISTING_KEY_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -294,6 +303,15 @@ export function parseShowingRequest(
   if (phone && !normalizedPhone) return { ok: false, error: "phone" };
   if (!truthy(get("consent_contact"))) return { ok: false, error: "consent" };
 
+  // Con agente: nombre y licencia, sin aviso NBR. Sin agente o sin saberlo: el aviso NBR,
+  // aceptado antes de enviar (la visita no se confirma sin él; la base también lo exige).
+  const withAgent = hasOwnAgent(otherAgent);
+  const agentName = (get("buyer_agent_name") ?? "").trim();
+  const agentLicense = withAgent ? normalizeAgentLicense(get("buyer_agent_license") ?? "") : null;
+  if (withAgent && (!agentName || agentName.length > 120 || !agentLicense)) return { ok: false, error: "agent" };
+  const nbrAccepted = !withAgent && truthy(get("nbr_accept"));
+  if (!withAgent && !nbrAccepted) return { ok: false, error: "nbr" };
+
   return {
     ok: true,
     data: {
@@ -309,6 +327,9 @@ export function parseShowingRequest(
         : null,
       consentMarketing: truthy(get("consent_marketing")),
       lang,
+      buyerAgentName: withAgent ? agentName : null,
+      buyerAgentLicense: agentLicense,
+      nbrAccepted,
     },
   };
 }

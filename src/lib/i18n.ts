@@ -1336,6 +1336,8 @@ export const dictionaries = {
         target: "This home is no longer available for showing requests.",
         rate_limited: "Too many requests. Please try again later.",
         failed: "We couldn't send your request. Please try again.",
+        agent: "Please enter your agent's name and Florida license number.",
+        nbr: "Please read and accept the No Brokerage Relationship notice.",
       },
     },
     property: {
@@ -3495,6 +3497,8 @@ export const dictionaries = {
         target: "Esta vivienda ya no acepta solicitudes de visita.",
         rate_limited: "Demasiadas solicitudes. Inténtalo más tarde.",
         failed: "No pudimos enviar tu solicitud. Inténtalo de nuevo.",
+        agent: "Escribe el nombre y el número de licencia de Florida de tu agente.",
+        nbr: "Lee y acepta el aviso de ausencia de relación de corretaje.",
       },
     },
     property: {

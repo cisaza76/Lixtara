@@ -58,6 +58,8 @@ interface SendInput {
   headers?: Record<string, string>;
   /** Overrides EMAIL_REPLY_TO (e.g. the visitor who wrote via /contact). */
   replyTo?: string;
+  /** Files attached to the email (e.g. the accepted NBR notice PDF). */
+  attachments?: Array<{ filename: string; content: Buffer }>;
 }
 
 async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -78,6 +80,7 @@ async function send(input: SendInput): Promise<{ ok: boolean; id?: string; error
         html: input.html,
         text: input.text,
         ...(input.headers ? { headers: input.headers } : {}),
+        ...(input.attachments ? { attachments: input.attachments } : {}),
       },
       input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
     );
@@ -765,6 +768,9 @@ export async function sendBrokerShowingRequest(input: {
   preferredTimes: string | null;
   message: string | null;
   otherAgentStatus: string;
+  /** Con agente propio: su nombre y licencia. Sin agente: si aceptó el aviso NBR. */
+  buyerAgent?: string | null;
+  nbrNotice?: string | null;
   needsToSell: string | null;
   consentMarketing: boolean;
   consentVersion: string;
@@ -786,6 +792,8 @@ export async function sendBrokerShowingRequest(input: {
     ["Phone", input.buyerPhone || "Not provided: contact by email"],
     ["Preferred times", input.preferredTimes || "—"],
     ["Other agent", input.otherAgentStatus],
+    ...(input.buyerAgent ? ([["Buyer's agent", input.buyerAgent]] as [string, string][]) : []),
+    ...(input.nbrNotice ? ([["NBR notice", input.nbrNotice]] as [string, string][]) : []),
     ["Needs to sell first", input.needsToSell || "—"],
     // Lo que el comprador autorizó, para no llamar ni escribir fuera de ese alcance.
     ["Consent", `Contact about this request by email or phone (no marketing, automated calls or texts) · text ${input.consentVersion}`],
@@ -846,5 +854,77 @@ export async function sendShowingRequestReceived(input: {
     subject,
     html: shell({ preheader: subject, body, lang: input.lang }),
     text: lines.join("\n\n"),
+  });
+}
+
+// ─── Aviso NBR (No Brokerage Relationship, F.S. 475.278(4)) ───────────
+
+/** Enlace para aceptar el aviso NBR antes de la visita (lo manda el admin o Loui). */
+export async function sendNbrNoticeLink(input: { to: string; lang: Lang; buyerName: string | null; url: string; days: number }) {
+  const isEs = input.lang === "es";
+  const subject = isEs
+    ? "Antes de tu visita: acepta el aviso de relación de corretaje"
+    : "Before your showing: please accept the brokerage relationship notice";
+  const hi = input.buyerName ? (isEs ? `Hola ${input.buyerName},` : `Hi ${input.buyerName},`) : isEs ? "Hola," : "Hi,";
+  const lines = isEs
+    ? [
+        hi,
+        "Como no tienes agente propio, la ley de Florida nos exige darte un aviso de ausencia de relación de corretaje (No Brokerage Relationship) antes de la visita.",
+        `Léelo y acéptalo en este enlace (vence en ${input.days} días). Tu visita no está confirmada hasta que lo aceptes y la broker la confirme contigo.`,
+      ]
+    : [
+        hi,
+        "Since you don't have your own agent, Florida law requires us to give you a No Brokerage Relationship notice before the showing.",
+        `Please read and accept it at this link (it expires in ${input.days} days). Your showing is not confirmed until you accept it and the broker confirms it with you.`,
+      ];
+  const body =
+    lines.map((l) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${escapeHtml(l)}</p>`).join("") +
+    button(input.url, isEs ? "Leer y aceptar el aviso" : "Read and accept the notice");
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: subject, body, lang: input.lang }),
+    text: [...lines, input.url].join("\n\n"),
+  });
+}
+
+/** Copia en PDF del aviso aceptado, al comprador (en su idioma) o a la broker (inglés). */
+export async function sendNbrNoticeAccepted(input: {
+  to: string;
+  lang: Lang;
+  recipient: "buyer" | "broker";
+  buyerName: string;
+  listingLabel: string | null;
+  pdf: Uint8Array;
+  idempotencyKey: string;
+}) {
+  const isEs = input.lang === "es" && input.recipient === "buyer";
+  const subject =
+    input.recipient === "broker"
+      ? `NBR notice accepted: ${input.buyerName}`
+      : isEs
+        ? "Tu copia del aviso de relación de corretaje"
+        : "Your copy of the brokerage relationship notice";
+  const where = input.listingLabel ? (isEs ? ` para ${input.listingLabel}` : ` for ${input.listingLabel}`) : "";
+  const lines =
+    input.recipient === "broker"
+      ? [`${input.buyerName} accepted the No Brokerage Relationship notice${where}. The signed copy is attached.`]
+      : isEs
+        ? [
+            `Hola ${input.buyerName}, adjuntamos la copia del aviso de ausencia de relación de corretaje que aceptaste${where}.`,
+            "Tu visita no está confirmada hasta que la broker la confirme contigo.",
+          ]
+        : [
+            `Hi ${input.buyerName}, attached is your copy of the No Brokerage Relationship notice you accepted${where}.`,
+            "Your showing is not confirmed until the broker confirms it with you.",
+          ];
+  const body = lines.map((l) => `<p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${escapeHtml(l)}</p>`).join("");
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: subject, body, lang: isEs ? "es" : "en" }),
+    text: lines.join("\n\n"),
+    attachments: [{ filename: "lixtara-no-brokerage-relationship-notice.pdf", content: Buffer.from(input.pdf) }],
+    idempotencyKey: input.idempotencyKey,
   });
 }

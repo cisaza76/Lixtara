@@ -448,6 +448,8 @@ describe("consentimiento antes de que monte el banner, retención y staff", () =
     expect(isAnalyticsExcludedPath("/es/admin")).toBe(true);
     expect(isAnalyticsExcludedPath("/en/administrator-guide")).toBe(false);
     expect(isAnalyticsExcludedPath("/en/properties")).toBe(false);
+    expect(isAnalyticsExcludedPath("/es/showing-notice/abc123")).toBe(true);
+    expect(isAnalyticsExcludedPath("/en/showing-notice/accepted")).toBe(true);
   });
 });
 

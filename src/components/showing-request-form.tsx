@@ -7,6 +7,8 @@
 import { useState } from "react";
 import type { t } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
+import { hasOwnAgent, nbrCopy } from "@/lib/nbr-notice";
+import { NbrNoticeText } from "@/components/nbr-notice-text";
 
 type Widen<T> = { [K in keyof T]: T[K] extends string ? string : Widen<T[K]> };
 /** Los textos del diccionario, ya con {brokerFirstName} resuelto por el servidor. */
@@ -32,6 +34,11 @@ export function ShowingRequestForm({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<null | "received" | "exclusive">(null);
+  // Respuesta a "¿firmaste con otro agente?": con agente se piden nombre y licencia; sin
+  // agente o sin saberlo, el aviso NBR (F.S. 475.278(4)) se acepta antes de enviar.
+  const [agentStatus, setAgentStatus] = useState<string>("");
+  const nbr = nbrCopy(lang);
+  const withAgent = hasOwnAgent(agentStatus);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -47,6 +54,9 @@ export function ShowingRequestForm({
       message: String(fd.get("message") ?? ""),
       other_agent_status: String(fd.get("other_agent_status") ?? ""),
       needs_to_sell: String(fd.get("needs_to_sell") ?? ""),
+      buyer_agent_name: String(fd.get("buyer_agent_name") ?? ""),
+      buyer_agent_license: String(fd.get("buyer_agent_license") ?? ""),
+      nbr_accept: fd.get("nbr_accept") === "on",
       consent_contact: fd.get("consent_contact") === "on",
       consent_marketing: fd.get("consent_marketing") === "on",
       website: String(fd.get("website") ?? ""),
@@ -149,11 +159,43 @@ export function ShowingRequestForm({
           ] as const
         ).map(([value, text]) => (
           <label key={value} className="flex items-center gap-2 text-sm text-ink/80">
-            <input type="radio" name="other_agent_status" value={value} required />
+            <input
+              type="radio"
+              name="other_agent_status"
+              value={value}
+              required
+              onChange={() => setAgentStatus(value)}
+            />
             {text}
           </label>
         ))}
       </fieldset>
+
+      {withAgent && (
+        <div data-buyer-agent className="flex flex-col gap-3">
+          <p className="text-xs text-ink/70">{nbr.agentNote}</p>
+          <label className={FIELD}>
+            <span className={LABEL}>{nbr.agentName}</span>
+            <input name="buyer_agent_name" required maxLength={120} className={CONTROL} />
+          </label>
+          <label className={FIELD}>
+            <span className={LABEL}>{nbr.agentLicense}</span>
+            <input name="buyer_agent_license" required maxLength={20} placeholder="SL…" className={CONTROL} />
+          </label>
+        </div>
+      )}
+
+      {agentStatus && !withAgent && (
+        <div className="border border-gold-soft bg-ivory-strong/40 p-4 flex flex-col gap-3">
+          <p className="font-display text-lg text-ink">{nbr.heading}</p>
+          <p className="text-xs text-ink/75">{nbr.explain}</p>
+          <NbrNoticeText lang={lang} />
+          <label className="flex items-start gap-2 text-xs text-ink/80">
+            <input type="checkbox" name="nbr_accept" required className="mt-0.5" />
+            <span>{nbr.accept}</span>
+          </label>
+        </div>
+      )}
 
       <fieldset className="flex flex-col gap-2">
         <legend className={`${LABEL} mb-1`}>{labels.needsToSellLabel}</legend>

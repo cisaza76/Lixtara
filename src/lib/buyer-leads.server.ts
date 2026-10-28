@@ -140,6 +140,8 @@ export async function insertShowingLead(
       preferred_times: req.preferredTimes,
       message: req.message,
       other_agent_status: req.otherAgentStatus,
+      buyer_agent_name: req.buyerAgentName,
+      buyer_agent_license: req.buyerAgentLicense,
       needs_to_sell: req.needsToSell,
       lang: req.lang,
       listing_key: req.target.kind === "mls" ? req.target.listingKey : null,

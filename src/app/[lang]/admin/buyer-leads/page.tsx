@@ -19,6 +19,8 @@ import {
   respondByIso,
   transitionBlockReason,
 } from "@/lib/buyer-leads";
+import { hasOwnAgent, nbrBlockReason, nbrStatusLine, normalizeAgentLicense } from "@/lib/nbr-notice";
+import { latestNotices, sendNbrLink } from "@/lib/nbr-notice.server";
 
 // Cola de la broker para los compradores. La tecnología trae la solicitud; una Realtor
 // real la atiende: contacta, verifica representación previa, gestiona el acuerdo y solo
@@ -40,6 +42,8 @@ interface Lead {
   preferred_times: string | null;
   message: string | null;
   other_agent_status: string | null;
+  buyer_agent_name: string | null;
+  buyer_agent_license: string | null;
   needs_to_sell: string | null;
   consent_contact_at: string | null;
   consent_marketing_at: string | null;
@@ -70,7 +74,7 @@ interface LeadEvent {
 }
 
 const LEAD_COLUMNS =
-  "id,created_at,source,status,legacy_status,full_name,email,phone,lang,listing_key,property_id,preferred_times,message,other_agent_status,needs_to_sell,consent_contact_at,consent_marketing_at,consent_version,assigned_agent_id,handled_by_agent_id,agreement_type,agreement_recorded_at,agreement_reference,agreement_exception_code,agreement_note,cancel_reason,notes,budget_min,budget_max,financing_type,timeline";
+  "id,created_at,source,status,legacy_status,full_name,email,phone,lang,listing_key,property_id,preferred_times,message,other_agent_status,buyer_agent_name,buyer_agent_license,needs_to_sell,consent_contact_at,consent_marketing_at,consent_version,assigned_agent_id,handled_by_agent_id,agreement_type,agreement_recorded_at,agreement_reference,agreement_exception_code,agreement_note,cancel_reason,notes,budget_min,budget_max,financing_type,timeline";
 
 const VIEWS = ["open", "all", "completed", "cancelled"] as const;
 type View = (typeof VIEWS)[number];
@@ -86,6 +90,11 @@ const ERRORS: Record<string, string> = {
   exception_required:
     "'Not required' needs a reason from the list, and it only applies to Lixtara's own listings. Listings of other brokers always need a written agreement.",
   broker_only: "Only the licensed broker can record buyer agreements.",
+  nbr_notice_missing:
+    "The buyer has no agent (or isn't sure): they must accept the No Brokerage Relationship notice before the showing is confirmed. Send it from this lead.",
+  nbr_buyer_agent_missing: "The buyer has an agent: record the agent's name and Florida license before confirming the showing.",
+  nbr_send_failed: "Could not send the NBR notice. Check the buyer's email and try again.",
+  agent_invalid: "Enter the agent's name and a valid Florida license number (SL or BK plus digits).",
   failed: "Could not save. Try again.",
 };
 
@@ -109,10 +118,69 @@ async function readLeadForTransition(lang: string, id: string) {
   const { sb, userId } = await assertStaffWithUser(lang);
   const { data } = await sb
     .from("buyer_leads")
-    .select("id,status,property_id,agreement_type,agreement_recorded_at,agreement_exception_code")
+    .select("id,status,property_id,agreement_type,agreement_recorded_at,agreement_exception_code,other_agent_status,buyer_agent_name,buyer_agent_license")
     .eq("id", id)
     .maybeSingle();
   return { sb, userId, lead: data };
+}
+
+/** Aviso NBR aceptado de ese lead (clave secreta: la tabla es de solo lectura para staff). */
+async function nbrAcceptedAt(leadId: string): Promise<string | null> {
+  const notices = await latestNotices(createService(), "lead_id", [leadId]);
+  return notices.get(leadId)?.accepted_at ?? null;
+}
+
+/** La ficha que pidió el comprador, para el aviso: dirección propia o número de MLS. */
+async function listingLabelFor(lead: { property_id: string | null; listing_key: string | null }): Promise<string | null> {
+  const svc = createService();
+  if (lead.property_id) {
+    const { data } = await svc.from("properties").select("address_street,address_city,address_zip").eq("id", lead.property_id).maybeSingle();
+    return data ? `${data.address_street}, ${data.address_city} ${data.address_zip}` : null;
+  }
+  if (lead.listing_key) {
+    const { data } = await svc.from("mls_listings").select("listing_id,city").eq("listing_key", lead.listing_key).maybeSingle();
+    return data ? `MLS #${data.listing_id}${data.city ? ` · ${data.city}` : ""}` : null;
+  }
+  return null;
+}
+
+interface LouiShowing {
+  id: string;
+  user_id: string;
+  topic: string;
+  preferred_time: string | null;
+  notes: string | null;
+  status: string;
+  buyer_agent_status: string | null;
+  buyer_agent_name: string | null;
+  buyer_agent_license: string | null;
+  created_at: string;
+}
+
+/** Visitas pedidas por Loui (schedule_requests): las lee y las cambia el staff con la clave secreta. */
+async function loadLouiShowings(): Promise<{ rows: LouiShowing[]; emails: Map<string, string> }> {
+  const svc = createService();
+  const { data } = await svc
+    .from("schedule_requests")
+    .select("id,user_id,topic,preferred_time,notes,status,buyer_agent_status,buyer_agent_name,buyer_agent_license,created_at")
+    .eq("request_type", "showing")
+    .in("status", ["pending", "scheduled"])
+    .order("created_at", { ascending: false })
+    .limit(50);
+  const rows = (data ?? []) as LouiShowing[];
+  const emails = new Map<string, string>();
+  for (const uid of new Set(rows.map((r) => r.user_id))) {
+    const { data: u } = await svc.auth.admin.getUserById(uid);
+    if (u.user?.email) emails.set(uid, u.user.email);
+  }
+  return { rows, emails };
+}
+
+/** El trigger guard_showing_nbr rechaza con 23514 y el motivo al principio del mensaje. */
+function dbNbrReason(message: string | undefined): "nbr_notice_missing" | "nbr_buyer_agent_missing" | null {
+  if (message?.startsWith("nbr_notice_missing")) return "nbr_notice_missing";
+  if (message?.startsWith("nbr_buyer_agent_missing")) return "nbr_buyer_agent_missing";
+  return null;
 }
 
 /**
@@ -175,6 +243,10 @@ export default async function AdminBuyerLeadsPage({
       : Promise.resolve({ data: [] }),
   ]);
   const agents = (agentRows ?? []) as Array<{ id: string; name: string; relationship: string; brokerage_name: string | null }>;
+  // Aviso NBR de cada lead (el aceptado, o el último enviado).
+  const nbrByLead = await latestNotices(createService(), "lead_id", ids);
+  const louiShowings = focus ? { rows: [] as LouiShowing[], emails: new Map<string, string>() } : await loadLouiShowings();
+  const nbrBySchedule = await latestNotices(createService(), "schedule_request_id", louiShowings.rows.map((r) => r.id));
   const agentName = new Map(agents.map((a) => [a.id, a.name]));
   const events = (eventRows ?? []) as LeadEvent[];
   // Quien mira, ¿es la broker licenciada? Solo ella ve el formulario de acuerdo.
@@ -219,6 +291,19 @@ export default async function AdminBuyerLeadsPage({
       await logRejected({ leadId: id, userId, from: lead.status, attempted: `status:${next}`, reason: check.error });
       redirect(back(lang, id, `&error=${check.error}`));
     }
+    // Sin agente: aviso NBR aceptado. Con agente: su nombre y licencia. La base lo exige igual.
+    if (next === "showing_confirmed" || next === "completed") {
+      const nbrBlock = nbrBlockReason({
+        agentStatus: lead.other_agent_status,
+        agentName: lead.buyer_agent_name,
+        agentLicense: lead.buyer_agent_license,
+        nbrAcceptedAt: await nbrAcceptedAt(id),
+      });
+      if (nbrBlock) {
+        await logRejected({ leadId: id, userId, from: lead.status, attempted: `status:${next}`, reason: nbrBlock });
+        redirect(back(lang, id, `&error=${nbrBlock}`));
+      }
+    }
     if (next === "cancelled" && !reason) redirect(back(lang, id, "&error=reason_required"));
     const { error } = await sb
       .from("buyer_leads")
@@ -230,7 +315,7 @@ export default async function AdminBuyerLeadsPage({
       .eq("id", id);
     // 23514 = check_violation: la base aplicó la regla aunque la UI la hubiera dejado pasar.
     if (error) {
-      const why = error.code === "23514" ? "agreement_missing" : "failed";
+      const why = error.code === "23514" ? (dbNbrReason(error.message) ?? "agreement_missing") : "failed";
       if (why !== "failed") {
         await logRejected({ leadId: id, userId, from: lead.status, attempted: `status:${next}`, reason: `db:${why}` });
       }
@@ -327,6 +412,89 @@ export default async function AdminBuyerLeadsPage({
     if (error) redirect(back(lang, id, "&error=failed"));
     revalidatePath(`/${lang}/admin/buyer-leads`);
     redirect(back(lang, id, "&done=taken"));
+  }
+
+  // Aviso NBR por enlace al comprador sin agente (F.S. 475.278(4)): lo lee y lo acepta antes
+  // de la visita. El correo va al email del lead; en la URL, solo el token.
+  async function sendNbr(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    if (!UUID_RE.test(id)) redirect(`/${lang}/admin/buyer-leads?error=failed`);
+    const sb = await assertStaff(lang);
+    const { data: lead } = await sb
+      .from("buyer_leads")
+      .select("id,email,full_name,lang,property_id,listing_key,other_agent_status")
+      .eq("id", id)
+      .maybeSingle();
+    if (!lead?.email || hasOwnAgent(lead.other_agent_status)) redirect(back(lang, id, "&error=nbr_send_failed"));
+    const sent = await sendNbrLink(createService(), { leadId: id }, {
+      email: lead.email,
+      name: lead.full_name,
+      lang: lead.lang === "es" ? "es" : "en",
+      listingLabel: await listingLabelFor(lead),
+      propertyId: lead.property_id,
+      listingKey: lead.listing_key,
+    });
+    if (!sent.ok) redirect(back(lang, id, "&error=nbr_send_failed"));
+    revalidatePath(`/${lang}/admin/buyer-leads`);
+    redirect(back(lang, id, "&done=nbr_sent"));
+  }
+
+  // Comprador con agente: nombre y licencia del agente (hacen falta para confirmar la visita).
+  async function saveBuyerAgent(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    const name = String(formData.get("buyer_agent_name") ?? "").trim();
+    const license = normalizeAgentLicense(String(formData.get("buyer_agent_license") ?? ""));
+    if (!name || name.length > 120 || !license) redirect(back(lang, id, "&error=agent_invalid"));
+    const sb = await assertStaff(lang);
+    const { error } = await sb
+      .from("buyer_leads")
+      .update({ buyer_agent_name: name, buyer_agent_license: license, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) redirect(back(lang, id, "&error=failed"));
+    revalidatePath(`/${lang}/admin/buyer-leads`);
+    redirect(back(lang, id, "&done=agent"));
+  }
+
+  // Visita pedida por Loui: mandar el aviso NBR, marcarla programada (con el aviso aceptado o
+  // los datos del agente; la base lo exige igual) o cancelarla.
+  async function louiShowingAction(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") ?? "");
+    const op = String(formData.get("op") ?? "");
+    const home = `/${lang}/admin/buyer-leads`;
+    if (!UUID_RE.test(id)) redirect(`${home}?error=failed`);
+    await assertStaff(lang);
+    const svc = createService();
+    const { data: row } = await svc
+      .from("schedule_requests")
+      .select("id,user_id,topic,request_type,buyer_agent_status,buyer_agent_name,buyer_agent_license")
+      .eq("id", id)
+      .maybeSingle();
+    if (!row || row.request_type !== "showing") redirect(`${home}?error=failed`);
+    if (op === "nbr") {
+      const { data: u } = await svc.auth.admin.getUserById(row.user_id);
+      if (!u.user?.email || hasOwnAgent(row.buyer_agent_status)) redirect(`${home}?error=nbr_send_failed`);
+      const name = typeof u.user.user_metadata?.full_name === "string" ? u.user.user_metadata.full_name : null;
+      const sent = await sendNbrLink(svc, { scheduleRequestId: id }, { email: u.user.email, name, lang: lang === "es" ? "es" : "en", listingLabel: row.topic });
+      redirect(sent.ok ? `${home}?done=nbr_sent` : `${home}?error=nbr_send_failed`);
+    }
+    if (op === "scheduled") {
+      const notices = await latestNotices(svc, "schedule_request_id", [id]);
+      const block = nbrBlockReason({
+        agentStatus: row.buyer_agent_status,
+        agentName: row.buyer_agent_name,
+        agentLicense: row.buyer_agent_license,
+        nbrAcceptedAt: notices.get(id)?.accepted_at ?? null,
+      });
+      if (block) redirect(`${home}?error=${block}`);
+    }
+    if (op !== "scheduled" && op !== "cancelled") redirect(`${home}?error=failed`);
+    const { error } = await svc.from("schedule_requests").update({ status: op, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) redirect(`${home}?error=${dbNbrReason(error.message) ?? "failed"}`);
+    revalidatePath(home);
+    redirect(`${home}?done=status`);
   }
 
   async function saveNotes(formData: FormData) {
@@ -453,6 +621,51 @@ export default async function AdminBuyerLeadsPage({
                 </div>
                 {l.message && <p className="text-sm text-ink/80 whitespace-pre-line border-l-2 border-gold-soft pl-3">{l.message}</p>}
 
+                {/* Aviso NBR (sin agente) o agente del comprador (con agente) */}
+                <div data-nbr-status className="border-t border-gold-soft pt-3 flex flex-col gap-2">
+                  {hasOwnAgent(l.other_agent_status) ? (
+                    <>
+                      <p className={small}>Buyer&apos;s agent · no NBR notice</p>
+                      <p className={`text-sm ${l.buyer_agent_name && l.buyer_agent_license ? "text-ink/80" : "text-amber-800"}`}>
+                        {l.buyer_agent_name && l.buyer_agent_license
+                          ? `${l.buyer_agent_name} · FL license ${l.buyer_agent_license}`
+                          : "Missing: record the agent's name and license before confirming the showing."}
+                      </p>
+                      <form action={saveBuyerAgent} className="flex flex-wrap items-end gap-2">
+                        <input type="hidden" name="id" value={l.id} />
+                        <input name="buyer_agent_name" defaultValue={l.buyer_agent_name ?? ""} placeholder="Agent name" maxLength={120} className={`${control} min-w-[180px]`} />
+                        <input name="buyer_agent_license" defaultValue={l.buyer_agent_license ?? ""} placeholder="FL license (SL…)" maxLength={20} className={control} />
+                        <button type="submit" className={btn}>Save agent</button>
+                      </form>
+                    </>
+                  ) : (
+                    (() => {
+                      const n = nbrByLead.get(l.id);
+                      const line = nbrStatusLine({ agentStatus: l.other_agent_status, acceptedAt: n?.accepted_at ?? null, sentAt: n?.sent_at ?? null }, lang);
+                      return (
+                        <>
+                          <p
+                            data-nbr-accepted={n?.accepted_at ? "true" : "false"}
+                            className={`text-sm ${n?.accepted_at ? "text-emerald-700" : "text-amber-800"}`}
+                          >
+                            {line}
+                            {n?.accepted_at && n.notice_version ? ` · ${n.notice_version}` : ""}
+                          </p>
+                          {!n?.accepted_at && l.email && (
+                            <form action={sendNbr} className="flex items-center gap-2">
+                              <input type="hidden" name="id" value={l.id} />
+                              <button type="submit" className={btn}>
+                                {n?.sent_at ? "Resend NBR notice" : "Send NBR notice"}
+                              </button>
+                              <span className="text-[11px] text-ink/55">Required before confirming the showing.</span>
+                            </form>
+                          )}
+                        </>
+                      );
+                    })()
+                  )}
+                </div>
+
                 {/* Acuerdo */}
                 <div className="border-t border-gold-soft pt-3 flex flex-col gap-2">
                   <p className={small}>Written agreement · recorded only by the licensed broker</p>
@@ -500,11 +713,22 @@ export default async function AdminBuyerLeadsPage({
                         {moves.map((s) => {
                           // Visible pero deshabilitada, con el motivo: evita un clic que siempre falla.
                           const block = transitionBlockReason(l, s);
+                          const nbrBlock =
+                            s === "showing_confirmed" || s === "completed"
+                              ? nbrBlockReason({
+                                  agentStatus: l.other_agent_status,
+                                  agentName: l.buyer_agent_name,
+                                  agentLicense: l.buyer_agent_license,
+                                  nbrAcceptedAt: nbrByLead.get(l.id)?.accepted_at ?? null,
+                                })
+                              : null;
                           return (
-                            <option key={s} value={s} disabled={block !== null}>
+                            <option key={s} value={s} disabled={block !== null || nbrBlock !== null}>
                               {LEAD_STATUS_LABELS[s]}
                               {block === "needs_agreement" ? " (record the written agreement first)" : ""}
                               {block === "needs_written_agreement" ? " (needs a written agreement, not an exception)" : ""}
+                              {!block && nbrBlock === "nbr_notice_missing" ? " (NBR notice not accepted yet)" : ""}
+                              {!block && nbrBlock === "nbr_buyer_agent_missing" ? " (record the buyer's agent first)" : ""}
                             </option>
                           );
                         })}
@@ -576,6 +800,63 @@ export default async function AdminBuyerLeadsPage({
             );
           })}
         </ul>
+      )}
+
+      {!focus && (
+        <section data-loui-showings className="flex flex-col gap-3 border-t border-gold-soft pt-6">
+          <h2 className="font-display text-xl text-ink font-normal">Showing requests from Loui</h2>
+          {louiShowings.rows.length === 0 ? (
+            <p className="text-sm text-ink/55 italic">None open.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {louiShowings.rows.map((r) => {
+                const n = nbrBySchedule.get(r.id);
+                const withAgent = hasOwnAgent(r.buyer_agent_status);
+                const block = nbrBlockReason({
+                  agentStatus: r.buyer_agent_status,
+                  agentName: r.buyer_agent_name,
+                  agentLicense: r.buyer_agent_license,
+                  nbrAcceptedAt: n?.accepted_at ?? null,
+                });
+                return (
+                  <li key={r.id} data-loui-showing={r.id} className="border border-gold-soft bg-ivory p-4 flex flex-col gap-2 text-sm text-ink/80">
+                    <p className="text-ink">
+                      {r.topic} · <span className="uppercase text-[10px] tracking-[0.18em]">{r.status}</span>
+                    </p>
+                    <p className="text-xs text-ink/60">
+                      {louiShowings.emails.get(r.user_id) ?? "—"} · requested {fmtDate(r.created_at)}
+                      {r.preferred_time ? ` · ${r.preferred_time}` : ""}
+                    </p>
+                    {r.notes && <p className="text-xs text-ink/70">{r.notes}</p>}
+                    {withAgent ? (
+                      <p className="text-xs">
+                        Buyer&apos;s agent: {r.buyer_agent_name ?? "—"} · FL license {r.buyer_agent_license ?? "—"}
+                      </p>
+                    ) : (
+                      <p data-nbr-accepted={n?.accepted_at ? "true" : "false"} className={`text-xs ${n?.accepted_at ? "text-emerald-700" : "text-amber-800"}`}>
+                        {nbrStatusLine({ agentStatus: r.buyer_agent_status, acceptedAt: n?.accepted_at ?? null, sentAt: n?.sent_at ?? null }, lang)}
+                      </p>
+                    )}
+                    <form action={louiShowingAction} className="flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="id" value={r.id} />
+                      {!withAgent && !n?.accepted_at && (
+                        <button type="submit" name="op" value="nbr" className={btn}>
+                          {n?.sent_at ? "Resend NBR notice" : "Send NBR notice"}
+                        </button>
+                      )}
+                      {r.status === "pending" && (
+                        <button type="submit" name="op" value="scheduled" disabled={block !== null} className={`${btn} disabled:opacity-40`}>
+                          Mark scheduled{block === "nbr_notice_missing" ? " (NBR notice not accepted yet)" : block ? " (buyer's agent missing)" : ""}
+                        </button>
+                      )}
+                      <button type="submit" name="op" value="cancelled" className={btn}>Cancel</button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       )}
     </div>
   );

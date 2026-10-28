@@ -12,6 +12,7 @@ const insertShowingLead = vi.fn(async () => ({
 }));
 const sendBroker = vi.fn(async () => ({ ok: true }));
 const sendBuyer = vi.fn(async () => ({ ok: true }));
+const recordNbr = vi.fn(async (..._a: unknown[]) => "nbr-1");
 
 vi.mock("@/lib/buyer-leads.server", () => ({
   canUseShowingRequests: async () => ({ allowed: state.allowed, staff: state.staff }),
@@ -20,6 +21,10 @@ vi.mock("@/lib/buyer-leads.server", () => ({
   insertShowingLead: (...a: unknown[]) => insertShowingLead(...(a as [])),
 }));
 vi.mock("@/lib/supabase/service", () => ({ createService: () => ({}) }));
+vi.mock("@/lib/nbr-notice.server", async (orig) => ({
+  ...(await orig<typeof import("@/lib/nbr-notice.server")>()),
+  recordInlineAcceptance: (...a: unknown[]) => recordNbr(...a),
+}));
 vi.mock("@/lib/email", () => ({
   sendBrokerShowingRequest: (...a: unknown[]) => sendBroker(...(a as [])),
   sendShowingRequestReceived: (...a: unknown[]) => sendBuyer(...(a as [])),
@@ -39,6 +44,7 @@ const valid = {
   email: "jane@example.com",
   other_agent_status: "none",
   consent_contact: true,
+  nbr_accept: true,
   lang: "en",
 };
 const post = (body: unknown) =>
@@ -56,6 +62,7 @@ beforeEach(() => {
   insertShowingLead.mockClear();
   sendBroker.mockClear();
   sendBuyer.mockClear();
+  recordNbr.mockClear();
 });
 
 describe("POST /api/showing-requests", () => {
@@ -85,11 +92,39 @@ describe("POST /api/showing-requests", () => {
 
   it("acuerdo exclusivo con otro broker → registrado, sin emails", async () => {
     state.leadStatus = "cancelled";
-    const res = await post({ ...valid, other_agent_status: "exclusive" });
+    const res = await post({ ...valid, other_agent_status: "exclusive", buyer_agent_name: "Ana Agente", buyer_agent_license: "SL123456" });
     expect(await res.json()).toEqual({ ok: true, exclusive: true });
     expect(insertShowingLead).toHaveBeenCalledTimes(1);
     expect(sendBroker).not.toHaveBeenCalled();
     expect(sendBuyer).not.toHaveBeenCalled();
+  });
+
+  it("sin agente: guarda el aviso NBR aceptado con IP y user agent, ligado al lead", async () => {
+    const res = await POST(new Request("https://lixtara.com/api/showing-requests", {
+      method: "POST",
+      headers: { "content-type": "application/json", host: "lixtara.com", "x-forwarded-for": "203.0.113.7", "user-agent": "TEST UA" },
+      body: JSON.stringify(valid),
+    }));
+    expect(res.status).toBe(200);
+    expect(recordNbr).toHaveBeenCalledWith({}, { leadId: "lead-1" }, expect.objectContaining({
+      fullName: "Jane Buyer", email: "jane@example.com", listingLabel: "MLS #A111", listingKey: "K1",
+      ip: "203.0.113.7", userAgent: "TEST UA", lang: "en",
+    }));
+    expect(sendBroker).toHaveBeenCalledWith(expect.objectContaining({ nbrNotice: expect.stringContaining("Accepted") }));
+  });
+
+  it("sin agente y sin aceptar el aviso → 400 'nbr', sin crear nada", async () => {
+    const res = await post({ ...valid, nbr_accept: false });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "nbr" });
+    expect(insertShowingLead).not.toHaveBeenCalled();
+  });
+
+  it("con agente: sin aviso NBR; nombre y licencia van a la broker", async () => {
+    const res = await post({ ...valid, other_agent_status: "non_exclusive", nbr_accept: false, buyer_agent_name: "Ana Agente", buyer_agent_license: "SL123456" });
+    expect(res.status).toBe(200);
+    expect(recordNbr).not.toHaveBeenCalled();
+    expect(sendBroker).toHaveBeenCalledWith(expect.objectContaining({ buyerAgent: "Ana Agente · FL license SL123456", nbrNotice: null }));
   });
 
   it("sin consentimiento → 400", async () => {
