@@ -117,10 +117,10 @@ describe("listing de prueba (is_test): no se aprueba ni manda el correo", () => 
     const home = read("src/app/[lang]/admin/page.tsx");
     expect(home).toContain("if (await isTestListing(supabase, id)) redirect(`/${lang}/admin?error=${TEST_LISTING_ERROR}`);");
     expect(home).toMatch(/\.eq\("mls_status", "pending_approval"\)\s*\.eq\("is_test", false\)/);
-    expect(home).toContain("disabled={legalPending.has(p.id) || p.is_test}");
+    expect(home).toContain("disabled={legalPending.has(p.id) || p.is_test || !!ownerBlocked}");
     const review = read("src/app/[lang]/admin/listings/[id]/review/page.tsx");
     expect(review).toContain("if (await isTestListing(supabase, id)) {");
-    expect(review).toContain("disabled={legalPending || prop.is_test}");
+    expect(review).toContain("disabled={legalPending || prop.is_test || !ownerGate.ok}");
   });
 });
 

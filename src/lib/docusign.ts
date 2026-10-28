@@ -461,6 +461,7 @@ export async function getEnvelopeStatus(envelopeId: string): Promise<EnvelopeSta
 export interface EnvelopeSigner {
   roleName?: string;
   clientUserId?: string;
+  name?: string;
   email?: string;
   status?: string;
 }
@@ -496,6 +497,11 @@ export function secondSellersSigned(signers: EnvelopeSigner[]): boolean {
 export function secondSellerHasSigned(signers: EnvelopeSigner[]): boolean {
   const others = signers.filter(isSecondSeller);
   return others.length > 0 && others.every(isDone);
+}
+
+/** El segundo vendedor tal como está en el sobre (nombre y correo a los que DocuSign escribe). */
+export function secondSellerOf(signers: EnvelopeSigner[]): EnvelopeSigner | null {
+  return signers.find(isSecondSeller) ?? null;
 }
 
 function isSecondSeller(r: EnvelopeSigner): boolean {
@@ -547,6 +553,25 @@ export async function getEnvelopeSigners(envelopeId: string): Promise<EnvelopeSi
     `/envelopes/${encodeURIComponent(envelopeId)}/recipients`,
   );
   return res.signers ?? [];
+}
+
+/**
+ * Anula un sobre que no terminó (plazo de firma vencido, #220). DocuSign no deja anular uno
+ * completado; uno ya anulado o vencido no se vuelve a tocar (el llamador lo comprueba antes).
+ */
+export async function voidEnvelope(envelopeId: string, reason: string): Promise<void> {
+  await authedRequest(`/envelopes/${encodeURIComponent(envelopeId)}`, {
+    method: "PUT",
+    body: { status: "voided", voidedReason: reason },
+  });
+}
+
+/** Vuelve a mandar el correo de DocuSign a los firmantes que todavía no firmaron. */
+export async function resendEnvelope(envelopeId: string): Promise<void> {
+  await authedRequest(`/envelopes/${encodeURIComponent(envelopeId)}?resend_envelope=true`, {
+    method: "PUT",
+    body: {},
+  });
 }
 
 export type AgreementStatus =

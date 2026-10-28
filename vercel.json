@@ -10,6 +10,10 @@
       "schedule": "23 * * * *"
     },
     {
+      "path": "/api/agreement/deadlines",
+      "schedule": "41 * * * *"
+    },
+    {
       "path": "/api/mls/reconcile",
       "schedule": "7,22,37,52 8-10 * * *"
     }

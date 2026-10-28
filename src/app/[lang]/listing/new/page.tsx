@@ -65,6 +65,7 @@ import {
   OWNERSHIP_ERROR_COPY,
   ownershipFormInitial,
   parseOwnershipForm,
+  SIGNING_DEADLINE_DAYS,
   type StoredOwnership,
   type StoredSigner,
 } from "@/lib/listing-ownership";
@@ -81,6 +82,8 @@ import { FIRST_TOUCH_COOKIE, parseFirstTouch } from "@/lib/funnel-events";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
+import { CosignerResendButton } from "@/components/cosigner-resend-button";
+import { staffMarksToReset } from "@/lib/listing-signers-admin";
 import {
   STEP1_FORM_COOKIE,
   STEP1_FORM_MAX_AGE_S,
@@ -1073,6 +1076,26 @@ export default async function ListingNewPage({
       .eq("owner_id", user.id);
     if (error) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
+    }
+    // Las marcas de la broker (Sunbiz, documento, revisión manual destrabada) son de la entidad o
+    // del motivo que revisó: si el vendedor los cambia, se borran. El vendedor no puede escribir
+    // esas columnas (guard_listing_signers): las borra el servidor, para el listing suyo.
+    const { data: storedOwnership } = await supabase
+      .from("listing_ownership")
+      .select("owner_kind,entity_name,manual_review_reason,sunbiz_status,authority_document_received_at,manual_review_cleared_at")
+      .eq("property_id", id)
+      .maybeSingle();
+    const staleMarks = staffMarksToReset(storedOwnership, owned.ownership);
+    if (staleMarks) {
+      const { error: resetError } = await createService()
+        .from("listing_ownership")
+        .update(staleMarks)
+        .eq("property_id", id)
+        .eq("owner_id", user.id);
+      if (resetError) {
+        console.error("step 3 staff marks reset failed", resetError.code);
+        redirect(`/${lang}/listing/new?step=3&id=${id}&error=save_failed`);
+      }
     }
     // Con la sesión del vendedor: RLS + guard_listing_signers (solo con el listing en borrador).
     // El firmante se guarda o se borra según las respuestas: sellers_required = 1 + firmantes.
@@ -3596,21 +3619,30 @@ export default async function ListingNewPage({
             }
 
             if (agStatus === "declined" || agStatus === "voided" || agStatus === "expired") {
+              // #220: venció el plazo de 7 días sin la firma del segundo vendedor (el cron anuló el
+              // sobre). El listing sigue en borrador; un sobre nuevo trae otro plazo.
+              const cosignerExpired =
+                agStatus === "expired" && latestAgreement?.sellers_required === 2 && !latestAgreement.additional_signer_signed_at;
+              const days = String(SIGNING_DEADLINE_DAYS);
               return (
                 <div className="flex flex-col gap-4">
-                  <div className="border border-red-300 bg-red-50 p-5 flex flex-col gap-2">
+                  <div className="border border-red-300 bg-red-50 p-5 flex flex-col gap-2" data-signing-expired={cosignerExpired || undefined}>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-red-800">
-                      {copy.step7.declinedTitle}
+                      {cosignerExpired ? copy.step7.expiredCosignerTitle : copy.step7.declinedTitle}
                     </p>
                     <p className="text-sm text-red-800 leading-relaxed">
-                      {copy.step7.declinedBody}
+                      {cosignerExpired
+                        ? copy.step7.expiredCosignerBody
+                            .replace("{name}", additionalSigner?.full_name ?? "")
+                            .replaceAll("{days}", days)
+                        : copy.step7.declinedBody}
                     </p>
                   </div>
                   <AgreementButton
                     propertyId={draftId}
                     lang={lang}
                     labels={{
-                      startButton: copy.step7.restartButton,
+                      startButton: cosignerExpired ? copy.step7.expiredRestartButton : copy.step7.restartButton,
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
                       consentRequired: copy.step7.consentRequired,
@@ -3646,6 +3678,16 @@ export default async function ListingNewPage({
                           .replace("{email}", waitingCosigner.email)
                           .replace("{date}", deadline)}
                       </p>
+                      <CosignerResendButton
+                        propertyId={draftId}
+                        labels={{
+                          button: copy.step7.resendButton,
+                          sending: copy.step7.resending,
+                          sent: copy.step7.resent.replace("{email}", waitingCosigner.email),
+                          failed: copy.step7.resendFailed,
+                          limit: copy.step7.resendLimit,
+                        }}
+                      />
                     </div>
                   ) : (
                   <div className="border border-gold-soft bg-ivory-strong/40 p-5 flex flex-col gap-2">

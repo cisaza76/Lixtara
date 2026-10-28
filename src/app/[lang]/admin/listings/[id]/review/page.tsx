@@ -34,6 +34,17 @@ import { correctListingMlsPublished, markListingMlsPublished } from "@/lib/mls-p
 import { MarkPublishedForm } from "@/components/admin/mark-published-form";
 import { CASSB1_ENABLED } from "@/lib/buyer-comp";
 import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
+import { getEnvelopeSigners } from "@/lib/docusign";
+import {
+  agreementSignerLines,
+  canClearManualReview,
+  ownershipApprovalGate,
+  ownershipGateMessage,
+  sellerSignatureMissing,
+  signersAdminCopy,
+  sunbizSearchUrl,
+} from "@/lib/listing-signers-admin";
+import { applyStaffMark, loadOwnershipForStaff, ownershipGateFor, type StaffMark } from "@/lib/listing-signers-admin.server";
 import { legalPendingHint, legalPendingMessage } from "@/lib/agreement-legal";
 import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
 import {
@@ -105,6 +116,9 @@ interface Agreement {
   signer_name: string | null;
   signer_email: string | null;
   signed_at: string | null;
+  sellers_required: number | null;
+  additional_signer_signed_at: string | null;
+  signing_deadline_at: string | null;
 }
 
 function field(label: string, value: string | number | null | undefined) {
@@ -118,6 +132,13 @@ function field(label: string, value: string | number | null | undefined) {
       </span>
     </div>
   );
+}
+
+// Marcas del staff sobre el titular (#220). A nivel de módulo por lo mismo que transition().
+async function staffMark(lang: string, id: string, mark: StaffMark) {
+  const { sb, userId } = await assertStaffWithUser(lang);
+  const r = await applyStaffMark(sb, userId, id, mark);
+  redirect(`/${lang}/admin/listings/${id}/review?${r.ok ? `done=ownership_${mark.kind}` : `error=mark_${r.error}`}`);
 }
 
 // Module scope on purpose: a plain function declared inside the page and
@@ -155,6 +176,9 @@ async function transition(
     if ((await pendingLegalByProperty([id])).has(id)) {
       redirect(`/${lang}/admin/listings/${id}/review?error=legal_pending`);
     }
+    // Titular (#220): entidad sin Sunbiz ni documento, o revisión manual sin destrabar.
+    const owner = await ownershipGateFor(id);
+    if (!owner.ok) redirect(`/${lang}/admin/listings/${id}/review?error=${owner.reason}`);
     const gate = await checkBrokerCountersigned(id);
     if (!gate.ok) redirect(`/${lang}/admin/listings/${id}/review?error=${gate.reason}`);
   }
@@ -233,7 +257,7 @@ export default async function ListingReviewPage({
       .order("display_order", { ascending: true }),
     svc
       .from("agreements")
-      .select("id,envelope_id,property_id,status,signer_name,signer_email,signed_at")
+      .select("id,envelope_id,property_id,status,signer_name,signer_email,signed_at,sellers_required,additional_signer_signed_at,signing_deadline_at")
       .eq("property_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -286,6 +310,23 @@ export default async function ListingReviewPage({
     }
   }
 
+  // Titular y firmantes (#220): el estado de cada firma, en vivo desde DocuSign si responde.
+  const { ownership, signer: cosigner } = await loadOwnershipForStaff(id);
+  const liveSigners =
+    agreement?.envelope_id && !["voided", "expired", "declined"].includes(agreement.status)
+      ? await getEnvelopeSigners(agreement.envelope_id).catch(() => null)
+      : null;
+  const signerLines = agreementSignerLines({
+    ownership,
+    sellerName: agreement?.signer_name ?? null,
+    cosigner,
+    agreement,
+    live: liveSigners,
+    propertyId: id,
+  });
+  const ownerGate = ownershipApprovalGate(ownership);
+  const sc = signersAdminCopy(lang);
+
   // ── Broker actions (admin/broker gated). The Lovable workflow statuses
   // (rejected / changes_requested / awaiting_broker_signature) don't exist in
   // this DB's mls_status enum, so we map: Approve→active, Reject→withdrawn,
@@ -303,6 +344,11 @@ export default async function ListingReviewPage({
     not_pending: "That request was already handled.",
     apply_failed: "Could not apply the request to the listing. Try again.",
     not_countersigned: "The broker hasn't countersigned the listing agreement in DocuSign yet.",
+    sunbiz_unchecked: ownershipGateMessage("sunbiz_unchecked", lang)!,
+    entity_authority_pending: ownershipGateMessage("entity_authority_pending", lang)!,
+    manual_review_pending: ownershipGateMessage("manual_review_pending", lang)!,
+    mark_not_applicable: "That mark doesn't apply to this owner anymore (the seller may have changed it).",
+    mark_save_failed: "Could not save the mark. Try again.",
     legal_pending: legalPendingMessage(lang),
     [TEST_LISTING_ERROR]: testListingMessage(lang),
     docusign_unavailable: "Could not confirm the broker's countersignature with DocuSign. Try again.",
@@ -423,6 +469,23 @@ export default async function ListingReviewPage({
         ? `/${lang}/admin/listings/${id}/review?done=seller_request_${decision === "approve" ? "approved" : "rejected"}`
         : `/${lang}/admin/listings/${id}/review?error=${r.error}`,
     );
+  }
+
+  async function markSunbizListed() {
+    "use server";
+    await staffMark(lang, id, { kind: "sunbiz", status: "listed" });
+  }
+  async function markSunbizNotListed() {
+    "use server";
+    await staffMark(lang, id, { kind: "sunbiz", status: "not_listed" });
+  }
+  async function markAuthorityDocument() {
+    "use server";
+    await staffMark(lang, id, { kind: "authority_document" });
+  }
+  async function clearManualReview() {
+    "use server";
+    await staffMark(lang, id, { kind: "clear_manual_review" });
   }
 
   async function reject() {
@@ -818,6 +881,119 @@ export default async function ListingReviewPage({
         )}
       </section>
 
+      {/* Titular y firmantes (#220) */}
+      <section data-owner-signers className="border border-gold-soft p-6 flex flex-col gap-4">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">{sc.title}</span>
+        {ownership ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            {field(sc.kindLabel, sc.kind[ownership.owner_kind as keyof typeof sc.kind] ?? ownership.owner_kind)}
+            {ownership.owner_kind !== "fl_entity" && field(sc.otherOnTitle, ownership.other_title_holders ? sc.yes : sc.no)}
+            {ownership.owner_kind !== "fl_entity" && field(sc.marriedHomestead, ownership.married_homestead ? sc.yes : sc.no)}
+            {ownership.owner_kind === "fl_entity" && field(sc.entity, ownership.entity_name)}
+            {ownership.owner_kind === "fl_entity" && field(sc.signerTitle, ownership.entity_signer_title)}
+            {ownership.owner_kind === "fl_entity" &&
+              field(sc.authorityConfirmed, ownership.entity_authority_confirmed_at ? sc.yes : sc.no)}
+            {ownership.owner_kind === "manual_review" &&
+              field(sc.reason, sc.reasons[ownership.manual_review_reason ?? ""] ?? ownership.manual_review_reason)}
+          </div>
+        ) : (
+          <p className="text-sm text-ink/55 italic">{sc.noOwnership}</p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">{sc.signers}</span>
+          <ul className="flex flex-col gap-1.5">
+            {signerLines.map((l) => (
+              <li key={l.role} data-signer={l.role} data-signer-status={l.status} className="text-sm text-ink flex flex-wrap gap-x-2">
+                <strong className="font-medium">{sc.roles[l.role]}</strong>
+                {l.name && <span>{l.name}</span>}
+                <span className="text-ink/55">· {sc.relationships[l.relationship]}</span>
+                <span className={l.status === "signed" ? "text-emerald-700" : "text-amber-700"}>· {sc.status[l.status]}</span>
+              </li>
+            ))}
+          </ul>
+          {agreement && sellerSignatureMissing(signerLines) && <p className="text-xs text-amber-700">⚠️ {sc.sellerMissing}</p>}
+        </div>
+
+        {ownership?.owner_kind === "fl_entity" && ownership.entity_name && (
+          <div className="flex flex-col gap-3 border-t border-gold-soft pt-4">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+              {sc.sunbiz} · <span data-sunbiz-status={ownership.sunbiz_status}>{sc.sunbizStatus[ownership.sunbiz_status as keyof typeof sc.sunbizStatus]}</span>
+              {ownership.sunbiz_checked_at ? ` · ${sc.checkedOn} ${formatMiamiDateTime(ownership.sunbiz_checked_at)}` : ""}
+            </span>
+            <a
+              href={sunbizSearchUrl(ownership.entity_name)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="self-start text-sm text-ink underline decoration-gold underline-offset-4 hover:text-gold"
+            >
+              {sc.sunbizOpen}
+            </a>
+            <p className="text-xs text-ink/60">{sc.sunbizHelp}</p>
+            <div className="flex flex-wrap gap-3">
+              <form action={markSunbizListed}>
+                <button type="submit" disabled={ownership.sunbiz_status === "listed"} className="inline-flex items-center px-4 py-2 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.2em] uppercase hover:border-gold disabled:opacity-40">
+                  {sc.markListed}
+                </button>
+              </form>
+              <form action={markSunbizNotListed}>
+                <button type="submit" disabled={ownership.sunbiz_status === "not_listed"} className="inline-flex items-center px-4 py-2 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.2em] uppercase hover:border-gold disabled:opacity-40">
+                  {sc.markNotListed}
+                </button>
+              </form>
+            </div>
+            {ownership.sunbiz_status === "not_listed" && (
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+                  {sc.authorityDoc}
+                  {ownership.authority_document_received_at
+                    ? ` · ${sc.docReceived} ${formatMiamiDateTime(ownership.authority_document_received_at)}`
+                    : ""}
+                </span>
+                {!ownership.authority_document_received_at && (
+                  <>
+                    <p className="text-xs text-ink/60">{sc.authorityDocHelp}</p>
+                    <form action={markAuthorityDocument}>
+                      <button type="submit" className="inline-flex items-center px-4 py-2 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.2em] uppercase hover:border-gold">
+                        {sc.markDocReceived}
+                      </button>
+                    </form>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {ownership?.owner_kind === "manual_review" && (
+          <div className="flex flex-col gap-2 border-t border-gold-soft pt-4">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
+              {sc.manualReview}
+              {ownership.manual_review_cleared_at ? ` · ${sc.cleared} ${formatMiamiDateTime(ownership.manual_review_cleared_at)}` : ""}
+            </span>
+            {!ownership.manual_review_cleared_at &&
+              (canClearManualReview(ownership.manual_review_reason) ? (
+                <>
+                  <p className="text-xs text-ink/60">{sc.manualReviewHelp}</p>
+                  <form action={clearManualReview}>
+                    <button type="submit" className="inline-flex items-center px-4 py-2 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.2em] uppercase hover:border-gold">
+                      {sc.clearManualReview}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <p className="text-xs text-ink/60">{sc.threeOwnersHelp}</p>
+              ))}
+          </div>
+        )}
+
+        {!ownerGate.ok && (
+          <p data-owner-gate={ownerGate.reason} className="text-xs text-red-700">
+            ⚠️ {ownershipGateMessage(ownerGate.reason, lang)}
+          </p>
+        )}
+      </section>
+
       {/* Listing agreement */}
       <section className="border border-gold-soft p-6 flex flex-col gap-2">
         <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
@@ -873,8 +1049,16 @@ export default async function ListingReviewPage({
           </label>
           <button
             type="submit"
-            disabled={legalPending || prop.is_test}
-            title={prop.is_test ? testListingMessage(lang) : legalPending ? legalPendingMessage(lang) : undefined}
+            disabled={legalPending || prop.is_test || !ownerGate.ok}
+            title={
+              prop.is_test
+                ? testListingMessage(lang)
+                : legalPending
+                  ? legalPendingMessage(lang)
+                  : !ownerGate.ok
+                    ? (ownershipGateMessage(ownerGate.reason, lang) ?? undefined)
+                    : undefined
+            }
             className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Approve → Active
