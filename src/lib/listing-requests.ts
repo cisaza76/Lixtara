@@ -6,6 +6,8 @@
 // Este módulo es lógica pura (sin red ni base): qué se puede pedir, en qué estado, y la
 // validación de cada valor. La escritura vive en listing-requests.server.ts.
 
+import { parseFormNumber, type NumberKind } from "@/lib/form-numbers";
+
 export type ListingRequestKind = "change" | "withdrawal";
 export type ListingRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 
@@ -73,6 +75,13 @@ export type ParseError =
   | { error: "unknown_field"; field: string }
   | { error: "invalid_value"; field: ChangeableField };
 
+/** Cómo se lee el texto de un campo numérico (src/lib/form-numbers.ts). */
+export function numberKindFor(field: ChangeableField): NumberKind {
+  if (field === "bathrooms") return "bathrooms";
+  if (field === "list_price" || field === "hoa_fee") return "moneyWhole";
+  return "whole";
+}
+
 /** Normaliza un valor según su especificación. undefined = inválido. */
 export function normalizeFieldValue(field: ChangeableField, raw: unknown): FieldValue | undefined {
   const spec: FieldSpec = CHANGEABLE_FIELDS[field];
@@ -85,7 +94,13 @@ export function normalizeFieldValue(field: ChangeableField, raw: unknown): Field
       return typeof raw === "boolean" ? raw : undefined;
     case "int":
     case "number": {
-      const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw.trim()) : NaN;
+      // Texto del vendedor: coma de miles y "$" se aceptan; nunca un número a medias.
+      let n: number;
+      if (typeof raw === "number") n = raw;
+      else if (typeof raw === "string") {
+        const parsed = parseFormNumber(raw, numberKindFor(field));
+        n = parsed.ok && parsed.value !== null ? parsed.value : NaN;
+      } else n = NaN;
       if (!Number.isFinite(n)) return undefined;
       if (spec.kind === "int" && !Number.isInteger(n)) return undefined;
       const max = field === "year_built" ? thisYear() + 2 : spec.max;

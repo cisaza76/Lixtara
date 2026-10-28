@@ -49,6 +49,7 @@ import {
   improveListingDescription,
   improveShowingInstructions,
 } from "@/lib/ai";
+import { NUMBER_PATTERNS, parseFormNumber, type NumberKind } from "@/lib/form-numbers";
 import { acceptCountyTax, baseStreetForLookup, lookupMiamiDadeProperty, staleCountyUpdates, step3PropertyTypeDefault, unitFromStoredStreet } from "@/lib/miami-dade";
 import { fetchRentcastEstimate, type RentcastComp } from "@/lib/rentcast";
 import { deletePropertyPhoto, storagePathFromUrl } from "@/lib/storage";
@@ -880,30 +881,21 @@ export default async function ListingNewPage({
     if (!id) redirect(`/${lang}/listing/new?step=1&error=required`);
 
     const propertyType = String(formData.get("property_type") ?? "single_family");
-    const bedrooms = Number.parseInt(String(formData.get("bedrooms") ?? "0"), 10);
-    const bathrooms = Number.parseFloat(
-      String(formData.get("bathrooms") ?? "1"),
-    );
-    const sqft = Number.parseInt(String(formData.get("sqft") ?? "0"), 10);
-    const lotSizeRaw = String(formData.get("lot_size") ?? "").trim();
-    const lotSizeParsed = lotSizeRaw === "" ? null : Number.parseInt(lotSizeRaw, 10);
-    const lotSize = lotSizeParsed !== null && Number.isFinite(lotSizeParsed) ? lotSizeParsed : null;
-    const yearBuilt = Number.parseInt(
-      String(formData.get("year_built") ?? "0"),
-      10,
-    );
-    const listPrice = Number.parseInt(
-      String(formData.get("list_price") ?? "0"),
-      10,
-    );
-
-    const parkingRaw = String(formData.get("parking_spaces") ?? "").trim();
-    const parkingSpaces =
-      parkingRaw === "" ? null : Number.parseInt(parkingRaw, 10);
-    const hoaRaw = String(formData.get("hoa_fee") ?? "").trim();
-    const hoaFee = hoaRaw === "" ? null : Number.parseInt(hoaRaw, 10);
-    const taxRaw = String(formData.get("tax_annual_amount") ?? "").trim();
-    const taxAnnual = taxRaw === "" ? null : Number.parseInt(taxRaw, 10);
+    // Números: coma de miles y "$" se aceptan y se quitan; nunca se lee un número a medias
+    // ("1,854" se guardaba como 1). Inválido → NaN (no pasa las validaciones de abajo).
+    const num = (name: string, kind: NumberKind): number | null => {
+      const r = parseFormNumber(formData.get(name), kind);
+      return r.ok ? r.value : Number.NaN;
+    };
+    const bedrooms = num("bedrooms", "whole") ?? Number.NaN;
+    const bathrooms = num("bathrooms", "bathrooms") ?? Number.NaN;
+    const sqft = num("sqft", "positiveWhole") ?? Number.NaN;
+    const lotSize = num("lot_size", "whole");
+    const yearBuilt = num("year_built", "whole") ?? Number.NaN;
+    const listPrice = num("list_price", "moneyWhole") ?? Number.NaN;
+    const parkingSpaces = num("parking_spaces", "whole");
+    const hoaFee = num("hoa_fee", "moneyWhole");
+    const taxAnnual = num("tax_annual_amount", "moneyWhole");
     const hasPool = formData.get("has_pool") === "1";
     // Financiamiento aceptado (L23 del acuerdo): al menos una opción; Other con texto.
     const financing = parseFinancing(formData.getAll("financing_terms"), formData.get("financing_other"));
@@ -927,11 +919,11 @@ export default async function ListingNewPage({
     // Lease details — only persisted when a tenant occupies the property;
     // cleared to null otherwise so changing occupancy doesn't leave stale data.
     const isTenant = occupancyStatus === "tenant_occupied";
-    const rentRaw = String(formData.get("monthly_rent") ?? "").trim();
-    const monthlyRent =
-      isTenant && rentRaw !== "" && Number.isFinite(Number(rentRaw))
-        ? Number(rentRaw)
-        : null;
+    const rent = isTenant ? num("monthly_rent", "money") : null;
+    if (rent !== null && (Number.isNaN(rent) || rent < 0 || rent > 10_000_000)) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_rent`);
+    }
+    const monthlyRent = rent;
     // Con inquilino: MM/DD/YYYY futura o «No la sé» (null). Va al acuerdo de listado (L20).
     const lease = isTenant
       ? parseLeaseEnd(String(formData.get("lease_end_date") ?? ""), formData.get("lease_end_unknown") === "1")
@@ -977,6 +969,9 @@ export default async function ListingNewPage({
     }
     if (!Number.isFinite(listPrice) || listPrice <= 0 || listPrice > 1000000000) {
       redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_price`);
+    }
+    if (lotSize !== null && (Number.isNaN(lotSize) || lotSize < 0 || lotSize > 100_000_000)) {
+      redirect(`/${lang}/listing/new?step=3&id=${id}&error=invalid_lot`);
     }
     if (
       parkingSpaces !== null &&
@@ -1801,6 +1796,10 @@ export default async function ListingNewPage({
                 ? copy.stepErrors.invalidBaths
                 : sp.error === "invalid_sqft"
                   ? copy.stepErrors.invalidSqft
+                  : sp.error === "invalid_lot"
+                    ? copy.stepErrors.invalidLot
+                  : sp.error === "invalid_rent"
+                    ? copy.stepErrors.invalidRent
                   : sp.error === "invalid_year"
                     ? copy.stepErrors.invalidYear
                     : sp.error === "invalid_price"
@@ -1870,6 +1869,20 @@ export default async function ListingNewPage({
     copy.step3.autofillMultifamily5,
     `/${lang}/contact?topic=sell`,
   );
+  // Paso 3: un número que no cumple su formato (o baños / pies² en 0) se rechaza en el
+  // navegador con el mismo mensaje por campo que el servidor.
+  const step3InvalidMessages = {
+    bedrooms: copy.stepErrors.invalidBeds,
+    bathrooms: copy.stepErrors.invalidBaths,
+    sqft: copy.stepErrors.invalidSqft,
+    year_built: copy.stepErrors.invalidYear,
+    lot_size: copy.stepErrors.invalidLot,
+    list_price: copy.stepErrors.invalidPrice,
+    parking_spaces: copy.stepErrors.invalidParking,
+    hoa_fee: copy.stepErrors.invalidHoa,
+    tax_annual_amount: copy.stepErrors.invalidTax,
+    monthly_rent: copy.stepErrors.invalidRent,
+  };
   const autofillResult =
     typeof sp === "object" && "autofill" in sp ? (sp.autofill as string) : null;
   const autofillMessage =
@@ -2353,6 +2366,7 @@ export default async function ListingNewPage({
             <AppFormValidation step={3} lang={lang} message={copy.stepErrors.checkMarked}
               labels={copy.validation}
               fieldMessages={copy.fieldErrors}
+              invalidMessages={step3InvalidMessages}
             />
             <input type="hidden" name="id" value={draftId ?? ""} />
 
@@ -2389,6 +2403,8 @@ export default async function ListingNewPage({
                 name="bedrooms"
                 type="text"
                 defaultValue={bedroomsFieldValue(draft)}
+                pattern={NUMBER_PATTERNS.whole}
+                inputMode="numeric"
                 help={copy.step3.bedroomsHelp}
                 autofilled={!!draft?.folio}
                 autofilledLabel={copy.step3.autofilledBadge}
@@ -2400,6 +2416,8 @@ export default async function ListingNewPage({
                 defaultValue={
                   draft?.bathrooms ? String(draft.bathrooms) : ""
                 }
+                pattern={NUMBER_PATTERNS.bathrooms}
+                inputMode="decimal"
                 autofilled={!!draft?.folio}
                 autofilledLabel={copy.step3.autofilledBadge}
               />
@@ -2415,6 +2433,8 @@ export default async function ListingNewPage({
                     ? String(draft.year_built)
                     : ""
                 }
+                pattern={NUMBER_PATTERNS.whole}
+                inputMode="numeric"
                 autofilled={!!draft?.folio}
                 autofilledLabel={copy.step3.autofilledBadge}
               />
@@ -2426,6 +2446,8 @@ export default async function ListingNewPage({
                 name="sqft"
                 type="text"
                 defaultValue={draft?.sqft ? String(draft.sqft) : ""}
+                pattern={NUMBER_PATTERNS.positiveWhole}
+                inputMode="numeric"
                 autofilled={!!draft?.folio}
                 autofilledLabel={copy.step3.autofilledBadge}
               />
@@ -2437,6 +2459,8 @@ export default async function ListingNewPage({
                 defaultValue={
                   draft?.lot_size ? String(draft.lot_size) : ""
                 }
+                pattern={NUMBER_PATTERNS.whole}
+                inputMode="numeric"
                 autofilled={!!draft?.folio}
                 autofilledLabel={copy.step3.autofilledBadge}
               />
@@ -2449,6 +2473,8 @@ export default async function ListingNewPage({
               defaultValue={
                 draft?.list_price ? String(draft.list_price) : ""
               }
+              pattern={NUMBER_PATTERNS.moneyWhole}
+              inputMode="decimal"
             />
 
             {/* Optional details */}
@@ -2473,6 +2499,8 @@ export default async function ListingNewPage({
                       ? String(draft.parking_spaces)
                       : ""
                   }
+                  pattern={NUMBER_PATTERNS.whole}
+                  inputMode="numeric"
                 />
                 <Field
                   label={copy.step3.hoaLabel}
@@ -2482,6 +2510,8 @@ export default async function ListingNewPage({
                   defaultValue={
                     draft?.hoa_fee != null ? String(draft.hoa_fee) : ""
                   }
+                  pattern={NUMBER_PATTERNS.moneyWhole}
+                  inputMode="decimal"
                 />
                 <Field
                   label={copy.step3.taxLabel}
@@ -2493,6 +2523,8 @@ export default async function ListingNewPage({
                       ? String(draft.tax_annual_amount)
                       : ""
                   }
+                  pattern={NUMBER_PATTERNS.moneyWhole}
+                  inputMode="decimal"
                   help={copy.step3.taxEstimateHint}
                 />
               </div>

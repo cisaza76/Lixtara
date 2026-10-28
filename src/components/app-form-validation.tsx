@@ -74,6 +74,7 @@ export function AppFormValidation({
   message,
   labels,
   fieldMessages = {},
+  invalidMessages = {},
 }: {
   step: number;
   lang: string;
@@ -83,6 +84,8 @@ export function AppFormValidation({
   labels: ValidationLabels;
   /** Mensaje por campo cuando falta (copy.fieldErrors): "Ingresa la dirección". */
   fieldMessages?: Record<string, string>;
+  /** Mensaje por campo cuando el valor no cumple su regla (p. ej. baños en 0): el mismo del servidor. */
+  invalidMessages?: Record<string, string>;
 }) {
   const anchor = useRef<HTMLSpanElement>(null);
   const [shown, setShown] = useState(false);
@@ -139,7 +142,10 @@ export function AppFormValidation({
         const key = el.name || el.id;
         if (!key || seen.has(key)) continue;
         seen.add(key);
-        const text = (el.validity.valueMissing && fieldMessages[el.name]) || messageFor(el, el.validity, labels);
+        const text =
+          (el.validity.valueMissing && fieldMessages[el.name]) ||
+          (el.validity.patternMismatch && invalidMessages[el.name]) ||
+          messageFor(el, el.validity, labels);
         const p = document.createElement("p");
         p.setAttribute(ERROR_ATTR, key);
         p.id = fieldErrorId(form, key);
@@ -168,7 +174,7 @@ export function AppFormValidation({
       form.removeEventListener("input", clear);
       form.removeEventListener("change", clear);
     };
-  }, [step, lang, labels, fieldMessages]);
+  }, [step, lang, labels, fieldMessages, invalidMessages]);
 
   return (
     <span ref={anchor} className="contents">

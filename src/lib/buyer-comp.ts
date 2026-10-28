@@ -6,6 +6,7 @@
 // En la base: properties.buyer_agent_comp_type + buyer_agent_commission (%) +
 // buyer_agent_comp_amount (USD), migración 20261017150000.
 
+import { parseFormNumber } from "@/lib/form-numbers";
 import {
   PRICING_TIERS,
   TRADITIONAL_COSTS,
@@ -105,15 +106,19 @@ export function parseOfferInput(
   if (preset !== undefined) return { ok: true, offer: { type: "percent", pct: preset } };
   if (choice !== "custom") return { ok: false, error: "choice_required" };
 
-  const raw = (input.customValue ?? "").trim().replace(/[$,\s%]/g, "");
-  const value = /^\d+(\.\d+)?$/.test(raw) ? Number(raw) : NaN;
   if (input.customKind === "amount") {
+    // Coma de miles bien agrupada y "$" (parseFormNumber): antes se quitaban TODAS las comas y
+    // "5,00" se leía como 500.
+    const parsed = parseFormNumber(input.customValue, "money");
+    const value = parsed.ok && parsed.value !== null ? parsed.value : NaN;
     const max = buyerCompMaxAmount(listPrice);
     if (!Number.isFinite(value) || value <= 0 || !(max > 0)) return { ok: false, error: "amount_range" };
     if (value > max) return { ok: false, error: "amount_max" };
     return { ok: true, offer: { type: "amount", amount: Math.round(value * 100) / 100 } };
   }
   if (input.customKind === "percent") {
+    const raw = (input.customValue ?? "").trim().replace(/[$\s%]/g, "");
+    const value = /^\d+(\.\d+)?$/.test(raw) ? Number(raw) : NaN;
     // Una coma en un porcentaje no es separador de miles: "2,5" no se lee como 25%.
     if ((input.customValue ?? "").includes(",")) return { ok: false, error: "pct_range" };
     // numeric(4,2) en la base: dos decimales.

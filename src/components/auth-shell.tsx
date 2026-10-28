@@ -45,6 +45,9 @@ interface FieldProps {
   autofilled?: boolean;
   autofilledLabel?: string;
   minLength?: number;
+  /** Regla de formato para la validación en el navegador (AppFormValidation). */
+  pattern?: string;
+  inputMode?: "numeric" | "decimal";
 }
 
 export function Field({
@@ -58,6 +61,8 @@ export function Field({
   autofilled,
   autofilledLabel,
   minLength,
+  pattern,
+  inputMode,
 }: FieldProps) {
   return (
     <label className="flex flex-col gap-2">
@@ -77,6 +82,8 @@ export function Field({
         defaultValue={defaultValue}
         autoComplete={autoComplete}
         minLength={minLength}
+        pattern={pattern}
+        inputMode={inputMode}
         className="bg-ivory border-2 border-gold-soft focus:border-gold outline-none px-4 py-3 text-base text-ink"
       />
       {help && (
