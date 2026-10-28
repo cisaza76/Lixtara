@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/lib/supabase/service";
 import { assertStaffWithUser } from "@/lib/admin-auth";
 import {
-  checkBrokerCountersigned,
   isFinalAgreementStatus,
   refreshAgreement,
   type AgreementRef,
@@ -32,24 +31,28 @@ import {
 } from "@/lib/mls-published";
 import { correctListingMlsPublished, markListingMlsPublished } from "@/lib/mls-published.server";
 import { MarkPublishedForm } from "@/components/admin/mark-published-form";
+import { OwnerSignersSection } from "@/components/admin/owner-signers-section";
+import { approvalBlocker } from "@/lib/approval-gate.server";
+import {
+  adminReviewCopy,
+  agreementApprovalBlock,
+  agreementStatusLabel,
+  approvalBlockMessage,
+  readableValue,
+} from "@/lib/admin-review-copy";
 import { CASSB1_ENABLED } from "@/lib/buyer-comp";
 import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
 import { getEnvelopeSigners } from "@/lib/docusign";
 import {
   agreementSignerLines,
-  canClearManualReview,
   ownershipApprovalGate,
   ownershipGateMessage,
-  sellerSignatureMissing,
-  signersAdminCopy,
-  sunbizSearchUrl,
 } from "@/lib/listing-signers-admin";
-import { applyStaffMark, loadOwnershipForStaff, ownershipGateFor, type StaffMark } from "@/lib/listing-signers-admin.server";
+import { applyStaffMark, loadOwnershipForStaff, type StaffMark } from "@/lib/listing-signers-admin.server";
 import { legalPendingHint, legalPendingMessage } from "@/lib/agreement-legal";
 import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
 import {
   TEST_LISTING_ERROR,
-  isTestListing,
   notifyListingApprovedOnce,
   testListingMessage,
   writeListingStatus,
@@ -168,19 +171,9 @@ async function transition(
   // El vendedor paga al firmar, pero el listing no se publica sin la contrafirma de la
   // broker en DocuSign (se consulta en vivo; si DocuSign no responde, no se publica).
   if (newStatus === "active") {
-    // Un listing de prueba no se aprueba: publicarlo mandaría el correo de aprobación.
-    if (await isTestListing(supabase, id)) {
-      redirect(`/${lang}/admin/listings/${id}/review?error=${TEST_LISTING_ERROR}`);
-    }
-    // Acuerdo enviado sin descripción legal verificada: no se publica (#217).
-    if ((await pendingLegalByProperty([id])).has(id)) {
-      redirect(`/${lang}/admin/listings/${id}/review?error=legal_pending`);
-    }
-    // Titular (#220): entidad sin Sunbiz ni documento, o revisión manual sin destrabar.
-    const owner = await ownershipGateFor(id);
-    if (!owner.ok) redirect(`/${lang}/admin/listings/${id}/review?error=${owner.reason}`);
-    const gate = await checkBrokerCountersigned(id);
-    if (!gate.ok) redirect(`/${lang}/admin/listings/${id}/review?error=${gate.reason}`);
+    // Listing de prueba, descripción legal (#217), titular (#220) y contrafirma en vivo.
+    const blocked = await approvalBlocker(supabase, id);
+    if (blocked) redirect(`/${lang}/admin/listings/${id}/review?error=${blocked}`);
   }
 
   const { error: updateError, becameActive } = await writeListingStatus(supabase, id, newStatus, mlsNumber);
@@ -325,7 +318,6 @@ export default async function ListingReviewPage({
     propertyId: id,
   });
   const ownerGate = ownershipApprovalGate(ownership);
-  const sc = signersAdminCopy(lang);
 
   // ── Broker actions (admin/broker gated). The Lovable workflow statuses
   // (rejected / changes_requested / awaiting_broker_signature) don't exist in
@@ -335,29 +327,14 @@ export default async function ListingReviewPage({
   // serializaría el listing completo en el formulario.
   const shortAddress = `${prop.address_street}, ${prop.address_city}`;
 
+  const rc = adminReviewCopy(lang);
   const MLS_ERRORS: Record<string, string> = {
-    invalid_format: "That MLS number doesn't look right (e.g. A11234567).",
-    empty: "Enter the MLS number.",
-    taken: "That MLS number is already on another listing.",
-    failed: "Could not save the MLS number. Try again.",
-    matrix_required: "Confirm you already made this change in Matrix.",
-    not_pending: "That request was already handled.",
-    apply_failed: "Could not apply the request to the listing. Try again.",
-    not_countersigned: "The broker hasn't countersigned the listing agreement in DocuSign yet.",
+    ...rc.mlsErrors,
     sunbiz_unchecked: ownershipGateMessage("sunbiz_unchecked", lang)!,
     entity_authority_pending: ownershipGateMessage("entity_authority_pending", lang)!,
     manual_review_pending: ownershipGateMessage("manual_review_pending", lang)!,
-    mark_not_applicable: "That mark doesn't apply to this owner anymore (the seller may have changed it).",
-    mark_save_failed: "Could not save the mark. Try again.",
     legal_pending: legalPendingMessage(lang),
     [TEST_LISTING_ERROR]: testListingMessage(lang),
-    docusign_unavailable: "Could not confirm the broker's countersignature with DocuSign. Try again.",
-    listing_not_active: "Approve the listing (active) before marking it as published on the MLS.",
-    already_published: "This listing already has an MLS publication date. Only an admin can correct it.",
-    mls_number_required: "Enter the MLS number to mark the listing as published.",
-    agreement_not_completed: "The listing agreement isn't completed (signed by the seller and countersigned) yet.",
-    payment_not_succeeded: "The plan payment hasn't succeeded yet.",
-    future_date: "The publication date can't be in the future.",
     admin_only: "Only an admin can correct the publication date.",
     note_required: `Write a note of at least ${MIN_CORRECTION_NOTE} characters explaining the correction.`,
     invalid_date: "That date doesn't look right.",
@@ -499,9 +476,9 @@ export default async function ListingReviewPage({
   }
 
   const fullAddress = `${prop.address_street}, ${prop.address_city}, ${prop.address_state} ${prop.address_zip}`;
-  const agreementSigned =
-    agreement?.status === "signed" || agreement?.status === "completed";
-  const awaitingCountersign = agreement?.status === "signed";
+  // Aprobar solo con el acuerdo completo: firmaron todos los vendedores y la broker (#220). La
+  // acción lo vuelve a comprobar en vivo (checkBrokerCountersigned).
+  const approvalBlock = agreementApprovalBlock(agreement?.status, signerLines);
   const legalPending = (await pendingLegalByProperty([id])).has(id);
   const planPaid = isPlanPaymentSucceeded(
     (paymentRows ?? []) as { payment_type: string | null; tier: string | null; status: string | null }[],
@@ -521,14 +498,14 @@ export default async function ListingReviewPage({
           href={`/${lang}/admin/listings`}
           className="text-[10px] uppercase tracking-[0.22em] text-ink/55 hover:text-gold transition-colors"
         >
-          ← Listings
+          {rc.back}
         </Link>
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="font-display text-3xl text-ink font-normal">
             {prop.address_street}
           </h1>
           <span className="text-[9px] uppercase tracking-[0.18em] px-2.5 py-1 border border-gold bg-gold/5 text-ink">
-            {prop.mls_status.replace("_", " ")}
+            {readableValue("mls_status", prop.mls_status, lang)}
           </span>
         </div>
         <p className="text-sm text-ink/60">{fullAddress}</p>
@@ -536,24 +513,21 @@ export default async function ListingReviewPage({
 
       {sp.done && (
         <div className="border border-gold bg-gold/5 px-4 py-3 text-sm text-ink">
-          Done: {sp.done.replace(/_/g, " ")}.
+          {rc.done.replace("{what}", rc.doneLabels[sp.done] ?? sp.done.replace(/_/g, " "))}
         </div>
       )}
       {sp.error && MLS_ERRORS[sp.error] && (
         <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {MLS_ERRORS[sp.error]} Nothing was changed.
+          {MLS_ERRORS[sp.error]} {rc.nothingChanged}
         </div>
       )}
 
       {sellerRequests.length > 0 && (
         <section className="border border-gold bg-gold/5 p-6 flex flex-col gap-5">
           <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
-            Seller requests ({sellerRequests.length})
+            {rc.sellerRequests.replace("{n}", String(sellerRequests.length))}
           </span>
-          <p className="text-sm text-ink/75">
-            Make the change in Matrix first. Approving applies it on lixtara.com; nothing is
-            published before that.
-          </p>
+          <p className="text-sm text-ink/75">{rc.sellerRequestsHelp}</p>
           {sellerRequests.map((r) => (
             <form
               key={r.id}
@@ -562,24 +536,24 @@ export default async function ListingReviewPage({
             >
               <input type="hidden" name="request_id" value={r.id} />
               <p className="text-sm text-ink">
-                <strong>{r.kind === "change" ? "Change" : "Withdrawal"}</strong>
-                <span className="text-ink/55"> · {new Date(r.created_at).toLocaleDateString("en-US")}</span>
+                <strong>{r.kind === "change" ? rc.requestChange : rc.requestWithdrawal}</strong>
+                <span className="text-ink/55"> · {new Date(r.created_at).toLocaleDateString(lang === "es" ? "es-US" : "en-US")}</span>
               </p>
               {r.kind === "change" ? (
                 <p className="text-sm text-ink/80 font-mono break-words">{describeChanges(r.changes)}</p>
               ) : (
-                <p className="text-sm text-ink/80">Take this listing off the market (→ withdrawn).</p>
+                <p className="text-sm text-ink/80">{rc.withdrawalBody}</p>
               )}
               {r.reason && <p className="text-sm text-ink/70 italic">“{r.reason}”</p>}
               <label className="flex items-center gap-2 text-sm text-ink">
                 <input type="checkbox" name="matrix_done" value="1" />
-                {r.kind === "change" ? "Already updated in Matrix" : "Already withdrawn in Matrix"}
+                {r.kind === "change" ? rc.matrixDoneChange : rc.matrixDoneWithdrawal}
               </label>
               <textarea
                 name="note"
                 rows={2}
                 maxLength={2000}
-                placeholder="Note to the seller (optional)"
+                placeholder={rc.noteToSeller}
                 className="w-full border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink"
               />
               <div className="flex gap-3">
@@ -589,7 +563,7 @@ export default async function ListingReviewPage({
                   value="approve"
                   className="inline-flex items-center px-5 py-2.5 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
                 >
-                  Approve &amp; apply
+                  {rc.approveApply}
                 </button>
                 <button
                   type="submit"
@@ -597,7 +571,7 @@ export default async function ListingReviewPage({
                   value="reject"
                   className="inline-flex items-center px-5 py-2.5 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.22em] uppercase hover:border-gold transition-colors"
                 >
-                  Reject
+                  {rc.reject}
                 </button>
               </div>
             </form>
@@ -609,12 +583,12 @@ export default async function ListingReviewPage({
           cancela corresponde reembolso total (legal-terms.ts#refundPolicy). */}
       <section className="border border-gold-soft p-6 flex flex-col gap-4">
         <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
-          MLS publication
+          {rc.mlsPublication}
         </span>
         {prop.mls_published_at ? (
           <div className="flex flex-col gap-1 text-sm text-ink/80">
             <p>
-              Published on the MLS:{" "}
+              {rc.publishedOn}{" "}
               <strong>{formatMiamiDateTime(prop.mls_published_at)}</strong>
               {prop.mls_number ? (
                 <>
@@ -622,18 +596,15 @@ export default async function ListingReviewPage({
                 </>
               ) : null}
             </p>
-            <p className="text-xs text-ink/60">
-              The flat fee is earned: if the seller cancels now, it is not refunded (except a
-              double charge or a technical error).
-            </p>
+            <p className="text-xs text-ink/60">{rc.feeEarned}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-ink/80">
-              Not marked as published.{" "}
+              {rc.notPublished}{" "}
               <span className="text-ink/60">
                 {refundOnCancel(prop.mls_published_at) === "full"
-                  ? "If the seller cancels now, the flat fee is refunded in full."
+                  ? rc.fullRefund
                   : null}
               </span>
             </p>
@@ -643,23 +614,21 @@ export default async function ListingReviewPage({
               active={!publishBlockers.includes("listing_not_active")}
               agreementCompleted={!publishBlockers.includes("agreement_not_completed")}
               planPaid={!publishBlockers.includes("payment_not_succeeded")}
+              labels={rc.published}
             />
-            <p className="text-xs text-ink/55">
-              Do it once the listing is live in Matrix. The date is now; it can&apos;t be edited
-              afterwards (only an admin can correct it, with a note).
-            </p>
+            <p className="text-xs text-ink/55">{rc.publishHelp}</p>
           </div>
         )}
 
         {prop.mls_published_at && isAdminRole === true && (
           <details>
             <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-ink/60 hover:text-gold">
-              Correct the date (admin) →
+              {rc.correctDate}
             </summary>
             <form action={correctPublished} className="flex flex-col gap-3 mt-3 max-w-xl">
               <label className="flex flex-col gap-1">
                 <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                  Published on (Miami time)
+                  {rc.publishedOnMiami}
                 </span>
                 <input
                   name="published_at"
@@ -670,7 +639,7 @@ export default async function ListingReviewPage({
               </label>
               <label className="flex items-center gap-2 text-sm text-ink">
                 <input type="checkbox" name="clear" value="1" />
-                Clear the date (the listing was never published)
+                {rc.clearDate}
               </label>
               <textarea
                 name="note"
@@ -678,14 +647,14 @@ export default async function ListingReviewPage({
                 required
                 minLength={MIN_CORRECTION_NOTE}
                 maxLength={2000}
-                placeholder="Why is the date being corrected? (required)"
+                placeholder={rc.correctionNote}
                 className="border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold"
               />
               <button
                 type="submit"
                 className="self-start inline-flex items-center px-6 py-3 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.22em] uppercase hover:border-gold transition-colors"
               >
-                Save correction
+                {rc.saveCorrection}
               </button>
             </form>
           </details>
@@ -693,13 +662,13 @@ export default async function ListingReviewPage({
 
         {publishedHistory.length > 0 && (
           <div className="flex flex-col gap-1 border-t border-gold-soft pt-3">
-            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">History</span>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">{rc.history}</span>
             <ul className="text-xs text-ink/70 flex flex-col gap-1">
               {publishedHistory.map((h) => (
                 <li key={`${h.changed_at}-${h.changed_by}`}>
                   {formatMiamiDateTime(h.changed_at)} · {actorName.get(h.changed_by) ?? h.changed_by}:{" "}
                   {h.old_published_at ? formatMiamiDateTime(h.old_published_at) : "—"} →{" "}
-                  {h.new_published_at ? formatMiamiDateTime(h.new_published_at) : "cleared"}
+                  {h.new_published_at ? formatMiamiDateTime(h.new_published_at) : rc.cleared}
                   {h.note ? <span className="italic"> · “{h.note}”</span> : null}
                 </li>
               ))}
@@ -712,19 +681,19 @@ export default async function ListingReviewPage({
           listing dos veces (fila propia + ficha del feed IDX). */}
       <section className="border border-gold-soft p-6 flex flex-col gap-3">
         <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
-          MLS number
+          {rc.mlsNumber}
         </span>
         <p className="text-sm text-ink/80">
           {prop.mls_number ? (
-            <>Current: <strong className="font-mono">{prop.mls_number}</strong></>
+            <>{rc.current} <strong className="font-mono">{prop.mls_number}</strong></>
           ) : (
-            <span className="text-ink/55 italic">Not recorded yet.</span>
+            <span className="text-ink/55 italic">{rc.notRecorded}</span>
           )}
         </p>
         <form action={saveMlsNumber} className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-              {prop.mls_number ? "Correct it" : "Record it"}
+              {prop.mls_number ? rc.correctIt : rc.recordIt}
             </span>
             <input
               name="mls_number"
@@ -741,60 +710,51 @@ export default async function ListingReviewPage({
             type="submit"
             className="inline-flex items-center px-6 py-3 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.22em] uppercase hover:border-gold transition-colors"
           >
-            Save MLS number
+            {rc.saveMlsNumber}
           </button>
         </form>
-        <p className="text-xs text-ink/55">
-          Enter it after the listing is live in Matrix. Saving it closes the
-          &ldquo;Enter MLS number&rdquo; task.
-        </p>
+        <p className="text-xs text-ink/55">{rc.mlsNumberHelp}</p>
         <Link
           href={`/${lang}/admin/listings/${id}/matrix`}
           className="self-start inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors"
         >
-          Matrix input sheet →
+          {rc.matrixSheet}
         </Link>
       </section>
 
       {/* Listing data */}
       <section className="border border-gold-soft p-6 grid grid-cols-2 md:grid-cols-4 gap-5">
-        {field("Type", prop.property_type)}
+        {field(rc.fields.type, readableValue("property_type", prop.property_type, lang))}
         {field(
-          "Beds / Baths",
+          rc.fields.bedsBaths,
           `${prop.bedrooms ?? "—"} / ${prop.bathrooms ?? "—"}`,
         )}
-        {field("Sqft", prop.sqft ? prop.sqft.toLocaleString() : null)}
-        {field("Year built", prop.year_built)}
+        {field(rc.fields.sqft, prop.sqft ? prop.sqft.toLocaleString() : null)}
+        {field(rc.fields.yearBuilt, prop.year_built)}
         {field(
-          "List price",
+          rc.fields.listPrice,
           prop.list_price ? `$${prop.list_price.toLocaleString()}` : null,
         )}
-        {field(
-          "Tier",
-          prop.pricing_tier
-            ? prop.pricing_tier.charAt(0).toUpperCase() +
-                prop.pricing_tier.slice(1)
-            : null,
-        )}
+        {field(rc.fields.tier, readableValue("tier", prop.pricing_tier, lang))}
         {(() => {
           const offer = offerFromRow(prop);
           return (
             <>
-              {field("Buyer's agent compensation", offer ? formatOffer(offer) : null)}
+              {field(rc.fields.buyerComp, offer ? formatOffer(offer) : null)}
               {/* Apagado mientras se confirma qué acuerdo corresponde (CASSB1_ENABLED). */}
               {CASSB1_ENABLED &&
                 field(
                   "CASSB-1",
                   offer
                     ? compensationAgreementsFor(offer) === 1
-                      ? "Needed when a buyer's agent asks for it"
-                      : "Not needed (0%)"
+                      ? rc.cassbNeeded
+                      : rc.cassbNotNeeded
                     : null,
                 )}
             </>
           );
         })()}
-        {field("Lot size", prop.lot_size)}
+        {field(rc.fields.lotSize, prop.lot_size)}
       </section>
 
       {(prop.description || prop.showing_instructions || prop.legal_description) && (
@@ -802,7 +762,7 @@ export default async function ListingReviewPage({
           {prop.description && (
             <div className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                Description
+                {rc.fields.description}
               </span>
               <p className="text-sm text-ink/80 leading-relaxed">
                 {prop.description}
@@ -812,7 +772,7 @@ export default async function ListingReviewPage({
           {prop.showing_instructions && (
             <div className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                Showing instructions
+                {rc.fields.showings}
               </span>
               <p className="text-sm text-ink/80 leading-relaxed">
                 {prop.showing_instructions}
@@ -822,7 +782,7 @@ export default async function ListingReviewPage({
           {prop.legal_description && (
             <div className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                Legal description
+                {rc.fields.legal}
               </span>
               <p className="text-sm text-ink/80 leading-relaxed whitespace-pre-line">
                 {prop.legal_description}
@@ -834,16 +794,16 @@ export default async function ListingReviewPage({
 
       {/* Occupancy */}
       <section className="border border-gold-soft p-6 grid grid-cols-2 md:grid-cols-4 gap-5">
-        {field("Occupancy", prop.occupancy_status?.replace("_", " "))}
+        {field(rc.fields.occupancy, readableValue("occupancy_status", prop.occupancy_status, lang))}
         {prop.occupancy_status === "tenant_occupied" && (
           <>
             {field(
-              "Monthly rent",
+              rc.fields.monthlyRent,
               prop.monthly_rent ? `$${prop.monthly_rent.toLocaleString()}` : null,
             )}
-            {field("Lease end", prop.lease_end_date)}
-            {field("Tenant", prop.tenant_cooperation?.replace("_", " "))}
-            {prop.tenant_notes && field("Tenant notes", prop.tenant_notes)}
+            {field(rc.fields.leaseEnd, prop.lease_end_date)}
+            {field(rc.fields.tenant, readableValue("tenant_cooperation", prop.tenant_cooperation, lang))}
+            {prop.tenant_notes && field(rc.fields.tenantNotes, prop.tenant_notes)}
           </>
         )}
       </section>
@@ -851,10 +811,10 @@ export default async function ListingReviewPage({
       {/* Photos */}
       <section className="flex flex-col gap-4">
         <h2 className="font-display text-xl text-ink">
-          Photos ({photos.length})
+          {rc.photos.replace("{n}", String(photos.length))}
         </h2>
         {photos.length === 0 ? (
-          <p className="text-sm text-ink/55 italic">No photos uploaded.</p>
+          <p className="text-sm text-ink/55 italic">{rc.noPhotos}</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {photos.map((ph) => (
@@ -872,7 +832,7 @@ export default async function ListingReviewPage({
                 />
                 {ph.is_primary && (
                   <span className="absolute top-1 left-1 text-[8px] uppercase tracking-[0.18em] bg-gold text-ivory px-1.5 py-0.5">
-                    Primary
+                    {rc.primary}
                   </span>
                 )}
               </div>
@@ -882,151 +842,39 @@ export default async function ListingReviewPage({
       </section>
 
       {/* Titular y firmantes (#220) */}
-      <section data-owner-signers className="border border-gold-soft p-6 flex flex-col gap-4">
-        <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">{sc.title}</span>
-        {ownership ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-            {field(sc.kindLabel, sc.kind[ownership.owner_kind as keyof typeof sc.kind] ?? ownership.owner_kind)}
-            {ownership.owner_kind !== "fl_entity" && field(sc.otherOnTitle, ownership.other_title_holders ? sc.yes : sc.no)}
-            {ownership.owner_kind !== "fl_entity" && field(sc.marriedHomestead, ownership.married_homestead ? sc.yes : sc.no)}
-            {ownership.owner_kind === "fl_entity" && field(sc.entity, ownership.entity_name)}
-            {ownership.owner_kind === "fl_entity" && field(sc.signerTitle, ownership.entity_signer_title)}
-            {ownership.owner_kind === "fl_entity" &&
-              field(sc.authorityConfirmed, ownership.entity_authority_confirmed_at ? sc.yes : sc.no)}
-            {ownership.owner_kind === "manual_review" &&
-              field(sc.reason, sc.reasons[ownership.manual_review_reason ?? ""] ?? ownership.manual_review_reason)}
-          </div>
-        ) : (
-          <p className="text-sm text-ink/55 italic">{sc.noOwnership}</p>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">{sc.signers}</span>
-          <ul className="flex flex-col gap-1.5">
-            {signerLines.map((l) => (
-              <li key={l.role} data-signer={l.role} data-signer-status={l.status} className="text-sm text-ink flex flex-wrap gap-x-2">
-                <strong className="font-medium">{sc.roles[l.role]}</strong>
-                {l.name && <span>{l.name}</span>}
-                <span className="text-ink/55">· {sc.relationships[l.relationship]}</span>
-                <span className={l.status === "signed" ? "text-emerald-700" : "text-amber-700"}>· {sc.status[l.status]}</span>
-              </li>
-            ))}
-          </ul>
-          {agreement && sellerSignatureMissing(signerLines) && <p className="text-xs text-amber-700">⚠️ {sc.sellerMissing}</p>}
-        </div>
-
-        {ownership?.owner_kind === "fl_entity" && ownership.entity_name && (
-          <div className="flex flex-col gap-3 border-t border-gold-soft pt-4">
-            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-              {sc.sunbiz} · <span data-sunbiz-status={ownership.sunbiz_status}>{sc.sunbizStatus[ownership.sunbiz_status as keyof typeof sc.sunbizStatus]}</span>
-              {ownership.sunbiz_checked_at ? ` · ${sc.checkedOn} ${formatMiamiDateTime(ownership.sunbiz_checked_at)}` : ""}
-            </span>
-            <a
-              href={sunbizSearchUrl(ownership.entity_name)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="self-start text-sm text-ink underline decoration-gold underline-offset-4 hover:text-gold"
-            >
-              {sc.sunbizOpen}
-            </a>
-            <p className="text-xs text-ink/60">{sc.sunbizHelp}</p>
-            <div className="flex flex-wrap gap-3">
-              <form action={markSunbizListed}>
-                <button type="submit" disabled={ownership.sunbiz_status === "listed"} className="inline-flex items-center px-4 py-2 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.2em] uppercase hover:border-gold disabled:opacity-40">
-                  {sc.markListed}
-                </button>
-              </form>
-              <form action={markSunbizNotListed}>
-                <button type="submit" disabled={ownership.sunbiz_status === "not_listed"} className="inline-flex items-center px-4 py-2 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.2em] uppercase hover:border-gold disabled:opacity-40">
-                  {sc.markNotListed}
-                </button>
-              </form>
-            </div>
-            {ownership.sunbiz_status === "not_listed" && (
-              <div className="flex flex-col gap-2">
-                <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-                  {sc.authorityDoc}
-                  {ownership.authority_document_received_at
-                    ? ` · ${sc.docReceived} ${formatMiamiDateTime(ownership.authority_document_received_at)}`
-                    : ""}
-                </span>
-                {!ownership.authority_document_received_at && (
-                  <>
-                    <p className="text-xs text-ink/60">{sc.authorityDocHelp}</p>
-                    <form action={markAuthorityDocument}>
-                      <button type="submit" className="inline-flex items-center px-4 py-2 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.2em] uppercase hover:border-gold">
-                        {sc.markDocReceived}
-                      </button>
-                    </form>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {ownership?.owner_kind === "manual_review" && (
-          <div className="flex flex-col gap-2 border-t border-gold-soft pt-4">
-            <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-              {sc.manualReview}
-              {ownership.manual_review_cleared_at ? ` · ${sc.cleared} ${formatMiamiDateTime(ownership.manual_review_cleared_at)}` : ""}
-            </span>
-            {!ownership.manual_review_cleared_at &&
-              (canClearManualReview(ownership.manual_review_reason) ? (
-                <>
-                  <p className="text-xs text-ink/60">{sc.manualReviewHelp}</p>
-                  <form action={clearManualReview}>
-                    <button type="submit" className="inline-flex items-center px-4 py-2 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.2em] uppercase hover:border-gold">
-                      {sc.clearManualReview}
-                    </button>
-                  </form>
-                </>
-              ) : (
-                <p className="text-xs text-ink/60">{sc.threeOwnersHelp}</p>
-              ))}
-          </div>
-        )}
-
-        {!ownerGate.ok && (
-          <p data-owner-gate={ownerGate.reason} className="text-xs text-red-700">
-            ⚠️ {ownershipGateMessage(ownerGate.reason, lang)}
-          </p>
-        )}
-      </section>
+      <OwnerSignersSection
+        lang={lang}
+        ownership={ownership}
+        signerLines={signerLines}
+        hasAgreement={!!agreement}
+        ownerGate={ownerGate}
+        actions={{ markSunbizListed, markSunbizNotListed, markAuthorityDocument, clearManualReview }}
+      />
 
       {/* Listing agreement */}
       <section className="border border-gold-soft p-6 flex flex-col gap-2">
         <span className="text-[10px] uppercase tracking-[0.18em] text-gold font-semibold">
-          Listing agreement
+          {rc.agreement}
         </span>
         {agreement ? (
           <p className="text-sm text-ink/80">
-            Status: <strong>{agreement.status}</strong>
+            {rc.agreementStatus} <strong data-agreement-status={agreement.status}>{agreementStatusLabel(agreement.status, lang)}</strong>
             {agreement.signer_name ? ` · ${agreement.signer_name}` : ""}
             {agreement.signed_at
-              ? ` · signed ${new Date(agreement.signed_at).toLocaleDateString(lang)}`
+              ? ` · ${rc.signedOn.replace("{date}", new Date(agreement.signed_at).toLocaleDateString(lang === "es" ? "es-US" : "en-US"))}`
               : ""}
           </p>
         ) : (
-          <p className="text-sm text-ink/55 italic">
-            No listing agreement on file yet.
-          </p>
+          <p className="text-sm text-ink/55 italic">{rc.noAgreement}</p>
         )}
-        {!agreementSigned && (
-          <p className="text-xs text-amber-700">
-            ⚠️ Seller hasn&apos;t signed the listing agreement. Approval stays
-            blocked until the seller signs and the broker countersigns.
+        {approvalBlock && (
+          <p data-approval-block={approvalBlock} className="text-xs text-amber-700">
+            ⚠️ {approvalBlockMessage(approvalBlock, agreement?.status, lang)}
           </p>
         )}
         {legalPending && (
           <p data-legal-pending className="text-xs text-red-700">
             ⚠️ {legalPendingMessage(lang)}. {legalPendingHint(lang)}
-          </p>
-        )}
-        {awaitingCountersign && (
-          <p className="text-xs text-amber-700">
-            ⚠️ Seller signed; waiting for the broker&apos;s countersignature in
-            DocuSign. Approval stays blocked until then.
           </p>
         )}
       </section>
@@ -1036,7 +884,7 @@ export default async function ListingReviewPage({
         <form action={approve} className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase tracking-[0.18em] text-ink/55">
-              MLS number (optional)
+              {rc.mlsNumberOptional}
             </span>
             <input
               name="mls_number"
@@ -1049,7 +897,7 @@ export default async function ListingReviewPage({
           </label>
           <button
             type="submit"
-            disabled={legalPending || prop.is_test || !ownerGate.ok}
+            disabled={legalPending || prop.is_test || !ownerGate.ok || !!approvalBlock}
             title={
               prop.is_test
                 ? testListingMessage(lang)
@@ -1057,11 +905,13 @@ export default async function ListingReviewPage({
                   ? legalPendingMessage(lang)
                   : !ownerGate.ok
                     ? (ownershipGateMessage(ownerGate.reason, lang) ?? undefined)
-                    : undefined
+                    : approvalBlock
+                      ? approvalBlockMessage(approvalBlock, agreement?.status, lang)
+                      : undefined
             }
             className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Approve → Active
+            {rc.approve}
           </button>
           {prop.is_test && (
             <span data-test-listing className="text-[11px] text-red-700">
@@ -1074,26 +924,26 @@ export default async function ListingReviewPage({
             type="submit"
             className="inline-flex items-center px-6 py-3 border border-red-300 text-red-800 text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-red-50 transition-colors"
           >
-            Reject (withdraw)
+            {rc.rejectWithdraw}
           </button>
         </form>
         <details className="w-full">
           <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-ink/60 hover:text-gold">
-            Request changes →
+            {rc.requestChanges}
           </summary>
           <form action={requestChanges} className="flex flex-col gap-3 mt-3 max-w-xl">
             <textarea
               name="note"
               rows={3}
               required
-              placeholder="What needs to change before this can be approved?"
+              placeholder={rc.requestChangesPlaceholder}
               className="border border-gold-soft bg-ivory px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold"
             />
             <button
               type="submit"
               className="self-start inline-flex items-center px-6 py-3 border border-gold-soft text-ink text-[10px] font-medium tracking-[0.22em] uppercase hover:border-gold transition-colors"
             >
-              Send back to seller (draft)
+              {rc.sendBack}
             </button>
           </form>
         </details>

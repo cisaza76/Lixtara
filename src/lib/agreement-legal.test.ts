@@ -25,15 +25,17 @@ describe("descripción legal pendiente", () => {
   });
 
   it("las dos acciones de aprobar lo comprueban en el servidor y deshabilitan el botón", () => {
+    // Las dos acciones pasan por approvalBlocker (approval-gate.server.ts).
     const home = readFileSync("src/app/[lang]/admin/page.tsx", "utf8");
-    expect(home).toContain("if ((await pendingLegalByProperty([id])).has(id)) redirect(`/${lang}/admin?error=legal_pending`);");
+    expect(home).toContain("const blocked = await approvalBlocker(supabase, id);");
     expect(home).toContain("disabled={legalPending.has(p.id) ||");
     const review = readFileSync("src/app/[lang]/admin/listings/[id]/review/page.tsx", "utf8");
-    expect(review).toContain("redirect(`/${lang}/admin/listings/${id}/review?error=legal_pending`);");
+    expect(review).toContain("const blocked = await approvalBlocker(supabase, id);");
     expect(review).toContain("disabled={legalPending ||");
-    // El bloqueo va antes de la consulta a DocuSign y de cualquier escritura.
-    expect(review.indexOf("error=legal_pending")).toBeLessThan(review.indexOf("checkBrokerCountersigned(id)"));
-    expect(home.indexOf("error=legal_pending")).toBeLessThan(home.indexOf("checkBrokerCountersigned(id)"));
+    // El bloqueo va antes de la consulta a DocuSign.
+    const gate = readFileSync("src/lib/approval-gate.server.ts", "utf8");
+    expect(gate.indexOf('return "legal_pending"')).toBeGreaterThan(0);
+    expect(gate.indexOf('return "legal_pending"')).toBeLessThan(gate.indexOf("deps.countersigned(id)"));
   });
 
   it("el acuerdo se guarda con su estado (columna) y la auditoría queda en activity_log", () => {
