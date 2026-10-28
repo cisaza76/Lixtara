@@ -36,11 +36,19 @@ import { CASSB1_ENABLED } from "@/lib/buyer-comp";
 import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
 import { legalPendingHint, legalPendingMessage } from "@/lib/agreement-legal";
 import { approveListingRequest, rejectListingRequest } from "@/lib/listing-requests.server";
-import { notifyListingApprovedOnce, writeListingStatus } from "@/lib/listing-approval.server";
+import {
+  TEST_LISTING_ERROR,
+  isTestListing,
+  notifyListingApprovedOnce,
+  testListingMessage,
+  writeListingStatus,
+} from "@/lib/listing-approval.server";
 
 interface Property {
   id: string;
   owner_id: string;
+  /** Listing de prueba: no se puede aprobar. */
+  is_test: boolean;
   address_street: string;
   address_city: string;
   address_state: string;
@@ -139,6 +147,10 @@ async function transition(
   // El vendedor paga al firmar, pero el listing no se publica sin la contrafirma de la
   // broker en DocuSign (se consulta en vivo; si DocuSign no responde, no se publica).
   if (newStatus === "active") {
+    // Un listing de prueba no se aprueba: publicarlo mandaría el correo de aprobación.
+    if (await isTestListing(supabase, id)) {
+      redirect(`/${lang}/admin/listings/${id}/review?error=${TEST_LISTING_ERROR}`);
+    }
     // Acuerdo enviado sin descripción legal verificada: no se publica (#217).
     if ((await pendingLegalByProperty([id])).has(id)) {
       redirect(`/${lang}/admin/listings/${id}/review?error=legal_pending`);
@@ -198,7 +210,7 @@ export default async function ListingReviewPage({
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,mls_published_at,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description",
+      "id,owner_id,address_street,address_city,address_state,address_zip,property_type,bedrooms,bathrooms,sqft,year_built,lot_size,list_price,mls_status,mls_number,mls_published_at,pricing_tier,description,showing_instructions,occupancy_status,monthly_rent,lease_end_date,tenant_cooperation,tenant_notes,legal_description,is_test",
     )
     .eq("id", id)
     .maybeSingle();
@@ -292,6 +304,7 @@ export default async function ListingReviewPage({
     apply_failed: "Could not apply the request to the listing. Try again.",
     not_countersigned: "The broker hasn't countersigned the listing agreement in DocuSign yet.",
     legal_pending: legalPendingMessage(lang),
+    [TEST_LISTING_ERROR]: testListingMessage(lang),
     docusign_unavailable: "Could not confirm the broker's countersignature with DocuSign. Try again.",
     listing_not_active: "Approve the listing (active) before marking it as published on the MLS.",
     already_published: "This listing already has an MLS publication date. Only an admin can correct it.",
@@ -860,12 +873,17 @@ export default async function ListingReviewPage({
           </label>
           <button
             type="submit"
-            disabled={legalPending}
-            title={legalPending ? legalPendingMessage(lang) : undefined}
+            disabled={legalPending || prop.is_test}
+            title={prop.is_test ? testListingMessage(lang) : legalPending ? legalPendingMessage(lang) : undefined}
             className="inline-flex items-center px-6 py-3 bg-ink text-ivory text-[10px] font-medium tracking-[0.22em] uppercase hover:bg-ink/85 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Approve → Active
           </button>
+          {prop.is_test && (
+            <span data-test-listing className="text-[11px] text-red-700">
+              {testListingMessage(lang)}
+            </span>
+          )}
         </form>
         <form action={reject}>
           <button
