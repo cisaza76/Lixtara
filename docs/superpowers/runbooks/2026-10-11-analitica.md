@@ -136,7 +136,19 @@ Detalle de cada regla:
 3. **Rutas sin publicidad:** en `/listing`, `/account`, `/auth`, `/sign-in`, `/sign-up`, `/dashboard` y `/admin` el código deja las tres señales `ad_*` en `denied` y `lx_ads_consent` = `denied` aunque haya consentimiento (`isAdsExcludedPath`). Cruzar ese límite con Publicidad aceptada fuerza carga completa (`RecordingGuard` / `needsFullLoad`). La excepción por `Page Path` del punto 2 de arriba queda como respaldo.
 4. **Eventos propios:** `track()` y `lx_page_view` salen **solo con Analítica**. Con Publicidad sola, Meta y Ads usan los disparadores de GTM (p. ej. *All Pages* / *History Change*) y no reciben los `lx_*`. Si el CMO quiere conversiones de Meta con eventos `lx_*` sin Analítica, es una decisión aparte.
 5. **Stripe:** la metadata del Checkout lleva `ads_consent` y, **solo con Publicidad aceptada**, `fbp`, `fbc` y `gclid` (de `_gcl_aw`). El `purchase` de GA4 por Measurement Protocol manda `ad_user_data` / `ad_personalization` = `GRANTED` solo si `ads_consent` = `granted`.
-6. **API de Conversiones de Meta:** **no existe** en el código ni en las políticas. El PR que la construya agrega en el mismo cambio su texto de Privacidad. Ese envío debe leer el consentimiento de Publicidad guardado y Global Privacy Control (como la metadata de Stripe), nunca suponerlos.
+6. **API de Conversiones de Meta** (rama `feat/meta-capi`, decisión del owner 2026-10-31; `src/lib/meta-capi*.ts`):
+   - **Eventos de servidor** (`event_id` estable):
+     - `Lead` al verificar el correo del paso 1 (`lead_<user id>`);
+     - `CompleteRegistration` al firmar, con el vendedor principal (`agreement_<listing id>`);
+     - `Purchase` al confirmarse el pago del plan (`purchase_<listing id>`).
+   - **Consentimiento:** solo con Publicidad `granted` y sin GPC. Se toma de la cookie de la petición o, sin navegador (webhooks), de lo guardado en `ad_attribution`. El `Purchase` usa además `ads_consent` de la metadata del Checkout.
+   - **Datos:** `em` y `external_id` en SHA-256, más `fbp`, `fbc`, IP y user agent. Nada del inmueble.
+   - **`ad_attribution`** (solo service role) se actualiza al verificar el correo, al retomar el registro, al abrir el Checkout y cada vez que cambia la elección del aviso (`POST /api/ad-attribution`). "Configurar cookies" la deja en `denied`.
+   - **Variables:**
+     - `META_CAPI_ENABLED`: apagada en Production hasta publicar el texto de Privacidad §6.2 (`docs/legal/2026-10-31-meta-capi-memo.md`).
+     - `META_CAPI_TOKEN`, `META_DATASET_ID`.
+     - `META_TEST_EVENT_CODE`: solo Preview.
+   - **Graph API:** `src/config/meta.ts`.
 7. **Valores viejos de `lx_consent`:** `granted` / `denied` (antes de la v4, solo analítica) se leen con Publicidad **denegada** y el banner no vuelve a salir; quien quiera publicidad la acepta en "Configurar cookies".
 8. **Global Privacy Control:** con `navigator.globalPrivacyControl === true`, la Publicidad queda denegada (`effectiveConsent`): las tres señales `ad_*` y `lx_ads_consent` quedan en `denied`, el banner no deja aceptarla y lo dice en esa categoría, y la metadata de Stripe la trata como denegada si el request trae `Sec-GPC: 1`. La Analítica no cambia.
 
