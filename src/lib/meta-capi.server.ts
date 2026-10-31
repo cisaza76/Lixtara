@@ -11,7 +11,6 @@
 //   - META_DATASET_ID: el conjunto de datos (no es secreto).
 //   - META_TEST_EVENT_CODE: solo Preview (Eventos de prueba), nunca Production.
 
-import type Stripe from "stripe";
 import { headers as nextHeaders } from "next/headers";
 import { createService } from "@/lib/supabase/service";
 import { META_GRAPH_API_VERSION, META_GRAPH_URL } from "@/config/meta";
@@ -27,7 +26,6 @@ import {
   type AdIdentifiers,
   type MetaServerEvent,
 } from "@/lib/meta-capi";
-import { metaFbc, metaFbp } from "@/lib/ga4-attribution";
 
 const TIMEOUT_MS = 3000;
 
@@ -198,44 +196,47 @@ export async function metaCompleteRegistration(input: { propertyId: string; sign
 }
 
 /**
- * Purchase: pago del plan confirmado (una vez por sesión, en fulfillTierCheckout). El
- * consentimiento es el del momento de abrir el Checkout (metadata ads_consent, con GPC);
- * fbp y fbc de esa metadata; IP y user agent de lo guardado al abrir el Checkout.
+ * Purchase: el pago del plan quedó confirmado. Punto ÚNICO, independiente de cómo se cobró
+ * (hoy Checkout, en fulfillTierCheckout; mañana un cobro off_session por
+ * payment_intent.succeeded debe llamar a esta misma función). Por eso no lee nada del
+ * Checkout: el consentimiento, fbp, fbc, IP y user agent son los guardados en ad_attribution
+ * (vigentes: el aviso de cookies y "Configurar cookies" los actualizan); el correo, el del
+ * vendedor principal. Un pago por listing: event_id purchase_<listing id>.
  */
-export async function metaPurchase(session: Stripe.Checkout.Session): Promise<void> {
+export async function metaPlanPurchase(input: {
+  propertyId: string;
+  /** Stripe livemode del pago (Production no envía pagos de prueba). */
+  livemode: boolean;
+  /** Monto cobrado, en la unidad de la moneda (495, no 49500). */
+  value: number;
+  currency: string;
+  tier: string | null;
+}): Promise<void> {
   try {
-    const md = (session.metadata ?? {}) as Record<string, string>;
-    const propertyId = md.property_id;
-    const userId = md.user_id;
-    if (!propertyId || !userId || md.ads_consent !== "granted") return;
-    const prop = await propertyInfo(propertyId);
-    if (!allowed(prop ? Boolean(prop.is_test) : null, session.livemode)) return;
-    const stored = await storedIdentifiers(userId);
-    // Si después de pagar retiró la Publicidad (guardado "denied"), no sale.
-    if (stored.ads === "denied") return;
-    const ids: AdIdentifiers = {
-      ads: "granted",
-      fbp: metaFbp(md.fbp ?? null),
-      fbc: metaFbc(md.fbc ?? null),
-      clientIp: stored.ads === "granted" ? stored.clientIp : null,
-      clientUa: stored.ads === "granted" ? stored.clientUa : null,
-    };
-    const lang = md.lang === "es" ? "es" : "en";
+    const prop = await propertyInfo(input.propertyId);
+    if (!prop?.owner_id) return;
+    if (!allowed(Boolean(prop.is_test), input.livemode)) return;
+    const ids = await storedIdentifiers(prop.owner_id);
+    if (ids.ads !== "granted") return;
+    const [{ data: owner }, lang] = await Promise.all([
+      createService().auth.admin.getUserById(prop.owner_id),
+      lookupRecipientLang(prop.owner_id),
+    ]);
     const event = buildMetaEvent({
       name: "Purchase",
-      eventId: metaEventId.purchase(propertyId),
-      // La hora de la confirmación del pago (esta llamada), no la de abrir el Checkout.
+      eventId: metaEventId.purchase(input.propertyId),
+      // La hora de la confirmación del pago (esta llamada).
       eventTime: new Date(),
-      sourceUrl: listingFlowUrl(SITE_URL, lang),
-      email: session.customer_details?.email ?? session.customer_email ?? null,
-      userId,
+      sourceUrl: listingFlowUrl(SITE_URL, lang ?? "en"),
+      email: owner?.user?.email ?? null,
+      userId: prop.owner_id,
       ids,
       customData: {
-        value: (session.amount_total ?? 0) / 100,
-        currency: (session.currency ?? "usd").toUpperCase(),
+        value: input.value,
+        currency: input.currency.toUpperCase(),
         content_type: "product",
-        content_ids: [md.tier ?? "plan"],
-        lang,
+        content_ids: [input.tier ?? prop.pricing_tier ?? "plan"],
+        lang: lang ?? "en",
       },
     });
     if (event) await post(event);

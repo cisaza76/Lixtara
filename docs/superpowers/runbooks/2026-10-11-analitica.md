@@ -141,7 +141,7 @@ Detalle de cada regla:
      - `Lead` al verificar el correo del paso 1 (`lead_<user id>`);
      - `CompleteRegistration` al firmar, con el vendedor principal (`agreement_<listing id>`);
      - `Purchase` al confirmarse el pago del plan (`purchase_<listing id>`).
-   - **Consentimiento:** solo con Publicidad `granted` y sin GPC. Se toma de la cookie de la petición o, sin navegador (webhooks), de lo guardado en `ad_attribution`. El `Purchase` usa además `ads_consent` de la metadata del Checkout.
+   - **Consentimiento:** solo con Publicidad `granted` y sin GPC. Se toma de la cookie de la petición o, sin navegador (webhooks), de lo guardado en `ad_attribution`. El `Purchase` sale de un punto único de "pago del plan confirmado" (`metaPlanPurchase`, hoy llamado desde `fulfillTierCheckout`; un cobro `off_session` por `payment_intent.succeeded` debe llamar a la misma función) y usa solo lo guardado, nunca la metadata del Checkout.
    - **Datos:** `em` y `external_id` en SHA-256, más `fbp`, `fbc`, IP y user agent. Nada del inmueble.
    - **`ad_attribution`** (solo service role) se actualiza al verificar el correo, al retomar el registro, al abrir el Checkout y cada vez que cambia la elección del aviso (`POST /api/ad-attribution`). "Configurar cookies" la deja en `denied`.
    - **Variables:**
