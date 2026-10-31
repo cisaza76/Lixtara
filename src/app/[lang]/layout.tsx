@@ -458,11 +458,20 @@ export default async function RootLayout({
             posthogKey={analytics.posthogKey}
             posthogHost={analytics.posthogHost}
             labels={{
-              // Solo analítica: Google Ads y Meta no están aprobados (2026-10-15).
-              message: cookieCopy.consentMessage.replace("{tools}", consentTools(analytics, lang)),
+              // Publicidad (Meta y Google Ads) solo con GTM: es lo que la carga (2026-10-24).
+              message: (analytics.gtmId ? cookieCopy.consentMessage : cookieCopy.consentMessageAnalyticsOnly).replace(
+                "{tools}",
+                consentTools(analytics, lang),
+              ),
               learnMore: cookieCopy.learnMore,
               accept: cookieCopy.consentAccept,
               reject: cookieCopy.consentReject,
+              acceptAll: cookieCopy.consentAcceptAll,
+              rejectAll: cookieCopy.consentRejectAll,
+              save: cookieCopy.consentSave,
+              analytics: cookieCopy.categoryAnalytics,
+              ads: analytics.gtmId ? cookieCopy.categoryAds : null,
+              gpcNote: cookieCopy.gpcNote,
               regionLabel: cookieCopy.regionLabel,
             }}
           />

@@ -25,7 +25,9 @@ describe("Términos v3 (2026-10-21)", () => {
   it("versión 2026-10-21-v3 solo en los Términos", () => {
     expect(LEGAL_DOCS.terms.version).toBe("2026-10-21-v3");
     expect(LEGAL_DOCS.terms.updated).toBe("2026-10-21");
-    for (const id of ["privacy", "cookies", "disclaimers", "notices", "accessibility"] as const) expect(LEGAL_DOCS[id].version, id).toBe("2026-10-18-v2");
+    for (const id of ["disclaimers", "notices", "accessibility"] as const) expect(LEGAL_DOCS[id].version, id).toBe("2026-10-18-v2");
+    // Privacidad y Cookies pasaron a la v4 (2026-10-24, categoría Publicidad).
+    for (const id of ["privacy", "cookies"] as const) expect(LEGAL_DOCS[id].version, id).toBe("2026-10-24-v4");
   });
 
   it("§6: no reembolsable una vez publicada, reembolso total antes, terminación sin costo, comisión al cierre", () => {
