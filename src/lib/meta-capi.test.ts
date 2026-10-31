@@ -144,7 +144,7 @@ describe("el envío (código)", () => {
   it("los tres hitos están conectados", () => {
     expect(readFileSync("src/app/[lang]/listing/new/page.tsx", "utf8")).toContain("metaLeadOnEmailVerified({ userId: user.id");
     expect(readFileSync("src/lib/agreement-refresh.ts", "utf8")).toContain("await metaCompleteRegistration({ propertyId: a.property_id");
-    expect(readFileSync("src/lib/tier-fulfillment.server.ts", "utf8")).toContain("await metaPurchase(session);");
+    expect(readFileSync("src/lib/tier-fulfillment.server.ts", "utf8")).toContain("await metaPlanPurchase({");
     expect(readFileSync("src/app/api/checkout/tier/route.ts", "utf8")).toContain("after(() => saveAdAttribution(user.id, adIds));");
   });
   it("el aviso de cookies avisa al servidor; 'Configurar cookies' cuenta como Publicidad denegada", () => {

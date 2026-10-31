@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type Stripe from "stripe";
 
 // Supabase simulado: properties y ad_attribution por id; el correo del dueño por auth.admin.
 const db = vi.hoisted(() => ({
@@ -27,23 +26,14 @@ vi.mock("@/lib/supabase/service", () => ({
 vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => "es" }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
-import { metaCompleteRegistration, metaLeadOnEmailVerified, metaPurchase, saveAdAttribution } from "@/lib/meta-capi.server";
+import { metaCompleteRegistration, metaLeadOnEmailVerified, metaPlanPurchase, saveAdAttribution } from "@/lib/meta-capi.server";
 
 const FBP = "fb.1.1730000000000.1234567890";
 const granted = { ads: "granted", fbp: FBP, fbc: null, clientIp: "203.0.113.10", clientUa: "UA" } as const;
 const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => new Response("{}", { status: 200 }));
 const sent = () => fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string));
 
-function session(md: Record<string, string>, livemode = true): Stripe.Checkout.Session {
-  return {
-    id: "cs_test_1",
-    livemode,
-    amount_total: 49500,
-    currency: "usd",
-    customer_details: { email: "owner@example.com" },
-    metadata: { property_id: "prop-1", user_id: "owner-1", tier: "pro", lang: "es", ...md },
-  } as unknown as Stripe.Checkout.Session;
-}
+const paid = (livemode = true) => ({ propertyId: "prop-1", livemode, value: 495, currency: "usd", tier: "pro" });
 
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
@@ -121,9 +111,9 @@ describe("CompleteRegistration", () => {
   });
 });
 
-describe("Purchase", () => {
-  it("pago confirmado con Publicidad aceptada al abrir el Checkout: purchase_<listing>, valor en USD", async () => {
-    await metaPurchase(session({ ads_consent: "granted", fbp: FBP }));
+describe("Purchase (punto único de pago confirmado)", () => {
+  it("con Publicidad guardada como aceptada: purchase_<listing>, valor en USD, identificadores guardados", async () => {
+    await metaPlanPurchase(paid());
     const ev = sent()[0].data[0];
     expect(ev).toMatchObject({
       event_name: "Purchase",
@@ -131,33 +121,44 @@ describe("Purchase", () => {
       custom_data: { value: 495, currency: "USD", content_type: "product", content_ids: ["pro"], lang: "es" },
     });
     expect(ev.user_data).toMatchObject({ fbp: FBP, client_ip_address: "203.0.113.10", client_user_agent: "UA" });
+    expect(JSON.stringify(ev)).not.toMatch(/owner@example\.com/i);
   });
-  it("Publicidad no aceptada al abrir el Checkout: no sale", async () => {
-    await metaPurchase(session({ ads_consent: "denied" }));
-    await metaPurchase(session({ ads_consent: "unknown" }));
+  it("no depende del Checkout: lo guardado en denied (retiró la Publicidad) o sin fila → no sale", async () => {
+    db.attribution = { ads_consent: "denied", fbp: null, fbc: null, client_ip: null, client_ua: null };
+    await metaPlanPurchase(paid());
+    db.attribution = null;
+    await metaPlanPurchase(paid());
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it("Stripe en modo prueba, en Production: no sale", async () => {
-    await metaPurchase(session({ ads_consent: "granted" }, false));
+  it("Production: pago de prueba de Stripe o listing is_test → no sale", async () => {
+    await metaPlanPurchase(paid(false));
+    db.property = { is_test: true, owner_id: "owner-1", pricing_tier: "pro" };
+    await metaPlanPurchase(paid());
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it("Preview con código de prueba: sale con test_event_code (también is_test y pago de prueba)", async () => {
+  it("Preview con código de prueba: sale con test_event_code, también is_test y pago de prueba", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     vi.stubEnv("META_TEST_EVENT_CODE", "TEST123");
     db.property = { is_test: true, owner_id: "owner-1", pricing_tier: "pro" };
-    await metaPurchase(session({ ads_consent: "granted" }, false));
+    await metaPlanPurchase(paid(false));
     expect(sent()[0].test_event_code).toBe("TEST123");
+    expect(sent()[0].data[0].event_id).toBe("purchase_prop-1");
+  });
+  it("Preview sin código de prueba: no sale", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    await metaPlanPurchase(paid(false));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
   it("Meta responde 500: un reintento y nunca lanza; 400: sin reintento", async () => {
     vi.useFakeTimers();
     fetchMock.mockResolvedValue(new Response("{}", { status: 500 }));
-    const p = metaPurchase(session({ ads_consent: "granted" }));
+    const p = metaPlanPurchase(paid());
     await vi.runAllTimersAsync();
     await expect(p).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     fetchMock.mockClear();
     fetchMock.mockResolvedValue(new Response("{}", { status: 400 }));
-    await metaPurchase(session({ ads_consent: "granted" }));
+    await metaPlanPurchase(paid());
     expect(fetchMock).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
