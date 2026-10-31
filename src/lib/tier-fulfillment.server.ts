@@ -11,6 +11,7 @@ import { isPricingTierId } from "@/lib/pricing-tiers";
 import { recordServerEvent } from "@/lib/analytics.server";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { sendGa4Purchase } from "@/lib/ga4-mp.server";
+import { metaPurchase } from "@/lib/meta-capi.server";
 
 export type TierFulfillment = "fulfilled" | "already" | "not_paid";
 
@@ -121,6 +122,7 @@ export async function fulfillTierCheckout(
 
   await sendPaymentEmails(db, session, propertyId);
   await sendGa4Purchase(session); // nunca lanza; solo con consentimiento + live + Production
+  await metaPurchase(session); // nunca lanza; solo con Publicidad aceptada y META_CAPI_ENABLED
   return "fulfilled";
 }
 

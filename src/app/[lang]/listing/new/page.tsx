@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createService } from "@/lib/supabase/service";
 import { SITE_URL } from "@/lib/config";
+import { adIdentifiersFromCurrentRequest, metaLeadOnEmailVerified, saveAdAttribution } from "@/lib/meta-capi.server";
 import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
 import { agreementSignedBySeller } from "@/lib/step-progress";
@@ -449,6 +450,9 @@ export default async function ListingNewPage({
       (resumedSource === "email_link" || resumedSource === "broker_link" || resumedSource === "account")
     ) {
       const resumedId = draft.id;
+      // Al retomar se actualizan los identificadores de Meta (firma y pago llegan sin navegador).
+      const adIds = await adIdentifiersFromCurrentRequest();
+      after(() => saveAdAttribution(sessionUser.id, adIds));
       after(() =>
         recordFunnelEvent({
           event: "listing_resumed",
@@ -888,6 +892,10 @@ export default async function ListingNewPage({
       propertyId: id,
     });
     if (result !== "verified") redirect(`${back}&gerror=${result}`);
+    // API de Conversiones de Meta (Lead): la cookie de esta petición, leída aquí; el envío,
+    // después de responder. Sin Publicidad aceptada no sale nada.
+    const adIds = await adIdentifiersFromCurrentRequest();
+    after(() => metaLeadOnEmailVerified({ userId: user.id, email: user.email, propertyId: id, lang, ids: adIds }));
     redirect(`/${lang}/listing/new?id=${id}&step=2&ev=email_verified_gate`);
   }
 

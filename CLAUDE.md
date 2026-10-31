@@ -198,6 +198,16 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   Checkout metadata = `granted`, Stripe `livemode`, `VERCEL_ENV=production` and a non-`is_test` property
   (owner decision 2026-10-14). The Checkout metadata carries only lang, consent and the GA4 client/session
   ids (never `_fbp`/`_fbc`/`gclid`). Either unset = nothing is sent. The secret is created by the owner.
+- `META_CAPI_ENABLED` / `META_CAPI_TOKEN` / `META_DATASET_ID` / `META_TEST_EVENT_CODE` — server-only. Meta
+  Conversions API (`src/lib/meta-capi.server.ts`, owner decision 2026-10-31): `Lead` (email verified at step 1),
+  `CompleteRegistration` (agreement signed, primary seller) and `Purchase` (plan payment confirmed), ONLY with
+  Advertising `granted` and no GPC; hashed email + user id, `_fbp`/`_fbc`, IP and user agent, never listing data.
+  The pixel still never loads on the ads-excluded routes. `ENABLED` stays unset in **Production** until the
+  Privacy §6.2 text (`docs/legal/2026-10-31-meta-capi-memo.md`) is approved and published. The token comes from
+  the CMO (Events Manager) and is set by the owner. `META_TEST_EVENT_CODE` is **Preview only**: in Preview,
+  nothing is sent without it, and in Production nothing is sent with it. Identifiers for webhook-time events
+  live in `ad_attribution` (service role only; migration `20261031120000`). Graph API version:
+  `src/config/meta.ts`.
 - `EMAIL_FROM` / `EMAIL_REPLY_TO` — server-only. Sender (`"Lixtara <…@lixtara.com>"`, a
   sender on the domain verified in Resend) and reply-to inbox for every email
   (`src/lib/email.ts#emailFrom`). Unset `EMAIL_FROM` = Resend's test sender
