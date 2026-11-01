@@ -51,6 +51,28 @@ describe("limpieza de datos de prueba", () => {
     expect(confirmationPhrase(plan)).toBe("BORRAR 2 LISTINGS Y 1 CUENTAS");
   });
 
+  it("--email: solo esa cuenta y sus listings, aunque el correo no sea de prueba; los demás is_test no", () => {
+    const accounts = [
+      { id: "u-francis", email: "Francis.Preview@example.com" },
+      { id: "u-qa", email: "qa@lixtara.com" },
+    ];
+    const properties = [
+      { id: "p-francis", owner_id: "u-francis", is_test: true },
+      { id: "p-qa", owner_id: "u-qa", is_test: true },
+      { id: "p-other-test", owner_id: "u-real", is_test: true },
+    ];
+    const plan = buildCleanupPlan(accounts, properties, { onlyEmail: " francis.preview@example.com " });
+    expect(plan.accounts.map((a) => a.id)).toEqual(["u-francis"]);
+    expect(plan.properties.map((p) => p.id)).toEqual(["p-francis"]);
+    // Con un listing real, no se borra nada: queda para revisar.
+    const guarded = buildCleanupPlan(accounts, [{ id: "p-real", owner_id: "u-francis", is_test: false }], {
+      onlyEmail: "francis.preview@example.com",
+    });
+    expect(guarded.accounts).toEqual([]);
+    expect(guarded.properties).toEqual([]);
+    expect(guarded.accountsToReview.map((a) => a.id)).toEqual(["u-francis"]);
+  });
+
   it("cubre cada FK sin cascada a properties y users del baseline", () => {
     const baseline = readFileSync("supabase/migrations/20260520151434_remote_baseline.sql", "utf8");
     const fks = [...baseline.matchAll(/ALTER TABLE ONLY public\.(\w+)\s+ADD CONSTRAINT \w+ FOREIGN KEY \((\w+)\) REFERENCES public\.(properties|users)\(id\);/g)];

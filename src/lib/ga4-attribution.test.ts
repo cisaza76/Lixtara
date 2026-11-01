@@ -5,6 +5,7 @@ import {
   gaClientId,
   gaSessionId,
   googleGclid,
+  googleGbraid,
   metaFbc,
   metaFbp,
   purchaseItem,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/ga4-attribution";
 
 const MID = "G-70H5Q9530F";
-const ADS = "_fbp=fb.1.1760000000000.1234567890; _fbc=fb.1.1760000000000.IwAR2abc_DEF-123; _gcl_aw=GCL.1760000000.Cj0KCQjw_abc-123";
+const ADS = "_fbp=fb.1.1760000000000.1234567890; _fbc=fb.1.1760000000000.IwAR2abc_DEF-123; _gcl_aw=GCL.1760000000.Cj0KCQjw_abc-123; _gcl_gb=GCL.1760000000.0AAAAAo_gbraid-1";
 const cookies = (consent: string) =>
   `lx_consent=${consent}; _ga=GA1.1.1234567890.1760000000; _ga_70H5Q9530F=GS2.1.s1760400000$o3$g1$t1760400500$j0$l0$h0; ${ADS}`;
 
@@ -29,7 +30,7 @@ describe("metadata del Checkout", () => {
       });
     }
   });
-  it("con Publicidad aceptada: _fbp, _fbc y gclid", () => {
+  it("con Publicidad aceptada: _fbp, _fbc, gclid y gbraid", () => {
     expect(checkoutAttribution(cookies("analytics-granted.ads-granted"), MID, "en")).toEqual({
       lang: "en",
       consent: "granted",
@@ -39,6 +40,7 @@ describe("metadata del Checkout", () => {
       fbp: "fb.1.1760000000000.1234567890",
       fbc: "fb.1.1760000000000.IwAR2abc_DEF-123",
       gclid: "Cj0KCQjw_abc-123",
+      gbraid: "0AAAAAo_gbraid-1",
     });
     // Publicidad sí, analítica no: solo los de publicidad.
     expect(checkoutAttribution(cookies("analytics-denied.ads-granted"), MID, "en")).toEqual({
@@ -48,6 +50,7 @@ describe("metadata del Checkout", () => {
       fbp: "fb.1.1760000000000.1234567890",
       fbc: "fb.1.1760000000000.IwAR2abc_DEF-123",
       gclid: "Cj0KCQjw_abc-123",
+      gbraid: "0AAAAAo_gbraid-1",
     });
   });
   it("Global Privacy Control (Sec-GPC: 1): Publicidad denegada, sin _fbp, _fbc ni gclid; GA4 sigue", () => {
@@ -79,6 +82,8 @@ describe("metadata del Checkout", () => {
     expect(googleGclid("GCL.1760000000.abc")).toBe("abc");
     expect(googleGclid("GCL.1.x;y")).toBeNull();
     expect(googleGclid(null)).toBeNull();
+    expect(googleGbraid("GCL.1760000000.0AAAAAo_x")).toBe("0AAAAAo_x");
+    expect(googleGbraid("0AAAAAo_x")).toBeNull();
   });
   it("sin measurement id no hay session_id (no sabe qué cookie leer)", () => {
     expect(checkoutAttribution(cookies("granted"), undefined, "en")).not.toHaveProperty("ga_session_id");

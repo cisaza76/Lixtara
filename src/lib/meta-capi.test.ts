@@ -4,6 +4,8 @@ import {
   adIdentifiersFromRequest,
   buildMetaEvent,
   clientIpFrom,
+  ipUaExpired,
+  ipUaRetentionCutoff,
   listingFlowUrl,
   metaEventId,
   normalizeEmail,
@@ -11,7 +13,7 @@ import {
   shouldSendMeta,
   type AdIdentifiers,
 } from "@/lib/meta-capi";
-import { META_GRAPH_API_VERSION } from "@/config/meta";
+import { AD_IP_UA_RETENTION_DAYS, META_GRAPH_API_VERSION } from "@/config/meta";
 
 const FBP = "fb.1.1730000000000.1234567890";
 const FBC = "fb.1.1730000000000.IwAR0abc_DEF-1";
@@ -123,6 +125,23 @@ describe("el evento", () => {
   });
 });
 
+describe("conservación de IP y user agent", () => {
+  const now = new Date("2026-11-01T00:00:00Z");
+  it("90 días, o sin fecha: vencidos", () => {
+    expect(AD_IP_UA_RETENTION_DAYS).toBe(90);
+    expect(ipUaRetentionCutoff(now).toISOString()).toBe("2026-08-03T00:00:00.000Z");
+    expect(ipUaExpired("2026-08-04T00:00:00Z", now)).toBe(false);
+    expect(ipUaExpired("2026-08-02T00:00:00Z", now)).toBe(true);
+    expect(ipUaExpired(null, now)).toBe(true);
+    expect(ipUaExpired("no es fecha", now)).toBe(true);
+  });
+  it("el borrado diario está programado y protegido con CRON_SECRET", () => {
+    const crons = JSON.parse(readFileSync("vercel.json", "utf8")).crons as { path: string }[];
+    expect(crons.map((c) => c.path)).toContain("/api/ad-attribution/retention");
+    expect(readFileSync("src/app/api/ad-attribution/retention/route.ts", "utf8")).toContain("if (!verifyCronSecret(req))");
+  });
+});
+
 describe("el envío (código)", () => {
   const server = readFileSync("src/lib/meta-capi.server.ts", "utf8");
   it("Graph API en una constante de configuración", () => {
@@ -154,5 +173,14 @@ describe("el envío (código)", () => {
     const route = readFileSync("src/app/api/ad-attribution/route.ts", "utf8");
     expect(route).toContain('body?.reset === true\n      ? ({ ads: "denied" } as const)');
     expect(route).toContain("if (!user) return new NextResponse(null, { status: 204 });");
+  });
+  it("Sec-GPC en el servidor: Publicidad denegada en cada punto que guarda o lee la elección", () => {
+    const route = readFileSync("src/app/api/ad-attribution/route.ts", "utf8");
+    expect(route).toContain('gpc: gpcEnabled(req.headers.get("sec-gpc"))');
+    expect(readFileSync("src/app/api/checkout/tier/route.ts", "utf8")).toContain('gpc: gpcEnabled(req.headers.get("sec-gpc"))');
+    expect(readFileSync("src/lib/meta-capi.server.ts", "utf8")).toContain('gpc: gpcEnabled(h.get("sec-gpc"))');
+    // Al volver de firmar (paso 7) y de pagar (paso 8) se guarda la elección vigente antes del evento.
+    const page = readFileSync("src/app/[lang]/listing/new/page.tsx", "utf8");
+    expect(page.match(/await saveAdAttribution\(sessionUser\.id, await adIdentifiersFromCurrentRequest\(\)\)/g)).toHaveLength(2);
   });
 });

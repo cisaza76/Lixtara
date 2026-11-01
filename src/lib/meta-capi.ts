@@ -20,6 +20,7 @@
 import { createHash } from "node:crypto";
 import { effectiveConsent, readConsentState, sanitizeUrl } from "@/lib/analytics-config";
 import { metaFbc, metaFbp } from "@/lib/ga4-attribution";
+import { AD_IP_UA_RETENTION_DAYS } from "@/config/meta";
 
 export type MetaEventName = "Lead" | "CompleteRegistration" | "Purchase";
 
@@ -174,4 +175,15 @@ export const metaEventId = {
 /** Página del registro donde ocurre cada hito (sin parámetros: nunca un id). */
 export function listingFlowUrl(siteUrl: string, lang: string): string {
   return `${siteUrl.replace(/\/$/, "")}/${lang === "es" ? "es" : "en"}/listing/new`;
+}
+
+/** Desde cuándo una IP y un user agent guardados ya no se usan ni se conservan. */
+export function ipUaRetentionCutoff(now: Date): Date {
+  return new Date(now.getTime() - AD_IP_UA_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+}
+
+/** ¿La IP y el user agent guardados en `savedAt` pasaron el plazo? Sin fecha, sí. */
+export function ipUaExpired(savedAt: string | null | undefined, now: Date): boolean {
+  const t = savedAt ? Date.parse(savedAt) : Number.NaN;
+  return !Number.isFinite(t) || t < ipUaRetentionCutoff(now).getTime();
 }
