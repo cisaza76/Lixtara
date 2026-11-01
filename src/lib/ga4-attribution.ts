@@ -4,9 +4,10 @@
 // Al crear el Checkout de Stripe se guardan en su metadata SOLO: idioma, estado de cada
 // categoría de consentimiento y:
 //   - con Analítica aceptada: el client_id y el session_id de GA4 (cookies _ga y _ga_<id>);
-//   - con Publicidad aceptada (decisión del owner 2026-10-24): _fbp y _fbc (Meta) y el gclid
-//     (de la cookie _gcl_aw de Google Ads). Sin Publicidad, ninguno de los tres. Con Global
-//     Privacy Control (header Sec-GPC: 1), la Publicidad cuenta como denegada.
+//   - con Publicidad aceptada (decisión del owner 2026-10-24): _fbp y _fbc (Meta), el gclid
+//     (cookie _gcl_aw de Google Ads) y el gbraid (cookie _gcl_gb; pedido del CMO 2026-10-31).
+//     Sin Publicidad, ninguno. Con Global Privacy Control (header Sec-GPC: 1), la Publicidad
+//     cuenta como denegada.
 // El webhook envía `purchase` solo si: analítica "granted" + Production + Stripe livemode +
 // propiedad no is_test.
 
@@ -22,6 +23,7 @@ export type CheckoutAttribution = {
   fbp?: string;
   fbc?: string;
   gclid?: string;
+  gbraid?: string;
 };
 
 function cookie(header: string, name: string): string | null {
@@ -59,6 +61,11 @@ export function googleGclid(value: string | null): string | null {
   return value?.match(/^GCL\.\d{1,13}\.([A-Za-z0-9_-]{1,400})$/)?.[1] ?? null;
 }
 
+/** `_gcl_gb` = GCL.<ts>.<gbraid> (mismo formato que _gcl_aw) → gbraid. */
+export function googleGbraid(value: string | null): string | null {
+  return value?.match(/^GCL\.\d{1,13}\.([A-Za-z0-9_-]{1,400})$/)?.[1] ?? null;
+}
+
 /** Lo que va a la metadata del Checkout. Cada identificador solo con su categoría aceptada. */
 export function checkoutAttribution(
   cookieHeader: string | null,
@@ -86,6 +93,8 @@ export function checkoutAttribution(
     if (fbc) out.fbc = fbc;
     const gclid = googleGclid(cookie(header, "_gcl_aw"));
     if (gclid) out.gclid = gclid;
+    const gbraid = googleGbraid(cookie(header, "_gcl_gb"));
+    if (gbraid) out.gbraid = gbraid;
   }
   return out;
 }

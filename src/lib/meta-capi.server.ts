@@ -20,6 +20,8 @@ import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import {
   adIdentifiersFromRequest,
   buildMetaEvent,
+  ipUaExpired,
+  ipUaRetentionCutoff,
   listingFlowUrl,
   metaEventId,
   shouldSendMeta,
@@ -82,13 +84,56 @@ export async function saveAdAttribution(userId: string, ids: AdIdentifiers): Pro
 async function storedIdentifiers(userId: string): Promise<AdIdentifiers> {
   const { data } = await createService()
     .from("ad_attribution")
-    .select("ads_consent, fbp, fbc, client_ip, client_ua")
+    .select("ads_consent, fbp, fbc, client_ip, client_ua, updated_at")
     .eq("user_id", userId)
     .maybeSingle();
-  const r = data as { ads_consent: string; fbp: string | null; fbc: string | null; client_ip: string | null; client_ua: string | null } | null;
+  const r = data as {
+    ads_consent: string;
+    fbp: string | null;
+    fbc: string | null;
+    client_ip: string | null;
+    client_ua: string | null;
+    updated_at: string | null;
+  } | null;
   if (!r) return { ads: "unknown" };
   if (r.ads_consent !== "granted") return { ads: "denied" };
-  return { ads: "granted", fbp: r.fbp, fbc: r.fbc, clientIp: r.client_ip, clientUa: r.client_ua };
+  // Pasado el plazo, la IP y el user agent no se usan aunque el borrado diario no haya corrido.
+  const expired = ipUaExpired(r.updated_at, new Date());
+  return {
+    ads: "granted",
+    fbp: r.fbp,
+    fbc: r.fbc,
+    clientIp: expired ? null : r.client_ip,
+    clientUa: expired ? null : r.client_ua,
+  };
+}
+
+/** Borra la IP y el user agent guardados de una persona (fbp, fbc y la elección quedan). */
+async function forgetIpAndUa(userId: string): Promise<void> {
+  const { error } = await createService()
+    .from("ad_attribution")
+    .update({ client_ip: null, client_ua: null, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error(JSON.stringify({ event: "ad_attribution_forget_failed", code: error.code }));
+}
+
+/**
+ * Borrado diario (cron): IP y user agent guardados hace más de AD_IP_UA_RETENTION_DAYS. Cada
+ * guardado con Publicidad aceptada reescribe los dos, así que updated_at es su fecha.
+ * Devuelve cuántas filas limpió; null si la tabla aún no existe (migración sin aplicar).
+ */
+export async function purgeExpiredIpAndUa(now = new Date()): Promise<number | null> {
+  const { data, error } = await createService()
+    .from("ad_attribution")
+    .update({ client_ip: null, client_ua: null })
+    .lt("updated_at", ipUaRetentionCutoff(now).toISOString())
+    .or("client_ip.not.is.null,client_ua.not.is.null")
+    .select("user_id");
+  if (error) {
+    if (error.code === "42P01" || error.code === "PGRST205") return null;
+    throw new Error(`ad_attribution purge: ${error.code ?? error.message}`);
+  }
+  return (data ?? []).length;
 }
 
 async function propertyInfo(propertyId: string) {
@@ -202,6 +247,10 @@ export async function metaCompleteRegistration(input: { propertyId: string; sign
  * Checkout: el consentimiento, fbp, fbc, IP y user agent son los guardados en ad_attribution
  * (vigentes: el aviso de cookies y "Configurar cookies" los actualizan); el correo, el del
  * vendedor principal. Un pago por listing: event_id purchase_<listing id>.
+ *
+ * Quien la llame lo hace cuando el cobro está CONFIRMADO (no al guardar una tarjeta) y con el
+ * monto realmente cobrado. Al terminar, se envíe o no el evento, se borran la IP y el user
+ * agent guardados del vendedor principal: ya no hay más hitos que los necesiten.
  */
 export async function metaPlanPurchase(input: {
   propertyId: string;
@@ -212,9 +261,11 @@ export async function metaPlanPurchase(input: {
   currency: string;
   tier: string | null;
 }): Promise<void> {
+  let ownerId: string | null = null;
   try {
     const prop = await propertyInfo(input.propertyId);
     if (!prop?.owner_id) return;
+    ownerId = prop.owner_id;
     if (!allowed(Boolean(prop.is_test), input.livemode)) return;
     const ids = await storedIdentifiers(prop.owner_id);
     if (ids.ads !== "granted") return;
@@ -242,5 +293,7 @@ export async function metaPlanPurchase(input: {
     if (event) await post(event);
   } catch (e) {
     console.error(JSON.stringify({ event: "meta_capi_failed", name: "Purchase", message: e instanceof Error ? e.message : "error" }));
+  } finally {
+    if (ownerId) await forgetIpAndUa(ownerId).catch(() => {});
   }
 }

@@ -3,6 +3,9 @@
 //   pnpm cleanup:test-data                  → SOLO LECTURA: lista lo que se borraría
 //   pnpm cleanup:test-data --out plan.json  → además guarda la lista en un archivo local
 //   pnpm cleanup:test-data --apply          → pide la frase de confirmación y borra
+//   pnpm cleanup:test-data --email <correo> [--apply]
+//                                           → solo esa cuenta y sus listings (p. ej. la de
+//                                             una prueba en Preview, que comparte esta base)
 //
 // Qué entra:
 //   - listings con properties.is_test = true;
@@ -32,6 +35,12 @@ import {
 const APPLY = process.argv.includes("--apply");
 const outIdx = process.argv.indexOf("--out");
 const OUT = outIdx > 0 ? process.argv[outIdx + 1] : null;
+const emailIdx = process.argv.indexOf("--email");
+const ONLY_EMAIL = emailIdx > 0 ? process.argv[emailIdx + 1] : undefined;
+if (emailIdx > 0 && !ONLY_EMAIL?.includes("@")) {
+  console.error("--email necesita un correo.");
+  process.exit(1);
+}
 const PHOTO_BUCKET = "property-photos";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -94,7 +103,11 @@ async function photoPaths(p: CleanupProperty): Promise<string[]> {
 
 async function main() {
   const [accounts, properties] = await Promise.all([allAccounts(), allProperties()]);
-  const plan = buildCleanupPlan(accounts, properties);
+  const plan = buildCleanupPlan(accounts, properties, { onlyEmail: ONLY_EMAIL });
+  if (ONLY_EMAIL && plan.accounts.length === 0 && plan.accountsToReview.length === 0) {
+    console.log("No hay ninguna cuenta con ese correo. Nada que borrar.");
+    return;
+  }
   const propIds = plan.properties.map((p) => p.id);
   const userIds = plan.accounts.map((a) => a.id);
   const byId = new Map(properties.map((p) => [p.id, p]));
@@ -129,7 +142,7 @@ async function main() {
   }
 
   if (!APPLY) {
-    console.log("\nNada se borró. Para borrar: pnpm cleanup:test-data --apply");
+    console.log(`\nNada se borró. Para borrar: pnpm cleanup:test-data${ONLY_EMAIL ? " --email <correo>" : ""} --apply`);
     return;
   }
   if (plan.properties.length === 0 && plan.accounts.length === 0) {
@@ -164,7 +177,7 @@ async function main() {
   }
 
   const [leftProps, leftAccounts] = await Promise.all([allProperties(), allAccounts()]);
-  const remaining = buildCleanupPlan(leftAccounts, leftProps);
+  const remaining = buildCleanupPlan(leftAccounts, leftProps, { onlyEmail: ONLY_EMAIL });
   console.log(`\nBorrado terminado. Quedan: ${remaining.properties.length} listings y ${remaining.accounts.length} cuentas de prueba.`);
   if (failures.length > 0) {
     console.log(`Errores (${failures.length}):`);

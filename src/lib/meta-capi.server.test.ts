@@ -5,6 +5,8 @@ const db = vi.hoisted(() => ({
   property: { is_test: false, owner_id: "owner-1", pricing_tier: "pro" } as Record<string, unknown> | null,
   attribution: null as Record<string, unknown> | null,
   upserts: [] as Record<string, unknown>[],
+  updates: [] as Record<string, unknown>[],
+  purged: [] as { user_id: string }[],
 }));
 vi.mock("@/lib/supabase/service", () => ({
   createService: () => ({
@@ -17,6 +19,13 @@ vi.mock("@/lib/supabase/service", () => ({
           db.upserts.push(row);
           return { error: null };
         },
+        update: (row: Record<string, unknown>) => {
+          db.updates.push(row);
+          return q;
+        },
+        lt: () => q,
+        or: () => q,
+        then: (resolve: (v: unknown) => unknown) => resolve({ data: db.purged, error: null }),
       };
       return q;
     },
@@ -26,7 +35,13 @@ vi.mock("@/lib/supabase/service", () => ({
 vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => "es" }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
-import { metaCompleteRegistration, metaLeadOnEmailVerified, metaPlanPurchase, saveAdAttribution } from "@/lib/meta-capi.server";
+import {
+  metaCompleteRegistration,
+  metaLeadOnEmailVerified,
+  metaPlanPurchase,
+  purgeExpiredIpAndUa,
+  saveAdAttribution,
+} from "@/lib/meta-capi.server";
 
 const FBP = "fb.1.1730000000000.1234567890";
 const granted = { ads: "granted", fbp: FBP, fbc: null, clientIp: "203.0.113.10", clientUa: "UA" } as const;
@@ -43,8 +58,10 @@ beforeEach(() => {
   vi.stubEnv("META_TEST_EVENT_CODE", "");
   vi.stubEnv("VERCEL_ENV", "production");
   db.property = { is_test: false, owner_id: "owner-1", pricing_tier: "pro" };
-  db.attribution = { ads_consent: "granted", fbp: FBP, fbc: null, client_ip: "203.0.113.10", client_ua: "UA" };
+  db.attribution = { ads_consent: "granted", fbp: FBP, fbc: null, client_ip: "203.0.113.10", client_ua: "UA", updated_at: new Date().toISOString() };
   db.upserts = [];
+  db.updates = [];
+  db.purged = [];
   fetchMock.mockClear();
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -100,7 +117,7 @@ describe("CompleteRegistration", () => {
     expect(JSON.stringify(ev)).not.toMatch(/owner@example\.com/i);
   });
   it("lo guardado dice denied (retiró la Publicidad o GPC): no sale", async () => {
-    db.attribution = { ads_consent: "denied", fbp: null, fbc: null, client_ip: null, client_ua: null };
+    db.attribution = { ads_consent: "denied", fbp: null, fbc: null, client_ip: null, client_ua: null, updated_at: null };
     await metaCompleteRegistration({ propertyId: "prop-1", signedAt: null });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -112,6 +129,26 @@ describe("CompleteRegistration", () => {
 });
 
 describe("Purchase (punto único de pago confirmado)", () => {
+  const forgotIpUa = () => db.updates.some((u) => u.client_ip === null && u.client_ua === null);
+  it("después del Purchase borra la IP y el user agent guardados", async () => {
+    await metaPlanPurchase(paid());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(forgotIpUa()).toBe(true);
+  });
+  it("también los borra si el Purchase no sale (apagada, pago de prueba o Publicidad denegada)", async () => {
+    vi.stubEnv("META_CAPI_ENABLED", "");
+    await metaPlanPurchase(paid());
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(forgotIpUa()).toBe(true);
+  });
+  it("IP y user agent guardados hace más de 90 días no se envían", async () => {
+    db.attribution = { ...db.attribution!, updated_at: new Date(Date.now() - 91 * 86_400_000).toISOString() };
+    await metaPlanPurchase(paid());
+    const ev = sent()[0].data[0];
+    expect(ev.user_data.fbp).toBe(FBP);
+    expect(ev.user_data).not.toHaveProperty("client_ip_address");
+    expect(ev.user_data).not.toHaveProperty("client_user_agent");
+  });
   it("con Publicidad guardada como aceptada: purchase_<listing>, valor en USD, identificadores guardados", async () => {
     await metaPlanPurchase(paid());
     const ev = sent()[0].data[0];
@@ -124,7 +161,7 @@ describe("Purchase (punto único de pago confirmado)", () => {
     expect(JSON.stringify(ev)).not.toMatch(/owner@example\.com/i);
   });
   it("no depende del Checkout: lo guardado en denied (retiró la Publicidad) o sin fila → no sale", async () => {
-    db.attribution = { ads_consent: "denied", fbp: null, fbc: null, client_ip: null, client_ua: null };
+    db.attribution = { ads_consent: "denied", fbp: null, fbc: null, client_ip: null, client_ua: null, updated_at: null };
     await metaPlanPurchase(paid());
     db.attribution = null;
     await metaPlanPurchase(paid());
@@ -161,5 +198,13 @@ describe("Purchase (punto único de pago confirmado)", () => {
     await metaPlanPurchase(paid());
     expect(fetchMock).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
+  });
+});
+
+describe("borrado diario de IP y user agent (cron)", () => {
+  it("limpia las filas vencidas y dice cuántas", async () => {
+    db.purged = [{ user_id: "a" }, { user_id: "b" }];
+    await expect(purgeExpiredIpAndUa(new Date("2026-11-01T00:00:00Z"))).resolves.toBe(2);
+    expect(db.updates[0]).toEqual({ client_ip: null, client_ua: null });
   });
 });

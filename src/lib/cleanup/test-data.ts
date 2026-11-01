@@ -29,8 +29,20 @@ export interface CleanupPlan {
   properties: CleanupProperty[];
 }
 
-export function buildCleanupPlan(accounts: CleanupAccount[], properties: CleanupProperty[]): CleanupPlan {
-  const testAccounts = accounts.filter((a) => isTestEmail(a.email));
+/**
+ * `onlyEmail`: limpia UNA cuenta (p. ej. la de una prueba en Preview), tenga o no un correo de
+ * prueba, con sus listings, y no toca otros listings is_test. La protección es la misma: si
+ * es dueña de un listing NO marcado is_test, no se borra nada y sale en "para revisar".
+ */
+export function buildCleanupPlan(
+  accounts: CleanupAccount[],
+  properties: CleanupProperty[],
+  opts: { onlyEmail?: string } = {},
+): CleanupPlan {
+  const only = opts.onlyEmail?.trim().toLowerCase();
+  const testAccounts = only
+    ? accounts.filter((a) => (a.email ?? "").toLowerCase() === only)
+    : accounts.filter((a) => isTestEmail(a.email));
   const realByOwner = new Map<string, string[]>();
   for (const p of properties) {
     if (!p.is_test && p.owner_id) realByOwner.set(p.owner_id, [...(realByOwner.get(p.owner_id) ?? []), p.id]);
@@ -43,7 +55,9 @@ export function buildCleanupPlan(accounts: CleanupAccount[], properties: Cleanup
   return {
     accounts: toDelete,
     accountsToReview,
-    properties: properties.filter((p) => p.is_test || (p.owner_id !== null && deleteIds.has(p.owner_id))),
+    properties: properties.filter(
+      (p) => (!only && p.is_test) || (p.owner_id !== null && deleteIds.has(p.owner_id)),
+    ),
   };
 }
 

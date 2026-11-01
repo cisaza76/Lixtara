@@ -213,8 +213,9 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   Privacy §6.2 text (`docs/legal/2026-10-31-meta-capi-memo.md`) is approved and published. The token comes from
   the CMO (Events Manager) and is set by the owner. `META_TEST_EVENT_CODE` is **Preview only**: in Preview,
   nothing is sent without it, and in Production nothing is sent with it. Identifiers for webhook-time events
-  live in `ad_attribution` (service role only; migration `20261031120000`). Graph API version:
-  `src/config/meta.ts`.
+  live in `ad_attribution` (service role only; migration `20261031120000`). IP and user agent there are
+  deleted 90 days after they are saved or once the plan payment is confirmed, whichever comes first (daily
+  cron `/api/ad-attribution/retention`, `CRON_SECRET`). Graph API version: `src/config/meta.ts`.
 - `EMAIL_FROM` / `EMAIL_REPLY_TO` — server-only. Sender (`"Lixtara <…@lixtara.com>"`, a
   sender on the domain verified in Resend) and reply-to inbox for every email
   (`src/lib/email.ts#emailFrom`). Unset `EMAIL_FROM` = Resend's test sender

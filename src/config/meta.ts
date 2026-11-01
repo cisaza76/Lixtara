@@ -10,3 +10,10 @@
 export const META_GRAPH_API_VERSION = "v26.0";
 
 export const META_GRAPH_URL = "https://graph.facebook.com";
+
+/**
+ * La IP y el user agent guardados en ad_attribution se borran a los 90 días de guardarse o al
+ * confirmarse el pago del plan (después del Purchase), lo que ocurra primero (pedido del CMO,
+ * 2026-10-31). fbp, fbc y la elección quedan mientras exista la cuenta.
+ */
+export const AD_IP_UA_RETENTION_DAYS = 90;

@@ -640,6 +640,11 @@ export default async function ListingNewPage({
       // firmar): con dos vendedores el otro firma por correo, cuando sea. El refresco manda una
       // vez el correo "ya firmaron todos" si esta lectura es la que ve la última firma.
       if (latestAgreement?.envelope_id && isAwaitingSellers(latestAgreement.status)) {
+        // La firma puede disparar CompleteRegistration: antes, la elección vigente de esta
+        // petición (cookie y Sec-GPC) reemplaza la guardada.
+        if (draft && sessionUser && draft.owner_id === sessionUser.id) {
+          await saveAdAttribution(sessionUser.id, await adIdentifiersFromCurrentRequest());
+        }
         const refreshed = await refreshAgreementResult(latestAgreement);
         ownSignedAgreement = refreshed.ownSigned;
         if (refreshed.fetched) latestAgreement = (await loadAgreement()) ?? latestAgreement;
@@ -669,6 +674,10 @@ export default async function ListingNewPage({
         if (isCheckoutSessionId(sp.session_id)) candidates.add(sp.session_id);
         if (pendingPayment?.status === "pending" && isCheckoutSessionId(pendingPayment.stripe_checkout_session_id)) {
           candidates.add(pendingPayment.stripe_checkout_session_id);
+        }
+        // El cumplimiento puede disparar Purchase: antes, la elección vigente (cookie y Sec-GPC).
+        if (candidates.size > 0) {
+          await saveAdAttribution(sessionUser.id, await adIdentifiersFromCurrentRequest());
         }
         for (const sessionId of candidates) {
           const result = await reconcileTierCheckout({ sessionId, propertyId: draftId, userId: sessionUser.id });

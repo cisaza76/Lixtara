@@ -14,6 +14,10 @@
       "schedule": "41 * * * *"
     },
     {
+      "path": "/api/ad-attribution/retention",
+      "schedule": "17 9 * * *"
+    },
+    {
       "path": "/api/mls/reconcile",
       "schedule": "7,22,37,52 8-10 * * *"
     }
