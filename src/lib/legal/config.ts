@@ -12,6 +12,8 @@
 // aquí (y la fecha en types.ts). Las aceptaciones ya registradas conservan su versión.
 // v4 (2026-10-24): Privacidad y Cookies con la categoría Publicidad, pendiente de revisión del
 // abogado (docs/legal/2026-10-24-textos-v4-memo.md). Términos sigue en la v3.
+// Cookies v5 (2026-11-02, decisión del owner): fila de lx_ft (UTM con Analítica; gclid,
+// gbraid y wbraid con Publicidad). Ver docs/legal/2026-10-31-meta-capi-memo.md.
 import { BROKERAGE, LEGAL_EMAIL, NOTICES_EMAIL, PRIVACY_EMAIL, SUPPORT_EMAIL } from "@/config/brokerage";
 import { PUBLICATION_BUSINESS_DAYS } from "@/config/legal-terms";
 import { PHOTOGRAPHY_ADDON_PRICE, PRICING_TIERS, formatPrice, type PricingTierId } from "@/lib/pricing-tiers";
@@ -42,7 +44,7 @@ export interface LegalDocMeta {
 export const LEGAL_DOCS = {
   terms: { path: "/terms", version: "2026-10-21-v3", updated: TERMS_LAST_UPDATED },
   privacy: { path: "/privacy", version: "2026-10-24-v4", updated: PRIVACY_LAST_UPDATED },
-  cookies: { path: "/cookies", version: "2026-10-24-v4", updated: COOKIES_LAST_UPDATED },
+  cookies: { path: "/cookies", version: "2026-11-02-v5", updated: COOKIES_LAST_UPDATED },
   disclaimers: { path: "/disclaimers", version: "2026-10-18-v2", updated: DISCLAIMERS_LAST_UPDATED },
   notices: { path: "/notices", version: "2026-10-18-v2", updated: NOTICES_LAST_UPDATED },
   accessibility: { path: "/accessibility", version: "2026-10-18-v2", updated: ACCESSIBILITY_LAST_UPDATED },
