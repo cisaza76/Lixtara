@@ -12,7 +12,7 @@
 // verificables (src/lib/analytics.server.ts).
 
 import { analyticsConfig, isAnalyticsExcludedPath, readConsent } from "@/lib/analytics-config";
-import { FIRST_TOUCH_COOKIE, FIRST_TOUCH_MAX_AGE_S, firstTouchCookieValue } from "@/lib/funnel-events";
+import { FIRST_TOUCH_COOKIE, FIRST_TOUCH_MAX_AGE_S, nextFirstTouchCookie } from "@/lib/funnel-events";
 import { isOwnershipError, OWNERSHIP_ERROR_FIELD } from "@/lib/listing-ownership";
 
 export const LISTING_STEP_SLUGS = [
@@ -237,7 +237,6 @@ const PENDING_MAX = 50;
 export function enableAnalytics(client: CaptureClient | null): void {
   consentState = true;
   posthogClient = client;
-  captureFirstTouch();
   if (client) for (const [event, props] of pendingForPosthog.splice(0)) client.capture(event, props);
 }
 
@@ -344,18 +343,22 @@ export function trackThen(e: AnalyticsEvent, done: () => void, timeoutMs = 1200)
 }
 
 /**
- * UTM de primer contacto: con consentimiento, si la URL trae utm_* y aún no hay cookie, se
- * guardan en lx_ft para que el paso 1 las registre. Primer contacto = no se sobrescribe.
- * Al rechazar o retirar el consentimiento el banner borra la cookie (ANALYTICS_COOKIE_RE).
+ * Primer contacto (lx_ft): lo llama el banner cada vez que se aplica una elección (con GPC
+ * ya aplicado). UTM solo con Analítica; gclid, gbraid y wbraid de la URL solo con
+ * Publicidad. Lo ya guardado no se sobrescribe; lo de una categoría denegada se borra.
+ * Nunca se escribe nada antes de elegir.
  */
-function captureFirstTouch(): void {
+export function syncFirstTouch(consent: { analytics: "granted" | "denied"; ads: "granted" | "denied" }): void {
   try {
-    if (new RegExp(`(?:^|;\\s*)${FIRST_TOUCH_COOKIE}=`).test(document.cookie)) return;
-    const value = firstTouchCookieValue(new URLSearchParams(window.location.search));
-    if (!value) return;
+    const prev = document.cookie.match(new RegExp(`(?:^|;\\s*)${FIRST_TOUCH_COOKIE}=([^;]*)`))?.[1] ?? null;
+    const next = nextFirstTouchCookie(prev, new URLSearchParams(window.location.search), consent);
+    if (next === prev) return;
     const secure = window.location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = `${FIRST_TOUCH_COOKIE}=${value}; Max-Age=${FIRST_TOUCH_MAX_AGE_S}; Path=/; SameSite=Lax${secure}`;
+    document.cookie =
+      next === null
+        ? `${FIRST_TOUCH_COOKIE}=; Max-Age=0; Path=/`
+        : `${FIRST_TOUCH_COOKIE}=${next}; Max-Age=${FIRST_TOUCH_MAX_AGE_S}; Path=/; SameSite=Lax${secure}`;
   } catch {
-    /* cookies bloqueadas: sin UTM */
+    /* cookies bloqueadas: sin primer contacto */
   }
 }

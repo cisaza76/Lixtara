@@ -44,7 +44,8 @@ import {
   type ConsentChoice,
   type ConsentState,
 } from "@/lib/analytics-config";
-import { disableAnalytics, enableAnalytics, markPageview } from "@/lib/analytics";
+import { disableAnalytics, enableAnalytics, markPageview, syncFirstTouch } from "@/lib/analytics";
+import { FIRST_TOUCH_COOKIE } from "@/lib/funnel-events";
 import { campaignFields } from "@/lib/funnel-events";
 
 interface Props {
@@ -261,6 +262,8 @@ export function AnalyticsConsent(props: Props) {
       clearStorage(ANALYTICS_COOKIE_RE, true);
     }
     if (state.ads === "denied") clearStorage(ADS_COOKIE_RE, false);
+    // lx_ft: UTM con Analítica y gclid/gbraid/wbraid con Publicidad; lo denegado se borra.
+    syncFirstTouch(state);
     // La configuración no cambia durante la vida de la página.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analytics, ads, excluded, gpc]);
