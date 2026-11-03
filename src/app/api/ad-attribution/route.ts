@@ -1,9 +1,9 @@
 // El aviso de cookies avisa aquí cada vez que cambia la elección, para que la API de
 // Conversiones de Meta use la elección vigente también en los hitos que llegan sin
 // navegador (firma por el webhook de DocuSign, pago por el de Stripe).
-//   - Elección guardada: se leen la cookie y Global Privacy Control de ESTA petición.
-//   - { reset: true } ("Configurar cookies" borra la elección): cuenta como Publicidad
-//     denegada hasta que vuelva a elegir.
+//   - Se leen la cookie (la elección guardada, nunca el estado forzado de una ruta sin
+//     publicidad) y Global Privacy Control de ESTA petición. "Configurar cookies" no borra la
+//     elección: solo avisa aquí cuando se guarda otra.
 // Sin sesión no hay nada que guardar. Siempre responde 204: no revela nada.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -22,16 +22,12 @@ export async function POST(req: Request) {
     label: "ad-attribution",
   });
   if (limited) return limited;
-  const body = (await req.json().catch(() => null)) as { reset?: unknown } | null;
-  const ids =
-    body?.reset === true
-      ? ({ ads: "denied" } as const)
-      : adIdentifiersFromRequest({
-          cookieHeader: req.headers.get("cookie"),
-          xForwardedFor: req.headers.get("x-forwarded-for"),
-          userAgent: req.headers.get("user-agent"),
-          gpc: gpcEnabled(req.headers.get("sec-gpc")),
-        });
+  const ids = adIdentifiersFromRequest({
+    cookieHeader: req.headers.get("cookie"),
+    xForwardedFor: req.headers.get("x-forwarded-for"),
+    userAgent: req.headers.get("user-agent"),
+    gpc: gpcEnabled(req.headers.get("sec-gpc")),
+  });
   await saveAdAttribution(user.id, ids);
   return new NextResponse(null, { status: 204 });
 }

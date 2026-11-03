@@ -45,7 +45,6 @@ import {
   type ConsentState,
 } from "@/lib/analytics-config";
 import { disableAnalytics, enableAnalytics, markPageview, syncFirstTouch } from "@/lib/analytics";
-import { FIRST_TOUCH_COOKIE } from "@/lib/funnel-events";
 import { campaignFields } from "@/lib/funnel-events";
 
 interface Props {
@@ -199,12 +198,12 @@ const consentStore = {
  * Avisa al servidor del cambio (API de Conversiones de Meta: la firma y el pago llegan sin
  * navegador y deben usar la elección vigente). Sin sesión, el servidor no guarda nada.
  */
-function syncAdAttribution(body: { reset?: true } = {}): void {
+function syncAdAttribution(): void {
   try {
     void fetch("/api/ad-attribution", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+      body: "{}",
       keepalive: true,
     }).catch(() => {});
   } catch {

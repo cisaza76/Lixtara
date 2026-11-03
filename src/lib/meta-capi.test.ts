@@ -166,12 +166,13 @@ describe("el envío (código)", () => {
     expect(readFileSync("src/lib/tier-fulfillment.server.ts", "utf8")).toContain("await metaPlanPurchase({");
     expect(readFileSync("src/app/api/checkout/tier/route.ts", "utf8")).toContain("after(() => saveAdAttribution(user.id, adIds));");
   });
-  it("el aviso de cookies avisa al servidor; 'Configurar cookies' cuenta como Publicidad denegada", () => {
+  it("el aviso de cookies avisa al servidor solo al guardar una elección; nunca un denied por la ruta ni por abrir 'Configurar cookies'", () => {
     const banner = readFileSync("src/components/analytics-consent.tsx", "utf8");
     expect(banner).toMatch(/function setConsent\(choice: ConsentState\): void \{\n  saveChoice\(choice\);\n  syncAdAttribution\(\);/);
-    expect(banner).toContain("syncAdAttribution({ reset: true });");
+    expect(banner.match(/syncAdAttribution\(/g)).toHaveLength(2); // la definición y setConsent
     const route = readFileSync("src/app/api/ad-attribution/route.ts", "utf8");
-    expect(route).toContain('body?.reset === true\n      ? ({ ads: "denied" } as const)');
+    expect(route).not.toMatch(/reset/);
+    expect(route).not.toMatch(/isAdsExcludedPath/);
     expect(route).toContain("if (!user) return new NextResponse(null, { status: 204 });");
   });
   it("Sec-GPC en el servidor: Publicidad denegada en cada punto que guarda o lee la elección", () => {
