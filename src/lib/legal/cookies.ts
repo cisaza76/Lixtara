@@ -4,8 +4,9 @@ import { STEP1_FORM_COOKIE, STEP1_FORM_MAX_AGE_S } from "@/lib/listing-step1-for
 import { SIGNUP_EMAIL_COOKIE } from "@/lib/auth/signup-code";
 import { FIRST_TOUCH_COOKIE, FIRST_TOUCH_MAX_AGE_S } from "@/lib/funnel-events";
 
-// Política de Cookies v4 (2026-10-24): categoría Publicidad (Meta y Google Ads, solo con
-// consentimiento). Pendiente de revisión del abogado: docs/legal/2026-10-24-textos-v4-memo.md.
+// Política de Cookies v5 (2026-11-02, decisión del owner): la fila de lx_ft describe sus dos
+// partes (UTM con Analítica; gclid, gbraid y wbraid con Publicidad). v4 (2026-10-24):
+// categoría Publicidad (Meta y Google Ads, solo con consentimiento). Pendiente de revisión del abogado: docs/legal/2026-10-24-textos-v4-memo.md.
 // La v2 (2026-10-18) se publicó por decisión del owner: docs/legal/2026-10-18-textos-v2-memo.md.
 //
 // Tiene que ser cierta en cada estado del sitio, así que se ARMA según lo configurado:
@@ -111,9 +112,14 @@ function analyticsRows(lang: Lang, t: CookieTools): string[][] {
     [
       FIRST_TOUCH_COOKIE,
       "Lixtara",
-      es
-        ? "Guarda de qué campaña o sitio llegó por primera vez (parámetros UTM, sin datos personales), para medir nuestras campañas."
-        : "Stores which campaign or website first brought you here (UTM parameters, no personal data), to measure our campaigns.",
+      // Sin GTM no hay categoría Publicidad: la cookie solo puede tener las UTM.
+      t.gtm
+        ? es
+          ? "Guarda de qué campaña o sitio llegó por primera vez (parámetros UTM, solo si acepta la analítica) y, solo si acepta la publicidad, el identificador del clic de Google Ads del enlace con el que llegó (gclid, gbraid o wbraid), para medir nuestras campañas y atribuir el registro o el pago a ese anuncio. Si rechaza una categoría, se borra su parte."
+          : "Stores which campaign or website first brought you here (UTM parameters, only if you accept analytics) and, only if you accept advertising, the Google Ads click identifier from the link you arrived on (gclid, gbraid or wbraid), to measure our campaigns and attribute a sign-up or payment to that ad. If you reject a category, its part is deleted."
+        : es
+          ? "Guarda de qué campaña o sitio llegó por primera vez (parámetros UTM, sin datos personales), para medir nuestras campañas."
+          : "Stores which campaign or website first brought you here (UTM parameters, no personal data), to measure our campaigns.",
       duration(lang, "days", days(FIRST_TOUCH_MAX_AGE_S)),
     ],
   ];
