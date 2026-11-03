@@ -425,10 +425,9 @@ describe("consentimiento: lo que concede cada categoría y lo que se borra al re
     expect(page).not.toContain('jar.get(CONSENT_COOKIE)?.value === "granted"');
   });
 
-  it("lx_ft se limpia por categoría al aplicar cada elección, y al pulsar Configurar cookies", () => {
+  it("lx_ft se limpia por categoría al aplicar cada elección guardada", () => {
     const src = readFileSync(join(process.cwd(), "src/components/analytics-consent.tsx"), "utf8");
     expect(src).toMatch(/if \(state\.ads === "denied"\) clearStorage\(ADS_COOKIE_RE, false\);[\s\S]{0,160}syncFirstTouch\(state\);/);
-    expect(src).toContain("document.cookie = `${FIRST_TOUCH_COOKIE}=; Max-Age=0; Path=/`;");
     // Nada de sessionStorage para la URL de llegada.
     expect(readFileSync(join(process.cwd(), "src/lib/analytics.ts"), "utf8")).not.toMatch(/sessionStorage/);
     expect(src).not.toMatch(/sessionStorage/);
