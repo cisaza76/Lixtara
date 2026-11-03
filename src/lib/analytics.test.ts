@@ -13,7 +13,7 @@ import {
   homePriceRange, markPageview, resultsBucket, resumeSourceFromMarker, track, trackThen,
 } from "@/lib/analytics";
 import {
-  ADS_COOKIE_RE, ANALYTICS_COOKIE_RE, analyticsConfig, analyticsConsentGranted, consentCookieValue, consentModeUpdate, consentTools,
+  ADS_COOKIE_RE, ANALYTICS_COOKIE_RE, analyticsConfig, analyticsConsentGranted, bannerDraft, consentCookieValue, consentModeUpdate, consentTools,
   effectiveConsent, gpcEnabled,
   isAdsExcludedPath, isAnalyticsExcludedPath, isRecordingExcludedPath, needsFullLoad, readAdsConsent, readConsent,
   readConsentState,
@@ -365,7 +365,7 @@ describe("consentimiento: lo que concede cada categoría y lo que se borra al re
     expect(src).toContain('const blocked = c.key === "ads" && gpc;');
     expect(src).toContain("disabled={blocked}");
     expect(src).toContain("{props.labels.gpcNote}");
-    expect(src).toContain("setConsent(effectiveConsent(draft, gpc))");
+    expect(src).toContain("onSave(effectiveConsent(draft, gpc))");
     expect(src).toContain("const state = effectiveConsent(");
     expect(t("es").cookieNotice.gpcNote).toBe("Tu navegador pidió no compartir datos para publicidad.");
     expect(t("en").cookieNotice.gpcNote).toBe("Your browser asked not to share data for advertising.");
@@ -381,10 +381,36 @@ describe("consentimiento: lo que concede cada categoría y lo que se borra al re
     expect(i('gtag("consent", "update", update)')).toBeLessThan(i("lx_ads_consent: update.ad_storage"));
     expect(i("lx_ads_consent: update.ad_storage")).toBeLessThan(i('event: "gtm.js"'));
     // "Rechazar todo" con el mismo estilo que "Aceptar todo".
-    expect(src).toMatch(/setConsent\(all\("denied"\)\)\} className=\{button\}/);
-    expect(src).toMatch(/setConsent\(all\("granted"\)\)\} className=\{button\}/);
-    // Por defecto, todo rechazado.
-    expect(src).toContain('useState<ConsentState>({ analytics: "denied", ads: "denied" })');
+    expect(src).toMatch(/onSave\(all\("denied"\)\)\} className=\{button\}/);
+    expect(src).toMatch(/onSave\(all\("granted"\)\)\} className=\{button\}/);
+    // Por defecto (sin elección), todo rechazado; con elección, la guardada (bannerDraft).
+    expect(src).toContain("useState<ConsentState>(initial)");
+    expect(src).toContain("initial={bannerDraft(saved, gpc, !!props.labels.ads)}");
+  });
+
+  it("el banner muestra la elección guardada, nunca el estado forzado de la ruta", () => {
+    const g = { analytics: "granted", ads: "granted" } as const;
+    expect(bannerDraft(null, false, true)).toEqual({ analytics: "denied", ads: "denied" });
+    expect(bannerDraft(g, false, true)).toEqual(g);
+    expect(bannerDraft({ analytics: "denied", ads: "granted" }, false, true)).toEqual({ analytics: "denied", ads: "granted" });
+    // GPC o sin categoría Publicidad: no se puede aceptar.
+    expect(bannerDraft(g, true, true)).toEqual({ analytics: "granted", ads: "denied" });
+    expect(bannerDraft(g, false, false)).toEqual({ analytics: "granted", ads: "denied" });
+    // En /listing GTM recibe ads denegado, pero la elección guardada no cambia.
+    expect(consentModeUpdate(g, "/es/listing/new").ad_storage).toBe("denied");
+    expect(bannerDraft(g, false, true).ads).toBe("granted");
+  });
+
+  it("nada reescribe lx_consent por estar en una ruta sin publicidad; Configurar cookies no la borra", () => {
+    const src = readFileSync(join(process.cwd(), "src/components/analytics-consent.tsx"), "utf8");
+    // Un solo lugar escribe la cookie (saveChoice), siempre con Path=/, y solo al guardar una elección.
+    expect(src.match(/document\.cookie = `\$\{CONSENT_COOKIE\}=/g)).toHaveLength(1);
+    expect(src).toContain("document.cookie = `${CONSENT_COOKIE}=${consentCookieValue(choice)}; Max-Age=${CONSENT_MAX_AGE_S}; Path=/;");
+    expect(src).not.toMatch(/isAdsExcludedPath\(/);
+    // "Configurar cookies" abre el banner; no borra ni recarga.
+    const link = src.slice(src.indexOf("export function CookieSettingsLink"));
+    expect(link).toContain("onClick={() => setSettingsOpen(true)}");
+    expect(link).not.toMatch(/Max-Age=0|reload/);
   });
 
   it("el paso 1 registra las UTM con Analítica aceptada en la cookie v4, no solo con la vieja \"granted\"", () => {

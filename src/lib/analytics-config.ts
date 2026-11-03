@@ -41,6 +41,16 @@ export function readConsentState(cookieHeader: string): ConsentState | null {
   return n ? { analytics: n[1] as ConsentChoice, ads: n[2] as ConsentChoice } : null;
 }
 
+/**
+ * Lo que el banner muestra marcado: la elección GUARDADA (todo rechazado si aún no eligió).
+ * Nunca el estado forzado de una ruta sin publicidad. Con GPC, o sin categoría Publicidad
+ * (sin GTM), la Publicidad se muestra rechazada porque no se puede aceptar.
+ */
+export function bannerDraft(saved: ConsentState | null, gpc: boolean, adsOffered: boolean): ConsentState {
+  const base = saved ?? { analytics: "denied", ads: "denied" };
+  return { analytics: base.analytics, ads: adsOffered && !gpc ? base.ads : "denied" };
+}
+
 /** ¿El valor de `lx_consent` acepta la Analítica? Sirve para el formato v4 y para el viejo. */
 export function analyticsConsentGranted(cookieValue: string | null | undefined): boolean {
   return readConsentState(`${CONSENT_COOKIE}=${cookieValue ?? ""}`)?.analytics === "granted";

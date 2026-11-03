@@ -122,7 +122,7 @@ Si usted acepta la analítica, Microsoft puede poner cookies en sus propios domi
 
 Cuando visita Lixtara por primera vez, el aviso de cookies le permite aceptar o rechazar por separado las cookies de analítica y las de publicidad, con "Aceptar" y "Rechazar" igual de visibles en cada categoría, y también "Rechazar todo" y "Aceptar todo". Las dos categorías están rechazadas hasta que usted acepte: nada de analítica ni de publicidad se activa antes.
 
-Puede cambiar su elección o retirar su consentimiento en cualquier momento en "Configurar cookies", en el pie del sitio. Al hacerlo, las dos categorías vuelven a quedar rechazadas hasta que elija de nuevo; las herramientas de la categoría que rechace dejan de activarse y las cookies que pusieron en nuestro dominio se borran de su navegador. Las cookies que Microsoft, Meta o Google ponen en sus propios dominios solo se pueden borrar desde el navegador.
+Puede cambiar su elección o retirar su consentimiento en cualquier momento en "Configurar cookies", en el pie del sitio. Ahí verá marcada su elección actual y puede cambiar cada categoría; las herramientas de la categoría que rechace dejan de activarse y las cookies que pusieron en nuestro dominio se borran de su navegador. Las cookies que Microsoft, Meta o Google ponen en sus propios dominios solo se pueden borrar desde el navegador.
 
 - También puede ver, bloquear o borrar cookies desde la configuración de su navegador.
 - Si bloquea las cookies necesarias, no podrá iniciar sesión ni usar el proceso de publicación.
@@ -189,7 +189,7 @@ If you accept analytics, Microsoft may set cookies on its own domains (Section 4
 
 When you first visit Lixtara, the cookie banner lets you accept or reject analytics cookies and advertising cookies separately, with "Accept" and "Reject" equally visible for each category, as well as "Reject all" and "Accept all". Both categories stay rejected until you accept: no analytics or advertising is activated before that.
 
-You can change your choice or withdraw your consent at any time through "Cookie settings" in the site footer. When you do, both categories return to rejected until you choose again; the tools in a category you reject stop being activated and the cookies they set on our domain are deleted from your browser. Cookies that Microsoft, Meta or Google set on their own domains can only be deleted from your browser.
+You can change your choice or withdraw your consent at any time through "Cookie settings" in the site footer. There you will see your current choice selected and can change each category; the tools in a category you reject stop being activated and the cookies they set on our domain are deleted from your browser. Cookies that Microsoft, Meta or Google set on their own domains can only be deleted from your browser.
 
 - You can also view, block or delete cookies in your browser settings.
 - If you block necessary cookies, you will not be able to sign in or use the listing flow.

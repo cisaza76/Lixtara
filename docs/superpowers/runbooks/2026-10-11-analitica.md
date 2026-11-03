@@ -94,7 +94,7 @@ Después, **Redeploy**: son variables `NEXT_PUBLIC_` y se incrustan en el build.
 ### 4 · Verificar
 1. **En una ventana privada:** debe aparecer el banner con "Aceptar" y "Rechazar" (o "Aceptar analítica" si solo está PostHog). Antes de elegir no debe haber peticiones a `googletagmanager.com` ni a `posthog.com` (DevTools → Network).
 2. **Rechazar:** sin peticiones, sin cookies `_ga` ni `ph_`.
-3. **"Configurar cookies" (pie) → Aceptar:** carga GTM y PostHog. GA4 DebugView y PostHog Live events muestran el pageview y los eventos.
+3. **"Configurar cookies" (pie):** abre el banner con la elección **guardada** marcada (nunca el estado forzado de la ruta: en `/listing` GTM recibe ads `denied`, pero la cookie `lx_consent` no cambia). No borra la cookie ni recarga; al guardar otra elección se aplica y, si cambió, recarga. **Aceptar:** carga GTM y PostHog. GA4 DebugView y PostHog Live events muestran el pageview y los eventos.
 4. **En PostHog y en GA4 DebugView, revisar las URLs** (`$current_url`, `page_location`): no deben tener `?…`, y no debe aparecer texto ni datos personales. En GA4 debe haber **un** page_view por página.
 5. **Entrar a `/en/admin`:** no debe haber peticiones a Google ni a PostHog.
 6. **La política de cookies** (`/en/cookies`) debe mostrar en 3.4 las herramientas configuradas (GA4 y Clarity con GTM; PostHog con su variable), en 3.5 que no se usa publicidad, y en 3.3 Sentry como herramienta técnica.

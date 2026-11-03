@@ -32,6 +32,7 @@ import {
   ANALYTICS_COOKIE_RE,
   CONSENT_COOKIE,
   CONSENT_MAX_AGE_S,
+  bannerDraft,
   consentCookieValue,
   consentModeUpdate,
   effectiveConsent,
@@ -198,6 +199,23 @@ function setConsent(choice: ConsentState): void {
   for (const l of listeners) l();
 }
 
+// "Configurar cookies" abre el banner con la elección GUARDADA marcada. No borra la cookie: la
+// elección (y lo que usa el servidor) solo cambia al guardar otra.
+const settingsListeners = new Set<() => void>();
+let settingsOpen = false;
+const settingsStore = {
+  subscribe(l: () => void) {
+    settingsListeners.add(l);
+    return () => settingsListeners.delete(l);
+  },
+  get: (): boolean => settingsOpen,
+  server: (): boolean => false,
+};
+function setSettingsOpen(open: boolean): void {
+  settingsOpen = open;
+  for (const l of settingsListeners) l();
+}
+
 let gtmLoaded = false;
 let analyticsOn = false;
 const noSubscribe = () => () => {};
@@ -209,8 +227,7 @@ export function AnalyticsConsent(props: Props) {
   const ads = choice && choice !== "unknown" ? choice.ads : null;
   const pathname = usePathname();
   const excluded = isAnalyticsExcludedPath(pathname);
-  // Lo que se marca en el banner antes de guardar. Por defecto, todo rechazado.
-  const [draft, setDraft] = useState<ConsentState>({ analytics: "denied", ads: "denied" });
+  const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.get, settingsStore.server);
   // Global Privacy Control: solo existe en el navegador, así que se lee después de montar.
   const gpc = useSyncExternalStore(noSubscribe, () => gpcEnabled(navigator), () => false);
 
@@ -236,8 +253,50 @@ export function AnalyticsConsent(props: Props) {
     if (analytics === "granted" && !excluded && started) pageview();
   }, [pathname, analytics, excluded]);
 
-  if (choice !== null || excluded) return null;
+  // El banner sale si aún no eligió o si abrió "Configurar cookies". Nunca en /admin.
+  if (excluded || (choice !== null && !settings)) return null;
+  const saved = choice && choice !== "unknown" ? choice : null;
+  const save = (next: ConsentState) => {
+    setConsent(next);
+    if (!settings) return;
+    setSettingsOpen(false);
+    // Lo ya cargado (GTM, PostHog) no se apaga en caliente: si cambió la elección, se recarga.
+    if (saved && consentCookieValue(saved) !== consentCookieValue(next)) window.location.reload();
+  };
+  return (
+    <ConsentPanel
+      // Al abrir "Configurar cookies" el panel arranca de nuevo con la elección guardada.
+      key={settings ? "settings" : "first"}
+      labels={props.labels}
+      lang={props.lang}
+      gpc={gpc}
+      initial={bannerDraft(saved, gpc, !!props.labels.ads)}
+      onSave={save}
+    />
+  );
+}
 
+/**
+ * Las categorías del banner. `initial`: la elección guardada (o todo rechazado si aún no
+ * eligió), nunca el estado forzado de la ruta: en las rutas sin publicidad GTM recibe ads
+ * denegado, pero la elección de la persona no cambia.
+ */
+function ConsentPanel({
+  labels,
+  lang,
+  gpc,
+  initial,
+  onSave,
+}: {
+  labels: Props["labels"];
+  lang: string;
+  gpc: boolean;
+  initial: ConsentState;
+  onSave: (c: ConsentState) => void;
+}) {
+  const props = { labels, lang };
+  // Lo que se marca en el banner antes de guardar.
+  const [draft, setDraft] = useState<ConsentState>(initial);
   // Con GPC, "Aceptar todo" y "Guardar" nunca guardan la publicidad aceptada.
   const all = (c: ConsentChoice): ConsentState => effectiveConsent({ analytics: c, ads: props.labels.ads ? c : "denied" }, gpc);
   // Mismo peso visual para aceptar y rechazar, para cada categoría y para "todo": mismo
@@ -277,7 +336,7 @@ export function AnalyticsConsent(props: Props) {
                 <button
                   type="button"
                   aria-pressed={draft[c.key] === "denied"}
-                  onClick={() => setDraft({ ...draft, [c.key]: "denied" })}
+                  onClick={() => setDraft((d) => ({ ...d, [c.key]: "denied" }))}
                   className={option(draft[c.key] === "denied")}
                 >
                   {props.labels.reject}
@@ -286,7 +345,7 @@ export function AnalyticsConsent(props: Props) {
                   type="button"
                   aria-pressed={draft[c.key] === "granted"}
                   disabled={blocked}
-                  onClick={() => setDraft({ ...draft, [c.key]: "granted" })}
+                  onClick={() => setDraft((d) => ({ ...d, [c.key]: "granted" }))}
                   className={`${option(draft[c.key] === "granted")} disabled:cursor-not-allowed disabled:opacity-40`}
                 >
                   {props.labels.accept}
@@ -297,13 +356,13 @@ export function AnalyticsConsent(props: Props) {
             })}
           </div>
           <div className="flex flex-wrap gap-2 sm:flex-nowrap">
-            <button type="button" onClick={() => setConsent(all("denied"))} className={button}>
+            <button type="button" onClick={() => onSave(all("denied"))} className={button}>
               {props.labels.rejectAll}
             </button>
-            <button type="button" onClick={() => setConsent(effectiveConsent(draft, gpc))} className={button}>
+            <button type="button" onClick={() => onSave(effectiveConsent(draft, gpc))} className={button}>
               {props.labels.save}
             </button>
-            <button type="button" onClick={() => setConsent(all("granted"))} className={button}>
+            <button type="button" onClick={() => onSave(all("granted"))} className={button}>
               {props.labels.acceptAll}
             </button>
           </div>
@@ -341,17 +400,15 @@ function pageview(): void {
 }
 
 /**
- * Enlace del pie para cambiar o retirar la elección: borra la cookie y recarga. Al recargar,
- * nada se carga (todo denegado) hasta que se vuelva a elegir en el banner.
+ * Enlace del pie para cambiar o retirar la elección: abre el banner con la elección guardada
+ * marcada. No borra la cookie ni recarga; al guardar otra elección, se aplica (y recarga si
+ * cambió).
  */
 export function CookieSettingsLink({ label }: { label: string }) {
   return (
     <button
       type="button"
-      onClick={() => {
-        document.cookie = `${CONSENT_COOKIE}=; Max-Age=0; Path=/`;
-        window.location.reload();
-      }}
+      onClick={() => setSettingsOpen(true)}
       className="underline-offset-2 hover:underline"
     >
       {label}
