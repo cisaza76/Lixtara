@@ -41,6 +41,11 @@ export function readConsentState(cookieHeader: string): ConsentState | null {
   return n ? { analytics: n[1] as ConsentChoice, ads: n[2] as ConsentChoice } : null;
 }
 
+/** ¿El valor de `lx_consent` acepta la Analítica? Sirve para el formato v4 y para el viejo. */
+export function analyticsConsentGranted(cookieValue: string | null | undefined): boolean {
+  return readConsentState(`${CONSENT_COOKIE}=${cookieValue ?? ""}`)?.analytics === "granted";
+}
+
 /**
  * Global Privacy Control (decisión del owner 2026-10-24): si el navegador manda la señal
  * (`navigator.globalPrivacyControl === true`, o el header `Sec-GPC: 1` en el servidor), la

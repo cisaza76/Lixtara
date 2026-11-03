@@ -77,7 +77,7 @@ import { PaymentStatusPoller } from "@/components/payment-status-poller";
 import { DashboardRedirect } from "@/components/dashboard-redirect";
 import { ListingFunnelEvents } from "@/components/listing-funnel-events";
 import { isPlanTier, listingErrorField } from "@/lib/analytics";
-import { CONSENT_COOKIE } from "@/lib/analytics-config";
+import { CONSENT_COOKIE, analyticsConsentGranted } from "@/lib/analytics-config";
 import { FIRST_TOUCH_COOKIE, parseFirstTouch } from "@/lib/funnel-events";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
@@ -752,14 +752,14 @@ export default async function ListingNewPage({
       }
     }
     // After saving the address (step 1 complete): send the code, or go straight to step 2.
-    // UTM de primer contacto solo si la persona aceptó cookies (sin consentimiento no hay
-    // cookie lx_ft, y se comprueba igual).
+    // UTM de primer contacto solo con Analítica aceptada (sin ella no hay cookie lx_ft, y se
+    // comprueba igual). Desde la v4 la cookie es analytics-<…>.ads-<…>; "granted" es la vieja.
     const continueTo = async (propertyId: string, uid: string): Promise<never> => {
       const jar = await cookies();
       jar.delete({ name: STEP1_FORM_COOKIE, path: step1FormCookiePath(lang) });
       jar.delete({ name: STEP1_FORM_COOKIE, path: legacyStep1FormCookiePath(lang) });
       const firstTouch =
-        jar.get(CONSENT_COOKIE)?.value === "granted"
+        analyticsConsentGranted(jar.get(CONSENT_COOKIE)?.value)
           ? parseFirstTouch(jar.get(FIRST_TOUCH_COOKIE)?.value)
           : {};
       stepCompleted(lang, 1, propertyId, uid, firstTouch);

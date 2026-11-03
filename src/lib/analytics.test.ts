@@ -13,7 +13,7 @@ import {
   homePriceRange, markPageview, resultsBucket, resumeSourceFromMarker, track, trackThen,
 } from "@/lib/analytics";
 import {
-  ADS_COOKIE_RE, ANALYTICS_COOKIE_RE, analyticsConfig, consentCookieValue, consentModeUpdate, consentTools,
+  ADS_COOKIE_RE, ANALYTICS_COOKIE_RE, analyticsConfig, analyticsConsentGranted, consentCookieValue, consentModeUpdate, consentTools,
   effectiveConsent, gpcEnabled,
   isAdsExcludedPath, isAnalyticsExcludedPath, isRecordingExcludedPath, needsFullLoad, readAdsConsent, readConsent,
   readConsentState,
@@ -385,6 +385,18 @@ describe("consentimiento: lo que concede cada categoría y lo que se borra al re
     expect(src).toMatch(/setConsent\(all\("granted"\)\)\} className=\{button\}/);
     // Por defecto, todo rechazado.
     expect(src).toContain('useState<ConsentState>({ analytics: "denied", ads: "denied" })');
+  });
+
+  it("el paso 1 registra las UTM con Analítica aceptada en la cookie v4, no solo con la vieja \"granted\"", () => {
+    expect(analyticsConsentGranted("analytics-granted.ads-denied")).toBe(true);
+    expect(analyticsConsentGranted("analytics-granted.ads-granted")).toBe(true);
+    expect(analyticsConsentGranted("granted")).toBe(true);
+    expect(analyticsConsentGranted("analytics-denied.ads-granted")).toBe(false);
+    expect(analyticsConsentGranted("denied")).toBe(false);
+    expect(analyticsConsentGranted(undefined)).toBe(false);
+    const page = readFileSync(join(process.cwd(), "src/app/[lang]/listing/new/page.tsx"), "utf8");
+    expect(page).toContain("analyticsConsentGranted(jar.get(CONSENT_COOKIE)?.value)");
+    expect(page).not.toContain('jar.get(CONSENT_COOKIE)?.value === "granted"');
   });
 
   it("al rechazar Analítica se borran GA4, Clarity, PostHog y lx_ft; al rechazar Publicidad, Google Ads y Meta", () => {
