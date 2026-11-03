@@ -1,13 +1,15 @@
 // Envía `purchase` a GA4 por Measurement Protocol desde el webhook de Stripe. Reglas en
-// ga4-attribution.ts. Nunca lanza ni demora el webhook más de 3 s: un fallo de GA4 solo
+// ga4-attribution.ts (purchaseSendMode): Production en vivo, o Preview con compras de prueba
+// y debug_mode: 1. Nunca lanza ni demora el webhook más de 3 s: un fallo de GA4 solo
 // queda en el log, y Stripe recibe su 200 igual.
 //
-// Variables (server-only, solo Production): GA4_MEASUREMENT_ID (G-…, no es secreto) y
-// GA4_MP_API_SECRET (lo crea el owner). Sin las dos, no se envía nada.
+// Variables (server-only): GA4_MEASUREMENT_ID (G-…, no es secreto) y GA4_MP_API_SECRET (lo
+// crea el owner). En Production; en Preview solo para probar (compras de prueba, DebugView).
+// Sin las dos, no se envía nada.
 
 import type Stripe from "stripe";
 import { createService } from "@/lib/supabase/service";
-import { purchaseItem, purchasePayload, shouldSendPurchase } from "@/lib/ga4-attribution";
+import { purchaseItem, purchasePayload, purchaseSendMode } from "@/lib/ga4-attribution";
 
 export async function sendGa4Purchase(session: Stripe.Checkout.Session): Promise<void> {
   try {
@@ -30,18 +32,15 @@ export async function sendGa4Purchase(session: Stripe.Checkout.Session): Promise
       propertyIsTest = data ? Boolean((data as { is_test: boolean | null }).is_test) : null;
     }
 
-    if (
-      !shouldSendPurchase({
-        vercelEnv: process.env.VERCEL_ENV,
-        livemode: session.livemode,
-        consent: md.consent,
-        clientId: md.ga_client_id,
-        propertyIsTest,
-        hasConfig: Boolean(measurementId && apiSecret),
-      })
-    ) {
-      return;
-    }
+    const mode = purchaseSendMode({
+      vercelEnv: process.env.VERCEL_ENV,
+      livemode: session.livemode,
+      consent: md.consent,
+      clientId: md.ga_client_id,
+      propertyIsTest,
+      hasConfig: Boolean(measurementId && apiSecret),
+    });
+    if (!mode) return;
 
     const url = `https://www.google-analytics.com/mp/collect?measurement_id=${encodeURIComponent(
       measurementId!,
@@ -58,6 +57,7 @@ export async function sendGa4Purchase(session: Stripe.Checkout.Session): Promise
           value: (session.amount_total ?? 0) / 100,
           currency: session.currency ?? "usd",
           item,
+          debugMode: mode === "debug",
         }),
       ),
       signal: AbortSignal.timeout(3000),

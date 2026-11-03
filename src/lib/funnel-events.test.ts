@@ -3,6 +3,8 @@ import {
   campaignFields,
   isHumanPageView,
   firstTouchCookieValue,
+  nextFirstTouchCookie,
+  parseFirstTouchClickIds,
   funnelIsTest,
   parseFirstTouch,
   sanitizeFunnelMetadata,
@@ -86,5 +88,35 @@ describe("visitas de navegadores reales (owners_landing_view)", () => {
     }
     expect(isHumanPageView({ userAgent: null, purpose: null })).toBe(false);
     expect(isHumanPageView({ userAgent: chrome, purpose: "prefetch" })).toBe(false);
+  });
+});
+
+describe("lx_ft: UTM con Analítica, gclid/gbraid/wbraid con Publicidad", () => {
+  const landing = new URLSearchParams("utm_source=google&utm_medium=cpc&gclid=Cj0K_abc-1&gbraid=0AAA_gb&wbraid=Cl_wb");
+  const both = { analytics: "granted", ads: "granted" } as const;
+  it("con las dos aceptadas: todo, de la URL de llegada", () => {
+    const v = nextFirstTouchCookie(null, landing, both);
+    expect(v).toBe("google|cpc||Cj0K_abc-1|0AAA_gb|Cl_wb");
+    expect(parseFirstTouchClickIds(v)).toEqual({ gclid: "Cj0K_abc-1", gbraid: "0AAA_gb", wbraid: "Cl_wb" });
+    expect(parseFirstTouch(v ?? undefined)).toEqual({ utm_source: "google", utm_medium: "cpc" });
+  });
+  it("solo Analítica: sin identificadores de clic; solo Publicidad: sin UTM", () => {
+    expect(nextFirstTouchCookie(null, landing, { analytics: "granted", ads: "denied" })).toBe("google|cpc|");
+    expect(nextFirstTouchCookie(null, landing, { analytics: "denied", ads: "granted" })).toBe("|||Cj0K_abc-1|0AAA_gb|Cl_wb");
+  });
+  it("Publicidad denegada (o GPC) después: se borran los identificadores; las dos denegadas: la cookie", () => {
+    const v = nextFirstTouchCookie(null, landing, both);
+    expect(nextFirstTouchCookie(v, new URLSearchParams(), { analytics: "granted", ads: "denied" })).toBe("google|cpc|");
+    expect(nextFirstTouchCookie(v, new URLSearchParams(), { analytics: "denied", ads: "denied" })).toBeNull();
+  });
+  it("primer contacto: lo guardado no se sobrescribe; lo que falta se completa", () => {
+    const v = nextFirstTouchCookie("google|cpc||Cj0K_old||", new URLSearchParams("utm_source=fb&gclid=NEW&wbraid=W1"), both);
+    expect(v).toBe("google|cpc||Cj0K_old||W1");
+  });
+  it("valores raros no entran; sin nada, no hay cookie", () => {
+    expect(nextFirstTouchCookie(null, new URLSearchParams("gclid=<script>&gbraid=a b"), both)).toBeNull();
+    expect(nextFirstTouchCookie(null, new URLSearchParams("q=1"), both)).toBeNull();
+    expect(parseFirstTouchClickIds("a|b|c|x;y||")).toEqual({});
+    expect(parseFirstTouchClickIds(undefined)).toEqual({});
   });
 });

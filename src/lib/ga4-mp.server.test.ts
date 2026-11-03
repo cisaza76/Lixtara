@@ -46,13 +46,40 @@ describe("sendGa4Purchase", () => {
     await expect(sendGa4Purchase(session)).resolves.toBeUndefined();
   });
 
-  it("modo de prueba de Stripe o fuera de Production: no envía", async () => {
+  it("Production con pago de prueba, o Preview con una compra real: no envía", async () => {
     configure();
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     await sendGa4Purchase({ ...session, livemode: false } as Stripe.Checkout.Session);
     vi.stubEnv("VERCEL_ENV", "preview");
     await sendGa4Purchase(session);
+    vi.stubEnv("VERCEL_ENV", "development");
+    await sendGa4Purchase({ ...session, livemode: false } as Stripe.Checkout.Session);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("Preview con compra de prueba: envía con debug_mode: 1 (plan y los otros tres productos)", async () => {
+    configure();
+    vi.stubEnv("VERCEL_ENV", "preview");
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetch);
+    const test = (metadata: Record<string, string>) =>
+      ({ ...session, id: "cs_test_1", livemode: false, metadata: { consent: "granted", ga_client_id: "1.2", ...metadata } }) as unknown as Stripe.Checkout.Session;
+    await sendGa4Purchase(test({ tier: "pro", property_id: "p1" }));
+    await sendGa4Purchase(test({ kind: "consultation" }));
+    await sendGa4Purchase(test({ kind: "photography", property_id: "p1" }));
+    await sendGa4Purchase(test({ kind: "staging_overage" }));
+    expect(fetch).toHaveBeenCalledTimes(4);
+    for (const call of fetch.mock.calls) {
+      expect(JSON.parse(call[1].body).events[0].params).toMatchObject({ transaction_id: "cs_test_1", debug_mode: 1 });
+    }
+  });
+
+  it("Production: sin debug_mode", async () => {
+    configure();
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetch);
+    await sendGa4Purchase(session);
+    expect(JSON.parse(fetch.mock.calls[0][1].body).events[0].params).not.toHaveProperty("debug_mode");
   });
 });

@@ -44,7 +44,10 @@ Decisión del owner del 2026-10-31, sobre el plan de medición del CMO (paso 4.8
   - EN: agregar "From then on, our server also stops notifying Meta and deletes the identifiers it kept for that purpose."
   - ES: agregar "A partir de ese momento, nuestro servidor también deja de avisar a Meta y borra los identificadores que guardaba para ello."
 - **§4.1:** la línea del proveedor Meta (`PRIVACY_PROVIDERS`) suma "Conversions API" / "API de Conversiones".
-- **Política de cookies:** sin cambios. La API de Conversiones no pone cookies; solo lee `_fbp` y `_fbc`, que ya están declaradas.
+- **Política de cookies:** la API de Conversiones no pone cookies; solo lee `_fbp` y `_fbc`, que ya están declaradas. **Pero `lx_ft` cambia** (pedido del CMO, 2026-11-02): además de las UTM (con Analítica), guarda los identificadores de clic de Google Ads de la URL de llegada (`gclid`, `gbraid`, `wbraid`), solo con Publicidad aceptada y sin GPC. Se borran si rechaza la Publicidad. Hoy la fila dice "parámetros UTM, sin datos personales" y queda inexacta en cuanto este código llegue a Production. Texto propuesto para esa fila, que pasa a nombrar las dos categorías:
+  - EN: "Stores which campaign or website first brought you here (UTM parameters, only if you accept analytics) and, only if you accept advertising, the Google Ads click identifier from the link you arrived on (gclid, gbraid or wbraid), to attribute a sign-up or payment to that ad."
+  - ES: "Guarda de qué campaña o sitio llegó por primera vez (parámetros UTM, solo si acepta la analítica) y, solo si acepta la publicidad, el identificador del clic de Google Ads del enlace con el que llegó (gclid, gbraid o wbraid), para atribuir el registro o el pago a ese anuncio."
+  - Sube la versión de la política de cookies. **El merge de este PR espera esta publicación**, porque la captura de `lx_ft` no depende de `META_CAPI_ENABLED`.
 - **Versión:** sube de `2026-10-24-v4` a v5. Si #225 aún no se hubiera publicado, se puede integrar en la v4.
 
 ## Preguntas para el abogado
