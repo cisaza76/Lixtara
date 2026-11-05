@@ -129,6 +129,38 @@ describe("Lead", () => {
   });
 });
 
+describe("saveAdAttribution: IP y user agent solo con la API encendida y configurada", () => {
+  it("con META_CAPI_ENABLED=true, token y conjunto de datos: guarda todo", async () => {
+    await saveAdAttribution("owner-1", granted);
+    expect(db.upserts[0]).toMatchObject({ ads_consent: "granted", fbp: FBP, client_ip: "203.0.113.10", client_ua: "UA" });
+  });
+  it.each([
+    ["META_CAPI_ENABLED vacía", "META_CAPI_ENABLED", ""],
+    ["META_CAPI_ENABLED distinta de true", "META_CAPI_ENABLED", "1"],
+    ["sin META_CAPI_TOKEN", "META_CAPI_TOKEN", ""],
+    ["sin META_DATASET_ID", "META_DATASET_ID", ""],
+    ["META_DATASET_ID inválido", "META_DATASET_ID", "abc"],
+  ])("%s: guarda la elección, fbp y fbc, sin IP ni user agent", async (_label, name, value) => {
+    vi.stubEnv(name, value);
+    await saveAdAttribution("owner-1", { ...granted, fbc: "fb.1.1730000000000.IwAR0abc" });
+    expect(db.upserts).toHaveLength(1);
+    expect(db.upserts[0]).toMatchObject({
+      user_id: "owner-1",
+      ads_consent: "granted",
+      fbp: FBP,
+      fbc: "fb.1.1730000000000.IwAR0abc",
+      client_ip: null,
+      client_ua: null,
+    });
+  });
+  it("Lead con la API apagada: guarda sin IP ni user agent y no envía", async () => {
+    vi.stubEnv("META_CAPI_ENABLED", "");
+    await metaLeadOnEmailVerified({ userId: "owner-1", email: "o@x.co", propertyId: "prop-1", lang: "en", ids: granted });
+    expect(db.upserts[0]).toMatchObject({ ads_consent: "granted", fbp: FBP, client_ip: null, client_ua: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("CompleteRegistration", () => {
   it("con lo guardado del vendedor principal, su correo cifrado y el plan", async () => {
     await metaCompleteRegistration({ propertyId: "prop-1", signedAt: "2026-11-09T15:00:00Z" });
