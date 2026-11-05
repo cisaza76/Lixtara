@@ -248,7 +248,7 @@ describe("cookies: publicidad solo con consentimiento, en el aviso y en la polí
         if (t.gtm) {
           expect(doc, `${lang} ${JSON.stringify(t)}`).not.toMatch(noAds);
           expect(doc).toMatch(lang === "en" ? /Advertising Cookies \(only with your consent\)/ : /Cookies de Publicidad \(solo con su consentimiento\)/);
-          for (const c of ["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]) expect(doc, c).toContain(c);
+          for (const c of ["_fbp", "_fbc", "_gcl_au", "_gcl_aw", "_gcl_gb"]) expect(doc, c).toContain(c);
         } else {
           expect(doc, `${lang} ${JSON.stringify(t)}`).toMatch(noAds);
         }
@@ -266,10 +266,10 @@ describe("cookies: publicidad solo con consentimiento, en el aviso y en la polí
   it("duraciones de fuentes oficiales: Google 90 días; Meta, aproximadamente 90 días", () => {
     for (const lang of LANGS) {
       const ads = cookiesDocFor(lang, { gtm: true, posthog: false }).sections.find((s) => s.id === "advertising")!;
-      expect(ads.table!.rows.map((r) => r[0])).toEqual(["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]);
+      expect(ads.table!.rows.map((r) => r[0])).toEqual(["_fbp", "_fbc", "_gcl_au", "_gcl_aw", "_gcl_gb"]);
       const d = Object.fromEntries(ads.table!.rows.map((r) => [r[0], r[3]]));
       for (const c of ["_fbp", "_fbc"]) expect(d[c], c).toBe(lang === "en" ? "About 90 days (set by Meta)" : "Aproximadamente 90 días (la fija Meta)");
-      for (const c of ["_gcl_au", "_gcl_aw"]) expect(d[c], c).toBe(lang === "en" ? "90 days (set by Google)" : "90 días (la fija Google)");
+      for (const c of ["_gcl_au", "_gcl_aw", "_gcl_gb"]) expect(d[c], c).toBe(lang === "en" ? "90 days (set by Google)" : "90 días (la fija Google)");
     }
     // Solo fuentes oficiales en el código.
     expect(read("src/lib/legal/cookies.ts")).not.toMatch(/toolongdidntread/);
