@@ -209,6 +209,11 @@ describe("Purchase (punto único de pago confirmado)", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(forgotIpUa()).toBe(true);
   });
+  it("sin valor en USD (null): no sale, pero igual borra la IP y el user agent", async () => {
+    await metaPlanPurchase({ ...paid(), value: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(forgotIpUa()).toBe(true);
+  });
   it("IP y user agent guardados hace más de 90 días no se envían", async () => {
     db.attribution = { ...db.attribution!, updated_at: new Date(Date.now() - 91 * 86_400_000).toISOString() };
     await metaPlanPurchase(paid());
@@ -358,6 +363,11 @@ describe("reenvío de validación (resendTestEvents)", () => {
     // No guarda ni borra nada.
     expect(db.upserts).toHaveLength(0);
     expect(db.updates).toHaveLength(0);
+  });
+  it("reenvío: un pago guardado en otra moneda no se reenvía como Purchase", async () => {
+    db.payment = { amount: 1980000, currency: "cop", tier: "pro", completed_at: "2026-11-05T00:30:41Z" };
+    const out = await resendTestEvents("prop-1", "TEST80832");
+    expect(out).toMatchObject([{ name: "Lead" }, { name: "CompleteRegistration" }, { name: "Purchase", sent: false, reason: "non_usd_payment" }]);
   });
   it("sin firma o sin pago: esos eventos no salen y dice por qué", async () => {
     db.agreement = null;
