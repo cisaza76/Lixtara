@@ -34,6 +34,7 @@ import { isSigningExpired, type DeadlineRow } from "@/lib/signing-deadline";
 import { sendAgreementSigned, sendAllSellersSigned } from "@/lib/email";
 import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import { SITE_URL } from "@/lib/config";
+import { metaCompleteRegistration } from "@/lib/meta-capi.server";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 
 // "signed" (seller done) is not final: it still moves to "completed" once the
@@ -151,6 +152,8 @@ export async function refreshAgreementResult(a: AgreementRef): Promise<RefreshRe
     // Embudo: firmar ES terminar el paso 7. Una sola vez, la de la transición.
     await recordFunnelEvent({ event: "listing_step_complete", propertyId: a.property_id, step: 7 });
     await recordFunnelEvent({ event: "agreement_signed", propertyId: a.property_id, step: 7 });
+    // API de Conversiones de Meta (CompleteRegistration): una vez, la de la transición. Nunca lanza.
+    await metaCompleteRegistration({ propertyId: a.property_id, signedAt: (update.signed_at as string | undefined) ?? null });
     await notifySellerSigned(a).catch((e) =>
       console.error("agreement refresh: email failed", e instanceof Error ? e.message : e),
     );

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/auth/safe-redirect";
+import { metaLeadOnFirstEmailVerification } from "@/lib/meta-capi.server";
 
 // Token-hash sign-in (magic links we send ourselves, e.g. "continue your
 // listing"). Unlike /auth/callback (PKCE code exchange), this works when the
@@ -18,8 +19,12 @@ export async function GET(request: NextRequest) {
 
   if (tokenHash && type && ALLOWED_TYPES.includes(type)) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
-    if (!error) return NextResponse.redirect(new URL(next, origin));
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (!error) {
+      // Meta (Lead): solo si este enlace confirmó el correo por primera vez.
+      await metaLeadOnFirstEmailVerification({ user: data.user, lang });
+      return NextResponse.redirect(new URL(next, origin));
+    }
   }
 
   // Expired or already used: offer a fresh link instead of a dead end.

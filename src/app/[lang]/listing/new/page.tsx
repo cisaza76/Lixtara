@@ -8,6 +8,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createService } from "@/lib/supabase/service";
 import { SITE_URL } from "@/lib/config";
+import {
+  adIdentifiersFromCurrentRequest,
+  currentTestCode,
+  metaLeadOnEmailVerified,
+  metaLeadOnFirstEmailVerification,
+  saveAdAttribution,
+} from "@/lib/meta-capi.server";
 import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
 import { agreementSignedBySeller } from "@/lib/step-progress";
@@ -449,6 +456,9 @@ export default async function ListingNewPage({
       (resumedSource === "email_link" || resumedSource === "broker_link" || resumedSource === "account")
     ) {
       const resumedId = draft.id;
+      // Al retomar se actualizan los identificadores de Meta (firma y pago llegan sin navegador).
+      const adIds = await adIdentifiersFromCurrentRequest();
+      after(() => saveAdAttribution(sessionUser.id, adIds));
       after(() =>
         recordFunnelEvent({
           event: "listing_resumed",
@@ -635,6 +645,11 @@ export default async function ListingNewPage({
       // firmar): con dos vendedores el otro firma por correo, cuando sea. El refresco manda una
       // vez el correo "ya firmaron todos" si esta lectura es la que ve la última firma.
       if (latestAgreement?.envelope_id && isAwaitingSellers(latestAgreement.status)) {
+        // La firma puede disparar CompleteRegistration: antes, la elección vigente de esta
+        // petición (cookie y Sec-GPC) reemplaza la guardada.
+        if (draft && sessionUser && draft.owner_id === sessionUser.id) {
+          await saveAdAttribution(sessionUser.id, await adIdentifiersFromCurrentRequest());
+        }
         const refreshed = await refreshAgreementResult(latestAgreement);
         ownSignedAgreement = refreshed.ownSigned;
         if (refreshed.fetched) latestAgreement = (await loadAgreement()) ?? latestAgreement;
@@ -664,6 +679,10 @@ export default async function ListingNewPage({
         if (isCheckoutSessionId(sp.session_id)) candidates.add(sp.session_id);
         if (pendingPayment?.status === "pending" && isCheckoutSessionId(pendingPayment.stripe_checkout_session_id)) {
           candidates.add(pendingPayment.stripe_checkout_session_id);
+        }
+        // El cumplimiento puede disparar Purchase: antes, la elección vigente (cookie y Sec-GPC).
+        if (candidates.size > 0) {
+          await saveAdAttribution(sessionUser.id, await adIdentifiersFromCurrentRequest());
         }
         for (const sessionId of candidates) {
           const result = await reconcileTierCheckout({ sessionId, propertyId: draftId, userId: sessionUser.id });
@@ -888,6 +907,11 @@ export default async function ListingNewPage({
       propertyId: id,
     });
     if (result !== "verified") redirect(`${back}&gerror=${result}`);
+    // API de Conversiones de Meta (Lead): la cookie de esta petición, leída aquí; el envío,
+    // después de responder. Sin Publicidad aceptada no sale nada.
+    const adIds = await adIdentifiersFromCurrentRequest();
+    const testCode = await currentTestCode(); // Preview: el código de Eventos de prueba de la URL
+    after(() => metaLeadOnEmailVerified({ userId: user.id, email: user.email, propertyId: id, lang, ids: adIds, testCode }));
     redirect(`/${lang}/listing/new?id=${id}&step=2&ev=email_verified_gate`);
   }
 
@@ -1838,18 +1862,22 @@ export default async function ListingNewPage({
     // flow is resilient to Supabase's exact classification of the upgrade.
     const otpTypes = ["email_change", "email", "signup"] as const;
     let verified = false;
+    let verifiedUser: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>["data"]["user"] = null;
     for (const type of otpTypes) {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         email: pending,
         token,
         type,
       });
       if (!error) {
         verified = true;
+        verifiedUser = data.user;
         break;
       }
     }
     if (!verified) redirect(`${back}&pending=1&cerror=invalid`);
+    // Meta (Lead): quien no pasó por el código del paso 1 confirma aquí su correo por primera vez.
+    await metaLeadOnFirstEmailVerification({ user: verifiedUser, lang, propertyId: id });
 
     redirect(`${back}&verified=1&ev=email_verified_account`);
   }

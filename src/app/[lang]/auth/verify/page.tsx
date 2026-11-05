@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import { SIGNUP_EMAIL_COOKIE, parseSignupCode } from "@/lib/auth/signup-code";
+import { metaLeadOnFirstEmailVerification } from "@/lib/meta-capi.server";
 import { AuthShell, Field, SubmitButton, ErrorBanner } from "@/components/auth-shell";
 
 // After /sign-up. Supabase's "Confirm signup" template sends a 6-digit code
@@ -33,8 +34,10 @@ export default async function VerifyPage({
     if (!address || !token) redirect(`/${lang}/auth/verify?error=format`);
 
     const supabase = await createClient();
-    const { error } = await supabase.auth.verifyOtp({ email: address, token, type: "signup" });
+    const { data, error } = await supabase.auth.verifyOtp({ email: address, token, type: "signup" });
     if (error) redirect(`/${lang}/auth/verify?error=invalid`);
+    // Meta (Lead): primera verificación del correo, con la elección de Publicidad vigente.
+    await metaLeadOnFirstEmailVerification({ user: data.user, lang });
 
     (await cookies()).delete({ name: SIGNUP_EMAIL_COOKIE, path: `/${lang}/auth/verify` });
     redirect(`/${lang}`);

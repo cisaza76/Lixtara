@@ -4,13 +4,17 @@
 // Al crear el Checkout de Stripe se guardan en su metadata SOLO: idioma, estado de cada
 // categoría de consentimiento y:
 //   - con Analítica aceptada: el client_id y el session_id de GA4 (cookies _ga y _ga_<id>);
-//   - con Publicidad aceptada (decisión del owner 2026-10-24): _fbp y _fbc (Meta) y el gclid
-//     (de la cookie _gcl_aw de Google Ads). Sin Publicidad, ninguno de los tres. Con Global
-//     Privacy Control (header Sec-GPC: 1), la Publicidad cuenta como denegada.
+//   - con Publicidad aceptada (decisión del owner 2026-10-24): _fbp y _fbc (Meta) y gclid,
+//     gbraid y wbraid de Google Ads (pedido del CMO 2026-10-31 y 11-02): primero los de la
+//     URL de llegada guardados en lx_ft; de respaldo, las cookies _gcl_aw (gclid) y _gcl_gb
+//     (gbraid). wbraid solo sale de lx_ft. Sin Publicidad, ninguno. Con Global Privacy Control (header Sec-GPC: 1), la Publicidad
+//     cuenta como denegada.
 // El webhook envía `purchase` solo si: analítica "granted" + Production + Stripe livemode +
-// propiedad no is_test.
+// propiedad no is_test. En Preview (pedido del CMO 2026-11-02), solo las compras de prueba
+// (Stripe en modo de prueba o listing is_test) y con debug_mode: 1, para verlas en DebugView.
 
 import { effectiveConsent, readConsentState } from "@/lib/analytics-config";
+import { FIRST_TOUCH_COOKIE, parseFirstTouchClickIds } from "@/lib/funnel-events";
 
 export type CheckoutAttribution = {
   lang: string;
@@ -22,6 +26,8 @@ export type CheckoutAttribution = {
   fbp?: string;
   fbc?: string;
   gclid?: string;
+  gbraid?: string;
+  wbraid?: string;
 };
 
 function cookie(header: string, name: string): string | null {
@@ -59,6 +65,11 @@ export function googleGclid(value: string | null): string | null {
   return value?.match(/^GCL\.\d{1,13}\.([A-Za-z0-9_-]{1,400})$/)?.[1] ?? null;
 }
 
+/** `_gcl_gb` = GCL.<ts>.<gbraid> (mismo formato que _gcl_aw) → gbraid. */
+export function googleGbraid(value: string | null): string | null {
+  return value?.match(/^GCL\.\d{1,13}\.([A-Za-z0-9_-]{1,400})$/)?.[1] ?? null;
+}
+
 /** Lo que va a la metadata del Checkout. Cada identificador solo con su categoría aceptada. */
 export function checkoutAttribution(
   cookieHeader: string | null,
@@ -84,8 +95,12 @@ export function checkoutAttribution(
     if (fbp) out.fbp = fbp;
     const fbc = metaFbc(cookie(header, "_fbc"));
     if (fbc) out.fbc = fbc;
-    const gclid = googleGclid(cookie(header, "_gcl_aw"));
+    const landing = parseFirstTouchClickIds(cookie(header, FIRST_TOUCH_COOKIE));
+    const gclid = landing.gclid ?? googleGclid(cookie(header, "_gcl_aw"));
     if (gclid) out.gclid = gclid;
+    const gbraid = landing.gbraid ?? googleGbraid(cookie(header, "_gcl_gb"));
+    if (gbraid) out.gbraid = gbraid;
+    if (landing.wbraid) out.wbraid = landing.wbraid;
   }
   return out;
 }
@@ -105,23 +120,29 @@ export function purchaseItem(metadata: Record<string, string> | null | undefined
   return null;
 }
 
-/** ¿Se envía `purchase`? Todas las condiciones a la vez; si falta una, no sale nada. */
-export function shouldSendPurchase(input: {
+/**
+ * ¿Se envía `purchase`, y cómo? Todas las condiciones a la vez; si falta una, no sale nada.
+ *   - "live": Production, Stripe livemode y propiedad no is_test (sin cambios).
+ *   - "debug": Preview, solo una compra de prueba (Stripe en modo de prueba o propiedad
+ *     is_test), con debug_mode: 1.
+ *   - null: nada (también Development / local).
+ */
+export function purchaseSendMode(input: {
   vercelEnv: string | undefined;
   livemode: boolean;
   consent: string | undefined;
   clientId: string | undefined;
   propertyIsTest: boolean | null;
   hasConfig: boolean;
-}): boolean {
-  return (
-    input.hasConfig &&
-    input.vercelEnv === "production" &&
-    input.livemode === true &&
-    input.consent === "granted" &&
-    !!input.clientId &&
-    input.propertyIsTest === false
-  );
+}): "live" | "debug" | null {
+  if (!input.hasConfig || input.consent !== "granted" || !input.clientId) return null;
+  if (input.vercelEnv === "production") {
+    return input.livemode === true && input.propertyIsTest === false ? "live" : null;
+  }
+  if (input.vercelEnv === "preview") {
+    return input.livemode === false || input.propertyIsTest === true ? "debug" : null;
+  }
+  return null;
 }
 
 export function purchasePayload(input: {
@@ -133,6 +154,8 @@ export function purchasePayload(input: {
   value: number;
   currency: string;
   item: PurchaseItem;
+  /** Preview: la compra de prueba va a DebugView. */
+  debugMode?: boolean;
 }) {
   return {
     client_id: input.clientId,
@@ -150,6 +173,7 @@ export function purchasePayload(input: {
           currency: input.currency.toUpperCase(),
           ...(input.sessionId ? { session_id: input.sessionId } : {}),
           engagement_time_msec: 1,
+          ...(input.debugMode ? { debug_mode: 1 } : {}),
           items: [
             {
               item_id: input.item.item_id,

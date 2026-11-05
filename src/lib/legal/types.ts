@@ -49,8 +49,11 @@ export const TERMS_LAST_UPDATED = LEGAL_V3_PUBLISHED;
 /** v4 (2026-10-24): Privacidad y Cookies con la categoría Publicidad (Meta y Google Ads). */
 export const LEGAL_V4_PUBLISHED = "2026-10-24";
 
-/** Cookie Policy v4: categoría Publicidad (_fbp, _fbc, _gcl_au, _gcl_aw), por separado de Analítica. */
-export const COOKIES_LAST_UPDATED = LEGAL_V4_PUBLISHED;
+/** Cookie Policy v5 (2026-11-02): lx_ft con UTM (Analítica) y gclid/gbraid/wbraid (Publicidad); fila de _gcl_gb (2026-11-04, antes de publicarse). */
+export const COOKIES_V5_PUBLISHED = "2026-11-02";
+
+/** Cookie Policy v5 sobre la v4 (categoría Publicidad: _fbp, _fbc, _gcl_au, _gcl_aw, _gcl_gb, aparte de Analítica). */
+export const COOKIES_LAST_UPDATED = COOKIES_V5_PUBLISHED;
 
 /** Disclaimers (Avisos Legales) v2: aviso IDX, valuaciones, registros públicos e IA. */
 export const DISCLAIMERS_LAST_UPDATED = LEGAL_V2_PUBLISHED;

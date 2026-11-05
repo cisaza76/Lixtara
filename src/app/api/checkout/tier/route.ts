@@ -17,6 +17,8 @@ import { gpcEnabled } from "@/lib/analytics-config";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
+import { adIdentifiersFromRequest } from "@/lib/meta-capi";
+import { saveAdAttribution } from "@/lib/meta-capi.server";
 import { createService } from "@/lib/supabase/service";
 import { decideCheckout, type ExistingPayment } from "@/lib/checkout-guard";
 import { checkoutGuardDeps } from "@/lib/checkout-return.server";
@@ -143,6 +145,15 @@ export async function POST(req: Request) {
     console.error(JSON.stringify({ event: "checkout_tier_prior_lookup_failed", property_id: propertyId, message: priorErr.message }));
     return NextResponse.json({ error: "payment_check_unavailable" }, { status: 503 });
   }
+  // Identificadores de Meta para el Purchase (el webhook de Stripe no trae el navegador),
+  // también si se reutiliza una sesión abierta.
+  const adIds = adIdentifiersFromRequest({
+    cookieHeader: req.headers.get("cookie"),
+    xForwardedFor: req.headers.get("x-forwarded-for"),
+    userAgent: req.headers.get("user-agent"),
+    gpc: gpcEnabled(req.headers.get("sec-gpc")),
+  });
+  after(() => saveAdAttribution(user.id, adIds));
   const decision = await decideCheckout(
     (prior ?? []) as ExistingPayment[],
     tier,

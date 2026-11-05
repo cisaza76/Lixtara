@@ -11,6 +11,8 @@ import { isPricingTierId } from "@/lib/pricing-tiers";
 import { recordServerEvent } from "@/lib/analytics.server";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { sendGa4Purchase } from "@/lib/ga4-mp.server";
+import { metaPlanPurchase } from "@/lib/meta-capi.server";
+import { checkoutUsdValue } from "@/lib/checkout-amount";
 
 export type TierFulfillment = "fulfilled" | "already" | "not_paid";
 
@@ -121,6 +123,16 @@ export async function fulfillTierCheckout(
 
   await sendPaymentEmails(db, session, propertyId);
   await sendGa4Purchase(session); // nunca lanza; solo con consentimiento + live + Production
+  // Meta (API de Conversiones): punto único de "pago del plan confirmado". Nunca lanza.
+  await metaPlanPurchase({
+    propertyId,
+    livemode: session.livemode,
+    // Siempre en USD, también con Adaptive Pricing (null = no se sabe en USD: no se envía).
+    value: checkoutUsdValue(session),
+    currency: "usd",
+    tier: paidTier && isPricingTierId(paidTier) ? paidTier : null,
+    lang: session.metadata?.lang ?? null,
+  });
   return "fulfilled";
 }
 

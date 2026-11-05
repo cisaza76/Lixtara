@@ -69,16 +69,31 @@ describe("páginas legales: todas, en los dos idiomas, desde una sola configurac
   });
 
   // Los Términos pasaron a la v3 (2026-10-21): published-v3.test.ts.
-  it("versión 2026-10-18-v2 en Avisos legales, Avisos de corretaje y Accesibilidad; v4 en Privacidad y Cookies", () => {
+  it("Cookies v5: la fila de lx_ft nombra sus dos partes (UTM con Analítica; gclid, gbraid y wbraid con Publicidad)", () => {
+    const row = (lang: "en" | "es", gtm: boolean) =>
+      JSON.stringify(cookiesDocFor(lang, { gtm, posthog: true })).match(/"lx_ft","Lixtara","([^"]+)"/)?.[1] ?? "";
+    expect(row("en", true)).toContain("UTM parameters, only if you accept analytics");
+    expect(row("en", true)).toContain("only if you accept advertising, the Google Ads click identifier from the link you arrived on (gclid, gbraid or wbraid)");
+    expect(row("es", true)).toContain("parámetros UTM, solo si acepta la analítica");
+    expect(row("es", true)).toContain("solo si acepta la publicidad, el identificador del clic de Google Ads del enlace con el que llegó (gclid, gbraid o wbraid)");
+    // Sin GTM no hay Publicidad: la fila no habla de identificadores de clic.
+    for (const lang of ["en", "es"] as const) {
+      expect(row(lang, false)).not.toMatch(/gclid|gbraid|wbraid/);
+      expect(row(lang, false)).toMatch(/UTM/);
+    }
+  });
+
+  it("versión 2026-10-18-v2 en Avisos legales, Avisos de corretaje y Accesibilidad; v4 en Privacidad, v5 en Cookies", () => {
     for (const id of ["disclaimers", "notices", "accessibility"] as const) {
       expect(LEGAL_DOCS[id].version, id).toBe("2026-10-18-v2");
       expect(LEGAL_DOCS[id].updated, id).toBe("2026-10-18");
     }
     // 2026-10-24: categoría Publicidad (Meta y Google Ads).
-    for (const id of ["privacy", "cookies"] as const) {
-      expect(LEGAL_DOCS[id].version, id).toBe("2026-10-24-v4");
-      expect(LEGAL_DOCS[id].updated, id).toBe("2026-10-24");
-    }
+    expect(LEGAL_DOCS.privacy.version).toBe("2026-10-24-v4");
+    expect(LEGAL_DOCS.privacy.updated).toBe("2026-10-24");
+    // 2026-11-02: Cookies v5 (fila de lx_ft con sus dos categorías).
+    expect(LEGAL_DOCS.cookies.version).toBe("2026-11-02-v5");
+    expect(LEGAL_DOCS.cookies.updated).toBe("2026-11-02");
   });
 
   it("el componente muestra la versión y la fecha de LEGAL_DOCS, con anclas y tablas", () => {
@@ -233,7 +248,7 @@ describe("cookies: publicidad solo con consentimiento, en el aviso y en la polí
         if (t.gtm) {
           expect(doc, `${lang} ${JSON.stringify(t)}`).not.toMatch(noAds);
           expect(doc).toMatch(lang === "en" ? /Advertising Cookies \(only with your consent\)/ : /Cookies de Publicidad \(solo con su consentimiento\)/);
-          for (const c of ["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]) expect(doc, c).toContain(c);
+          for (const c of ["_fbp", "_fbc", "_gcl_au", "_gcl_aw", "_gcl_gb"]) expect(doc, c).toContain(c);
         } else {
           expect(doc, `${lang} ${JSON.stringify(t)}`).toMatch(noAds);
         }
@@ -251,10 +266,10 @@ describe("cookies: publicidad solo con consentimiento, en el aviso y en la polí
   it("duraciones de fuentes oficiales: Google 90 días; Meta, aproximadamente 90 días", () => {
     for (const lang of LANGS) {
       const ads = cookiesDocFor(lang, { gtm: true, posthog: false }).sections.find((s) => s.id === "advertising")!;
-      expect(ads.table!.rows.map((r) => r[0])).toEqual(["_fbp", "_fbc", "_gcl_au", "_gcl_aw"]);
+      expect(ads.table!.rows.map((r) => r[0])).toEqual(["_fbp", "_fbc", "_gcl_au", "_gcl_aw", "_gcl_gb"]);
       const d = Object.fromEntries(ads.table!.rows.map((r) => [r[0], r[3]]));
       for (const c of ["_fbp", "_fbc"]) expect(d[c], c).toBe(lang === "en" ? "About 90 days (set by Meta)" : "Aproximadamente 90 días (la fija Meta)");
-      for (const c of ["_gcl_au", "_gcl_aw"]) expect(d[c], c).toBe(lang === "en" ? "90 days (set by Google)" : "90 días (la fija Google)");
+      for (const c of ["_gcl_au", "_gcl_aw", "_gcl_gb"]) expect(d[c], c).toBe(lang === "en" ? "90 days (set by Google)" : "90 días (la fija Google)");
     }
     // Solo fuentes oficiales en el código.
     expect(read("src/lib/legal/cookies.ts")).not.toMatch(/toolongdidntread/);

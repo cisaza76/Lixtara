@@ -193,11 +193,28 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
 - `INSTANTLY_API_KEY` — server-only, **Production only** (Preview shares the production DB: a
   preview with this key could load real leads). Scope `leads:create` or `leads:all`. Read only by
   `src/lib/crm/instantly.server.ts`; unset = the CRM's "send to Instantly" button is disabled.
-- `GA4_MEASUREMENT_ID` / `GA4_MP_API_SECRET` — server-only, **Production only**. GA4 Measurement Protocol
-  (`src/lib/ga4-mp.server.ts`): the Stripe webhook sends `purchase` ONLY with the consent stored in the
-  Checkout metadata = `granted`, Stripe `livemode`, `VERCEL_ENV=production` and a non-`is_test` property
-  (owner decision 2026-10-14). The Checkout metadata carries only lang, consent and the GA4 client/session
-  ids (never `_fbp`/`_fbc`/`gclid`). Either unset = nothing is sent. The secret is created by the owner.
+- `GA4_MEASUREMENT_ID` / `GA4_MP_API_SECRET` — server-only, Production (and Preview only for testing).
+  GA4 Measurement Protocol (`src/lib/ga4-mp.server.ts`, `purchaseSendMode`): the Stripe webhook sends
+  `purchase` ONLY with the consent stored in the Checkout metadata = `granted`, and in Production with Stripe
+  `livemode` and a non-`is_test` property (owner decision 2026-10-14). In Preview it sends only test purchases
+  (Stripe test mode or `is_test` property) with `debug_mode: 1` (CMO, 2026-11-02); never in Development.
+  Advertising identifiers in the Checkout metadata (`fbp`/`fbc`/`gclid`/`gbraid`/`wbraid`) only with
+  Advertising granted and no GPC. Either unset = nothing is sent. The secret is created by the owner.
+- `META_CAPI_ENABLED` / `META_CAPI_TOKEN` / `META_DATASET_ID` / `META_TEST_EVENT_CODE` — server-only. Meta
+  Conversions API (`src/lib/meta-capi.server.ts`, owner decision 2026-10-31): `Lead` (first email verification, any path:
+  step 1, `/sign-up` code, `/auth/callback`, `/auth/confirm`, step 7; once per user, `lead_<user id>`),
+  `CompleteRegistration` (agreement signed, primary seller) and `Purchase` (plan payment confirmed), ONLY with
+  Advertising `granted` and no GPC; hashed email + user id, `_fbp`/`_fbc`, IP and user agent, never listing data.
+  The pixel still never loads on the ads-excluded routes. `ENABLED` stays unset in **Production** until the
+  Privacy §6.2 text (`docs/legal/2026-10-31-meta-capi-memo.md`) is approved and published. The token comes from
+  the CMO (Events Manager) and is set by the owner. `META_TEST_EVENT_CODE` is **Preview only**: in Preview,
+  nothing is sent without it, and in Production nothing is sent with it. In Preview only, `?meta_test_code=TEST…`
+  on any page overrides it for that browser (httpOnly cookie `lx_meta_test`, 1 day; ignored in Production), and
+  staff can re-send a test listing's three events with `POST /api/meta/test-events` (runbook). Identifiers for webhook-time events
+  live in `ad_attribution` (service role only; migration `20261031120000`). IP and user agent are stored only
+  when all three of `ENABLED=true`, token and dataset are set (otherwise only the choice, `_fbp`/`_fbc`); they are
+  deleted 90 days after they are saved or once the plan payment is confirmed, whichever comes first (daily
+  cron `/api/ad-attribution/retention`, `CRON_SECRET`). Graph API version: `src/config/meta.ts`.
 - `EMAIL_FROM` / `EMAIL_REPLY_TO` — server-only. Sender (`"Lixtara <…@lixtara.com>"`, a
   sender on the domain verified in Resend) and reply-to inbox for every email
   (`src/lib/email.ts#emailFrom`). Unset `EMAIL_FROM` = Resend's test sender
