@@ -88,17 +88,33 @@ export async function adIdentifiersFromCurrentRequest(): Promise<AdIdentifiers> 
   });
 }
 
+/** ¿La API de Conversiones puede enviar? META_CAPI_ENABLED = "true", token y conjunto de datos. */
+function capiConfigured(): boolean {
+  const { token, datasetId } = config();
+  return process.env.META_CAPI_ENABLED === "true" && Boolean(token && datasetId);
+}
+
 /**
  * Guarda (o actualiza) los identificadores de la persona para los hitos que llegan sin su
  * navegador (firma por el webhook de DocuSign, pago por el de Stripe). Sin elección en la
  * cookie no toca nada; con Publicidad rechazada (o GPC) borra lo que hubiera.
+ *
+ * La IP y el user agent solo se guardan si la API está encendida y configurada
+ * (capiConfigured): si no, nada los usaría. La elección, fbp y fbc se guardan igual.
  */
 export async function saveAdAttribution(userId: string, ids: AdIdentifiers): Promise<void> {
   if (ids.ads === "unknown") return;
   try {
+    const keepIpUa = capiConfigured();
     const row =
       ids.ads === "granted"
-        ? { ads_consent: "granted", fbp: ids.fbp, fbc: ids.fbc, client_ip: ids.clientIp, client_ua: ids.clientUa }
+        ? {
+            ads_consent: "granted",
+            fbp: ids.fbp,
+            fbc: ids.fbc,
+            client_ip: keepIpUa ? ids.clientIp : null,
+            client_ua: keepIpUa ? ids.clientUa : null,
+          }
         : { ads_consent: "denied", fbp: null, fbc: null, client_ip: null, client_ua: null };
     const { error } = await createService()
       .from("ad_attribution")

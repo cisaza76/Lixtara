@@ -211,7 +211,8 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   nothing is sent without it, and in Production nothing is sent with it. In Preview only, `?meta_test_code=TEST…`
   on any page overrides it for that browser (httpOnly cookie `lx_meta_test`, 1 day; ignored in Production), and
   staff can re-send a test listing's three events with `POST /api/meta/test-events` (runbook). Identifiers for webhook-time events
-  live in `ad_attribution` (service role only; migration `20261031120000`). IP and user agent there are
+  live in `ad_attribution` (service role only; migration `20261031120000`). IP and user agent are stored only
+  when all three of `ENABLED=true`, token and dataset are set (otherwise only the choice, `_fbp`/`_fbc`); they are
   deleted 90 days after they are saved or once the plan payment is confirmed, whichever comes first (daily
   cron `/api/ad-attribution/retention`, `CRON_SECRET`). Graph API version: `src/config/meta.ts`.
 - `EMAIL_FROM` / `EMAIL_REPLY_TO` — server-only. Sender (`"Lixtara <…@lixtara.com>"`, a
