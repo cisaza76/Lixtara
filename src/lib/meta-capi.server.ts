@@ -28,6 +28,7 @@ import {
   listingFlowUrl,
   META_TEST_CODE_COOKIE,
   metaEventId,
+  metaLang,
   resolveTestEventCode,
   shouldSendMeta,
   signUpFlowUrl,
@@ -178,6 +179,31 @@ export async function purgeExpiredIpAndUa(now = new Date()): Promise<number | nu
     throw new Error(`ad_attribution purge: ${error.code ?? error.message}`);
   }
   return (data ?? []).length;
+}
+
+/**
+ * Idioma del recorrido de un listing para los eventos que no salen de una ruta (firma por
+ * webhook, pago por webhook, reenvío): el de la ruta que el embudo guardó en el último paso
+ * (funnel_events.metadata.lang); si no hay, el del gate de correo (seller_leads); si no,
+ * inglés. Nunca lanza.
+ */
+async function listingLang(propertyId: string, ownerId: string): Promise<"en" | "es"> {
+  let fromFunnel: unknown = null;
+  try {
+    const { data } = await createService()
+      .from("funnel_events")
+      .select("metadata")
+      .eq("property_id", propertyId)
+      .not("metadata->>lang", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    fromFunnel = (data as { metadata?: { lang?: unknown } } | null)?.metadata?.lang ?? null;
+  } catch {
+    fromFunnel = null;
+  }
+  if (fromFunnel === "en" || fromFunnel === "es") return fromFunnel;
+  return metaLang(await lookupRecipientLang(ownerId));
 }
 
 async function propertyInfo(propertyId: string) {
@@ -393,13 +419,13 @@ export async function metaCompleteRegistration(input: { propertyId: string; sign
     if (ids.ads !== "granted") return;
     const [{ data: owner }, lang] = await Promise.all([
       createService().auth.admin.getUserById(prop.owner_id),
-      lookupRecipientLang(prop.owner_id),
+      listingLang(input.propertyId, prop.owner_id),
     ]);
     const event = agreementEvent({
       propertyId: input.propertyId,
       ownerId: prop.owner_id,
       email: owner?.user?.email ?? null,
-      lang: lang ?? "en",
+      lang,
       tier: prop.pricing_tier,
       ids,
       at: input.signedAt ? new Date(input.signedAt) : new Date(),
@@ -430,6 +456,8 @@ export async function metaPlanPurchase(input: {
   value: number;
   currency: string;
   tier: string | null;
+  /** Idioma de la página que abrió el Checkout (metadata `lang`), si se conoce. */
+  lang?: string | null;
 }): Promise<void> {
   let ownerId: string | null = null;
   try {
@@ -442,13 +470,13 @@ export async function metaPlanPurchase(input: {
     if (ids.ads !== "granted") return;
     const [{ data: owner }, lang] = await Promise.all([
       createService().auth.admin.getUserById(prop.owner_id),
-      lookupRecipientLang(prop.owner_id),
+      input.lang === "en" || input.lang === "es" ? input.lang : listingLang(input.propertyId, prop.owner_id),
     ]);
     const event = purchaseEvent({
       propertyId: input.propertyId,
       ownerId: prop.owner_id,
       email: owner?.user?.email ?? null,
-      lang: lang ?? "en",
+      lang,
       value: input.value,
       currency: input.currency,
       tier: input.tier ?? prop.pricing_tier ?? "plan",
@@ -484,7 +512,7 @@ export async function resendTestEvents(propertyId: string, testEventCode: string
   const [ids, { data: owner }, lang, { data: agreement }, { data: payment }] = await Promise.all([
     storedIdentifiers(ownerId),
     db.auth.admin.getUserById(ownerId),
-    lookupRecipientLang(ownerId),
+    listingLang(propertyId, ownerId),
     db
       .from("agreements")
       .select("signed_at")
@@ -503,7 +531,7 @@ export async function resendTestEvents(propertyId: string, testEventCode: string
       .maybeSingle(),
   ]);
   const email = owner?.user?.email ?? null;
-  const l = lang ?? "en";
+  const l = lang;
   const signed = agreement as { signed_at: string | null } | null;
   const paid = payment as { amount: number | string | null; currency: string | null; tier: string | null; completed_at: string | null } | null;
 

@@ -175,6 +175,12 @@ export const metaEventId = {
   purchase: (listingId: string) => `purchase_${listingId}`,
 };
 
+/** El primer idioma válido ("en" o "es") de la lista; si no hay ninguno, inglés. */
+export function metaLang(...candidates: unknown[]): "en" | "es" {
+  for (const c of candidates) if (c === "en" || c === "es") return c;
+  return "en";
+}
+
 /** Página de /sign-up (Lead por la creación de cuenta; sin parámetros). */
 export function signUpFlowUrl(siteUrl: string, lang: string): string {
   return `${siteUrl.replace(/\/$/, "")}/${lang === "es" ? "es" : "en"}/sign-up`;
