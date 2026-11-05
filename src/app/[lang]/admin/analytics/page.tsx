@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
+import { METRIC_PAYMENT_COLUMNS, liveRevenue } from "@/lib/admin-metrics";
 
 function sum(rows: Array<Record<string, unknown>> | null, key: string): number {
   return (rows ?? []).reduce((s, r) => s + Number(r[key] ?? 0), 0);
@@ -37,10 +38,15 @@ export default async function AdminAnalyticsPage({
     { count: hotLeads },
     { count: photoOrders },
   ] = await Promise.all([
-    supabase.from("payments").select("amount").eq("status", "succeeded"),
-    supabase.from("properties").select("id", { count: "exact", head: true }),
-    headCount("properties", "mls_status", "active"),
-    headCount("transactions", "status", "closed"),
+    // Sin datos de prueba: ni listings is_test ni pagos de Stripe en modo de prueba.
+    supabase.from("payments").select(METRIC_PAYMENT_COLUMNS).eq("status", "succeeded"),
+    supabase.from("properties").select("id", { count: "exact", head: true }).eq("is_test", false),
+    headCount("properties", "mls_status", "active").eq("is_test", false),
+    supabase
+      .from("transactions")
+      .select("id,properties!inner(is_test)", { count: "exact", head: true })
+      .eq("status", "closed")
+      .eq("properties.is_test", false),
     supabase.from("transactions").select("title_referral_fee"),
     supabase.from("consultation_tokens").select("hours_total,hours_used"),
     headCount("consultation_sessions", "status", "completed"),
@@ -51,7 +57,7 @@ export default async function AdminAnalyticsPage({
       .select("id", { count: "exact", head: true }),
   ]);
 
-  const totalRevenue = sum(paidPayments.data, "amount");
+  const totalRevenue = liveRevenue(paidPayments.data);
   const titleReferral = sum(titleFees.data, "title_referral_fee");
   const hoursSold = sum(consultTokens.data, "hours_total");
   const referralRewards = sum(paidReferrals.data, "reward_amount");

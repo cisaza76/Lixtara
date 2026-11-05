@@ -13,6 +13,7 @@ import { assertStaffWithUser } from "@/lib/admin-auth";
 import { fetchSellerContacts } from "@/lib/admin-sellers.server";
 import { fetchSubmittedAt } from "@/lib/admin-submitted.server";
 import { activityText } from "@/lib/admin-activity";
+import { METRIC_PAYMENT_COLUMNS, liveActivity, liveRevenue } from "@/lib/admin-metrics";
 import { shortListingId } from "@/lib/admin-sellers";
 import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
 import { legalPendingMessage } from "@/lib/agreement-legal";
@@ -124,6 +125,8 @@ export default async function AdminPage({
 
   // ── Dashboard KPIs (adapted to the real schema; payments use 'succeeded',
   // transactions have no 'title_order_sent' status so that KPI is omitted) ──
+  // Sin datos de prueba (src/lib/admin-metrics.ts): ni listings is_test ni pagos de Stripe en
+  // modo de prueba. La cola de abajo sí muestra los is_test, con su etiqueta.
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
@@ -141,31 +144,35 @@ export default async function AdminPage({
     supabase
       .from("properties")
       .select("id", { count: "exact", head: true })
-      .eq("mls_status", "pending_approval"),
+      .eq("mls_status", "pending_approval")
+      .eq("is_test", false),
     supabase
       .from("transactions")
-      .select("id", { count: "exact", head: true })
-      .not("status", "in", "(closed,cancelled)"),
+      .select("id,properties!inner(is_test)", { count: "exact", head: true })
+      .not("status", "in", "(closed,cancelled)")
+      .eq("properties.is_test", false),
     supabase
       .from("payments")
-      .select("amount")
+      .select(METRIC_PAYMENT_COLUMNS)
       .eq("status", "succeeded")
       .gte("created_at", monthStart.toISOString()),
+    // Se piden más filas porque las de listings is_test se descartan después.
     supabase
       .from("activity_log")
-      .select("description,action_type,created_at")
+      .select("description,action_type,created_at,properties(is_test)")
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(50),
   ]);
-  const monthRevenue = ((monthPayments ?? []) as Array<{ amount: number }>).reduce(
-    (sum, p) => sum + Number(p.amount ?? 0),
-    0,
+  const monthRevenue = liveRevenue(monthPayments);
+  const activity = liveActivity(
+    (activityRows ?? []) as Array<{
+      description: string | null;
+      action_type: string;
+      created_at: string;
+      properties: { is_test: boolean | null } | Array<{ is_test: boolean | null }> | null;
+    }>,
+    10,
   );
-  const activity = (activityRows ?? []) as Array<{
-    description: string | null;
-    action_type: string;
-    created_at: string;
-  }>;
   const kpis = [
     { label: copy.kpiPendingTasks, value: String(pendingTasksCount ?? 0), href: `/${lang}/admin/tasks`, cta: copy.kpiViewTasks },
     { label: copy.kpiPendingApprovals, value: String(pendingApprovalsCount ?? 0), href: `/${lang}/admin/listings?status=pending_approval`, cta: copy.kpiReviewNow },
