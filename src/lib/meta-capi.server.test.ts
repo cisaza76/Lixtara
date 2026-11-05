@@ -9,6 +9,8 @@ const db = vi.hoisted(() => ({
   purged: [] as { user_id: string }[],
   agreement: null as Record<string, unknown> | null,
   payment: null as Record<string, unknown> | null,
+  funnel: null as Record<string, unknown> | null,
+  recipientLang: "es" as string | null,
 }));
 const jar = vi.hoisted(() => ({ value: null as string | null, reads: 0, throws: false, header: "" }));
 const afterQueue = vi.hoisted(() => [] as Array<() => unknown>);
@@ -23,7 +25,12 @@ vi.mock("@/lib/supabase/service", () => ({
         order: () => q,
         limit: () => q,
         maybeSingle: async () => {
-          const rows: Record<string, unknown> = { properties: db.property, agreements: db.agreement, payments: db.payment };
+          const rows: Record<string, unknown> = {
+            properties: db.property,
+            agreements: db.agreement,
+            payments: db.payment,
+            funnel_events: db.funnel,
+          };
           return { data: table in rows ? rows[table] : db.attribution };
         },
         upsert: async (row: Record<string, unknown>) => {
@@ -43,7 +50,7 @@ vi.mock("@/lib/supabase/service", () => ({
     auth: { admin: { getUserById: async () => ({ data: { user: { email: "Owner@Example.com" } } }) } },
   }),
 }));
-vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => "es" }));
+vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => db.recipientLang }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ cookie: jar.header, "x-forwarded-for": "203.0.113.20", "user-agent": "UA2" }),
   cookies: async () => {
@@ -84,6 +91,8 @@ beforeEach(() => {
   db.purged = [];
   db.agreement = null;
   db.payment = null;
+  db.funnel = null;
+  db.recipientLang = "es";
   jar.value = null;
   jar.reads = 0;
   jar.throws = false;
@@ -439,5 +448,67 @@ describe("Lead en la primera verificación del correo por cualquier vía", () =>
     expect(afterQueue).toHaveLength(0);
     expect(db.upserts).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("lang de los eventos: el de la ruta del recorrido", () => {
+  const langs = () => sent().map((b) => [b.data[0].event_name, b.data[0].custom_data.lang, b.data[0].event_source_url.match(/\/(en|es)\//)?.[1]]);
+  it("CompleteRegistration: el idioma de la ruta que guardó el embudo gana al del gate de correo", async () => {
+    db.funnel = { metadata: { lang: "es" } };
+    db.recipientLang = "en";
+    await metaCompleteRegistration({ propertyId: "prop-1", signedAt: null });
+    expect(langs()).toEqual([["CompleteRegistration", "es", "es"]]);
+  });
+  it("Purchase: el idioma de la página que abrió el Checkout gana; sin él, el del embudo", async () => {
+    db.funnel = { metadata: { lang: "en" } };
+    await metaPlanPurchase({ ...paid(), lang: "es" });
+    db.funnel = { metadata: { lang: "es" } };
+    db.recipientLang = null;
+    await metaPlanPurchase(paid());
+    expect(langs()).toEqual([
+      ["Purchase", "es", "es"],
+      ["Purchase", "es", "es"],
+    ]);
+  });
+  it("sin embudo: el del gate de correo; sin nada: inglés", async () => {
+    db.recipientLang = "es";
+    await metaCompleteRegistration({ propertyId: "prop-1", signedAt: null });
+    db.recipientLang = null;
+    await metaCompleteRegistration({ propertyId: "prop-1", signedAt: null });
+    expect(langs().map((l) => l[1])).toEqual(["es", "en"]);
+  });
+  it("Lead del envío normal: el idioma de la ruta donde se verificó el correo", async () => {
+    db.recipientLang = "en";
+    await metaLeadOnEmailVerified({ userId: "owner-1", email: "o@example.com", propertyId: "prop-1", lang: "es", ids: granted });
+    expect(langs()).toEqual([["Lead", "es", "es"]]);
+  });
+  it("reenvío: los tres con el idioma del recorrido (quien entró por /sign-up no tiene seller_leads)", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    db.property = { is_test: true, owner_id: "owner-1", pricing_tier: "pro" };
+    db.agreement = { signed_at: "2026-11-05T00:28:53Z" };
+    db.payment = { amount: 495, currency: "usd", tier: "pro", completed_at: "2026-11-05T00:30:41Z" };
+    db.funnel = { metadata: { lang: "es" } };
+    db.recipientLang = null;
+    await resendTestEvents("prop-1", "TEST80832");
+    expect(langs()).toEqual([
+      ["Lead", "es", "es"],
+      ["CompleteRegistration", "es", "es"],
+      ["Purchase", "es", "es"],
+    ]);
+  });
+});
+
+describe("Production sin META_CAPI_TOKEN: el flujo sigue normal", () => {
+  beforeEach(() => vi.stubEnv("META_CAPI_TOKEN", ""));
+  it("registro, firma y pago no lanzan ni llaman a Meta; se guarda la elección sin IP ni user agent", async () => {
+    await expect(
+      metaLeadOnEmailVerified({ userId: "owner-1", email: "o@example.com", propertyId: "prop-1", lang: "en", ids: granted }),
+    ).resolves.toBeUndefined();
+    await expect(metaCompleteRegistration({ propertyId: "prop-1", signedAt: null })).resolves.toBeUndefined();
+    await expect(metaPlanPurchase(paid())).resolves.toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(db.upserts).toEqual([
+      expect.objectContaining({ ads_consent: "granted", fbp: FBP, client_ip: null, client_ua: null }),
+    ]);
   });
 });

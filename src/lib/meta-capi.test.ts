@@ -10,6 +10,7 @@ import {
   ipUaRetentionCutoff,
   listingFlowUrl,
   metaEventId,
+  metaLang,
   normalizeEmail,
   sha256Hex,
   resolveTestEventCode,
@@ -250,5 +251,13 @@ describe("primera verificación del correo (emailJustConfirmed)", () => {
       ["src/app/[lang]/listing/new/page.tsx", /if \(!verified\) redirect\([^\n]+\n(\s+\/\/[^\n]*\n)?\s+await metaLeadOnFirstEmailVerification\(\{ user: verifiedUser, lang, propertyId: id \}\);/],
     ];
     for (const [f, re] of wired) expect(readFileSync(f, "utf8"), f).toMatch(re);
+  });
+});
+
+describe("metaLang", () => {
+  it("el primer en/es válido; si no hay, inglés", () => {
+    expect(metaLang(null, "es", "en")).toBe("es");
+    expect(metaLang(undefined, "fr", "en")).toBe("en");
+    expect(metaLang()).toBe("en");
   });
 });

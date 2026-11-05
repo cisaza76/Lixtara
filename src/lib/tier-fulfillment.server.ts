@@ -129,6 +129,7 @@ export async function fulfillTierCheckout(
     value: (session.amount_total ?? 0) / 100,
     currency: session.currency ?? "usd",
     tier: paidTier && isPricingTierId(paidTier) ? paidTier : null,
+    lang: session.metadata?.lang ?? null,
   });
   return "fulfilled";
 }
