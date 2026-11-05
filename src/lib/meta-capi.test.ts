@@ -10,7 +10,10 @@ import {
   metaEventId,
   normalizeEmail,
   sha256Hex,
+  resolveTestEventCode,
   shouldSendMeta,
+  testCodeFromUrl,
+  validTestEventCode,
   type AdIdentifiers,
 } from "@/lib/meta-capi";
 import { AD_IP_UA_RETENTION_DAYS, META_GRAPH_API_VERSION } from "@/config/meta";
@@ -158,7 +161,10 @@ describe("el envío (código)", () => {
     }
   });
   it("test_event_code solo en Preview", () => {
-    expect(server).toContain('process.env.VERCEL_ENV === "preview" && testCode ? { test_event_code: testCode }');
+    expect(server).toContain('const preview = process.env.VERCEL_ENV === "preview";');
+    expect(server).toContain("...(preview && test.code ? { test_event_code: test.code } : {}),");
+    // La cookie del código de prueba solo se lee en Preview.
+    expect(server).toMatch(/if \(process\.env\.VERCEL_ENV === "preview"\) \{\n\s+try \{\n\s+jar = await nextCookies\(\);/);
   });
   it("los tres hitos están conectados", () => {
     expect(readFileSync("src/app/[lang]/listing/new/page.tsx", "utf8")).toContain("metaLeadOnEmailVerified({ userId: user.id");
@@ -183,5 +189,36 @@ describe("el envío (código)", () => {
     // Al volver de firmar (paso 7) y de pagar (paso 8) se guarda la elección vigente antes del evento.
     const page = readFileSync("src/app/[lang]/listing/new/page.tsx", "utf8");
     expect(page.match(/await saveAdAttribution\(sessionUser\.id, await adIdentifiersFromCurrentRequest\(\)\)/g)).toHaveLength(2);
+  });
+});
+
+describe("código de Eventos de prueba por URL (solo Preview)", () => {
+  it("formato: TEST + dígitos; nada más", () => {
+    expect(validTestEventCode("TEST80832")).toBe("TEST80832");
+    expect(validTestEventCode(" TEST80832 ")).toBe("TEST80832");
+    for (const v of ["test80832", "TEST", "TEST12a", "80832", "TEST1234567890123", "", null, undefined]) {
+      expect(validTestEventCode(v), String(v)).toBeNull();
+    }
+  });
+  it("de la URL solo en Preview", () => {
+    expect(testCodeFromUrl("preview", "TEST80832")).toBe("TEST80832");
+    expect(testCodeFromUrl("production", "TEST80832")).toBeNull();
+    expect(testCodeFromUrl(undefined, "TEST80832")).toBeNull();
+  });
+  it("Preview: la cookie válida gana a la variable; inválida o sin cookie, la variable", () => {
+    const r = (cookie: string | null, env?: string) => resolveTestEventCode({ vercelEnv: "preview", envValue: env, cookieValue: () => cookie });
+    expect(r("TEST80832", "TEST36176")).toEqual({ code: "TEST80832", source: "cookie" });
+    expect(r("nope", "TEST36176")).toEqual({ code: "TEST36176", source: "env" });
+    expect(r(null, undefined)).toEqual({ code: undefined, source: null });
+  });
+  it("Production: la cookie ni se lee; solo la variable (que apaga el envío)", () => {
+    let read = 0;
+    const cookieValue = () => {
+      read++;
+      return "TEST80832";
+    };
+    expect(resolveTestEventCode({ vercelEnv: "production", envValue: undefined, cookieValue })).toEqual({ code: undefined, source: null });
+    expect(resolveTestEventCode({ vercelEnv: "production", envValue: "TEST1", cookieValue }).code).toBe("TEST1");
+    expect(read).toBe(0);
   });
 });

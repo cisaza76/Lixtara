@@ -15,7 +15,8 @@
 //   - Solo em y external_id (SHA-256), fbp, fbc, IP y user agent. Nada del inmueble ni del
 //     listing, ni nombre ni teléfono. event_source_url sin parámetros.
 //   - Apagada en Production (META_CAPI_ENABLED) hasta que el texto de §6.2 esté aprobado y
-//     publicado. En Preview, solo con META_TEST_EVENT_CODE (Eventos de prueba).
+//     publicado. En Preview, solo con código de Eventos de prueba: el de la URL
+//     (?meta_test_code=TEST…, guardado en una cookie) o, si no hay, META_TEST_EVENT_CODE.
 
 import { createHash } from "node:crypto";
 import { effectiveConsent, readConsentState, sanitizeUrl } from "@/lib/analytics-config";
@@ -175,6 +176,45 @@ export const metaEventId = {
 /** Página del registro donde ocurre cada hito (sin parámetros: nunca un id). */
 export function listingFlowUrl(siteUrl: string, lang: string): string {
   return `${siteUrl.replace(/\/$/, "")}/${lang === "es" ? "es" : "en"}/listing/new`;
+}
+
+/**
+ * Código de Eventos de prueba por URL, solo en Preview: Meta lo cambia cada vez que se abre
+ * Eventos de prueba, así que quien prueba lo pasa con ?meta_test_code=TEST… y el proxy lo
+ * guarda en una cookie httpOnly de un día. En Production ni el parámetro ni la cookie se
+ * leen ni se escriben.
+ */
+export const META_TEST_CODE_PARAM = "meta_test_code";
+export const META_TEST_CODE_COOKIE = "lx_meta_test";
+export const META_TEST_CODE_MAX_AGE = 24 * 60 * 60;
+
+/** "TEST" + dígitos (lo que muestra Eventos de prueba); cualquier otra cosa, null. */
+export function validTestEventCode(value: string | null | undefined): string | null {
+  const v = value?.trim() ?? "";
+  return /^TEST\d{1,12}$/.test(v) ? v : null;
+}
+
+/** Qué guardar en la cookie a partir de la URL: solo en Preview y con formato válido. */
+export function testCodeFromUrl(vercelEnv: string | undefined, param: string | null): string | null {
+  return vercelEnv === "preview" ? validTestEventCode(param) : null;
+}
+
+/**
+ * Código vigente: en Preview, el de la cookie (válido) y si no, la variable; fuera de
+ * Preview, solo la variable (que en Production apaga el envío). `cookieValue` es una
+ * función para que fuera de Preview la cookie ni se lea.
+ */
+export function resolveTestEventCode(input: {
+  vercelEnv: string | undefined;
+  envValue: string | undefined;
+  cookieValue: () => string | null | undefined;
+}): { code: string | undefined; source: "cookie" | "env" | null } {
+  const env = input.envValue?.trim() || undefined;
+  if (input.vercelEnv === "preview") {
+    const fromCookie = validTestEventCode(input.cookieValue());
+    if (fromCookie) return { code: fromCookie, source: "cookie" };
+  }
+  return { code: env, source: env ? "env" : null };
 }
 
 /** Desde cuándo una IP y un user agent guardados ya no se usan ni se conservan. */

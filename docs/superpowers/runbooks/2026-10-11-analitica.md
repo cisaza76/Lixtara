@@ -153,8 +153,14 @@ Detalle de cada regla:
    - **Variables:**
      - `META_CAPI_ENABLED`: apagada en Production hasta publicar el texto de Privacidad §6.2 (`docs/legal/2026-10-31-meta-capi-memo.md`).
      - `META_CAPI_TOKEN`, `META_DATASET_ID`.
-     - `META_TEST_EVENT_CODE`: solo Preview.
+     - `META_TEST_EVENT_CODE`: solo Preview. Meta cambia el código cada vez que se abre Eventos de prueba; ver abajo.
    - **Graph API:** `src/config/meta.ts`.
+   - **Prueba en Preview (2026-11-04):**
+     - **Código por URL:** abrir cualquier página del preview con `?meta_test_code=TEST12345` (el que muestra Eventos de prueba). El proxy lo guarda en la cookie httpOnly `lx_meta_test` (path `/`, 1 día) y los eventos de ese navegador lo usan en lugar de `META_TEST_EVENT_CODE`. Solo "TEST" + dígitos. En Production el parámetro y la cookie ni se leen ni se escriben.
+     - **Qué eventos lo toman:** los que salen de una petición del navegador: `Lead` (verificar el correo del paso 1), `CompleteRegistration` (al volver de firmar, paso 7, o `POST /api/agreement/sync`) y `Purchase` (al volver de pagar, paso 8). Los webhooks no llevan cookie y usan la variable; además, en Preview no llegan a esta rama: el de DocuSign va a `lixtara.com` y el de Stripe (modo de prueba) a `preview.lixtara.com`, que apunta a la rama que tenga ese alias. Si ese webhook cumple el pago antes que el regreso del paso 8, el `Purchase` de esta rama no sale (el pago ya está cumplido): usar el reenvío.
+     - **Reenvío sin repetir el recorrido:** `POST /api/meta/test-events` con `{"listing_id": "<uuid>", "test_event_code": "TEST12345"}`, con sesión de admin o broker, solo en Preview y solo para un listing `is_test`. Reenvía `Lead`, `CompleteRegistration` (si está firmado) y `Purchase` (si hay un pago `succeeded`) con sus mismos `event_id` y lo guardado en `ad_attribution` (la IP y el user agent pueden faltar: se borran al pagar). Devuelve por evento HTTP, `events_received`, `fbtrace_id` y el error de Meta. No guarda ni borra nada. Fuera de Preview, 404.
+     - **Logs:** cada envío deja `{"event":"meta_capi", name, event_id, status, events_received, fbtrace_id, error, attempt}` y, solo en Preview, `test_event_code` y `test_code_source` (`cookie`, `env` o `request`).
+     - **`Lead` y cuentas ya verificadas:** sale solo al verificar el correo con el código del paso 1. Quien empieza el registro con una sesión cuyo correo ya está confirmado (por ejemplo, después de `/sign-up`) no pasa por ese código y no genera `Lead`.
 7. **Valores viejos de `lx_consent`:** `granted` / `denied` (antes de la v4, solo analítica) se leen con Publicidad **denegada** y el banner no vuelve a salir; quien quiera publicidad la acepta en "Configurar cookies".
 8. **Global Privacy Control:** con `navigator.globalPrivacyControl === true`, la Publicidad queda denegada (`effectiveConsent`): las tres señales `ad_*` y `lx_ads_consent` quedan en `denied`, el banner no deja aceptarla y lo dice en esa categoría, y la metadata de Stripe la trata como denegada si el request trae `Sec-GPC: 1`. La Analítica no cambia.
 

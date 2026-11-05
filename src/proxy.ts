@@ -8,6 +8,7 @@ import {
   matchListingDetailPath,
 } from "@/lib/routing/listing-http-status";
 import { PATHNAME_HEADER } from "@/lib/seo";
+import { META_TEST_CODE_COOKIE, META_TEST_CODE_MAX_AGE, META_TEST_CODE_PARAM, testCodeFromUrl } from "@/lib/meta-capi";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -54,6 +55,19 @@ export async function proxy(request: NextRequest) {
   }
 
   const { response } = await updateSession(request, { [PATHNAME_HEADER]: pathname });
+  // Meta, Eventos de prueba: ?meta_test_code=TEST… solo en Preview (en Production ni se lee).
+  if (process.env.VERCEL_ENV === "preview") {
+    const code = testCodeFromUrl(process.env.VERCEL_ENV, request.nextUrl.searchParams.get(META_TEST_CODE_PARAM));
+    if (code) {
+      response.cookies.set(META_TEST_CODE_COOKIE, code, {
+        path: "/",
+        maxAge: META_TEST_CODE_MAX_AGE,
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+      });
+    }
+  }
   return response;
 }
 
