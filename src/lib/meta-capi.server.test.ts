@@ -7,14 +7,23 @@ const db = vi.hoisted(() => ({
   upserts: [] as Record<string, unknown>[],
   updates: [] as Record<string, unknown>[],
   purged: [] as { user_id: string }[],
+  agreement: null as Record<string, unknown> | null,
+  payment: null as Record<string, unknown> | null,
 }));
+const jar = vi.hoisted(() => ({ value: null as string | null, reads: 0, throws: false }));
 vi.mock("@/lib/supabase/service", () => ({
   createService: () => ({
     from: (table: string) => {
       const q = {
         select: () => q,
         eq: () => q,
-        maybeSingle: async () => ({ data: table === "properties" ? db.property : db.attribution }),
+        not: () => q,
+        order: () => q,
+        limit: () => q,
+        maybeSingle: async () => {
+          const rows: Record<string, unknown> = { properties: db.property, agreements: db.agreement, payments: db.payment };
+          return { data: table in rows ? rows[table] : db.attribution };
+        },
         upsert: async (row: Record<string, unknown>) => {
           db.upserts.push(row);
           return { error: null };
@@ -33,13 +42,21 @@ vi.mock("@/lib/supabase/service", () => ({
   }),
 }));
 vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => "es" }));
-vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers(),
+  cookies: async () => {
+    jar.reads++;
+    if (jar.throws) throw new Error("outside a request scope");
+    return { get: (name: string) => (name === "lx_meta_test" && jar.value ? { value: jar.value } : undefined) };
+  },
+}));
 
 import {
   metaCompleteRegistration,
   metaLeadOnEmailVerified,
   metaPlanPurchase,
   purgeExpiredIpAndUa,
+  resendTestEvents,
   saveAdAttribution,
 } from "@/lib/meta-capi.server";
 
@@ -62,6 +79,11 @@ beforeEach(() => {
   db.upserts = [];
   db.updates = [];
   db.purged = [];
+  db.agreement = null;
+  db.payment = null;
+  jar.value = null;
+  jar.reads = 0;
+  jar.throws = false;
   fetchMock.mockClear();
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -206,5 +228,113 @@ describe("borrado diario de IP y user agent (cron)", () => {
     db.purged = [{ user_id: "a" }, { user_id: "b" }];
     await expect(purgeExpiredIpAndUa(new Date("2026-11-01T00:00:00Z"))).resolves.toBe(2);
     expect(db.updates[0]).toEqual({ client_ip: null, client_ua: null });
+  });
+});
+
+describe("código de Eventos de prueba (Preview: el de la URL, guardado en la cookie)", () => {
+  const logs = () =>
+    vi.mocked(console.log).mock.calls.map((c) => JSON.parse(String(c[0]))).filter((l) => l.event === "meta_capi");
+  beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("META_TEST_EVENT_CODE", "TEST36176");
+    db.property = { is_test: true, owner_id: "owner-1", pricing_tier: "pro" };
+  });
+  it("la cookie válida gana a la variable, y el log lleva la respuesta de Meta y el código usado", async () => {
+    jar.value = "TEST80832";
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ events_received: 1, fbtrace_id: "AbC123" }), { status: 200 }));
+    await metaPlanPurchase(paid(false));
+    expect(sent()[0].test_event_code).toBe("TEST80832");
+    expect(logs()[0]).toMatchObject({
+      name: "Purchase",
+      event_id: "purchase_prop-1",
+      status: 200,
+      events_received: 1,
+      fbtrace_id: "AbC123",
+      error: null,
+      test_event_code: "TEST80832",
+      test_code_source: "cookie",
+    });
+  });
+  it("un 400 de Meta queda en el log con su código de error y fbtrace_id", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { message: "Invalid parameter", type: "OAuthException", code: 100, error_subcode: 2804003, fbtrace_id: "XyZ" } }), { status: 400 }),
+    );
+    await metaPlanPurchase(paid(false));
+    expect(logs()[0]).toMatchObject({ status: 400, events_received: null, fbtrace_id: "XyZ", error: { code: 100, subcode: 2804003, type: "OAuthException" }, test_code_source: "env" });
+  });
+  it("cookie con otro formato: se usa la variable", async () => {
+    jar.value = "TEST80832; injected";
+    await metaPlanPurchase(paid(false));
+    expect(sent()[0].test_event_code).toBe("TEST36176");
+  });
+  it("sin petición (webhook): cookies() falla y queda la variable", async () => {
+    jar.throws = true;
+    await metaCompleteRegistration({ propertyId: "prop-1", signedAt: null });
+    expect(sent()[0].test_event_code).toBe("TEST36176");
+  });
+  it("Production: la cookie ni se lee y el envío no lleva código de prueba", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("META_TEST_EVENT_CODE", "");
+    db.property = { is_test: false, owner_id: "owner-1", pricing_tier: "pro" };
+    jar.value = "TEST80832";
+    await metaPlanPurchase(paid());
+    await metaCompleteRegistration({ propertyId: "prop-1", signedAt: null });
+    expect(jar.reads).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const b of sent()) expect(b).not.toHaveProperty("test_event_code");
+    for (const l of logs()) expect(l).not.toHaveProperty("test_event_code");
+  });
+});
+
+describe("reenvío de validación (resendTestEvents)", () => {
+  beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("META_TEST_EVENT_CODE", "");
+    db.property = { is_test: true, owner_id: "owner-1", pricing_tier: "pro" };
+    db.agreement = { signed_at: "2026-11-05T00:28:53Z" };
+    db.payment = { amount: 495, currency: "usd", tier: "pro", completed_at: "2026-11-05T00:30:41Z" };
+    // IP y user agent ya borrados al pagar.
+    db.attribution = { ads_consent: "granted", fbp: null, fbc: null, client_ip: null, client_ua: null, updated_at: new Date().toISOString() };
+  });
+  it("los tres eventos, mismos event_id, con el código dado y la respuesta de Meta por evento", async () => {
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ events_received: 1, fbtrace_id: "T1" }), { status: 200 }));
+    const out = await resendTestEvents("prop-1", "TEST80832");
+    expect(out).toEqual([
+      { name: "Lead", event_id: "lead_owner-1", sent: true, status: 200, events_received: 1, fbtrace_id: "T1", error: null },
+      { name: "CompleteRegistration", event_id: "agreement_prop-1", sent: true, status: 200, events_received: 1, fbtrace_id: "T1", error: null },
+      { name: "Purchase", event_id: "purchase_prop-1", sent: true, status: 200, events_received: 1, fbtrace_id: "T1", error: null },
+    ]);
+    const bodies = sent();
+    expect(bodies.map((b) => b.test_event_code)).toEqual(["TEST80832", "TEST80832", "TEST80832"]);
+    expect(bodies[1].data[0].event_time).toBe(Date.UTC(2026, 10, 5, 0, 28, 53) / 1000);
+    expect(bodies[2].data[0].custom_data).toMatchObject({ value: 495, currency: "USD", content_ids: ["pro"] });
+    expect(bodies[2].data[0].user_data).not.toHaveProperty("client_ip_address");
+    // No guarda ni borra nada.
+    expect(db.upserts).toHaveLength(0);
+    expect(db.updates).toHaveLength(0);
+  });
+  it("sin firma o sin pago: esos eventos no salen y dice por qué", async () => {
+    db.agreement = null;
+    db.payment = null;
+    const out = await resendTestEvents("prop-1", "TEST80832");
+    expect(out).toMatchObject([
+      { name: "Lead", sent: true },
+      { name: "CompleteRegistration", sent: false, reason: "agreement_not_signed" },
+      { name: "Purchase", sent: false, reason: "no_succeeded_payment" },
+    ]);
+  });
+  it("Publicidad guardada como rechazada: no sale ninguno", async () => {
+    db.attribution = { ads_consent: "denied", fbp: null, fbc: null, client_ip: null, client_ua: null, updated_at: null };
+    const out = await resendTestEvents("prop-1", "TEST80832");
+    expect(out).toMatchObject([{ reason: "ads_denied" }, { reason: "ads_denied" }, { reason: "ads_denied" }]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("solo listings is_test y solo en Preview", async () => {
+    db.property = { is_test: false, owner_id: "owner-1", pricing_tier: "pro" };
+    await expect(resendTestEvents("prop-1", "TEST80832")).resolves.toBe("not_allowed");
+    db.property = { is_test: true, owner_id: "owner-1", pricing_tier: "pro" };
+    vi.stubEnv("VERCEL_ENV", "production");
+    await expect(resendTestEvents("prop-1", "TEST80832")).resolves.toBe("not_allowed");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createService } from "@/lib/supabase/service";
 import { SITE_URL } from "@/lib/config";
-import { adIdentifiersFromCurrentRequest, metaLeadOnEmailVerified, saveAdAttribution } from "@/lib/meta-capi.server";
+import { adIdentifiersFromCurrentRequest, currentTestCode, metaLeadOnEmailVerified, saveAdAttribution } from "@/lib/meta-capi.server";
 import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
 import { agreementSignedBySeller } from "@/lib/step-progress";
@@ -904,7 +904,8 @@ export default async function ListingNewPage({
     // API de Conversiones de Meta (Lead): la cookie de esta petición, leída aquí; el envío,
     // después de responder. Sin Publicidad aceptada no sale nada.
     const adIds = await adIdentifiersFromCurrentRequest();
-    after(() => metaLeadOnEmailVerified({ userId: user.id, email: user.email, propertyId: id, lang, ids: adIds }));
+    const testCode = await currentTestCode(); // Preview: el código de Eventos de prueba de la URL
+    after(() => metaLeadOnEmailVerified({ userId: user.id, email: user.email, propertyId: id, lang, ids: adIds, testCode }));
     redirect(`/${lang}/listing/new?id=${id}&step=2&ev=email_verified_gate`);
   }
 
