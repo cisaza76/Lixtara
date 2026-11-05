@@ -13,6 +13,7 @@ import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createTierCheckoutSession, expireCheckoutSession } from "@/lib/stripe";
 import { checkoutAttribution } from "@/lib/ga4-attribution";
+import { gpcEnabled } from "@/lib/analytics-config";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { apiLimiter, enforceLimit } from "@/lib/ratelimit";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
@@ -162,7 +163,12 @@ export async function POST(req: Request) {
 
   try {
     const { sessionId, url, livemode } = await createTierCheckoutSession({
-      attribution: checkoutAttribution(req.headers.get("cookie"), process.env.GA4_MEASUREMENT_ID, lang),
+      attribution: checkoutAttribution(
+        req.headers.get("cookie"),
+        process.env.GA4_MEASUREMENT_ID,
+        lang,
+        gpcEnabled(req.headers.get("sec-gpc")),
+      ),
       lang,
       tier,
       propertyId,

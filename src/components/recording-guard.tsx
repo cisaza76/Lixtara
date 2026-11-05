@@ -2,17 +2,21 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { needsFullLoad, readConsent } from "@/lib/analytics-config";
+import { gpcEnabled, needsFullLoad, readConsentState } from "@/lib/analytics-config";
 
 // Clarity (desde GTM) graba la sesión y no tiene una función documentada para detenerse.
 // El contenedor la excluye de /account (y /admin) en la CARGA de página, pero una navegación
 // sin recarga (Link de Next, router.push, redirect() de una server action, atrás/adelante)
 // la dejaría grabando. Decisión del owner (2026-10-16): toda entrada a /account es con carga
 // completa, y toda salida de /account hacia el embudo también (con consentimiento), para
-// que Clarity vuelva a cargarse. Las rutas y la regla viven en analytics-config.
+// que Clarity vuelva a cargarse. Lo mismo con la publicidad aceptada (2026-10-24): al entrar a
+// una ruta sin publicidad y al salir de ella, para que GTM se cargue con las señales de esa
+// ruta. Las rutas y la regla viven en analytics-config.
 
-function consentGranted(): boolean {
-  return readConsent(document.cookie) === "granted";
+function consentGranted(): { analytics: boolean; ads: boolean } {
+  const s = readConsentState(document.cookie);
+  // Con Global Privacy Control la publicidad está denegada en todas partes: no hay que recargar por ella.
+  return { analytics: s?.analytics === "granted", ads: s?.ads === "granted" && !gpcEnabled(navigator) };
 }
 
 export function RecordingGuard() {
