@@ -10,7 +10,9 @@ const db = vi.hoisted(() => ({
   agreement: null as Record<string, unknown> | null,
   payment: null as Record<string, unknown> | null,
 }));
-const jar = vi.hoisted(() => ({ value: null as string | null, reads: 0, throws: false }));
+const jar = vi.hoisted(() => ({ value: null as string | null, reads: 0, throws: false, header: "" }));
+const afterQueue = vi.hoisted(() => [] as Array<() => unknown>);
+vi.mock("next/server", () => ({ after: (fn: () => unknown) => afterQueue.push(fn) }));
 vi.mock("@/lib/supabase/service", () => ({
   createService: () => ({
     from: (table: string) => {
@@ -43,7 +45,7 @@ vi.mock("@/lib/supabase/service", () => ({
 }));
 vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => "es" }));
 vi.mock("next/headers", () => ({
-  headers: async () => new Headers(),
+  headers: async () => new Headers({ cookie: jar.header, "x-forwarded-for": "203.0.113.20", "user-agent": "UA2" }),
   cookies: async () => {
     jar.reads++;
     if (jar.throws) throw new Error("outside a request scope");
@@ -54,6 +56,7 @@ vi.mock("next/headers", () => ({
 import {
   metaCompleteRegistration,
   metaLeadOnEmailVerified,
+  metaLeadOnFirstEmailVerification,
   metaPlanPurchase,
   purgeExpiredIpAndUa,
   resendTestEvents,
@@ -84,6 +87,8 @@ beforeEach(() => {
   jar.value = null;
   jar.reads = 0;
   jar.throws = false;
+  jar.header = "";
+  afterQueue.length = 0;
   fetchMock.mockClear();
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -335,6 +340,72 @@ describe("reenvío de validación (resendTestEvents)", () => {
     db.property = { is_test: true, owner_id: "owner-1", pricing_tier: "pro" };
     vi.stubEnv("VERCEL_ENV", "production");
     await expect(resendTestEvents("prop-1", "TEST80832")).resolves.toBe("not_allowed");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Lead en la primera verificación del correo por cualquier vía", () => {
+  const runAfter = async () => {
+    for (const fn of afterQueue.splice(0)) await fn();
+  };
+  const justNow = (over: Record<string, unknown> = {}) => ({
+    id: "user-9",
+    email: "Seller@Example.com",
+    is_anonymous: false,
+    email_confirmed_at: new Date(Date.now() - 30_000).toISOString(),
+    ...over,
+  });
+  it("vía /sign-up (sin listing): guarda ad_attribution y envía lead_<user id> desde /sign-up", async () => {
+    jar.header = `lx_consent=analytics-granted.ads-granted; _fbp=${FBP}`;
+    await metaLeadOnFirstEmailVerification({ user: justNow(), lang: "es" });
+    await runAfter();
+    expect(db.upserts[0]).toMatchObject({ user_id: "user-9", ads_consent: "granted", fbp: FBP, client_ip: "203.0.113.20", client_ua: "UA2" });
+    const ev = sent()[0].data[0];
+    expect(ev).toMatchObject({
+      event_name: "Lead",
+      event_id: "lead_user-9",
+      custom_data: { content_name: "account_registration", lang: "es" },
+    });
+    expect(ev.event_source_url).toMatch(/\/es\/sign-up$/);
+    expect(JSON.stringify(sent()[0])).not.toMatch(/seller@example\.com/i);
+  });
+  it("vía paso 1 del listing y vía /sign-up: el mismo event_id para la misma persona", async () => {
+    await metaLeadOnEmailVerified({ userId: "user-9", email: "s@example.com", propertyId: "prop-1", lang: "en", ids: granted });
+    jar.header = "lx_consent=analytics-denied.ads-granted";
+    await metaLeadOnFirstEmailVerification({ user: justNow(), lang: "en" });
+    await runAfter();
+    expect(sent().map((b) => b.data[0].event_id)).toEqual(["lead_user-9", "lead_user-9"]);
+    expect(sent()[0].data[0].custom_data.content_name).toBe("listing_registration");
+  });
+  it("vía paso 7 (con listing): usa el listing para is_test y el registro como página", async () => {
+    jar.header = "lx_consent=analytics-granted.ads-granted";
+    db.property = { is_test: true, owner_id: "user-9", pricing_tier: "pro" };
+    await metaLeadOnFirstEmailVerification({ user: justNow(), lang: "en", propertyId: "prop-1" });
+    await runAfter();
+    expect(fetchMock).not.toHaveBeenCalled(); // listing is_test en Production
+    db.property = { is_test: false, owner_id: "user-9", pricing_tier: "pro" };
+    await metaLeadOnFirstEmailVerification({ user: justNow(), lang: "en", propertyId: "prop-1" });
+    await runAfter();
+    expect(sent()[0].data[0]).toMatchObject({ event_id: "lead_user-9", custom_data: { content_name: "listing_registration" } });
+  });
+  it("sin consentimiento de Publicidad: guarda denied y no envía; sin elección: no guarda ni envía", async () => {
+    jar.header = "lx_consent=analytics-granted.ads-denied";
+    await metaLeadOnFirstEmailVerification({ user: justNow(), lang: "en" });
+    await runAfter();
+    expect(db.upserts[0]).toMatchObject({ user_id: "user-9", ads_consent: "denied", fbp: null, client_ip: null });
+    jar.header = "";
+    await metaLeadOnFirstEmailVerification({ user: justNow(), lang: "en" });
+    await runAfter();
+    expect(db.upserts).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("no es la primera verificación (correo confirmado hace días) o sin usuario: no hace nada", async () => {
+    jar.header = "lx_consent=analytics-granted.ads-granted";
+    await metaLeadOnFirstEmailVerification({ user: justNow({ email_confirmed_at: "2026-10-01T00:00:00Z" }), lang: "en" });
+    await metaLeadOnFirstEmailVerification({ user: justNow({ is_anonymous: true }), lang: "en" });
+    await metaLeadOnFirstEmailVerification({ user: null, lang: "en" });
+    expect(afterQueue).toHaveLength(0);
+    expect(db.upserts).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
