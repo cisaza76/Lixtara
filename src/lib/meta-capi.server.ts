@@ -13,6 +13,7 @@
 //     manda el de ?meta_test_code=TEST… (cookie lx_meta_test, la pone el proxy) si lo hay.
 
 import { cookies as nextCookies, headers as nextHeaders } from "next/headers";
+import { after } from "next/server";
 import { createService } from "@/lib/supabase/service";
 import { META_GRAPH_API_VERSION, META_GRAPH_URL } from "@/config/meta";
 import { SITE_URL } from "@/lib/config";
@@ -21,6 +22,7 @@ import { lookupRecipientLang } from "@/lib/email-recipient-lang";
 import {
   adIdentifiersFromRequest,
   buildMetaEvent,
+  emailJustConfirmed,
   ipUaExpired,
   ipUaRetentionCutoff,
   listingFlowUrl,
@@ -28,6 +30,7 @@ import {
   metaEventId,
   resolveTestEventCode,
   shouldSendMeta,
+  signUpFlowUrl,
   type AdIdentifiers,
   type MetaServerEvent,
 } from "@/lib/meta-capi";
@@ -243,16 +246,20 @@ async function post(event: MetaServerEvent, test: TestCode): Promise<MetaSendRes
   return last;
 }
 
-function leadEvent(input: { userId: string; email: string | null; lang: string; ids: AdIdentifiers; at: Date }) {
+/** Dónde se verificó el correo: en el registro de un listing o al crear la cuenta. */
+export type LeadSource = "listing" | "account";
+
+function leadEvent(input: { userId: string; email: string | null; lang: string; ids: AdIdentifiers; at: Date; source?: LeadSource }) {
+  const account = input.source === "account";
   return buildMetaEvent({
     name: "Lead",
     eventId: metaEventId.lead(input.userId),
     eventTime: input.at,
-    sourceUrl: listingFlowUrl(SITE_URL, input.lang),
+    sourceUrl: account ? signUpFlowUrl(SITE_URL, input.lang) : listingFlowUrl(SITE_URL, input.lang),
     email: input.email,
     userId: input.userId,
     ids: input.ids,
-    customData: { content_name: "listing_registration", lang: input.lang === "es" ? "es" : "en" },
+    customData: { content_name: account ? "account_registration" : "listing_registration", lang: input.lang === "es" ? "es" : "en" },
   });
 }
 
@@ -293,15 +300,17 @@ function purchaseEvent(input: { propertyId: string; ownerId: string; email: stri
 }
 
 /**
- * Lead: el vendedor verificó su correo en el paso 1. `ids` sale de la cookie de ESA
+ * Lead: la persona verificó su correo por primera vez (paso 1 del registro, o
+ * metaLeadOnFirstEmailVerification desde las otras vías). `ids` sale de la cookie de ESA
  * petición (adIdentifiersFromCurrentRequest, leída antes de after()); se guardan para la
- * firma y el pago.
+ * firma y el pago. Sin listing (creación de cuenta) cuenta como no is_test.
  */
 export async function metaLeadOnEmailVerified(input: {
   userId: string;
   email: string | null | undefined;
-  propertyId: string;
+  propertyId: string | null;
   lang: string;
+  source?: LeadSource;
   ids: AdIdentifiers;
   /** Leído antes de after() (ahí la cookie ya no se puede leer). */
   testCode?: TestCode;
@@ -309,11 +318,46 @@ export async function metaLeadOnEmailVerified(input: {
   const ids = input.ids;
   try {
     await saveAdAttribution(input.userId, ids);
-    const prop = await propertyInfo(input.propertyId);
+    const prop = input.propertyId ? await propertyInfo(input.propertyId) : null;
     const test = input.testCode ?? (await currentTestCode());
-    if (!allowed(test, prop ? Boolean(prop.is_test) : null)) return;
-    const event = leadEvent({ userId: input.userId, email: input.email ?? null, lang: input.lang, ids, at: new Date() });
+    // Con un listing que no se encuentra: null (no sale en Production).
+    const isTest = input.propertyId ? (prop ? Boolean(prop.is_test) : null) : false;
+    if (!allowed(test, isTest)) return;
+    const event = leadEvent({ userId: input.userId, email: input.email ?? null, lang: input.lang, ids, at: new Date(), source: input.source });
     if (event) await post(event, test);
+  } catch (e) {
+    console.error(JSON.stringify({ event: "meta_capi_failed", name: "Lead", message: e instanceof Error ? e.message : "error" }));
+  }
+}
+
+/**
+ * Lead desde las vías de Supabase Auth (código de /sign-up, /auth/callback, /auth/confirm,
+ * código del paso 7): solo si esa verificación es la PRIMERA del correo (emailJustConfirmed),
+ * con la elección de Publicidad de ESTA petición, guardándola en ad_attribution como el
+ * paso 1. Lee la petición ya y envía después de responder (after). Nunca lanza.
+ */
+export async function metaLeadOnFirstEmailVerification(input: {
+  user: { id: string; is_anonymous?: boolean; email?: string | null; email_confirmed_at?: string | null; confirmed_at?: string | null } | null | undefined;
+  lang: string;
+  propertyId?: string | null;
+}): Promise<void> {
+  try {
+    const user = input.user;
+    if (!user || !emailJustConfirmed(user, new Date())) return;
+    const ids = await adIdentifiersFromCurrentRequest();
+    const testCode = await currentTestCode();
+    const propertyId = input.propertyId ?? null;
+    after(() =>
+      metaLeadOnEmailVerified({
+        userId: user.id,
+        email: user.email,
+        propertyId,
+        lang: input.lang,
+        source: propertyId ? "listing" : "account",
+        ids,
+        testCode,
+      }),
+    );
   } catch (e) {
     console.error(JSON.stringify({ event: "meta_capi_failed", name: "Lead", message: e instanceof Error ? e.message : "error" }));
   }

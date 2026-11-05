@@ -8,7 +8,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createService } from "@/lib/supabase/service";
 import { SITE_URL } from "@/lib/config";
-import { adIdentifiersFromCurrentRequest, currentTestCode, metaLeadOnEmailVerified, saveAdAttribution } from "@/lib/meta-capi.server";
+import {
+  adIdentifiersFromCurrentRequest,
+  currentTestCode,
+  metaLeadOnEmailVerified,
+  metaLeadOnFirstEmailVerification,
+  saveAdAttribution,
+} from "@/lib/meta-capi.server";
 import { apiLimiter } from "@/lib/ratelimit";
 import { AccountGate } from "@/components/account-gate";
 import { agreementSignedBySeller } from "@/lib/step-progress";
@@ -1856,18 +1862,22 @@ export default async function ListingNewPage({
     // flow is resilient to Supabase's exact classification of the upgrade.
     const otpTypes = ["email_change", "email", "signup"] as const;
     let verified = false;
+    let verifiedUser: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>["data"]["user"] = null;
     for (const type of otpTypes) {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         email: pending,
         token,
         type,
       });
       if (!error) {
         verified = true;
+        verifiedUser = data.user;
         break;
       }
     }
     if (!verified) redirect(`${back}&pending=1&cerror=invalid`);
+    // Meta (Lead): quien no pasó por el código del paso 1 confirma aquí su correo por primera vez.
+    await metaLeadOnFirstEmailVerification({ user: verifiedUser, lang, propertyId: id });
 
     redirect(`${back}&verified=1&ev=email_verified_account`);
   }

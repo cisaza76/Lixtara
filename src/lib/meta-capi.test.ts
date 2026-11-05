@@ -4,6 +4,8 @@ import {
   adIdentifiersFromRequest,
   buildMetaEvent,
   clientIpFrom,
+  EMAIL_JUST_CONFIRMED_MS,
+  emailJustConfirmed,
   ipUaExpired,
   ipUaRetentionCutoff,
   listingFlowUrl,
@@ -220,5 +222,33 @@ describe("código de Eventos de prueba por URL (solo Preview)", () => {
     expect(resolveTestEventCode({ vercelEnv: "production", envValue: undefined, cookieValue })).toEqual({ code: undefined, source: null });
     expect(resolveTestEventCode({ vercelEnv: "production", envValue: "TEST1", cookieValue }).code).toBe("TEST1");
     expect(read).toBe(0);
+  });
+});
+
+describe("primera verificación del correo (emailJustConfirmed)", () => {
+  const now = new Date("2026-11-05T12:00:00Z");
+  const u = (at: string | null, over: Record<string, unknown> = {}) => ({ email: "a@example.com", email_confirmed_at: at, ...over });
+  it("confirmado recién: sí; hace más del margen: no", () => {
+    expect(emailJustConfirmed(u("2026-11-05T11:59:00Z"), now)).toBe(true);
+    expect(emailJustConfirmed(u(new Date(now.getTime() - EMAIL_JUST_CONFIRMED_MS - 1000).toISOString()), now)).toBe(false);
+    expect(emailJustConfirmed(u("2026-10-01T00:00:00Z"), now)).toBe(false);
+  });
+  it("sin confirmación, anónimo, sin correo o sin usuario: no", () => {
+    expect(emailJustConfirmed(u(null), now)).toBe(false);
+    expect(emailJustConfirmed(u("2026-11-05T11:59:00Z", { is_anonymous: true }), now)).toBe(false);
+    expect(emailJustConfirmed(u("2026-11-05T11:59:00Z", { email: null }), now)).toBe(false);
+    expect(emailJustConfirmed(null, now)).toBe(false);
+  });
+  it("confirmed_at sirve si falta email_confirmed_at", () => {
+    expect(emailJustConfirmed({ email: "a@example.com", confirmed_at: "2026-11-05T11:58:00Z" }, now)).toBe(true);
+  });
+  it("todas las vías de verificación de Supabase Auth mandan el Lead después de confirmar", () => {
+    const wired: Array<[string, RegExp]> = [
+      ["src/app/[lang]/auth/verify/page.tsx", /verifyOtp\(\{ email: address, token, type: "signup" \}\);\n\s+if \(error\) redirect\([^\n]+\n(\s+\/\/[^\n]*\n)?\s+await metaLeadOnFirstEmailVerification\(\{ user: data\.user, lang \}\);/],
+      ["src/app/[lang]/auth/callback/route.ts", /exchangeCodeForSession\(code\);\n\s+if \(!error\) \{\n(\s+\/\/[^\n]*\n)?\s+await metaLeadOnFirstEmailVerification\(\{ user: data\.user, lang \}\);/],
+      ["src/app/[lang]/auth/confirm/route.ts", /verifyOtp\(\{ token_hash: tokenHash, type \}\);\n\s+if \(!error\) \{\n(\s+\/\/[^\n]*\n)?\s+await metaLeadOnFirstEmailVerification\(\{ user: data\.user, lang \}\);/],
+      ["src/app/[lang]/listing/new/page.tsx", /if \(!verified\) redirect\([^\n]+\n(\s+\/\/[^\n]*\n)?\s+await metaLeadOnFirstEmailVerification\(\{ user: verifiedUser, lang, propertyId: id \}\);/],
+    ];
+    for (const [f, re] of wired) expect(readFileSync(f, "utf8"), f).toMatch(re);
   });
 });

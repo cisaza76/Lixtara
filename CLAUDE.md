@@ -201,7 +201,8 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   Advertising identifiers in the Checkout metadata (`fbp`/`fbc`/`gclid`/`gbraid`/`wbraid`) only with
   Advertising granted and no GPC. Either unset = nothing is sent. The secret is created by the owner.
 - `META_CAPI_ENABLED` / `META_CAPI_TOKEN` / `META_DATASET_ID` / `META_TEST_EVENT_CODE` — server-only. Meta
-  Conversions API (`src/lib/meta-capi.server.ts`, owner decision 2026-10-31): `Lead` (email verified at step 1),
+  Conversions API (`src/lib/meta-capi.server.ts`, owner decision 2026-10-31): `Lead` (first email verification, any path:
+  step 1, `/sign-up` code, `/auth/callback`, `/auth/confirm`, step 7; once per user, `lead_<user id>`),
   `CompleteRegistration` (agreement signed, primary seller) and `Purchase` (plan payment confirmed), ONLY with
   Advertising `granted` and no GPC; hashed email + user id, `_fbp`/`_fbc`, IP and user agent, never listing data.
   The pixel still never loads on the ads-excluded routes. `ENABLED` stays unset in **Production** until the

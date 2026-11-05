@@ -3,7 +3,9 @@
 // meta-capi.server.ts.
 //
 // Tres eventos de servidor, cada uno una vez por persona o listing (event_id estable):
-//   - Lead:                 correo verificado en el paso 1 del registro   → lead_<user id>
+//   - Lead:                 primera verificación del correo, por cualquier vía (paso 1 del
+//                           registro, código o enlace de /sign-up, enlace de acceso, paso 7)
+//                                                                         → lead_<user id>
 //   - CompleteRegistration: el vendedor principal firma el contrato       → agreement_<listing id>
 //   - Purchase:             pago del plan confirmado                      → purchase_<listing id>
 //
@@ -172,6 +174,31 @@ export const metaEventId = {
   agreement: (listingId: string) => `agreement_${listingId}`,
   purchase: (listingId: string) => `purchase_${listingId}`,
 };
+
+/** Página de /sign-up (Lead por la creación de cuenta; sin parámetros). */
+export function signUpFlowUrl(siteUrl: string, lang: string): string {
+  return `${siteUrl.replace(/\/$/, "")}/${lang === "es" ? "es" : "en"}/sign-up`;
+}
+
+/**
+ * Margen para decidir que una verificación es la PRIMERA del correo: la confirmación
+ * (email_confirmed_at) se fija una sola vez, al confirmar; un ingreso posterior por enlace o
+ * código la encuentra vieja. Dos vías dentro de este margen mandan el mismo event_id
+ * (lead_<user id>) y Meta lo deduplica.
+ */
+export const EMAIL_JUST_CONFIRMED_MS = 10 * 60 * 1000;
+
+/** ¿Este usuario acaba de confirmar su correo (primera verificación)? */
+export function emailJustConfirmed(
+  user: { is_anonymous?: boolean; email?: string | null; email_confirmed_at?: string | null; confirmed_at?: string | null } | null | undefined,
+  now: Date,
+): boolean {
+  if (!user || user.is_anonymous === true || !user.email) return false;
+  const at = Date.parse(user.email_confirmed_at ?? user.confirmed_at ?? "");
+  if (!Number.isFinite(at)) return false;
+  const age = now.getTime() - at;
+  return age >= -60_000 && age <= EMAIL_JUST_CONFIRMED_MS;
+}
 
 /** Página del registro donde ocurre cada hito (sin parámetros: nunca un id). */
 export function listingFlowUrl(siteUrl: string, lang: string): string {
