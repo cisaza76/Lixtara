@@ -18,8 +18,8 @@ import { FIRST_TOUCH_COOKIE, FIRST_TOUCH_MAX_AGE_S } from "@/lib/funnel-events";
 // Sin GTM no hay publicidad (Meta y Google Ads solo se cargan desde el contenedor): esa
 // variante dice que no se usan. Nombres y duraciones de NUESTRAS cookies salen de las
 // constantes del código. Duraciones de publicidad, solo fuentes oficiales (2026-10-24): Google,
-// "How Google uses cookies in advertising" (business.safety.google/adscookies): _gcl_au y
-// _gcl_aw, 90 días. Meta no da el plazo de _fbp en una página oficial comprobable, y para _fbc
+// "How Google uses cookies in advertising" (business.safety.google/adscookies): _gcl_au,
+// _gcl_aw y _gcl_gb, 90 días (_gcl_gb comprobada el 2026-11-04). Meta no da el plazo de _fbp en una página oficial comprobable, y para _fbc
 // solo recomienda 90 días a quien la pone desde su servidor (guía de fbp/fbc de la API de
 // Conversiones): las dos van como "aproximadamente 90 días".
 // Clarity: lista de "Clarity Cookies" (Microsoft Learn, actualizada 2025-12-05); Microsoft ya
@@ -240,6 +240,14 @@ function adsRows(lang: Lang): string[][] {
       es
         ? "Guarda el identificador del clic cuando llega desde un anuncio de Google (parámetro gclid), para atribuir el registro o el pago a ese anuncio."
         : "Stores the click identifier when you arrive from a Google ad (gclid parameter), to attribute a sign-up or payment to that ad.",
+      ninety("Google"),
+    ],
+    [
+      "_gcl_gb",
+      google,
+      es
+        ? "Guarda el identificador del clic que Google usa en lugar de gclid en algunos casos, por ejemplo en iPhone (parámetro gbraid), cuando llega desde un anuncio de Google, para atribuir el registro o el pago a ese anuncio."
+        : "Stores the click identifier Google uses instead of gclid in some cases, for example on iPhone (gbraid parameter), when you arrive from a Google ad, to attribute a sign-up or payment to that ad.",
       ninety("Google"),
     ],
   ];
