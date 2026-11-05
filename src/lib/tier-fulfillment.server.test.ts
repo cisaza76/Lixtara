@@ -11,7 +11,7 @@ vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => 
 vi.mock("@/lib/analytics.server", () => ({ recordServerEvent: () => {} }));
 vi.mock("@/lib/funnel-events.server", () => ({ recordFunnelEvent }));
 vi.mock("@/lib/ga4-mp.server", () => ({ sendGa4Purchase }));
-const metaPlanPurchase = vi.fn(async (_input: unknown) => {});
+const metaPlanPurchase = vi.fn<(input: unknown) => Promise<void>>(async () => {});
 vi.mock("@/lib/meta-capi.server", () => ({ metaPlanPurchase }));
 
 const { fulfillTierCheckout, isTierSession } = await import("@/lib/tier-fulfillment.server");
