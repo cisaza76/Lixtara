@@ -9,6 +9,7 @@
 
 import type Stripe from "stripe";
 import { createService } from "@/lib/supabase/service";
+import { checkoutUsdValue } from "@/lib/checkout-amount";
 import { purchaseItem, purchasePayload, purchaseSendMode } from "@/lib/ga4-attribution";
 
 export async function sendGa4Purchase(session: Stripe.Checkout.Session): Promise<void> {
@@ -41,6 +42,12 @@ export async function sendGa4Purchase(session: Stripe.Checkout.Session): Promise
       hasConfig: Boolean(measurementId && apiSecret),
     });
     if (!mode) return;
+    // Siempre en USD (Adaptive Pricing puede cobrar en otra moneda): ver checkout-amount.ts.
+    const value = checkoutUsdValue(session);
+    if (value === null) {
+      console.error(JSON.stringify({ event: "ga4_purchase_skipped", reason: "no_usd_amount", currency: session.currency ?? null }));
+      return;
+    }
 
     const url = `https://www.google-analytics.com/mp/collect?measurement_id=${encodeURIComponent(
       measurementId!,
@@ -54,8 +61,8 @@ export async function sendGa4Purchase(session: Stripe.Checkout.Session): Promise
           adsConsent: md.ads_consent,
           sessionId: md.ga_session_id,
           transactionId: session.id,
-          value: (session.amount_total ?? 0) / 100,
-          currency: session.currency ?? "usd",
+          value,
+          currency: "usd",
           item,
           debugMode: mode === "debug",
         }),

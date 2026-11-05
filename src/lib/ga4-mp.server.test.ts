@@ -39,6 +39,29 @@ describe("sendGa4Purchase", () => {
     expect(body.events[0].params).toMatchObject({ transaction_id: "cs_live_1", value: 495, currency: "USD" });
   });
 
+  it("sesión cobrada en COP (Adaptive Pricing): value y currency en USD, de currency_conversion", async () => {
+    configure();
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetch);
+    await sendGa4Purchase({
+      ...session,
+      amount_total: 198_000_000,
+      currency: "cop",
+      currency_conversion: { amount_subtotal: 49500, amount_total: 49500, fx_rate: "4000", source_currency: "usd" },
+    } as unknown as Stripe.Checkout.Session);
+    const body = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(body.events[0].params).toMatchObject({ value: 495, currency: "USD" });
+  });
+
+  it("moneda distinta de USD sin conversión: no envía un valor en otra moneda", async () => {
+    configure();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetch);
+    await sendGa4Purchase({ ...session, amount_total: 198_000_000, currency: "cop" } as Stripe.Checkout.Session);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("nunca lanza si GA4 falla (el webhook de Stripe responde 200 igual)", async () => {
     configure();
     vi.spyOn(console, "error").mockImplementation(() => {});

@@ -452,8 +452,8 @@ export async function metaPlanPurchase(input: {
   propertyId: string;
   /** Stripe livemode del pago (Production no envía pagos de prueba). */
   livemode: boolean;
-  /** Monto cobrado, en la unidad de la moneda (495, no 49500). */
-  value: number;
+  /** Monto cobrado en USD (495, no 49500); null = no se sabe en USD y el evento no sale. */
+  value: number | null;
   currency: string;
   tier: string | null;
   /** Idioma de la página que abrió el Checkout (metadata `lang`), si se conoce. */
@@ -468,6 +468,11 @@ export async function metaPlanPurchase(input: {
     if (!allowed(test, Boolean(prop.is_test), input.livemode)) return;
     const ids = await storedIdentifiers(prop.owner_id);
     if (ids.ads !== "granted") return;
+    if (input.value === null) {
+      console.error(JSON.stringify({ event: "meta_capi_skipped", name: "Purchase", reason: "no_usd_amount" }));
+      return;
+    }
+    const value = input.value;
     const [{ data: owner }, lang] = await Promise.all([
       createService().auth.admin.getUserById(prop.owner_id),
       input.lang === "en" || input.lang === "es" ? input.lang : listingLang(input.propertyId, prop.owner_id),
@@ -477,7 +482,7 @@ export async function metaPlanPurchase(input: {
       ownerId: prop.owner_id,
       email: owner?.user?.email ?? null,
       lang,
-      value: input.value,
+      value,
       currency: input.currency,
       tier: input.tier ?? prop.pricing_tier ?? "plan",
       ids,
@@ -564,7 +569,8 @@ export async function resendTestEvents(propertyId: string, testEventCode: string
           ids,
           at: paid!.completed_at ? new Date(paid!.completed_at) : new Date(),
         }),
-      missing: paid ? null : "no_succeeded_payment",
+      // payments.amount está en la moneda cobrada: solo se reenvía si es USD.
+      missing: !paid ? "no_succeeded_payment" : (paid.currency ?? "usd").toLowerCase() !== "usd" ? "non_usd_payment" : null,
     },
   ];
 

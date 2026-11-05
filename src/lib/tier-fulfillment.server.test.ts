@@ -11,6 +11,8 @@ vi.mock("@/lib/email-recipient-lang", () => ({ lookupRecipientLang: async () => 
 vi.mock("@/lib/analytics.server", () => ({ recordServerEvent: () => {} }));
 vi.mock("@/lib/funnel-events.server", () => ({ recordFunnelEvent }));
 vi.mock("@/lib/ga4-mp.server", () => ({ sendGa4Purchase }));
+const metaPlanPurchase = vi.fn(async (_input: unknown) => {});
+vi.mock("@/lib/meta-capi.server", () => ({ metaPlanPurchase }));
 
 const { fulfillTierCheckout, isTierSession } = await import("@/lib/tier-fulfillment.server");
 
@@ -83,6 +85,22 @@ describe("fulfillTierCheckout: una vez por sesión (webhook + regreso del paso 8
     );
     expect(sendPaymentReceipt).toHaveBeenCalledOnce();
     expect(sendGa4Purchase).toHaveBeenCalledOnce();
+  });
+
+  it("Meta Purchase siempre en USD: la sesión cobrada en COP (Adaptive Pricing) manda el total de origen", async () => {
+    const { db } = fakeDb({ payment: "pending" });
+    await fulfillTierCheckout(
+      db,
+      session({
+        amount_total: 198_000_000,
+        currency: "cop",
+        currency_conversion: { amount_subtotal: 49500, amount_total: 49500, fx_rate: "4000", source_currency: "usd" },
+      } as unknown as Partial<Stripe.Checkout.Session>),
+    );
+    expect(metaPlanPurchase).toHaveBeenCalledWith(expect.objectContaining({ value: 495, currency: "usd" }));
+    const { db: db2 } = fakeDb({ payment: "pending" });
+    await fulfillTierCheckout(db2, session());
+    expect(metaPlanPurchase).toHaveBeenLastCalledWith(expect.objectContaining({ value: 495, currency: "usd" }));
   });
 
   it("segunda llamada (el otro camino llega después): 'already', sin repetir correos ni eventos", async () => {

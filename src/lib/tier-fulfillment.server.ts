@@ -12,6 +12,7 @@ import { recordServerEvent } from "@/lib/analytics.server";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { sendGa4Purchase } from "@/lib/ga4-mp.server";
 import { metaPlanPurchase } from "@/lib/meta-capi.server";
+import { checkoutUsdValue } from "@/lib/checkout-amount";
 
 export type TierFulfillment = "fulfilled" | "already" | "not_paid";
 
@@ -126,8 +127,9 @@ export async function fulfillTierCheckout(
   await metaPlanPurchase({
     propertyId,
     livemode: session.livemode,
-    value: (session.amount_total ?? 0) / 100,
-    currency: session.currency ?? "usd",
+    // Siempre en USD, también con Adaptive Pricing (null = no se sabe en USD: no se envía).
+    value: checkoutUsdValue(session),
+    currency: "usd",
     tier: paidTier && isPricingTierId(paidTier) ? paidTier : null,
     lang: session.metadata?.lang ?? null,
   });
