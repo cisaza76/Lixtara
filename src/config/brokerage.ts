@@ -4,7 +4,10 @@
 // Verificados en el DBPR de Florida el 2026-09-27:
 //   Lixtara LLC — Real Estate Corporation — CQ1075352 — Active — vence 2028-09-30
 //   Anamaria Velasquez — Broker — BK3664191 — Active — vence 2027-09-30
-//   Dirección registrada de la correduría: 181 Vera Ct, Miami, FL 33143
+//   Dirección registrada de la correduría: 181 Vera Ct, 33143
+//
+// Dirección oficial de la oficina (decisión del owner, 2026-11-10): 181 Vera Ct, Coral Gables,
+// FL 33143. La misma en todo el sitio, los correos, el pie, los textos legales, el contrato y /dmca.
 //
 // Si cambia cualquiera de estos datos en el DBPR, se cambia AQUÍ y en ningún otro sitio:
 // src/config/brokerage.test.ts falla si aparece en el código otro número de licencia, o un
@@ -17,7 +20,7 @@ export const BROKERAGE = {
   brokerageLicense: "CQ1075352",
   brokerName: "Anamaria Velasquez",
   brokerLicense: "BK3664191",
-  address: "181 Vera Ct, Miami, FL 33143",
+  address: "181 Vera Ct, Coral Gables, FL 33143",
 } as const;
 
 /**

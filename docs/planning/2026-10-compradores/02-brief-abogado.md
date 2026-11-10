@@ -7,7 +7,7 @@
 ## 1. Who we are
 - **Brokerage:** Lixtara LLC, Real Estate Corporation, **CQ1075352**, expires 2028-09-30.
 - **Broker of record:** Anamaria Velasquez, **BK3664191**, expires 2027-09-30.
-- **Registered address:** 181 Vera Ct, Miami, FL 33143.
+- **Registered address:** 181 Vera Ct, Coral Gables, FL 33143.
 - Verified in FL DBPR on 2026-09-27. **Please confirm current status** and Ms. Velasquez's capacity to sign agreements on behalf of the LLC (qualifying broker, member or manager).
 - **Business 1 (core): seller listings.** A platform fee ($199 / $495 / $995) plus a listing commission of **0.5 %, 1 % or 1.5 %** by plan. The listing agreement is signed via DocuSign.
 - **Business 2 (new): buyer brokerage.** Buyers find homes on lixtara.com (MIAMI IDX feed and our own listings). A licensed professional, initially only Ms. Velasquez, works with them. Proposed buyer compensation is **2 %, 2.5 % or 3 %**: 3 % is our preferred proposal for full service, and it is always individually negotiated.

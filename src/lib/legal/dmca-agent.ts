@@ -61,7 +61,7 @@ export interface DmcaRegistration {
 }
 
 const REGISTERED_ADDRESS: DmcaAddress = {
-  line1: "181 Vera Court",
+  line1: "181 Vera Ct",
   city: "Coral Gables",
   state: "FL",
   zip: "33143",

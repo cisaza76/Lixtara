@@ -36,7 +36,7 @@ describe("public agent block", () => {
   it("publishes the designated agent's public contact", () => {
     expect(block).toContain("dmca@lixtara.com");
     expect(block).toContain("786-210-3562");
-    expect(block).toContain("181 Vera Court");
+    expect(block).toContain("181 Vera Ct");
     expect(block).toContain("Coral Gables, FL 33143");
     expect(block).toContain("DMCA-1080195");
   });

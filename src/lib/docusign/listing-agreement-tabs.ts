@@ -25,6 +25,7 @@
 //     "plus $" and line 207's cancellation fee stay empty and read-only;
 //   - paragraph 15 (lines 230–244): additionalTerms(), which controls over the printed clauses.
 
+import { formatUsPhone } from "@/lib/phone";
 import { APPLIANCE_KEYS, sanitizeAppliances } from "@/lib/appliances";
 import type { BuyerCompOffer } from "@/lib/buyer-comp";
 import { buyerCompOption } from "@/lib/buyer-comp";
@@ -133,10 +134,7 @@ export function usDate(iso: string | null): string {
  * the brokerage's on line 255; anything else as the seller typed it, trimmed; empty → "".
  */
 export function contractPhone(raw: string | null): string {
-  const s = (raw ?? "").trim();
-  const d = s.replace(/\D/g, "");
-  const us = d.length === 10 ? d : d.length === 11 && d.startsWith("1") ? d.slice(1) : null;
-  return us && /^\+?[0-9 ().-]+$/.test(s) ? `+1 (${us.slice(0, 3)}) ${us.slice(3, 6)}-${us.slice(6)}` : s;
+  return formatUsPhone(raw);
 }
 
 /** 650000 → "650,000"; 2.5 → "2.5" (the form prints the "$" or "%" itself). */
