@@ -24,6 +24,7 @@ import {
   type CommercialSenderIdentity,
 } from "@/lib/email-compliance";
 import { escapeHtml } from "@/lib/contact-form";
+import { formatUsPhone } from "@/lib/phone";
 import { PRICING_TIERS, isPricingTierId } from "@/lib/pricing-tiers";
 
 let _client: Resend | null = null;
@@ -578,7 +579,7 @@ export async function sendContractPreparingInternal(input: ContractPreparingInte
     ["Precio de lista", price],
     ["Vendedor", input.seller.name],
     ["Correo", input.seller.email],
-    ["Teléfono", input.seller.phone ?? "—"],
+    ["Teléfono", formatUsPhone(input.seller.phone) || "—"],
     ["Idioma", input.seller.lang === "es" ? "Español" : "Inglés"],
     ...(input.cosigner ? ([["Segundo vendedor", `${input.cosigner.name} <${input.cosigner.email}>`]] as Array<[string, string]>) : []),
     ["Listing", input.propertyId],
@@ -784,7 +785,7 @@ export async function sendContactMessage(input: {
   const rows: [string, string][] = [
     ["Name", input.name],
     ["Email", input.email],
-    ["Phone", input.phone || "—"],
+    ["Phone", formatUsPhone(input.phone) || "—"],
     ["Topic", input.topic],
     ["Language", input.lang],
   ];
@@ -842,7 +843,7 @@ export async function sendBrokerShowingRequest(input: {
     ["Property", input.target],
     ["Buyer", input.buyerName],
     ["Email", input.buyerEmail],
-    ["Phone", input.buyerPhone || "Not provided: contact by email"],
+    ["Phone", formatUsPhone(input.buyerPhone) || "Not provided: contact by email"],
     ["Preferred times", input.preferredTimes || "—"],
     ["Other agent", input.otherAgentStatus],
     ["Needs to sell first", input.needsToSell || "—"],
