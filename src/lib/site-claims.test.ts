@@ -157,7 +157,7 @@ describe.each(["en", "es"] as const)("%s: afirmaciones con respaldo", (lang) => 
     expect(termsDoc[lang].intro[0]).toContain(`${BROKERAGE.legalName} (`);
     const contact = termsDoc[lang].sections.find((s) => s.heading.startsWith("21."));
     expect(contact?.body.join("\n")).toContain(`${BROKERAGE.legalName}, ${BROKERAGE.address}`);
-    expect(BROKERAGE.address).toBe("181 Vera Ct, Miami, FL 33143");
+    expect(BROKERAGE.address).toBe("181 Vera Ct, Coral Gables, FL 33143");
   });
 });
 

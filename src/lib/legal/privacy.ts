@@ -12,7 +12,7 @@ export const privacyDoc: LegalContent = {
   en: {
     title: "Privacy Policy",
     intro: [
-      "This Privacy Policy explains how Lixtara collects, uses, shares, and protects information about you when you use our website, platform, and related services (the \"Service\"). Lixtara is a Miami, Florida-based real-estate technology platform that connects sellers who list their own homes with buyers who make offers, and supports the e-signing of real-estate agreements.",
+      "This Privacy Policy explains how Lixtara collects, uses, shares, and protects information about you when you use our website, platform, and related services (the \"Service\"). Lixtara is a Coral Gables, Florida-based real-estate technology platform that connects sellers who list their own homes with buyers who make offers, and supports the e-signing of real-estate agreements.",
       `Lixtara is operated by ${BROKERAGE.legalName}, a licensed Florida real estate brokerage (FL #${BROKERAGE.brokerageLicense}) located at ${BROKERAGE.address}. By accessing or using the Service, you acknowledge that you have read and understood this Privacy Policy. If you do not agree with our practices, please do not use the Service.`,
       "We are a United States-based company, and we process information in the United States. Please read this Policy together with our Terms of Service and our Cookie Policy.",
     ],
@@ -274,7 +274,7 @@ export const privacyDoc: LegalContent = {
   es: {
     title: "Política de Privacidad",
     intro: [
-      "Esta Política de Privacidad explica cómo Lixtara recopila, usa, comparte y protege la información sobre usted cuando utiliza nuestro sitio web, plataforma y servicios relacionados (el \"Servicio\"). Lixtara es una plataforma de tecnología inmobiliaria con sede en Miami, Florida, que conecta a vendedores que publican sus propias viviendas con compradores que presentan ofertas, y facilita la firma electrónica de acuerdos inmobiliarios.",
+      "Esta Política de Privacidad explica cómo Lixtara recopila, usa, comparte y protege la información sobre usted cuando utiliza nuestro sitio web, plataforma y servicios relacionados (el \"Servicio\"). Lixtara es una plataforma de tecnología inmobiliaria con sede en Coral Gables, Florida, que conecta a vendedores que publican sus propias viviendas con compradores que presentan ofertas, y facilita la firma electrónica de acuerdos inmobiliarios.",
       `Lixtara es operada por ${BROKERAGE.legalName}, una correduría inmobiliaria con licencia en Florida (FL #${BROKERAGE.brokerageLicense}), con domicilio en ${BROKERAGE.address}. Al acceder o utilizar el Servicio, usted reconoce que ha leído y comprendido esta Política de Privacidad. Si no está de acuerdo con nuestras prácticas, por favor no utilice el Servicio.`,
       "Somos una empresa con sede en los Estados Unidos y procesamos la información en los Estados Unidos. Le pedimos que lea esta Política junto con nuestros Términos de Servicio y nuestra Política de Cookies.",
     ],

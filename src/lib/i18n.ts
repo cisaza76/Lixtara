@@ -1520,7 +1520,7 @@ export const dictionaries = {
         },
         contact: {
           eyebrow: "Contact",
-          body: "The contact form is in the works. In the meantime, reach our brokerage, Lixtara, in Miami, Florida.",
+          body: "The contact form is in the works. In the meantime, reach our brokerage, Lixtara, in Coral Gables, Florida.",
         },
         terms: {
           eyebrow: "Terms of service",
@@ -3689,7 +3689,7 @@ export const dictionaries = {
         },
         contact: {
           eyebrow: "Contacto",
-          body: "El formulario de contacto está en construcción. Mientras tanto, contáctanos en Lixtara, Miami, Florida.",
+          body: "El formulario de contacto está en construcción. Mientras tanto, contáctanos en Lixtara, Coral Gables, Florida.",
         },
         terms: {
           eyebrow: "Términos de servicio",

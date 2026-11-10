@@ -21,7 +21,7 @@ AOR § VII.B.2 exige lo mismo como **condición previa** para activar el feed de
 ```
 Copyright Agent
 LIXTARA LLC
-181 Vera Court
+181 Vera Ct
 Coral Gables, FL 33143
 United States
 Email: dmca@lixtara.com
@@ -67,7 +67,7 @@ a 61 días pasa, a 60 falla, vencido falla.
 
 ### ⚠️ La dirección publicada es residencial
 
-`181 Vera Court, Coral Gables` queda publicada en `/dmca` **y en el directorio público de la
+`181 Vera Ct, Coral Gables` queda publicada en `/dmca` **y en el directorio público de la
 Copyright Office** — la ley exige que la dirección del agente sea pública, así que ya lo es
 por el registro mismo. Si prefieres no exponer un domicilio particular, la alternativa es
 re-registrar con la dirección de un *registered agent* o un buzón comercial. Es una decisión

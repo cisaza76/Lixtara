@@ -56,7 +56,7 @@ const terms: LegalContent = {
   en: {
     title: "Terms of Service",
     intro: [
-      `These Terms of Service (the \"Terms\") govern your access to and use of the Lixtara website, applications, and services (collectively, the \"Services\"). Lixtara is an online platform that combines for-sale-by-owner (FSBO) tools with licensed-broker support to help property owners in Florida list, market, and sell their homes. Lixtara is operated by ${B.legalName} (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), based in Miami, Florida, United States.`,
+      `These Terms of Service (the \"Terms\") govern your access to and use of the Lixtara website, applications, and services (collectively, the \"Services\"). Lixtara is an online platform that combines for-sale-by-owner (FSBO) tools with licensed-broker support to help property owners in Florida list, market, and sell their homes. Lixtara is operated by ${B.legalName} (\"Lixtara,\" \"we,\" \"us,\" or \"our\"), based in Coral Gables, Florida, United States.`,
       "Please read these Terms carefully. By accessing or using the Services, creating an account, starting a listing, or signing any agreement through the Services, you agree to be bound by these Terms. If you do not agree, do not use the Services. These Terms include important provisions that affect your legal rights, including disclaimers of warranties, a limitation of liability, an indemnification obligation, and provisions regarding dispute resolution and arbitration.",
     ],
     sections: [
@@ -283,7 +283,7 @@ const terms: LegalContent = {
   es: {
     title: "Términos del Servicio",
     intro: [
-      `Estos Términos del Servicio (los \"Términos\") rigen su acceso y uso del sitio web, las aplicaciones y los servicios de Lixtara (en conjunto, los \"Servicios\"). Lixtara es una plataforma en línea que combina herramientas de venta por el propietario (FSBO, por sus siglas en inglés) con el apoyo de un broker de bienes raíces con licencia, para ayudar a los propietarios en Florida a publicar, promocionar y vender sus viviendas. Lixtara es operada por ${B.legalName} (\"Lixtara\", \"nosotros\" o \"nuestro\"), con sede en Miami, Florida, Estados Unidos.`,
+      `Estos Términos del Servicio (los \"Términos\") rigen su acceso y uso del sitio web, las aplicaciones y los servicios de Lixtara (en conjunto, los \"Servicios\"). Lixtara es una plataforma en línea que combina herramientas de venta por el propietario (FSBO, por sus siglas en inglés) con el apoyo de un broker de bienes raíces con licencia, para ayudar a los propietarios en Florida a publicar, promocionar y vender sus viviendas. Lixtara es operada por ${B.legalName} (\"Lixtara\", \"nosotros\" o \"nuestro\"), con sede en Coral Gables, Florida, Estados Unidos.`,
       "Lea estos Términos detenidamente. Al acceder o utilizar los Servicios, crear una cuenta, iniciar una publicación o firmar cualquier acuerdo a través de los Servicios, usted acepta quedar obligado por estos Términos. Si no está de acuerdo, no utilice los Servicios. Estos Términos incluyen disposiciones importantes que afectan sus derechos legales, incluidas exenciones de garantías, una limitación de responsabilidad, una obligación de indemnización y disposiciones sobre resolución de disputas y arbitraje.",
     ],
     sections: [

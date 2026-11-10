@@ -37,7 +37,7 @@ describe("config/brokerage — datos verificados en el DBPR", () => {
       brokerageLicense: "CQ1075352",
       brokerName: "Anamaria Velasquez",
       brokerLicense: "BK3664191",
-      address: "181 Vera Ct, Miami, FL 33143",
+      address: "181 Vera Ct, Coral Gables, FL 33143",
     });
   });
 
@@ -52,7 +52,7 @@ describe("config/brokerage — datos verificados en el DBPR", () => {
   it("pie de los correos fríos, literal (2026-10-18)", () => {
     expect(COLD_EMAIL_AD_NOTICE).toBe("This is an advertisement.");
     expect(coldEmailFooter()).toBe(
-      "Lixtara LLC · Licensed Real Estate Brokerage · FL #CQ1075352 · Anamaria Velasquez, Broker · FL #BK3664191 · 181 Vera Ct, Miami, FL 33143 · If your property is currently listed with another broker, please disregard this message. · Unsubscribe");
+      "Lixtara LLC · Licensed Real Estate Brokerage · FL #CQ1075352 · Anamaria Velasquez, Broker · FL #BK3664191 · 181 Vera Ct, Coral Gables, FL 33143 · If your property is currently listed with another broker, please disregard this message. · Unsubscribe");
   });
 });
 
@@ -124,5 +124,35 @@ describe("fillBrokerageCopy", () => {
       const texts = [...d.faq.items.map((i) => i.a), ...d.valueProps.props.map((p) => p.body)];
       for (const s of texts) expect(fillBrokerageCopy(s)).not.toMatch(/\{broker/);
     }
+  });
+});
+
+// Dirección oficial de la oficina (owner, 2026-11-10): 181 Vera Ct, Coral Gables, FL 33143, la
+// misma en el sitio, los correos, el pie, los textos legales, el contrato y /dmca.
+describe("dirección de la oficina: una sola", () => {
+  it("es Coral Gables, y el pie del sitio dice la misma ciudad", async () => {
+    expect(BROKERAGE.address).toBe("181 Vera Ct, Coral Gables, FL 33143");
+    const { BROKERAGE_LOCATION } = await import("@/lib/broker");
+    expect(BROKERAGE.address).toContain(BROKERAGE_LOCATION);
+  });
+
+  it("/dmca publica la misma calle, ciudad y código postal", async () => {
+    const { DMCA_REGISTRATION } = await import("@/lib/legal/dmca-agent");
+    for (const a of [DMCA_REGISTRATION.serviceProvider.address, DMCA_REGISTRATION.designatedAgent.address]) {
+      expect(`${a.line1}, ${a.city}, ${a.state} ${a.zip}`).toBe(BROKERAGE.address);
+    }
+  });
+
+  it("ningún archivo de src/ describe la oficina en Miami ni escribe la calle a mano", () => {
+    const malos = archivosDelRepo()
+      .filter((f) => f.path.startsWith("src/") && !/\.test\.tsx?$/.test(f.path))
+      .filter((f) => /Vera Court|Vera Ct, Miami|Miami, FL 33143|(based in|con sede en|in) Miami, Florida|Miami, Florida-based|Lixtara, Miami/.test(f.text))
+      .map((f) => f.path);
+    expect(malos).toEqual([]);
+    const calleAMano = archivosDelRepo()
+      .filter((f) => f.path.startsWith("src/") && !/\.test\.tsx?$/.test(f.path) && f.path !== "src/config/brokerage.ts" && f.path !== "src/lib/legal/dmca-agent.ts")
+      .filter((f) => /181 Vera/.test(f.text))
+      .map((f) => f.path);
+    expect(calleAMano).toEqual([]);
   });
 });

@@ -10,7 +10,8 @@ export const BROKERAGE_NAME = "Lixtara";
 /** Nombre legal de la entidad licenciada; es el que va en acuerdos y avisos. */
 export const BROKERAGE_LICENSED_ENTITY = BROKERAGE.legalName;
 export const BROKER_LICENSE = BROKERAGE.brokerageLicense;
-export const BROKERAGE_LOCATION = "Miami, FL";
+/** Ciudad de la oficina, en el pie del sitio. La misma que BROKERAGE.address. */
+export const BROKERAGE_LOCATION = "Coral Gables, FL";
 
 export const BROKER_OF_RECORD = BROKERAGE.brokerName;
 export const BROKER_OF_RECORD_LICENSE = BROKERAGE.brokerLicense;
