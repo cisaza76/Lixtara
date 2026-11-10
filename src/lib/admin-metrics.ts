@@ -40,5 +40,24 @@ export function liveActivity<T extends { properties?: EmbeddedProperty }>(rows: 
   return (rows ?? []).filter((r) => !propertyIsTest(r.properties)).slice(0, limit);
 }
 
+/**
+ * Conteo de la cabecera "Aprobación pendiente (…)". La cola muestra también los listings is_test
+ * (con su etiqueta), pero el tile "Aprobaciones pendientes" no los cuenta, así que la cabecera
+ * dice cuántos son de prueba:
+ *   todos de prueba → "3 de prueba"; mezcla → "3 · 1 de prueba"; ninguno → "3".
+ * `testLabel(m)` da "M de prueba" / "M test". Sin filas → null (no se muestra conteo).
+ */
+export function pendingQueueCount(
+  rows: Array<{ is_test: boolean | null }> | null | undefined,
+  testLabel: (m: number) => string,
+): string | null {
+  const list = rows ?? [];
+  if (list.length === 0) return null;
+  const tests = list.filter((r) => r.is_test === true).length;
+  if (tests === 0) return String(list.length);
+  if (tests === list.length) return testLabel(tests);
+  return `${list.length} · ${testLabel(tests)}`;
+}
+
 /** Columnas de `payments` que necesitan liveRevenue. */
 export const METRIC_PAYMENT_COLUMNS = "amount,stripe_checkout_session_id,properties(is_test)";
