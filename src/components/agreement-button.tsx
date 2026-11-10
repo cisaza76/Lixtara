@@ -11,6 +11,11 @@ interface AgreementButtonProps {
     failed: string;
     /** Si se pulsa sin marcar la casilla E-SIGN (idioma de la página, no la burbuja del navegador). */
     consentRequired: string;
+    /**
+     * Guard de producción (DocuSign aún en Demo): el servidor no crea el sobre de un listing real
+     * y responde `contract_preparing`. Se muestra en lugar del botón, no como error.
+     */
+    preparing: string;
   };
   /** Aviso y casilla E-SIGN (src/lib/legal/consents.ts, marcadores ya resueltos). */
   esign: {
@@ -26,6 +31,7 @@ export function AgreementButton({ propertyId, lang, labels, esign }: AgreementBu
   const [missing, setMissing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const box = useRef<HTMLInputElement>(null);
 
   async function handleClick() {
@@ -48,6 +54,11 @@ export function AgreementButton({ propertyId, lang, labels, esign }: AgreementBu
         }),
       });
       const data = (await res.json()) as { url?: string; error?: string; detail?: string; redirect?: string };
+      if (data.error === "contract_preparing") {
+        setPreparing(true);
+        setSubmitting(false);
+        return;
+      }
       // Falta algo del listado (p. ej. la oferta del paso 6): volver a ese paso.
       if (!res.ok && data.redirect?.startsWith("/") && !data.redirect.startsWith("//")) {
         window.location.href = data.redirect;
@@ -66,6 +77,14 @@ export function AgreementButton({ propertyId, lang, labels, esign }: AgreementBu
       setError(code ? `${labels.failed} (${code})` : labels.failed);
       setSubmitting(false);
     }
+  }
+
+  if (preparing) {
+    return (
+      <div role="status" data-contract-preparing className="border border-gold-soft bg-ivory-strong/40 p-5 max-w-xl">
+        <p className="text-sm text-ink/80 leading-relaxed">{labels.preparing}</p>
+      </div>
+    );
   }
 
   return (
