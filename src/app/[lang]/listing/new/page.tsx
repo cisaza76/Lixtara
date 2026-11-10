@@ -81,6 +81,7 @@ import { CONSENT_COOKIE, analyticsConsentGranted } from "@/lib/analytics-config"
 import { FIRST_TOUCH_COOKIE, parseFirstTouch } from "@/lib/funnel-events";
 import { recordFunnelEvent } from "@/lib/funnel-events.server";
 import { AgreementButton } from "@/components/agreement-button";
+import { fillBrokerageCopy } from "@/config/brokerage";
 import { AgreementStatusPoller } from "@/components/agreement-status-poller";
 import { CosignerResendButton } from "@/components/cosigner-resend-button";
 import { refreshAgreementResult } from "@/lib/agreement-refresh";
@@ -3701,6 +3702,7 @@ export default async function ListingNewPage({
                       redirecting: copy.step7.redirecting,
                       failed: copy.step7.failed,
                       consentRequired: copy.step7.consentRequired,
+                      preparing: fillBrokerageCopy(copy.step7.contractPreparing),
                     }}
                     esign={esignProps}
                   />
@@ -3770,6 +3772,7 @@ export default async function ListingNewPage({
                         redirecting: copy.step7.redirecting,
                         failed: copy.step7.failed,
                         consentRequired: copy.step7.consentRequired,
+                      preparing: fillBrokerageCopy(copy.step7.contractPreparing),
                       }}
                       esign={esignProps}
                     />
@@ -3801,6 +3804,7 @@ export default async function ListingNewPage({
                   redirecting: copy.step7.redirecting,
                   failed: copy.step7.failed,
                   consentRequired: copy.step7.consentRequired,
+                  preparing: fillBrokerageCopy(copy.step7.contractPreparing),
                 }}
                 esign={esignProps}
               />

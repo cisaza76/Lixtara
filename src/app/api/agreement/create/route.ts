@@ -21,6 +21,8 @@ import {
   voidEnvelope,
 } from "@/lib/docusign";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
+import { blocksRealAgreement } from "@/lib/docusign-demo-guard";
+import { notifyContractPreparing } from "@/lib/contract-preparing.server";
 import { offerFromRow, offerWithinLimit } from "@/lib/buyer-comp";
 import { fetchBuyerComp } from "@/lib/buyer-comp.server";
 import { BROKERAGE_LICENSED_ENTITY } from "@/lib/broker";
@@ -94,7 +96,7 @@ export async function POST(req: Request) {
   const { data: property } = await supabase
     .from("properties")
     .select(
-      "id, owner_id, pricing_tier, mls_status, address_street, address_city, address_state, address_zip, list_price, legal_description, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, financing_terms, financing_other, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
+      "id, owner_id, pricing_tier, mls_status, is_test, address_street, address_city, address_state, address_zip, list_price, legal_description, has_pool, bedrooms, bathrooms, sqft, year_built, cash_only, financing_terms, financing_other, as_is_sale, property_type, folio, lot_size, parking_spaces, hoa_fee, tax_annual_amount, flood_zone, occupancy_status, monthly_rent, lease_end_date, tenant_cooperation, description, appliances",
     )
     .eq("id", propertyId)
     .eq("owner_id", user.id)
@@ -209,6 +211,24 @@ export async function POST(req: Request) {
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
     user.email;
   const signerEmail = user.email;
+
+  // Guard de producción: con DocuSign aún en Demo, un listing real no recibe sobre (un contrato
+  // de Demo no vale y desbloquearía el pago). El vendedor ve "tu contrato se está preparando" y
+  // Camilo y la broker reciben el aviso. Sin sobre no hay acuerdo firmado, así que el paso 8
+  // sigue bloqueado. Los listings is_test siguen como hoy.
+  if (blocksRealAgreement({ isTest: property.is_test === true })) {
+    await notifyContractPreparing({
+      propertyId: property.id,
+      propertyAddress: `${property.address_street}, ${property.address_city}, ${property.address_state} ${property.address_zip}`,
+      tier: property.pricing_tier ?? null,
+      listPrice: property.list_price != null ? Number(property.list_price) : null,
+      seller: { name: signerName, email: signerEmail, phone: profile?.phone ?? null, lang },
+      cosigner: plan.signer ? { name: plan.signer.full_name, email: plan.signer.email } : null,
+      reviewUrl: `${new URL(req.url).origin}/es/admin/listings/${encodeURIComponent(property.id)}/review`,
+    });
+    console.info(JSON.stringify({ event: "agreement_blocked_docusign_demo", property_id: property.id }));
+    return NextResponse.json({ error: "contract_preparing" }, { status: 409 });
+  }
 
   // Prueba del consentimiento E-SIGN (IP, user agent, versión, hash del texto). Sin ella no
   // se abre DocuSign.

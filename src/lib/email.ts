@@ -550,6 +550,65 @@ export async function sendBrokerNewPending(input: BrokerNewPendingInput) {
 }
 
 
+// ---- Guard de producción: contrato en preparación (DocuSign aún en Demo) --------------
+// Aviso interno (Camilo + la broker) cuando un vendedor real llega al paso 7 y no se le crea
+// sobre (src/lib/docusign-demo-guard.ts). En español: lo leen el equipo y la broker. Todo lo
+// que escribió el vendedor va escapado.
+export interface ContractPreparingInternalInput {
+  to: string;
+  propertyId: string;
+  propertyAddress: string;
+  tier: string | null;
+  listPrice: number | null;
+  seller: { name: string; email: string; phone: string | null; lang: Lang };
+  /** Segundo vendedor (#220), si lo hay. */
+  cosigner: { name: string; email: string } | null;
+  reviewUrl: string;
+  /** Un aviso por listing, destinatario y día aunque el vendedor pulse varias veces. */
+  idempotencyKey: string;
+}
+
+export async function sendContractPreparingInternal(input: ContractPreparingInternalInput) {
+  const subject = `Contrato por preparar: ${input.propertyAddress}`;
+  const tier = input.tier ? input.tier.charAt(0).toUpperCase() + input.tier.slice(1) : "—";
+  const price = input.listPrice ? `$${input.listPrice.toLocaleString("en-US")}` : "—";
+  const rows: Array<[string, string]> = [
+    ["Dirección", input.propertyAddress],
+    ["Plan", tier],
+    ["Precio de lista", price],
+    ["Vendedor", input.seller.name],
+    ["Correo", input.seller.email],
+    ["Teléfono", input.seller.phone ?? "—"],
+    ["Idioma", input.seller.lang === "es" ? "Español" : "Inglés"],
+    ...(input.cosigner ? ([["Segundo vendedor", `${input.cosigner.name} <${input.cosigner.email}>`]] as Array<[string, string]>) : []),
+    ["Listing", input.propertyId],
+  ];
+  const lead =
+    "Un vendedor llegó al paso 7 y no se le creó el sobre: DocuSign de Production sigue en la cuenta Demo. " +
+    "Se le dijo que su contrato se está preparando y que la broker lo contactará en menos de 24 horas. " +
+    "El pago (paso 8) sigue bloqueado hasta que firme.";
+  const body = `
+    <p style="font-family:Georgia,serif;font-size:20px;line-height:1.4;color:#1c1c1c;margin:0 0 12px;">Contrato por preparar</p>
+    <p style="font-size:14px;line-height:1.7;color:#1c1c1c;">${lead}</p>
+    <table cellpadding="0" cellspacing="0" style="margin:16px 0;font-size:13px;color:#1c1c1c;">
+      ${rows
+        .map(
+          ([k, v]) =>
+            `<tr><td style="padding:4px 16px 4px 0;color:#8a8268;text-transform:uppercase;font-size:10px;letter-spacing:0.18em;">${k}</td><td style="padding:4px 0;">${escapeHtml(v)}</td></tr>`,
+        )
+        .join("")}
+    </table>
+    ${button(input.reviewUrl, "Abrir el listado →")}
+  `;
+  return send({
+    to: input.to,
+    subject,
+    html: shell({ preheader: subject, body, lang: "es" }),
+    text: [subject, lead, "", ...rows.map(([k, v]) => `${k}: ${v}`), "", input.reviewUrl].join("\n"),
+    idempotencyKey: input.idempotencyKey,
+  });
+}
+
 // ---- #134 / #136 — solicitud del vendedor sobre un listing ya enviado -----------------
 export interface BrokerListingRequestInput {
   to: string;

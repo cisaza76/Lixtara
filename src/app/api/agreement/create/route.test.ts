@@ -19,6 +19,8 @@ const notifyCosignerInvitation = vi.fn(async () => true);
 const voidEnvelope = vi.fn(async (...a: unknown[]) => void a);
 const svcUpdates: Array<Record<string, unknown>> = [];
 let existingAgreement: Record<string, unknown> | null = null;
+let propertyIsTest = false;
+const notifyContractPreparing = vi.fn(async (...a: unknown[]) => void a);
 const fetchBuyerComp = vi.fn(async () => ({
   buyer_agent_comp_type: "percent",
   buyer_agent_commission: 2.5,
@@ -40,7 +42,7 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: { getUser: async () => ({ data: { user: { id: "u1", email: "s@example.com" } } }) },
     from: (t: string) =>
       t === "properties"
-        ? chain({ data: { id: "p1", owner_id: "u1", pricing_tier: "pro", mls_status: "draft", list_price: 400000 } })
+        ? chain({ data: { id: "p1", owner_id: "u1", pricing_tier: "pro", mls_status: "draft", list_price: 400000, is_test: propertyIsTest, address_street: "1 Main St", address_city: "Miami", address_state: "FL", address_zip: "33101" } })
         : t === "agreements"
           ? chain({ data: existingAgreement, error: null })
           : chain({ data: null, error: null }),
@@ -75,6 +77,9 @@ vi.mock("@/lib/cosigner-notify.server", () => ({
   notifyCosignerInvitation: (...a: unknown[]) => notifyCosignerInvitation(...(a as [])),
 }));
 vi.mock("@/lib/buyer-comp.server", () => ({ fetchBuyerComp: (...a: unknown[]) => fetchBuyerComp(...(a as [])) }));
+vi.mock("@/lib/contract-preparing.server", () => ({
+  notifyContractPreparing: (...a: unknown[]) => notifyContractPreparing(...a),
+}));
 vi.mock("@/lib/legal/consents.server", () => ({ recordAcceptance: (...a: unknown[]) => recordAcceptance(...(a as [])) }));
 vi.mock("@/lib/docusign", () => ({
   createEnvelopeFromTemplate: (input: unknown) => createEnvelope(input),
@@ -231,5 +236,62 @@ describe("POST /api/agreement/create: quién firma (#220)", () => {
     expect(res.status).toBe(503);
     expect((await res.json()).error).toBe("second_seller_not_supported");
     expect(createEnvelope).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/agreement/create: guard de producción con DocuSign en Demo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    inserted.length = 0;
+    existingAgreement = null;
+    propertyIsTest = false;
+    loadFirstIncompleteStep.mockResolvedValue(null);
+    loadOwnership.mockResolvedValue(ONE_SELLER);
+    process.env.DOCUSIGN_LISTING_AGREEMENT_TEMPLATE_ID = "tpl-v4";
+    vi.stubEnv("VERCEL_ENV", "production");
+  });
+  const run = async () => {
+    try {
+      return await POST(req());
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  };
+
+  it("Production + Demo + listing real → sin sobre ni acuerdo, 'contract_preparing' y aviso interno", async () => {
+    vi.stubEnv("DOCUSIGN_AUTH_HOST", "account-d.docusign.com");
+    const res = await run();
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "contract_preparing" });
+    expect(createEnvelope).not.toHaveBeenCalled();
+    expect(inserted).toEqual([]);
+    expect(recordAcceptance).not.toHaveBeenCalled();
+    expect(notifyContractPreparing).toHaveBeenCalledTimes(1);
+    expect(notifyContractPreparing.mock.calls[0][0]).toMatchObject({
+      propertyId: "p1",
+      propertyAddress: "1 Main St, Miami, FL 33101",
+      tier: "pro",
+      listPrice: 400000,
+      seller: { email: "s@example.com", lang: "es" },
+      cosigner: null,
+      reviewUrl: "https://lixtara.com/es/admin/listings/p1/review",
+    });
+  });
+
+  it("Production + Demo + listing is_test → sigue como hoy (sobre, sin aviso)", async () => {
+    vi.stubEnv("DOCUSIGN_AUTH_HOST", "account-d.docusign.com");
+    propertyIsTest = true;
+    const res = await run();
+    expect(res.status).toBe(200);
+    expect(createEnvelope).toHaveBeenCalledTimes(1);
+    expect(notifyContractPreparing).not.toHaveBeenCalled();
+  });
+
+  it("Production + DocuSign de producción + listing real → sigue (sobre, sin aviso)", async () => {
+    vi.stubEnv("DOCUSIGN_AUTH_HOST", "account.docusign.com");
+    const res = await run();
+    expect(res.status).toBe(200);
+    expect(createEnvelope).toHaveBeenCalledTimes(1);
+    expect(notifyContractPreparing).not.toHaveBeenCalled();
   });
 });
