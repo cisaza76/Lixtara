@@ -6,8 +6,11 @@ import {
   computeConnectSignature,
   handleConnectWebhook,
   hmacKeysFromEnv,
+  MIN_WEBHOOK_TOKEN_LENGTH,
   sha256Hex,
   verifyConnectSignature,
+  verifyWebhookToken,
+  webhookTokenFromEnv,
   type WebhookDeps,
 } from "./docusign-connect";
 
@@ -150,6 +153,74 @@ describe("webhook /api/webhooks/docusign", () => {
     expect(res.status).toBe(200);
     expect(refresh).not.toHaveBeenCalled();
     expect(calls.find((c) => c.table === "docusign_events")!.payload).toMatchObject({ note: "unknown_envelope" });
+  });
+});
+
+const TOKEN = "k".repeat(40);
+const withToken = (token: string | null, sigKey: string | null = null, b = body) =>
+  new Request(`https://lixtara.com/api/webhooks/docusign${token === null ? "" : `?token=${token}`}`, {
+    method: "POST",
+    body: b,
+    headers: headersWith(sigKey ? [computeConnectSignature(b, sigKey)] : []),
+  });
+
+describe("token del webhook (respaldo sin claves HMAC)", () => {
+  it("token desde el entorno: vacío o corto → no configurado", () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(webhookTokenFromEnv({ DOCUSIGN_WEBHOOK_TOKEN: ` ${TOKEN} ` } as never)).toBe(TOKEN);
+    expect(webhookTokenFromEnv({} as never)).toBeNull();
+    expect(webhookTokenFromEnv({ DOCUSIGN_WEBHOOK_TOKEN: "x".repeat(MIN_WEBHOOK_TOKEN_LENGTH - 1) } as never)).toBeNull();
+    err.mockRestore();
+  });
+
+  it("verifyWebhookToken: igual → true; distinto, ausente o sin token esperado → false", () => {
+    expect(verifyWebhookToken(`https://x/a?token=${TOKEN}`, TOKEN)).toBe(true);
+    expect(verifyWebhookToken(`https://x/a?token=${TOKEN}x`, TOKEN)).toBe(false);
+    expect(verifyWebhookToken("https://x/a", TOKEN)).toBe(false);
+    expect(verifyWebhookToken(`https://x/a?token=${TOKEN}`, null)).toBe(false);
+  });
+
+  it("Production solo con token: token válido → procesa (hmac_valid = false); sigue usando refresh", async () => {
+    const { deps, calls, refresh } = setup({ refreshedStatus: "signed" });
+    deps.env = { VERCEL_ENV: "production", DOCUSIGN_WEBHOOK_TOKEN: TOKEN } as never;
+    const res = await handleConnectWebhook(withToken(TOKEN), deps);
+    expect(await res.json()).toEqual({ ok: true, status: "signed" });
+    expect(refresh).toHaveBeenCalled();
+    expect(calls.find((c) => c.table === "docusign_events")!.payload).toMatchObject({ hmac_valid: false });
+  });
+
+  it("Production solo con token: token incorrecto o ausente → 401, sin tocar la base", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    for (const req of [withToken("k".repeat(39) + "z"), withToken(null)]) {
+      const { deps, calls, refresh } = setup({});
+      deps.env = { VERCEL_ENV: "production", DOCUSIGN_WEBHOOK_TOKEN: TOKEN } as never;
+      expect((await handleConnectWebhook(req, deps)).status).toBe(401);
+      expect(calls).toEqual([]);
+      expect(refresh).not.toHaveBeenCalled();
+    }
+    warn.mockRestore();
+  });
+
+  it("HMAC y token configurados: basta uno de los dos válido; ninguno → 401", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const env = { VERCEL_ENV: "production", DOCUSIGN_CONNECT_HMAC_KEY: KEY, DOCUSIGN_WEBHOOK_TOKEN: TOKEN } as never;
+    const run = async (req: Request) => {
+      const { deps } = setup({});
+      deps.env = env;
+      return (await handleConnectWebhook(req, deps)).status;
+    };
+    expect(await run(withToken(null, KEY))).toBe(200); // HMAC válido, sin token
+    expect(await run(withToken(TOKEN, "wrong"))).toBe(200); // firma mala, token válido
+    expect(await run(withToken("nope", "wrong"))).toBe(401);
+    warn.mockRestore();
+  });
+
+  it("un token en la URL no sirve si no hay token configurado (solo HMAC)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { deps } = setup({});
+    deps.env = { VERCEL_ENV: "production", DOCUSIGN_CONNECT_HMAC_KEY: KEY } as never;
+    expect((await handleConnectWebhook(withToken(TOKEN), deps)).status).toBe(401);
+    warn.mockRestore();
   });
 });
 

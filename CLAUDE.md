@@ -187,6 +187,13 @@ The Lovable reference codebase lives at `../lixtara-lovable-reference/` (read-on
   (anonymous until step 7); set = the seller confirms their email with a 6-digit code
   right after the address, and the broker can send a "continue your listing" magic link
   from `/admin/seller-leads` (sellers can request one at `/listing/continue`).
+- DocuSign events: in Production each envelope carries its own `eventNotification` to
+  `/api/webhooks/docusign` (`src/lib/docusign-event-notification.ts`); Preview keeps the Demo
+  account's Connect. The webhook accepts a valid HMAC (`DOCUSIGN_CONNECT_HMAC_KEY`/`_KEY_2`) OR a
+  valid `DOCUSIGN_WEBHOOK_TOKEN` (server-only, optional, ≥32 chars, sent as `?token=` — the fallback
+  when the account can't create HMAC keys) and never trusts the payload (only `refreshAgreement`).
+  `DOCUSIGN_CONSENT_REDIRECT_URI` (server-only, optional) is a Redirect URI registered on the
+  integration key, used in the `consent_required` message. Cutover: `docs/superpowers/runbooks/2026-11-10-docusign-produccion.md`.
 - `OUTREACH_WEBHOOK_TOKEN` — server-only, **Production only**. Shared secret of the Instantly
   webhook (`/api/crm/outreach-webhook`), sent by Instantly as `Authorization: Bearer <token>`.
   Unset = every call is 401 (fail-closed). Created by the owner in the Vercel dashboard.

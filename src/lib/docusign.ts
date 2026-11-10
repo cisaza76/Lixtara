@@ -14,7 +14,9 @@
 //
 // First-call gotcha: DocuSign requires the integration user to consent to
 // the requested scopes ONCE before JWT auth works. If we get back
-// `consent_required`, surface the consent URL so the user can grant it.
+// `consent_required`, surface the consent URL so the user can grant it
+// (consentRequiredMessage: host from DOCUSIGN_AUTH_HOST, redirect URI from
+// DOCUSIGN_CONSENT_REDIRECT_URI — one registered on the integration key).
 
 import { SignJWT, importPKCS8 } from "jose";
 import {
@@ -23,6 +25,7 @@ import {
   SIGNING_REMINDER_EVERY_DAYS,
   SIGNING_REMINDER_FIRST_DAY,
 } from "@/lib/listing-ownership";
+import type { EnvelopeEventNotification } from "@/lib/docusign-event-notification";
 
 const SCOPES = "signature impersonation";
 
@@ -58,16 +61,43 @@ function privateKeyPem(): string {
   return env("DOCUSIGN_PRIVATE_KEY");
 }
 
-export function getConsentUrl(redirectUri: string): string {
-  // One-time per integration: the impersonated user visits this URL and
-  // approves the requested scopes. After that, JWT auth works.
+/**
+ * One-time per integration and account: the impersonated user (DOCUSIGN_USER_ID) visits this
+ * URL and approves the requested scopes. After that, JWT auth works. `redirectUri` must be one
+ * registered on the integration key (Apps & Keys); where it lands afterwards doesn't matter.
+ */
+export function consentUrl(input: { authHost: string; integrationKey: string; redirectUri: string }): string {
   const params = new URLSearchParams({
     response_type: "code",
     scope: SCOPES,
-    client_id: integrationKey(),
-    redirect_uri: redirectUri,
+    client_id: input.integrationKey,
+    redirect_uri: input.redirectUri,
   });
-  return `https://${authHost()}/oauth/auth?${params.toString()}`;
+  return `https://${input.authHost}/oauth/auth?${params.toString()}`;
+}
+
+/**
+ * The consent_required error text: the consent URL for THIS environment's account (Demo:
+ * account-d.docusign.com; production: account.docusign.com). Without
+ * DOCUSIGN_CONSENT_REDIRECT_URI it says what to set instead of inventing a redirect URI.
+ */
+export function consentRequiredMessage(env: NodeJS.ProcessEnv = process.env): string {
+  const authHost = env.DOCUSIGN_AUTH_HOST ?? "";
+  const integrationKey = env.DOCUSIGN_INTEGRATION_KEY ?? "";
+  const redirectUri = (env.DOCUSIGN_CONSENT_REDIRECT_URI ?? "").trim();
+  if (redirectUri) {
+    return `DocuSign consent_required — the DocuSign user DOCUSIGN_USER_ID must open ${consentUrl({
+      authHost,
+      integrationKey,
+      redirectUri,
+    })} once to grant impersonation, then retry.`;
+  }
+  return (
+    "DocuSign consent_required — set DOCUSIGN_CONSENT_REDIRECT_URI to a Redirect URI registered on the " +
+    "integration key (Apps & Keys), or have the DocuSign user DOCUSIGN_USER_ID open " +
+    `${consentUrl({ authHost, integrationKey, redirectUri: "REGISTERED_REDIRECT_URI" })} once, ` +
+    "replacing REGISTERED_REDIRECT_URI with that URI, then retry."
+  );
 }
 
 interface TokenCache {
@@ -116,11 +146,7 @@ export async function getAccessToken(): Promise<string> {
   if (!res.ok) {
     const txt = await res.text();
     if (txt.includes("consent_required")) {
-      throw new Error(
-        `DocuSign consent_required — visit ${getConsentUrl(
-          "https://lixtara.vercel.app/api/agreement/consent-callback",
-        )} once to grant impersonation, then retry.`,
-      );
+      throw new Error(consentRequiredMessage());
     }
     throw new Error(`DocuSign token exchange failed: ${res.status} ${txt}`);
   }
@@ -207,6 +233,11 @@ export interface CreateEnvelopeInput {
     /** Solo sobres TEST (scripts/docusign/test-envelopes.ts --sign-urls); el sitio no lo pone. */
     clientUserId?: string;
   }>;
+  /**
+   * DocuSign avisa al webhook de este sobre (src/lib/docusign-event-notification.ts). Solo lo
+   * pone el sitio en Production; sin él, el sobre depende del Connect de la cuenta.
+   */
+  eventNotification?: EnvelopeEventNotification;
 }
 
 /** Rol del broker de Lixtara en cada plantilla (#137 f; confirmar con scripts/check-docusign-template.ts). */
@@ -363,15 +394,19 @@ export async function createEnvelopeFromTemplate(
   // de la llamada si falta la broker (#137 f).
   const roles = buildTemplateRoles(input, tabs);
   const notification = envelopeNotification(input);
+  const extras = {
+    ...(notification ? { notification } : {}),
+    ...(input.eventNotification ? { eventNotification: input.eventNotification } : {}),
+  };
   if (input.attachments?.length) {
     return authedRequest<CreateEnvelopeResult>("/envelopes", {
       method: "POST",
-      body: { ...compositeEnvelopeBody(input, roles, body.emailSubject), ...(notification ? { notification } : {}) },
+      body: { ...compositeEnvelopeBody(input, roles, body.emailSubject), ...extras },
     });
   }
   return authedRequest<CreateEnvelopeResult>("/envelopes", {
     method: "POST",
-    body: { ...body, templateRoles: roles, ...(notification ? { notification } : {}) },
+    body: { ...body, templateRoles: roles, ...extras },
   });
 }
 

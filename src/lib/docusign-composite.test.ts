@@ -2,6 +2,7 @@
 // templates; las pestañas van solo con la plantilla. Y la opción de ocupación como radio. Sin red.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildTemplateRoles, compositeEnvelopeBody, type CreateEnvelopeInput } from "./docusign";
+import type { EnvelopeEventNotification } from "./docusign-event-notification";
 
 const input: CreateEnvelopeInput = {
   templateId: "tpl-1",
@@ -66,6 +67,23 @@ describe("sobre con anexo", () => {
       await mod.createEnvelopeFromTemplate(input);
       expect(sent[2]).toHaveProperty("compositeTemplates");
       expect(sent[2]).not.toHaveProperty("templateRoles");
+      expect(sent[2]).not.toHaveProperty("eventNotification");
+
+      // eventNotification (Production): en el cuerpo simple y en el de composite templates.
+      const eventNotification: EnvelopeEventNotification = {
+        url: "https://lixtara.com/api/webhooks/docusign",
+        requireAcknowledgment: "true",
+        includeHMAC: "true",
+        loggingEnabled: "true",
+        deliveryMode: "SIM",
+        eventData: { version: "restv2.1", format: "json" },
+        events: ["envelope-completed"],
+      };
+      await mod.createEnvelopeFromTemplate({ ...input, attachments: undefined, eventNotification });
+      expect(sent[3].eventNotification).toEqual(eventNotification);
+      await mod.createEnvelopeFromTemplate({ ...input, eventNotification });
+      expect(sent[4]).toHaveProperty("compositeTemplates");
+      expect(sent[4].eventNotification).toEqual(eventNotification);
       vi.unstubAllGlobals();
     });
   });
