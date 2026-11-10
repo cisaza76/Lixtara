@@ -7,7 +7,11 @@
 //
 // On first invocation in a fresh DocuSign account this fails with a
 // consent_required error — the response surfaces the consent URL the user
-// must visit ONCE to grant impersonation. After that, JWT auth works.
+// must visit ONCE to grant impersonation (consentRequiredMessage in
+// src/lib/docusign.ts). After that, JWT auth works.
+//
+// In Production each envelope carries its own eventNotification (DocuSign
+// notifies /api/webhooks/docusign); Preview keeps the Demo account's Connect.
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +24,7 @@ import {
   templateHasRole,
   voidEnvelope,
 } from "@/lib/docusign";
+import { envelopeEventNotification } from "@/lib/docusign-event-notification";
 import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing-tiers";
 import { blocksRealAgreement } from "@/lib/docusign-demo-guard";
 import { notifyContractPreparing } from "@/lib/contract-preparing.server";
@@ -333,6 +338,8 @@ export async function POST(req: Request) {
             ? [{ name: "Attachment to Listing Agreement", html: attachmentHtml(contract.attachment, propertyLine) }]
             : undefined,
         emailSubject: "Please sign your Lixtara listing agreement",
+        // Production only: DocuSign notifies our webhook of this envelope (no account Connect needed).
+        eventNotification: envelopeEventNotification(),
       });
       envelopeId = created.envelopeId;
 

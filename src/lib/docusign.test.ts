@@ -3,6 +3,8 @@ import {
   LIXTARA_BROKER_ROLE,
   MissingBrokerSignerError,
   buildTemplateRoles,
+  consentRequiredMessage,
+  consentUrl,
   createEnvelopeFromTemplate,
   mapEnvelopeStatus,
   primarySellerHasSigned,
@@ -100,5 +102,48 @@ describe("primarySellerHasSigned (#220)", () => {
   });
   it("el segundo firmó y el vendedor no: false", () => {
     expect(primarySellerHasSigned([{ ...seller, status: "sent" }, { ...second, status: "completed" }], "p1")).toBe(false);
+  });
+});
+
+describe("consent_required: URL de consentimiento de ESTA cuenta", () => {
+  const IK = "11111111-aaaa-bbbb-cccc-222222222222";
+
+  it("consentUrl: host, scopes, integration key y redirect URI", () => {
+    const u = new URL(consentUrl({ authHost: "account.docusign.com", integrationKey: IK, redirectUri: "https://lixtara.com/" }));
+    expect(u.origin + u.pathname).toBe("https://account.docusign.com/oauth/auth");
+    expect(Object.fromEntries(u.searchParams)).toEqual({
+      response_type: "code",
+      scope: "signature impersonation",
+      client_id: IK,
+      redirect_uri: "https://lixtara.com/",
+    });
+  });
+
+  it("producción con redirect URI configurado → URL completa en account.docusign.com", () => {
+    const msg = consentRequiredMessage({
+      DOCUSIGN_AUTH_HOST: "account.docusign.com",
+      DOCUSIGN_INTEGRATION_KEY: IK,
+      DOCUSIGN_CONSENT_REDIRECT_URI: "https://lixtara.com/",
+    } as never);
+    expect(msg).toContain("https://account.docusign.com/oauth/auth?");
+    expect(msg).toContain(`client_id=${IK}`);
+    expect(msg).toContain(`redirect_uri=${encodeURIComponent("https://lixtara.com/")}`);
+  });
+
+  it("Demo → account-d.docusign.com", () => {
+    const msg = consentRequiredMessage({
+      DOCUSIGN_AUTH_HOST: "account-d.docusign.com",
+      DOCUSIGN_INTEGRATION_KEY: IK,
+      DOCUSIGN_CONSENT_REDIRECT_URI: "https://preview.lixtara.com/",
+    } as never);
+    expect(msg).toContain("https://account-d.docusign.com/oauth/auth?");
+  });
+
+  it("sin redirect URI → dice qué configurar, sin inventar uno (nunca la ruta inexistente)", () => {
+    const msg = consentRequiredMessage({ DOCUSIGN_AUTH_HOST: "account.docusign.com", DOCUSIGN_INTEGRATION_KEY: IK } as never);
+    expect(msg).toContain("DOCUSIGN_CONSENT_REDIRECT_URI");
+    expect(msg).toContain("REGISTERED_REDIRECT_URI");
+    expect(msg).not.toContain("consent-callback");
+    expect(msg).not.toContain("vercel.app");
   });
 });

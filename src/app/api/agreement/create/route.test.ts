@@ -229,6 +229,31 @@ describe("POST /api/agreement/create: quién firma (#220)", () => {
     expect(notifyCosignerInvitation).not.toHaveBeenCalled();
   });
 
+  it("Production: el sobre lleva eventNotification al webhook de lixtara.com", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://lixtara.com");
+    try {
+      const res = await POST(req());
+      expect(res.status).toBe(200);
+      const en = (createEnvelope.mock.calls[0][0] as Record<string, unknown>).eventNotification as Record<string, unknown>;
+      expect(en).toMatchObject({ url: "https://lixtara.com/api/webhooks/docusign", includeHMAC: "true" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("Preview: sin eventNotification (sigue el Connect de la cuenta Demo)", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://preview.lixtara.com");
+    try {
+      const res = await POST(req());
+      expect(res.status).toBe(200);
+      expect((createEnvelope.mock.calls[0][0] as Record<string, unknown>).eventNotification).toBeUndefined();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("dos vendedores con una plantilla sin 'Seller 2' (v3) → 503, sin sobre", async () => {
     loadOwnership.mockResolvedValueOnce(owners({ other_title_holders: true }, [LUIS]));
     templateHasRole.mockResolvedValueOnce(false);

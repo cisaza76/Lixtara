@@ -5,9 +5,16 @@
 // alguna firma coincide con alguna clave configurada; la comparación es de tiempo
 // constante. Docs: https://developers.docusign.com/platform/webhooks/connect/validate/
 //
-// Claves: DOCUSIGN_CONNECT_HMAC_KEY (y DOCUSIGN_CONNECT_HMAC_KEY_2 para rotar). Sin clave:
-// en Production se rechaza todo (401) — fail-closed —; fuera de Production se procesa y
-// el evento queda registrado con hmac_valid = false.
+// Claves: DOCUSIGN_CONNECT_HMAC_KEY (y DOCUSIGN_CONNECT_HMAC_KEY_2 para rotar).
+//
+// Token (respaldo si la cuenta de DocuSign no permite claves HMAC): DOCUSIGN_WEBHOOK_TOKEN,
+// al menos 32 caracteres, en la URL del eventNotification de cada sobre (?token=…, ver
+// src/lib/docusign-event-notification.ts). Comparación en tiempo constante.
+//
+// Se acepta una entrega con HMAC válido O token válido. Con algo configurado y nada válido:
+// 401. Sin nada configurado: en Production se rechaza todo (401) — fail-closed —; fuera de
+// Production se procesa y el evento queda registrado con hmac_valid = false. En Production,
+// una entrega aceptada con hmac_valid = false entró por token.
 //
 // El estado del acuerdo nunca se toma del payload: lo resuelve `refresh`
 // (refreshAgreement), que consulta DocuSign, actualiza la fila de forma condicionada y
@@ -57,6 +64,35 @@ export function verifyConnectSignature(rawBody: string, headers: Headers, keys: 
   return false;
 }
 
+/** Parámetro de la URL que lleva el token del webhook. */
+export const WEBHOOK_TOKEN_PARAM = "token";
+/** Un token más corto no se usa (se trata como no configurado y se avisa en los logs). */
+export const MIN_WEBHOOK_TOKEN_LENGTH = 32;
+
+export function webhookTokenFromEnv(env: NodeJS.ProcessEnv = process.env): string | null {
+  const t = (env.DOCUSIGN_WEBHOOK_TOKEN ?? "").trim();
+  if (!t) return null;
+  if (t.length < MIN_WEBHOOK_TOKEN_LENGTH) {
+    console.error(JSON.stringify({ event: "docusign_webhook_token_too_short", min: MIN_WEBHOOK_TOKEN_LENGTH }));
+    return null;
+  }
+  return t;
+}
+
+/** ¿La URL de la petición trae el token esperado? Tiempo constante; sin token esperado, false. */
+export function verifyWebhookToken(requestUrl: string, expected: string | null): boolean {
+  if (!expected) return false;
+  let got: string | null;
+  try {
+    got = new URL(requestUrl).searchParams.get(WEBHOOK_TOKEN_PARAM);
+  } catch {
+    return false;
+  }
+  if (!got) return false;
+  // Hash de los dos lados: misma longitud siempre, sin filtrar la longitud del token.
+  return timingSafeEqual(createHash("sha256").update(got).digest(), createHash("sha256").update(expected).digest());
+}
+
 export function sha256Hex(raw: string): string {
   return createHash("sha256").update(raw, "utf8").digest("hex");
 }
@@ -93,19 +129,27 @@ const ack = (body: Record<string, unknown>, status = 200) => Response.json(body,
 export async function handleConnectWebhook(req: Request, deps: WebhookDeps): Promise<Response> {
   const raw = await req.text();
   const keys = hmacKeysFromEnv(deps.env);
+  const token = webhookTokenFromEnv(deps.env);
   const production = deps.env.VERCEL_ENV === "production";
 
-  let hmacValid = false;
-  if (keys.length > 0) {
-    hmacValid = verifyConnectSignature(raw, req.headers, keys);
-    if (!hmacValid) {
+  const hmacValid = keys.length > 0 && verifyConnectSignature(raw, req.headers, keys);
+  const tokenValid = !hmacValid && verifyWebhookToken(req.url, token);
+  if (!hmacValid && !tokenValid) {
+    if (keys.length > 0 || token) {
       // Sin registrar en la base: cualquiera podría llenarla con peticiones sin firma.
-      console.warn(JSON.stringify({ event: "docusign_connect_bad_signature", signatures: connectSignatures(req.headers).length }));
+      console.warn(
+        JSON.stringify({
+          event: "docusign_connect_bad_signature",
+          signatures: connectSignatures(req.headers).length,
+          token_present: new URL(req.url).searchParams.has(WEBHOOK_TOKEN_PARAM),
+        }),
+      );
       return ack({ ok: false, error: "invalid_signature" }, 401);
     }
-  } else if (production) {
-    console.error(JSON.stringify({ event: "docusign_connect_hmac_not_configured", action: "reject" }));
-    return ack({ ok: false, error: "hmac_not_configured" }, 401);
+    if (production) {
+      console.error(JSON.stringify({ event: "docusign_connect_hmac_not_configured", action: "reject" }));
+      return ack({ ok: false, error: "hmac_not_configured" }, 401);
+    }
   }
 
   let payload: ConnectPayload;
