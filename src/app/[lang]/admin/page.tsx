@@ -13,7 +13,7 @@ import { assertStaffWithUser } from "@/lib/admin-auth";
 import { fetchSellerContacts } from "@/lib/admin-sellers.server";
 import { fetchSubmittedAt } from "@/lib/admin-submitted.server";
 import { activityText } from "@/lib/admin-activity";
-import { METRIC_PAYMENT_COLUMNS, liveActivity, liveRevenue } from "@/lib/admin-metrics";
+import { METRIC_PAYMENT_COLUMNS, isTestPayment, liveActivity, liveRevenue, pendingQueueCount } from "@/lib/admin-metrics";
 import { shortListingId } from "@/lib/admin-sellers";
 import { pendingLegalByProperty } from "@/lib/agreement-legal.server";
 import { legalPendingMessage } from "@/lib/agreement-legal";
@@ -56,6 +56,8 @@ interface PaymentRowJoined {
   created_at: string;
   property_id: string;
   user_id: string;
+  stripe_checkout_session_id: string | null;
+  properties: { is_test: boolean | null } | Array<{ is_test: boolean | null }> | null;
 }
 
 /** Estado de un pago en el idioma de la página; un estado desconocido se muestra tal cual. */
@@ -117,11 +119,13 @@ export default async function AdminPage({
   const { data: payRows } = await supabase
     .from("payments")
     .select(
-      "id,amount,currency,status,payment_type,tier,created_at,property_id,user_id",
+      "id,amount,currency,status,payment_type,tier,created_at,property_id,user_id,stripe_checkout_session_id,properties(is_test)",
     )
     .order("created_at", { ascending: false })
     .limit(20);
   const payments = (payRows ?? []) as PaymentRowJoined[];
+  // Cabecera de la cola: "(3 de prueba)" si todos son is_test, para no contradecir el tile.
+  const pendingCount = pendingQueueCount(pending, (n) => copy.pendingAllTest.replace("{n}", String(n)));
 
   // ── Dashboard KPIs (adapted to the real schema; payments use 'succeeded',
   // transactions have no 'title_order_sent' status so that KPI is omitted) ──
@@ -383,9 +387,9 @@ export default async function AdminPage({
         <div className="mb-16 lg:mb-20">
           <h2 className="font-display text-2xl text-ink mb-6 border-b border-gold-soft pb-3">
             {copy.pendingListingsHeader}
-            {pending.length > 0 && (
+            {pendingCount && (
               <span className="ml-3 text-base text-gold align-middle">
-                ({pending.length})
+                ({pendingCount})
               </span>
             )}
           </h2>
@@ -680,6 +684,12 @@ export default async function AdminPage({
                         >
                           {p.property_id.slice(0, 8)}…
                         </Link>
+                        {/* Misma regla que las métricas (#247): cs_test_ o listing is_test. */}
+                        {isTestPayment(p) && (
+                          <span data-test-payment className="ml-2 text-[10px] uppercase tracking-[0.18em] text-ink/50">
+                            {rc.testBadge}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

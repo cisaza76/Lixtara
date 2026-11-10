@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { isStripeTestSession, isTestPayment, liveActivity, liveRevenue } from "@/lib/admin-metrics";
+import { isStripeTestSession, isTestPayment, liveActivity, liveRevenue, pendingQueueCount } from "@/lib/admin-metrics";
 
 const live = { is_test: false };
 const test = { is_test: true };
@@ -61,5 +61,25 @@ describe("métricas del admin sin datos de prueba", () => {
     expect(page).toContain('supabase.from("properties").select("id", { count: "exact", head: true }).eq("is_test", false)');
     expect(page).toContain('headCount("properties", "mls_status", "active").eq("is_test", false)');
     expect(page).toMatch(/\.eq\("status", "closed"\)\n\s+\.eq\("properties\.is_test", false\),/);
+  });
+});
+
+describe("admin: pagos y cola de prueba a la vista ", () => {
+  const label = (n: number) => `${n} de prueba`;
+
+  it("cabecera de la cola: todos is_test → 'N de prueba'; alguno real → N; vacía → null", () => {
+    expect(pendingQueueCount([test, test, test], label)).toBe("3 de prueba");
+    expect(pendingQueueCount([test, live], label)).toBe("2");
+    expect(pendingQueueCount([live], label)).toBe("1");
+    expect(pendingQueueCount([], label)).toBeNull();
+    expect(pendingQueueCount(null, label)).toBeNull();
+  });
+
+  it("la página marca las filas de 'Pagos recientes' con la regla de las métricas y usa el conteo", () => {
+    const src = readFileSync("src/app/[lang]/admin/page.tsx", "utf8");
+    expect(src).toMatch(/\.from\("payments"\)\s*\.select\(\s*"[^"]*stripe_checkout_session_id,properties\(is_test\)"/);
+    expect(src).toMatch(/isTestPayment\(p\) && \(\s*<span data-test-payment[^>]*>\s*\{rc\.testBadge\}/);
+    expect(src).toContain("pendingQueueCount(pending,");
+    expect(src).not.toContain("({pending.length})");
   });
 });
