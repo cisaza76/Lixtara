@@ -229,8 +229,10 @@ describe("POST /api/agreement/create: quién firma (#220)", () => {
     expect(notifyCosignerInvitation).not.toHaveBeenCalled();
   });
 
-  it("Production: el sobre lleva eventNotification al webhook de lixtara.com", async () => {
+  it("Production + DocuSign de producción: el sobre lleva eventNotification al webhook de lixtara.com", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
+    // Con la cuenta Demo, el guard de #249 no crea sobre para un listing real.
+    vi.stubEnv("DOCUSIGN_AUTH_HOST", "account.docusign.com");
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://lixtara.com");
     try {
       const res = await POST(req());

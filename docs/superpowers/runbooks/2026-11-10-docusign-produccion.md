@@ -123,6 +123,12 @@ a `DOCUSIGN_CONNECT_HMAC_KEY`.
 3. **Redeploy obligatorio:** las variables solo aplican a deploys nuevos.
 4. Comprobación sin sobre: `curl -s -X POST https://lixtara.com/api/webhooks/docusign` debe
    devolver `401 invalid_signature`.
+5. **Guard Demo (#249):** con `DOCUSIGN_AUTH_HOST=account.docusign.com`, ese mismo deploy deja
+   de bloquear los listings reales (`src/lib/docusign-demo-guard.ts`). Desde ese momento el paso
+   7 crea sobres de verdad. Los vendedores que vieron "Tu contrato se está preparando" vuelven a
+   pulsar el botón del paso 7 (la broker les avisa). Para saber quiénes son, busca
+   `agreement_blocked_docusign_demo` en los logs de Production o en los correos internos
+   "Contrato por preparar".
 
 ## 7 · Prueba
 
@@ -154,6 +160,8 @@ a `DOCUSIGN_CONNECT_HMAC_KEY`.
 ## 8 · Vuelta atrás
 
 - Instant Rollback al deploy anotado en el paso 6.1, o las variables de Demo más un redeploy.
+  Con `DOCUSIGN_AUTH_HOST` otra vez en Demo, vuelve el guard de #249: los listings reales no
+  reciben sobre.
 - Los sobres enviados en prod en el intermedio no se pueden leer desde Demo: sus acuerdos quedan
   congelados (`refresh` devuelve `fetched = false`) hasta volver a prod.
 
