@@ -124,7 +124,8 @@ export default async function AdminPage({
     .order("created_at", { ascending: false })
     .limit(20);
   const payments = (payRows ?? []) as PaymentRowJoined[];
-  // Cabecera de la cola: "(3 de prueba)" si todos son is_test, para no contradecir el tile.
+  // Cabecera de la cola: "(3 de prueba)" si todos son is_test, "(3 · 1 de prueba)" si hay
+  // mezcla, para no contradecir el tile (que no cuenta los is_test).
   const pendingCount = pendingQueueCount(pending, (n) => copy.pendingAllTest.replace("{n}", String(n)));
 
   // ── Dashboard KPIs (adapted to the real schema; payments use 'succeeded',

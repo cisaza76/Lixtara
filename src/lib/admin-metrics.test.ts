@@ -67,9 +67,12 @@ describe("métricas del admin sin datos de prueba", () => {
 describe("admin: pagos y cola de prueba a la vista ", () => {
   const label = (n: number) => `${n} de prueba`;
 
-  it("cabecera de la cola: todos is_test → 'N de prueba'; alguno real → N; vacía → null", () => {
+  it("cabecera de la cola: todos is_test → 'N de prueba'; mezcla → 'N · M de prueba'; solo reales → N; vacía → null", () => {
     expect(pendingQueueCount([test, test, test], label)).toBe("3 de prueba");
-    expect(pendingQueueCount([test, live], label)).toBe("2");
+    expect(pendingQueueCount([live, test, live], label)).toBe("3 · 1 de prueba");
+    expect(pendingQueueCount([test, live], label)).toBe("2 · 1 de prueba");
+    expect(pendingQueueCount([live, test, live], (m) => `${m} test`)).toBe("3 · 1 test");
+    expect(pendingQueueCount([live, live], label)).toBe("2");
     expect(pendingQueueCount([live], label)).toBe("1");
     expect(pendingQueueCount([], label)).toBeNull();
     expect(pendingQueueCount(null, label)).toBeNull();
