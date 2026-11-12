@@ -56,7 +56,7 @@ Está en `src/lib/legal/privacy.ts` y lo fija `published-v2.test.ts` ("Privacida
     - EN: "Stores which campaign or website first brought you here (UTM parameters, only if you accept analytics) and, only if you accept advertising, the Google Ads click identifier from the link you arrived on (gclid, gbraid or wbraid), to measure our campaigns and attribute a sign-up or payment to that ad. If you reject a category, its part is deleted."
     - ES: "Guarda de qué campaña o sitio llegó por primera vez (parámetros UTM, solo si acepta la analítica) y, solo si acepta la publicidad, el identificador del clic de Google Ads del enlace con el que llegó (gclid, gbraid o wbraid), para medir nuestras campañas y atribuir el registro o el pago a ese anuncio. Si rechaza una categoría, se borra su parte."
   - **`_gcl_gb` (2026-11-04):** fila en Publicidad junto a `_gcl_au` y `_gcl_aw` (90 días según la página de cookies publicitarias de Google). Texto: "Guarda el identificador del clic que Google usa en lugar de gclid en algunos casos, por ejemplo en iPhone (parámetro gbraid), cuando llega desde un anuncio de Google, para atribuir el registro o el pago a ese anuncio." / "Stores the click identifier Google uses instead of gclid in some cases, for example on iPhone (gbraid parameter), when you arrive from a Google ad, to attribute a sign-up or payment to that ad."
-  - Su "Última actualización" dirá 2026-11-02, la fecha de la decisión, aunque se publique después.
+  - Su "Última actualización" dice 2026-11-11, la fecha de publicación con el merge (owner, 2026-11-11). El identificador de versión sigue siendo `2026-11-02-v5`.
 
 ## Preguntas para el abogado
 

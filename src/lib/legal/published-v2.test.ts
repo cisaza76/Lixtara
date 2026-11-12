@@ -91,9 +91,9 @@ describe("páginas legales: todas, en los dos idiomas, desde una sola configurac
     // 2026-11-11: Privacidad v5, API de Conversiones de Meta (sobre la v4 del 2026-10-24).
     expect(LEGAL_DOCS.privacy.version).toBe("2026-11-11-v5");
     expect(LEGAL_DOCS.privacy.updated).toBe("2026-11-11");
-    // 2026-11-02: Cookies v5 (fila de lx_ft con sus dos categorías).
+    // Cookies v5 (fila de lx_ft con sus dos categorías; decidida el 2026-11-02, publicada el 2026-11-11).
     expect(LEGAL_DOCS.cookies.version).toBe("2026-11-02-v5");
-    expect(LEGAL_DOCS.cookies.updated).toBe("2026-11-02");
+    expect(LEGAL_DOCS.cookies.updated).toBe("2026-11-11");
   });
 
   it("el componente muestra la versión y la fecha de LEGAL_DOCS, con anclas y tablas", () => {
