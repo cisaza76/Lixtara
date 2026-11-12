@@ -58,8 +58,11 @@ export const COOKIES_LAST_UPDATED = COOKIES_V5_PUBLISHED;
 /** Disclaimers (Avisos Legales) v2: aviso IDX, valuaciones, registros públicos e IA. */
 export const DISCLAIMERS_LAST_UPDATED = LEGAL_V2_PUBLISHED;
 
-/** Privacy Policy v4: §4.6 compartición para publicidad con consentimiento, §6.2 publicidad (Meta y Google Ads), §6.3 retiro, §9.1 Global Privacy Control. */
-export const PRIVACY_LAST_UPDATED = LEGAL_V4_PUBLISHED;
+/** Privacy Policy v5 (2026-11-11, aprobada por el owner): §6.2 API de Conversiones de Meta, §4.1, §4.6 y §6.3. */
+export const PRIVACY_V5_PUBLISHED = "2026-11-11";
+
+/** Privacy Policy v5 sobre la v4 (§4.6 compartición para publicidad con consentimiento, §6.2 publicidad, §6.3 retiro, §9.1 GPC). */
+export const PRIVACY_LAST_UPDATED = PRIVACY_V5_PUBLISHED;
 
 /** Avisos de corretaje, vivienda justa y fraude (/notices), primera publicación. */
 export const NOTICES_LAST_UPDATED = LEGAL_V2_PUBLISHED;

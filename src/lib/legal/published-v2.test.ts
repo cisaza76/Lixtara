@@ -88,9 +88,9 @@ describe("páginas legales: todas, en los dos idiomas, desde una sola configurac
       expect(LEGAL_DOCS[id].version, id).toBe("2026-10-18-v2");
       expect(LEGAL_DOCS[id].updated, id).toBe("2026-10-18");
     }
-    // 2026-10-24: categoría Publicidad (Meta y Google Ads).
-    expect(LEGAL_DOCS.privacy.version).toBe("2026-10-24-v4");
-    expect(LEGAL_DOCS.privacy.updated).toBe("2026-10-24");
+    // 2026-11-11: Privacidad v5, API de Conversiones de Meta (sobre la v4 del 2026-10-24).
+    expect(LEGAL_DOCS.privacy.version).toBe("2026-11-11-v5");
+    expect(LEGAL_DOCS.privacy.updated).toBe("2026-11-11");
     // 2026-11-02: Cookies v5 (fila de lx_ft con sus dos categorías).
     expect(LEGAL_DOCS.cookies.version).toBe("2026-11-02-v5");
     expect(LEGAL_DOCS.cookies.updated).toBe("2026-11-02");
@@ -275,12 +275,12 @@ describe("cookies: publicidad solo con consentimiento, en el aviso y en la polí
     expect(read("src/lib/legal/cookies.ts")).not.toMatch(/toolongdidntread/);
   });
 
-  it("privacidad: compartición para publicidad solo con consentimiento, GPC y retiro; sin API de Conversiones", () => {
+  it("privacidad: compartición para publicidad solo con consentimiento, GPC y retiro; API de Conversiones solo en §4.1, §4.6, §6.2 y §6.3", () => {
     for (const lang of LANGS) {
       const doc = fillLegalDoc(privacyDoc[lang]);
       const s = JSON.stringify(doc);
-      // La API de Conversiones no existe todavía: se describe en el PR que la construya.
-      expect(s).not.toMatch(/SHA-256|Conversions API|API de Conversiones|hash/i);
+      // Privacidad v5 (2026-11-11): la API de Conversiones se describe en §6.2; la política de
+      // cookies no la nombra (no pone cookies, solo lee _fbp y _fbc).
       for (const c of [true, false]) {
         expect(JSON.stringify(cookiesDocFor(lang, { gtm: true, posthog: c }))).not.toMatch(/Conversions API|API de Conversiones|SHA-256/);
       }
@@ -318,5 +318,48 @@ describe("pie de página", () => {
     expect(layout).toContain("{BROKERAGE.legalName}");
     expect(layout).toContain("LEGAL_DOCS.notices.path}#fair-housing");
     expect(read("src/lib/sitemap-routes.ts")).toMatch(/"\/notices",\s*"\/accessibility"/);
+  });
+});
+
+// Privacidad v5 (2026-11-11), texto aprobado por el owner: docs/legal/2026-10-31-meta-capi-memo.md.
+describe("Privacidad v5: API de Conversiones de Meta", () => {
+  const sub = (lang: Lang, n: string) =>
+    fillLegalDoc(privacyDoc[lang]).sections.flatMap((s) => s.sub ?? []).find((s) => s.heading.startsWith(n))!;
+
+  it.each(LANGS)("%s: §6.2 tiene tres párrafos (píxel, servidor, GPC) y el texto aprobado", (lang) => {
+    const body = sub(lang, "6.2").body;
+    expect(body).toHaveLength(3);
+    if (lang === "en") {
+      expect(body[0]).toContain("The Meta pixel and Google Ads never load in the listing flow");
+      expect(body[0]).not.toContain("Advertising is never activated");
+      expect(body[1]).toMatch(/^If you have accepted the Advertising category, our server \(not your browser\) notifies Meta Platforms, Inc\., through the Meta Conversions API, of three steps: when you verify your email to create your account or list your home,/);
+      expect(body[1]).toMatch(/we send nothing to Meta\.$/);
+    } else {
+      expect(body[0]).toContain("El píxel de Meta y Google Ads nunca se cargan en el proceso de publicación");
+      expect(body[0]).not.toContain("La publicidad nunca se activa");
+      expect(body[1]).toMatch(/^Si usted aceptó la categoría Publicidad, nuestro servidor \(no su navegador\) avisa a Meta Platforms, Inc\., mediante la API de Conversiones de Meta, de tres pasos: cuando verifica su correo al crear su cuenta o publicar su vivienda,/);
+      expect(body[1]).toMatch(/no enviamos nada a Meta\.$/);
+      // Sin fragmentos repetidos.
+      expect(body[1].split("mientras exista su cuenta").length).toBe(2);
+      expect(body[1].split("Si usted retira su consentimiento").length).toBe(2);
+    }
+    expect(body[1]).toContain("SHA-256");
+    expect(body[2]).toContain("Global Privacy Control");
+  });
+
+  it.each(LANGS)("%s: §6.3, §4.6 y §4.1 con los ajustes", (lang) => {
+    const s63 = sub(lang, "6.3").body.join(" ");
+    const s46 = sub(lang, "4.6").body.join(" ");
+    const s41 = sub(lang, "4.1").bullets!.join("\n");
+    if (lang === "en") {
+      expect(s63).toContain("deleted from your browser. Our server also stops notifying Meta and deletes the identifiers it kept for that purpose.");
+      expect(s46).toContain("information about your use of our site and, as described in Section 6.2, notices of the steps of your listing with Meta Platforms, Inc.");
+      expect(s41).toContain("Meta Platforms, Inc. (Meta pixel and Conversions API):");
+    } else {
+      expect(s63).toContain("se borran de su navegador. Nuestro servidor también deja de avisar a Meta y borra los identificadores que guardaba para ello.");
+      expect(s46).toContain("información sobre su uso de nuestro sitio y, según se describe en la Sección 6.2, avisos de los pasos de su listado con Meta Platforms, Inc.");
+      expect(s41).toContain("Meta Platforms, Inc. (píxel de Meta y API de Conversiones):");
+      expect(s41).not.toContain("Meta pixel");
+    }
   });
 });

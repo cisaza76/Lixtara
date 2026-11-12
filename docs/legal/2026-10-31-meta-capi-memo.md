@@ -1,6 +1,6 @@
 # API de Conversiones de Meta: texto de Privacidad para aprobar
 
-**Fecha:** 2026-10-31 · **PR:** `feat/meta-capi` (sobre #225) · **Estado:** borrador, **NO publicado**
+**Fecha:** 2026-10-31 · **PR:** #246 `feat/meta-capi` · **Estado:** **Privacidad v5 aprobada por el owner el 2026-11-11** (versión `2026-11-11-v5`). Se publica al mergear #246, junto con Cookies v5. Revisión del abogado pendiente (preguntas abajo).
 
 ## Qué cambia en el sitio
 
@@ -25,31 +25,38 @@ Decisión del owner del 2026-10-31, sobre el plan de medición del CMO (paso 4.8
   - La fila se borra con la cuenta.
 - **La función está apagada en producción** (`META_CAPI_ENABLED`) hasta que este texto esté aprobado y publicado.
 
-## Texto propuesto
+## Texto aprobado (owner, 2026-11-11)
 
-**§6.2.** Se mantiene el párrafo del píxel y se agrega uno nuevo después de la frase "Advertising is never activated in the listing flow…".
+Está en `src/lib/legal/privacy.ts` y lo fija `published-v2.test.ts` ("Privacidad v5").
+
+**§6.2.** Los párrafos 1 y 2 se reemplazan por estos dos. El párrafo de GPC queda igual, como tercero.
 
 **EN**
 
-> The Meta pixel and Google Ads are not activated on those pages. However, if you have accepted the Advertising category, our server notifies Meta Platforms, Inc. (through the Meta Conversions API) of three steps of your listing: when you verify your email to list your home, when you sign the listing agreement, and when you pay for your plan. With each notice we send your email address and your Lixtara user ID, both converted with a one-way hash (SHA-256) before they leave our servers, the Meta cookies in your browser (_fbp and _fbc), your IP address and your browser's user agent, and, for the payment, the plan and the amount paid. We never send your name, phone number, or the address or any other detail of your home or listing. Meta uses this information to measure our campaigns, to decide who sees our ads, and to avoid showing them to people who have already purchased a plan. To send the notices that happen without your browser (for example, when the signature or the payment is confirmed), we keep the Meta cookies, your IP address and your user agent on our servers. We delete your IP address and user agent 90 days after we save them or once your plan payment is confirmed, whichever comes first; we keep the Meta cookies while your account exists. We delete all of them if you withdraw your consent. If you do not accept advertising, or your browser sends the Global Privacy Control signal, we send nothing to Meta.
+> We use the Meta pixel (Meta Platforms, Inc.) and Google Ads (Google LLC) to measure our advertising campaigns and to show you Lixtara ads on other websites and apps. They run only if you accept the Advertising category in the cookie banner; until then, and if you reject it, they are not activated. The Meta pixel and Google Ads never load in the listing flow for your home, in your account, in sign-in and sign-up, or in your dashboard, even if you have accepted advertising.
+>
+> If you have accepted the Advertising category, our server (not your browser) notifies Meta Platforms, Inc., through the Meta Conversions API, of three steps: when you verify your email to create your account or list your home, when you sign the listing agreement, and when you pay for your plan. With each notice we send your email address and your Lixtara user ID, both converted with a one-way hash (SHA-256) before they leave our servers, the Meta cookies in your browser (_fbp and _fbc), your IP address and your browser's user agent, and, for the payment, the plan and the amount paid. We never send your name, phone number, or the address or any other detail of your home or listing. Meta uses this information to measure our campaigns, to decide who sees our ads, and to avoid showing them to people who have already purchased a plan. To send the notices that happen without your browser (for example, when the signature or the payment is confirmed), we keep the Meta cookies, your IP address and your user agent on our servers. We delete your IP address and user agent 90 days after we save them or once your plan payment is confirmed, whichever comes first; we keep the Meta cookies while your account exists. We delete all of them if you withdraw your consent. If you do not accept advertising, or your browser sends the Global Privacy Control signal, we send nothing to Meta.
 
 **ES (usted)**
 
-> El píxel de Meta y Google Ads no se activan en esas páginas. Sin embargo, si usted aceptó la categoría Publicidad, nuestro servidor avisa a Meta Platforms, Inc. (mediante la API de Conversiones de Meta) de tres pasos de su listado: cuando verifica su correo para publicar su vivienda, cuando firma el contrato de listado y cuando paga su plan. Con cada aviso enviamos su correo electrónico y su identificador de usuario de Lixtara, ambos convertidos con un hash irreversible (SHA-256) antes de salir de nuestros servidores, las cookies de Meta de su navegador (_fbp y _fbc), su dirección IP y el agente de usuario de su navegador y, en el pago, el plan y el monto pagado. Nunca enviamos su nombre, su teléfono, ni la dirección u otro dato de su vivienda o de su listado. Meta usa esta información para medir nuestras campañas, decidir a quién se muestran nuestros anuncios y no mostrárselos a quien ya compró un plan. Para enviar los avisos que ocurren sin su navegador (por ejemplo, cuando se confirma la firma o el pago), guardamos en nuestros servidores las cookies de Meta, su dirección IP y su agente de usuario. Borramos su dirección IP y su agente de usuario 90 días después de guardarlos o cuando se confirma el pago de su plan, lo que ocurra primero; las cookies de Meta las conservamos mientras exista su cuenta. Si usted retira su consentimiento, borramos todo. Si usted no acepta la publicidad, o su navegador envía la señal Global Privacy Control, no enviamos nada a Meta.
+> Usamos el píxel de Meta (Meta Platforms, Inc.) y Google Ads (Google LLC) para medir nuestras campañas de publicidad y mostrarle anuncios de Lixtara en otros sitios y aplicaciones. Solo funcionan si usted acepta la categoría Publicidad en el aviso de cookies; hasta entonces, y si la rechaza, no se activan. El píxel de Meta y Google Ads nunca se cargan en el proceso de publicación de su vivienda, en su cuenta, en el inicio de sesión y el registro, ni en su panel, aunque usted haya aceptado la publicidad.
+>
+> Si usted aceptó la categoría Publicidad, nuestro servidor (no su navegador) avisa a Meta Platforms, Inc., mediante la API de Conversiones de Meta, de tres pasos: cuando verifica su correo al crear su cuenta o publicar su vivienda, cuando firma el contrato de listado y cuando paga su plan. Con cada aviso enviamos su correo electrónico y su identificador de usuario de Lixtara, ambos convertidos con un hash irreversible (SHA-256) antes de salir de nuestros servidores, las cookies de Meta de su navegador (_fbp y _fbc), su dirección IP y el agente de usuario de su navegador y, en el pago, el plan y el monto pagado. Nunca enviamos su nombre, su teléfono, ni la dirección u otro dato de su vivienda o de su listado. Meta usa esta información para medir nuestras campañas, decidir a quién se muestran nuestros anuncios y no mostrárselos a quien ya compró un plan. Para enviar los avisos que ocurren sin su navegador (por ejemplo, cuando se confirma la firma o el pago), guardamos en nuestros servidores las cookies de Meta, su dirección IP y su agente de usuario. Borramos su dirección IP y su agente de usuario 90 días después de guardarlos o cuando se confirma el pago de su plan, lo que ocurra primero; las cookies de Meta las conservamos mientras exista su cuenta. Si usted retira su consentimiento, borramos todo. Si usted no acepta la publicidad, o su navegador envía la señal Global Privacy Control, no enviamos nada a Meta.
 
-**Otros ajustes de Privacidad v4 que hay que hacer en el mismo cambio:**
+**Otros ajustes de Privacidad v5 (aprobados):**
 
-- **§4.6 (EN/ES):** después de "information about your use of our site", agregar "and, as described in Section 6.2, notices of the steps of your listing".
-- **§6.3:**
-  - EN: agregar "From then on, our server also stops notifying Meta and deletes the identifiers it kept for that purpose."
-  - ES: agregar "A partir de ese momento, nuestro servidor también deja de avisar a Meta y borra los identificadores que guardaba para ello."
-- **§4.1:** la línea del proveedor Meta (`PRIVACY_PROVIDERS`) suma "Conversions API" / "API de Conversiones".
-- **Política de cookies:** la API de Conversiones no pone cookies; solo lee `_fbp` y `_fbc`, que ya están declaradas. **`lx_ft` cambió y ya está PUBLICADO en la v5** (`2026-11-02-v5`; pedido del CMO, decisión del owner del 2026-11-02, sin esperar al abogado). Además de las UTM (con Analítica), guarda los identificadores de clic de Google Ads de la URL de llegada (`gclid`, `gbraid`, `wbraid`), solo con Publicidad aceptada y sin GPC, y se borran si rechaza la Publicidad. Texto de la fila (sin GTM no hay Publicidad y la fila sigue diciendo solo UTM):
-  - EN: "Stores which campaign or website first brought you here (UTM parameters, only if you accept analytics) and, only if you accept advertising, the Google Ads click identifier from the link you arrived on (gclid, gbraid or wbraid), to measure our campaigns and attribute a sign-up or payment to that ad. If you reject a category, its part is deleted."
-  - ES: "Guarda de qué campaña o sitio llegó por primera vez (parámetros UTM, solo si acepta la analítica) y, solo si acepta la publicidad, el identificador del clic de Google Ads del enlace con el que llegó (gclid, gbraid o wbraid), para medir nuestras campañas y atribuir el registro o el pago a ese anuncio. Si rechaza una categoría, se borra su parte."
-  - Lo único pendiente de aprobación legal es §6.2 (la API de Conversiones sigue apagada con `META_CAPI_ENABLED`).
-- **`_gcl_gb` (2026-11-04, pedido del owner):** la v5 agrega su fila en Publicidad, junto a `_gcl_au` y `_gcl_aw` (90 días según la página de cookies publicitarias de Google). Texto: "Guarda el identificador del clic que Google usa en lugar de gclid en algunos casos, por ejemplo en iPhone (parámetro gbraid), cuando llega desde un anuncio de Google, para atribuir el registro o el pago a ese anuncio." / "Stores the click identifier Google uses instead of gclid in some cases, for example on iPhone (gbraid parameter), when you arrive from a Google ad, to attribute a sign-up or payment to that ad."
-- **Versión:** Privacidad sube de `2026-10-24-v4` a v5 cuando se publique §6.2. (Cookies ya está en `2026-11-02-v5` por la fila de `lx_ft`.)
+- **§4.1:** la línea de Meta dice "Meta Platforms, Inc. (Meta pixel and Conversions API)" en EN y "Meta Platforms, Inc. (píxel de Meta y API de Conversiones)" en ES (`name_es` en `providers.ts`).
+- **§4.6:** después de "information about your use of our site" se agrega "and, as described in Section 6.2, notices of the steps of your listing". En ES, "y, según se describe en la Sección 6.2, avisos de los pasos de su listado".
+- **§6.3:** después de la frase del borrado de cookies se agrega:
+  - EN: "Our server also stops notifying Meta and deletes the identifiers it kept for that purpose."
+  - ES: "Nuestro servidor también deja de avisar a Meta y borra los identificadores que guardaba para ello."
+- **Versión:** Privacidad pasa a `2026-11-11-v5` ("Última actualización" 2026-11-11). La casilla del registro se registra como `terms-2026-10-21-v3+privacy-2026-11-11-v5`, con el mismo texto y hash. La versión anterior (`…+privacy-2026-10-24-v4`) queda en el historial.
+- **Política de cookies v5 (`2026-11-02-v5`): NO está publicada** (corrección del 2026-11-11). Solo existe en la rama de #246: en `main` y en lixtara.com sigue la v4 (`2026-10-24-v4`). Sale con el merge de #246, junto con Privacidad v5. La API de Conversiones no pone cookies; solo lee `_fbp` y `_fbc`, que ya están declaradas. Lo que cambia en la v5:
+  - **`lx_ft`:** además de las UTM (con Analítica), guarda los identificadores de clic de Google Ads de la URL de llegada (`gclid`, `gbraid`, `wbraid`), solo con Publicidad aceptada y sin GPC, y se borran si se rechaza la Publicidad. Texto de la fila (sin GTM no hay Publicidad y la fila dice solo UTM):
+    - EN: "Stores which campaign or website first brought you here (UTM parameters, only if you accept analytics) and, only if you accept advertising, the Google Ads click identifier from the link you arrived on (gclid, gbraid or wbraid), to measure our campaigns and attribute a sign-up or payment to that ad. If you reject a category, its part is deleted."
+    - ES: "Guarda de qué campaña o sitio llegó por primera vez (parámetros UTM, solo si acepta la analítica) y, solo si acepta la publicidad, el identificador del clic de Google Ads del enlace con el que llegó (gclid, gbraid o wbraid), para medir nuestras campañas y atribuir el registro o el pago a ese anuncio. Si rechaza una categoría, se borra su parte."
+  - **`_gcl_gb` (2026-11-04):** fila en Publicidad junto a `_gcl_au` y `_gcl_aw` (90 días según la página de cookies publicitarias de Google). Texto: "Guarda el identificador del clic que Google usa en lugar de gclid en algunos casos, por ejemplo en iPhone (parámetro gbraid), cuando llega desde un anuncio de Google, para atribuir el registro o el pago a ese anuncio." / "Stores the click identifier Google uses instead of gclid in some cases, for example on iPhone (gbraid parameter), when you arrive from a Google ad, to attribute a sign-up or payment to that ad."
+  - Su "Última actualización" dirá 2026-11-02, la fecha de la decisión, aunque se publique después.
 
 ## Preguntas para el abogado
 
@@ -59,7 +66,7 @@ Decisión del owner del 2026-10-31, sobre el plan de medición del CMO (paso 4.8
 
 ## Para encenderla
 
-1. Aprobar el texto (owner).
-2. Publicar el texto: el PR que cambia `src/lib/legal/privacy.ts`, con nueva versión. El test `published-v2.test.ts` hoy exige que no aparezca la API de Conversiones y hay que actualizarlo.
+1. ~~Aprobar el texto (owner).~~ Aprobado el 2026-11-11.
+2. Publicar el texto: está en #246 (`privacy.ts`, versión `2026-11-11-v5`, tests actualizados). Se publica al mergear #246.
 3. Aplicar la migración `20261031120000_ad_attribution.sql` (owner, `supabase db push`).
 4. Agregar las variables en Production: `META_CAPI_TOKEN`, `META_DATASET_ID` y `META_CAPI_ENABLED=true`. Nunca `META_TEST_EVENT_CODE`.
