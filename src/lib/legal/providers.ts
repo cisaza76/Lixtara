@@ -9,8 +9,10 @@
 
 export interface PrivacyProvider {
   id: string;
-  /** Como aparece en la política (EN y ES). */
+  /** Como aparece en la política (EN, y ES si no hay name_es). */
   name: string;
+  /** Nombre en español, si difiere del inglés. */
+  name_es?: string;
   purpose_en: string;
   purpose_es: string;
   /** Política de privacidad del proveedor (comprobada); sin ella, la política no muestra enlace. */
@@ -76,7 +78,8 @@ export const PRIVACY_PROVIDERS: PrivacyProvider[] = [
   },
   {
     id: "meta",
-    name: "Meta Platforms, Inc. (Meta pixel)",
+    name: "Meta Platforms, Inc. (Meta pixel and Conversions API)",
+    name_es: "Meta Platforms, Inc. (píxel de Meta y API de Conversiones)",
     purpose_en: "measurement of our advertising campaigns and Lixtara ads on Facebook, Instagram and other apps, only if you accept advertising cookies (see Section 6.2)",
     purpose_es: "medición de nuestras campañas de publicidad y anuncios de Lixtara en Facebook, Instagram y otras aplicaciones, solo si usted acepta las cookies de publicidad (consulte la Sección 6.2)",
     policyUrl: "https://www.facebook.com/privacy/policy/",
@@ -211,6 +214,7 @@ export const PRIVACY_PROVIDERS: PrivacyProvider[] = [
 /** Una línea por proveedor para la Política de Privacidad. */
 export function providerBullet(p: PrivacyProvider, lang: "en" | "es"): string {
   const purpose = lang === "es" ? p.purpose_es : p.purpose_en;
+  const name = lang === "es" ? (p.name_es ?? p.name) : p.name;
   const policy = lang === "es" ? "Política de privacidad" : "Privacy policy";
-  return p.policyUrl ? `${p.name}: ${purpose}. ${policy}: ${p.policyUrl}` : `${p.name}: ${purpose}.`;
+  return p.policyUrl ? `${name}: ${purpose}. ${policy}: ${p.policyUrl}` : `${name}: ${purpose}.`;
 }

@@ -44,7 +44,7 @@ import {
   type ConsentChoice,
   type ConsentState,
 } from "@/lib/analytics-config";
-import { disableAnalytics, enableAnalytics, markPageview } from "@/lib/analytics";
+import { disableAnalytics, enableAnalytics, markPageview, syncFirstTouch } from "@/lib/analytics";
 import { campaignFields } from "@/lib/funnel-events";
 
 interface Props {
@@ -194,8 +194,26 @@ const consentStore = {
   },
   server: (): "unknown" => "unknown",
 };
+/**
+ * Avisa al servidor del cambio (API de Conversiones de Meta: la firma y el pago llegan sin
+ * navegador y deben usar la elección vigente). Sin sesión, el servidor no guarda nada.
+ */
+function syncAdAttribution(): void {
+  try {
+    void fetch("/api/ad-attribution", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* sin red: la próxima visita al registro actualiza lo guardado */
+  }
+}
+
 function setConsent(choice: ConsentState): void {
   saveChoice(choice);
+  syncAdAttribution();
   for (const l of listeners) l();
 }
 
@@ -243,6 +261,8 @@ export function AnalyticsConsent(props: Props) {
       clearStorage(ANALYTICS_COOKIE_RE, true);
     }
     if (state.ads === "denied") clearStorage(ADS_COOKIE_RE, false);
+    // lx_ft: UTM con Analítica y gclid/gbraid/wbraid con Publicidad; lo denegado se borra.
+    syncFirstTouch(state);
     // La configuración no cambia durante la vida de la página.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analytics, ads, excluded, gpc]);

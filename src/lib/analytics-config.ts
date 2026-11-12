@@ -88,10 +88,10 @@ export function consentModeUpdate(s: ConsentState, pathname: string, gpc = false
 
 /**
  * Cookies de analítica que las herramientas dejan en NUESTRO dominio y que se borran al
- * rechazar o retirar la analítica: GA4 `_ga*`/`_gid`, Clarity `_clck`/`_clsk`, PostHog `ph_*`
- * y nuestra `lx_ft` (UTM de primer contacto, solo con consentimiento).
+ * rechazar o retirar la analítica: GA4 `_ga*`/`_gid`, Clarity `_clck`/`_clsk`, PostHog `ph_*`.
+ * Nuestra `lx_ft` tiene una parte por categoría: la limpia syncFirstTouch (analytics.ts).
  */
-export const ANALYTICS_COOKIE_RE = /^(_ga|_gid|_clck|_clsk|ph_|lx_ft$)/;
+export const ANALYTICS_COOKIE_RE = /^(_ga|_gid|_clck|_clsk|ph_)/;
 
 /**
  * Cookies de publicidad en NUESTRO dominio (Google Ads `_gcl_*`, Meta `_fbp`/`_fbc`): se

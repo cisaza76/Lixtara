@@ -425,8 +425,17 @@ describe("consentimiento: lo que concede cada categoría y lo que se borra al re
     expect(page).not.toContain('jar.get(CONSENT_COOKIE)?.value === "granted"');
   });
 
-  it("al rechazar Analítica se borran GA4, Clarity, PostHog y lx_ft; al rechazar Publicidad, Google Ads y Meta", () => {
-    for (const c of ["_ga", "_ga_ABC123", "_gid", "_clck", "_clsk", "ph_phc_x_posthog", "lx_ft"]) {
+  it("lx_ft se limpia por categoría al aplicar cada elección guardada", () => {
+    const src = readFileSync(join(process.cwd(), "src/components/analytics-consent.tsx"), "utf8");
+    expect(src).toMatch(/if \(state\.ads === "denied"\) clearStorage\(ADS_COOKIE_RE, false\);[\s\S]{0,160}syncFirstTouch\(state\);/);
+    // Nada de sessionStorage para la URL de llegada.
+    expect(readFileSync(join(process.cwd(), "src/lib/analytics.ts"), "utf8")).not.toMatch(/sessionStorage/);
+    expect(src).not.toMatch(/sessionStorage/);
+  });
+
+  it("al rechazar Analítica se borran GA4, Clarity y PostHog; al rechazar Publicidad, Google Ads y Meta", () => {
+    expect(ANALYTICS_COOKIE_RE.test("lx_ft")).toBe(false);
+    for (const c of ["_ga", "_ga_ABC123", "_gid", "_clck", "_clsk", "ph_phc_x_posthog"]) {
       expect(ANALYTICS_COOKIE_RE.test(c), c).toBe(true);
       expect(ADS_COOKIE_RE.test(c), c).toBe(false);
     }

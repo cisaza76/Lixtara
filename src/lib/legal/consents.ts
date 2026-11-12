@@ -84,6 +84,9 @@ const TERMS_V2: ConsentVersion = { version: "terms-2026-10-18-v2+privacy-2026-10
 // v3 de los Términos con la Privacidad v2 (2026-10-21 → 2026-10-24): misma casilla.
 const TERMS_V3: ConsentVersion = { version: "terms-2026-10-21-v3+privacy-2026-10-18-v2", checkbox: TERMS_CHECKBOX };
 
+// Términos v3 con la Privacidad v4 (2026-10-24 → 2026-11-11): misma casilla.
+const TERMS_V3_PRIVACY_V4: ConsentVersion = { version: "terms-2026-10-21-v3+privacy-2026-10-24-v4", checkbox: TERMS_CHECKBOX };
+
 // Casilla del paso 8 v1/v2 (2026-10-18): conservada para reconstruir las aceptaciones registradas.
 const TERMS_REFUND_CHECKBOX_V1: Record<ConsentLang, ConsentParts> = {
   en: {
@@ -143,7 +146,7 @@ export const CONSENTS: Record<ConsentDocument, ConsentDefinition> = {
     checkbox: TERMS_CHECKBOX,
     links: [LEGAL_DOCS.terms.path, `${LEGAL_DOCS.terms.path}#section-17`, LEGAL_DOCS.privacy.path],
     // Privacidad v4 (2026-10-24): misma casilla, versión nueva; las anteriores se conservan.
-    previous: [TERMS_V1, TERMS_V2, TERMS_V3],
+    previous: [TERMS_V1, TERMS_V2, TERMS_V3, TERMS_V3_PRIVACY_V4],
   },
   // Paso 8, antes de "Pagar con Stripe". Dice lo mismo que legal-terms.ts#refundPolicy, los
   // Términos §6 y la FAQ (site-claims.test.ts lo comprueba). La versión es la de los Términos:
@@ -303,6 +306,11 @@ export const PUBLISHED_CONSENT_HASHES: Record<string, Record<ConsentLang, string
   },
   // Misma casilla que la v2/v3 (mismo hash): cambió la versión de la Privacidad que se acepta.
   "terms@terms-2026-10-21-v3+privacy-2026-10-24-v4": {
+    en: "4c3ae511d2e3245df3fbf105c4c1c587c2e6dcb701747fea13cde78c2addecb6",
+    es: "971219881754a9fde2d0243a491213ae7bdcadf90005650b52d8b1afe07c90c1",
+  },
+  // Privacidad v5 (2026-11-11, API de Conversiones de Meta): misma casilla, mismo hash.
+  "terms@terms-2026-10-21-v3+privacy-2026-11-11-v5": {
     en: "4c3ae511d2e3245df3fbf105c4c1c587c2e6dcb701747fea13cde78c2addecb6",
     es: "971219881754a9fde2d0243a491213ae7bdcadf90005650b52d8b1afe07c90c1",
   },

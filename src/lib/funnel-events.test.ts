@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   campaignFields,
   isHumanPageView,
   firstTouchCookieValue,
+  nextFirstTouchCookie,
+  parseFirstTouchClickIds,
   funnelIsTest,
   parseFirstTouch,
   sanitizeFunnelMetadata,
@@ -86,5 +90,69 @@ describe("visitas de navegadores reales (owners_landing_view)", () => {
     }
     expect(isHumanPageView({ userAgent: null, purpose: null })).toBe(false);
     expect(isHumanPageView({ userAgent: chrome, purpose: "prefetch" })).toBe(false);
+  });
+});
+
+describe("lx_ft: UTM con Analítica, gclid/gbraid/wbraid con Publicidad", () => {
+  const landing = new URLSearchParams("utm_source=google&utm_medium=cpc&gclid=Cj0K_abc-1&gbraid=0AAA_gb&wbraid=Cl_wb");
+  const both = { analytics: "granted", ads: "granted" } as const;
+  it("con las dos aceptadas: todo, de la URL de llegada", () => {
+    const v = nextFirstTouchCookie(null, landing, both);
+    expect(v).toBe("google|cpc||Cj0K_abc-1|0AAA_gb|Cl_wb");
+    expect(parseFirstTouchClickIds(v)).toEqual({ gclid: "Cj0K_abc-1", gbraid: "0AAA_gb", wbraid: "Cl_wb" });
+    expect(parseFirstTouch(v ?? undefined)).toEqual({ utm_source: "google", utm_medium: "cpc" });
+  });
+  it("solo Analítica: sin identificadores de clic; solo Publicidad: sin UTM", () => {
+    expect(nextFirstTouchCookie(null, landing, { analytics: "granted", ads: "denied" })).toBe("google|cpc|");
+    expect(nextFirstTouchCookie(null, landing, { analytics: "denied", ads: "granted" })).toBe("|||Cj0K_abc-1|0AAA_gb|Cl_wb");
+  });
+  it("Publicidad denegada (o GPC) después: se borran los identificadores; las dos denegadas: la cookie", () => {
+    const v = nextFirstTouchCookie(null, landing, both);
+    expect(nextFirstTouchCookie(v, new URLSearchParams(), { analytics: "granted", ads: "denied" })).toBe("google|cpc|");
+    expect(nextFirstTouchCookie(v, new URLSearchParams(), { analytics: "denied", ads: "denied" })).toBeNull();
+  });
+  it("primer contacto: lo guardado no se sobrescribe; lo que falta se completa", () => {
+    const v = nextFirstTouchCookie("google|cpc||Cj0K_old||", new URLSearchParams("utm_source=fb&gclid=NEW&wbraid=W1"), both);
+    expect(v).toBe("google|cpc||Cj0K_old||W1");
+  });
+  it("valores raros no entran; sin nada, no hay cookie", () => {
+    expect(nextFirstTouchCookie(null, new URLSearchParams("gclid=<script>&gbraid=a b"), both)).toBeNull();
+    expect(nextFirstTouchCookie(null, new URLSearchParams("q=1"), both)).toBeNull();
+    expect(parseFirstTouchClickIds("a|b|c|x;y||")).toEqual({});
+    expect(parseFirstTouchClickIds(undefined)).toEqual({});
+  });
+});
+
+// Regla del owner (2026-11-05): lx_ft es first-party. La exclusión de publicidad en el embudo,
+// la cuenta y el acceso (isAdsExcludedPath) aplica solo a GTM y al píxel; los IDs de clic de un
+// anuncio que lleva directo a /es/listing/new se guardan si la elección de la persona tiene
+// Publicidad aceptada (guardada o aceptada en el banner de esa ruta). Comprobado en el preview
+// el 2026-11-05; este test fija la regla.
+describe("lx_ft: gclid/gbraid/wbraid al llegar directo a una ruta sin publicidad", () => {
+  const landing = new URLSearchParams("gclid=TESTgclidA1");
+
+  it("la ruta excluye la publicidad de GTM, pero el banner y lx_ft siguen corriendo ahí", async () => {
+    const { isAdsExcludedPath, isAnalyticsExcludedPath } = await import("@/lib/analytics-config");
+    for (const p of ["/es/listing/new", "/en/listing/new"]) {
+      expect(isAdsExcludedPath(p), p).toBe(true);
+      expect(isAnalyticsExcludedPath(p), p).toBe(false);
+    }
+  });
+
+  it("con Publicidad aceptada (sin GPC) guarda el gclid; con GPC o Publicidad rechazada, no", async () => {
+    const { effectiveConsent } = await import("@/lib/analytics-config");
+    const accepted = effectiveConsent({ analytics: "denied", ads: "granted" }, false);
+    expect(nextFirstTouchCookie(null, landing, accepted)).toContain("TESTgclidA1");
+    expect(nextFirstTouchCookie(null, landing, effectiveConsent({ analytics: "denied", ads: "granted" }, true)) ?? "").not.toContain("TESTgclidA1");
+    expect(nextFirstTouchCookie(null, landing, { analytics: "granted", ads: "denied" }) ?? "").not.toContain("TESTgclidA1");
+  });
+
+  it("el banner pasa a lx_ft la elección de la persona (con GPC), no el estado forzado de la ruta", () => {
+    const src = readFileSync(join(process.cwd(), "src/components/analytics-consent.tsx"), "utf8");
+    const effect = src.slice(src.indexOf("// Efectos de la elección"), src.indexOf("syncFirstTouch(state);") + 30);
+    expect(effect).toContain("const state = effectiveConsent({ analytics, ads: props.gtmId ? ads : \"denied\" }, gpc);");
+    expect(effect).toContain("syncFirstTouch(state);");
+    // Solo /admin (isAnalyticsExcludedPath) corta el efecto; la exclusión de publicidad no entra.
+    expect(effect).not.toMatch(/isAdsExcludedPath|adsExcluded|forced/);
   });
 });

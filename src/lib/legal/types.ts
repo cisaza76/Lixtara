@@ -49,14 +49,24 @@ export const TERMS_LAST_UPDATED = LEGAL_V3_PUBLISHED;
 /** v4 (2026-10-24): Privacidad y Cookies con la categoría Publicidad (Meta y Google Ads). */
 export const LEGAL_V4_PUBLISHED = "2026-10-24";
 
-/** Cookie Policy v4: categoría Publicidad (_fbp, _fbc, _gcl_au, _gcl_aw), por separado de Analítica. */
-export const COOKIES_LAST_UPDATED = LEGAL_V4_PUBLISHED;
+/**
+ * Cookie Policy v5 (decidida el 2026-11-02): lx_ft con UTM (Analítica) y gclid/gbraid/wbraid
+ * (Publicidad); fila de _gcl_gb (2026-11-04). "Última actualización" = fecha de publicación,
+ * 2026-11-11, con Privacidad v5 (decisión del owner).
+ */
+export const COOKIES_V5_PUBLISHED = "2026-11-11";
+
+/** Cookie Policy v5 sobre la v4 (categoría Publicidad: _fbp, _fbc, _gcl_au, _gcl_aw, _gcl_gb, aparte de Analítica). */
+export const COOKIES_LAST_UPDATED = COOKIES_V5_PUBLISHED;
 
 /** Disclaimers (Avisos Legales) v2: aviso IDX, valuaciones, registros públicos e IA. */
 export const DISCLAIMERS_LAST_UPDATED = LEGAL_V2_PUBLISHED;
 
-/** Privacy Policy v4: §4.6 compartición para publicidad con consentimiento, §6.2 publicidad (Meta y Google Ads), §6.3 retiro, §9.1 Global Privacy Control. */
-export const PRIVACY_LAST_UPDATED = LEGAL_V4_PUBLISHED;
+/** Privacy Policy v5 (2026-11-11, aprobada por el owner): §6.2 API de Conversiones de Meta, §4.1, §4.6 y §6.3. */
+export const PRIVACY_V5_PUBLISHED = "2026-11-11";
+
+/** Privacy Policy v5 sobre la v4 (§4.6 compartición para publicidad con consentimiento, §6.2 publicidad, §6.3 retiro, §9.1 GPC). */
+export const PRIVACY_LAST_UPDATED = PRIVACY_V5_PUBLISHED;
 
 /** Avisos de corretaje, vivienda justa y fraude (/notices), primera publicación. */
 export const NOTICES_LAST_UPDATED = LEGAL_V2_PUBLISHED;

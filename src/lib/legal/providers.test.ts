@@ -83,7 +83,8 @@ describe("proveedores de la Política de Privacidad", () => {
     for (const lang of ["en", "es"] as const) {
       const doc = JSON.stringify(fillLegalDoc(privacyDoc[lang]));
       for (const p of PRIVACY_PROVIDERS) {
-        expect(doc, `${lang}: ${p.name}`).toContain(p.name);
+        const name = lang === "es" ? (p.name_es ?? p.name) : p.name;
+        expect(doc, `${lang}: ${name}`).toContain(name);
         if (p.policyUrl) {
           expect(p.policyUrl, p.id).toMatch(/^https:\/\/\S+$/);
           expect(doc, `${lang}: ${p.id} url`).toContain(p.policyUrl);

@@ -57,10 +57,15 @@ export function sanitizeFunnelMetadata(
   return out;
 }
 
-// --- UTM de primer contacto -------------------------------------------------------------
-// El navegador las guarda en la cookie lx_ft SOLO con consentimiento (analytics.ts); el
-// paso 1 las lee del lado del servidor. Formato: source|medium|campaign, cada parte ya
-// saneada. Sin consentimiento no hay cookie y las columnas quedan vacías.
+// --- Primer contacto: UTM e identificadores de clic de Google Ads ------------------------
+// El navegador los guarda en la cookie lx_ft (analytics.ts, syncFirstTouch), cada parte con
+// SU categoría (pedido del CMO 2026-11-02):
+//   - source|medium|campaign (UTM): solo con Analítica aceptada; el paso 1 las registra.
+//   - gclid|gbraid|wbraid (parámetros de la URL de llegada): solo con Publicidad aceptada y
+//     sin GPC; el Checkout los lleva a la metadata de Stripe (antes que _gcl_aw / _gcl_gb).
+// Formato: source|medium|campaign[|gclid|gbraid|wbraid], cada parte ya saneada. Nada se
+// guarda antes del consentimiento: si acepta en la página de llegada, se toman de la URL en
+// ese momento. Al denegar una categoría se borra su parte; sin ninguna, la cookie.
 
 export const FIRST_TOUCH_COOKIE = "lx_ft";
 export const FIRST_TOUCH_MAX_AGE_S = 90 * 24 * 60 * 60;
@@ -74,6 +79,52 @@ function cleanUtm(v: string | null | undefined): string {
 export function firstTouchCookieValue(params: URLSearchParams): string | null {
   const parts = ["utm_source", "utm_medium", "utm_campaign"].map((k) => cleanUtm(params.get(k)));
   return parts.some(Boolean) ? parts.join("|") : null;
+}
+
+export type AdClickIds = { gclid?: string; gbraid?: string; wbraid?: string };
+const CLICK_ID_KEYS = ["gclid", "gbraid", "wbraid"] as const;
+const CLICK_ID = /^[A-Za-z0-9_-]{1,400}$/;
+
+function cleanClickId(v: string | null | undefined): string {
+  const s = (v ?? "").trim();
+  return CLICK_ID.test(s) ? s : "";
+}
+
+/** gclid, gbraid y wbraid guardados en lx_ft (vacío si no hay). */
+export function parseFirstTouchClickIds(value: string | null | undefined): AdClickIds {
+  const parts = (value ?? "").split("|").slice(3, 6);
+  const out: AdClickIds = {};
+  CLICK_ID_KEYS.forEach((k, i) => {
+    const v = cleanClickId(parts[i]);
+    if (v) out[k] = v;
+  });
+  return out;
+}
+
+/**
+ * Nuevo valor de lx_ft según la elección vigente (ya con GPC aplicado): conserva lo que ya
+ * había de cada categoría aceptada (primer contacto) y, si falta, lo toma de la URL actual;
+ * borra la parte de una categoría denegada. null = borrar la cookie.
+ */
+export function nextFirstTouchCookie(
+  prev: string | null | undefined,
+  params: URLSearchParams,
+  consent: { analytics: "granted" | "denied"; ads: "granted" | "denied" },
+): string | null {
+  const old = (prev ?? "").split("|");
+  const oldUtm = old.slice(0, 3).map((p) => cleanUtm(p));
+  while (oldUtm.length < 3) oldUtm.push("");
+  const utm =
+    consent.analytics !== "granted"
+      ? ["", "", ""]
+      : oldUtm.some(Boolean)
+        ? oldUtm
+        : (firstTouchCookieValue(params)?.split("|") ?? ["", "", ""]);
+  const clicks = CLICK_ID_KEYS.map((k, i) =>
+    consent.ads === "granted" ? cleanClickId(old[3 + i]) || cleanClickId(params.get(k)) : "",
+  );
+  if (!utm.some(Boolean) && !clicks.some(Boolean)) return null;
+  return clicks.some(Boolean) ? [...utm, ...clicks].join("|") : utm.join("|");
 }
 
 /**
